@@ -193,7 +193,7 @@ export class ChartGenerator {
           />
           
           <!-- Label -->
-          ${this.createSegmentLabel(segment, innerRadius, outerRadius)}
+          ${options.showLegend === false ? '' : this.createSegmentLabel(segment, innerRadius, outerRadius)}
         </g>`;
       }).join('')}
     </g>

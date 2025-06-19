@@ -1291,7 +1291,7 @@ export class ImprovedProductionHTMLReportGenerator {
             {
                 width: 300,
                 height: 300,
-                showLegend: true,
+                showLegend: false, // FIXED: Disable chart legend to use manual legend below
                 animations: true
             },
             this.theme
@@ -1347,29 +1347,39 @@ export class ImprovedProductionHTMLReportGenerator {
         const tagData = this.generateTagDistribution(reportData);
         let tagChart = '';
         try {
-            tagChart = await this.chartGenerator.generateChart(
-                ChartType.PIE,
-                tagData as any,
-                {
-                    width: 300,
-                    height: 300,
-                    showLegend: false,
-                    animations: true
-                },
-                this.theme
-            );
+            // FIXED: Always generate chart for tag distribution, even with single tag
+            if (tagData.labels.length > 0) {
+                tagChart = await this.chartGenerator.generateChart(
+                    ChartType.PIE,
+                    tagData as any,
+                    {
+                        width: 300,
+                        height: 300,
+                        showLegend: false,
+                        animations: true
+                    },
+                    this.theme
+                );
+            } else {
+                tagChart = '<div style="text-align: center; padding: 2rem; color: #666;">No tags found in test scenarios</div>';
+            }
         } catch (e) {
-            tagChart = await this.chartGenerator.generateChart(
-                ChartType.DOUGHNUT,
-                tagData as any,
-                {
-                    width: 300,
-                    height: 300,
-                    showLegend: false,
-                    animations: true
-                },
-                this.theme
-            );
+            // Fallback to doughnut chart if pie chart fails
+            try {
+                tagChart = await this.chartGenerator.generateChart(
+                    ChartType.DOUGHNUT,
+                    tagData as any,
+                    {
+                        width: 300,
+                        height: 300,
+                        showLegend: false,
+                        animations: true
+                    },
+                    this.theme
+                );
+            } catch (e2) {
+                tagChart = '<div style="text-align: center; padding: 2rem; color: #666;">Unable to generate tag distribution chart</div>';
+            }
         }
 
         return `
@@ -1850,40 +1860,52 @@ export class ImprovedProductionHTMLReportGenerator {
                                     ${stepShots.map(screenshot => {
                                 // Convert absolute path to relative path for web display
                                 let imagePath = screenshot.path || '';
-                                // const originalPath = imagePath;
                                 
-                                // Handle different path formats
-                                if (imagePath.includes('/reports/')) {
-                                    // Extract the relative path from reports folder
+                                // FIXED: Handle new zip structure where HTML is in root and screenshots are in evidence/screenshots/
+                                if (imagePath.includes('/screenshots/')) {
+                                    // Extract just the filename from the path
+                                    const filename = imagePath.split('/screenshots/').pop();
+                                    imagePath = `evidence/screenshots/${filename}`;
+                                } else if (imagePath.includes('\\screenshots\\')) {
+                                    // Windows path - extract just the filename
+                                    const filename = imagePath.split('\\screenshots\\').pop()?.replace(/\\/g, '/');
+                                    imagePath = `evidence/screenshots/${filename}`;
+                                } else if (imagePath.includes('/reports/')) {
+                                    // Legacy path handling - extract relative path
                                     const parts = imagePath.split('/reports/');
                                     if (parts.length > 1) {
-                                        // Get the report folder name and path after it
                                         const afterReports = parts[1];
                                         const reportFolderMatch = afterReports.match(/^(report-[^/]+)\/(.*)/);                                        
                                         if (reportFolderMatch) {
-                                            // We're in a report subfolder, need to go up appropriately
-                                            imagePath = '../' + reportFolderMatch[2];
+                                            // Check if it's a screenshot path
+                                            if (reportFolderMatch[2].includes('screenshots/')) {
+                                                const filename = reportFolderMatch[2].split('screenshots/').pop();
+                                                imagePath = `evidence/screenshots/${filename}`;
+                                            } else {
+                                                imagePath = reportFolderMatch[2];
+                                            }
                                         } else {
-                                            imagePath = '../' + afterReports;
+                                            imagePath = afterReports;
                                         }
                                     }
                                 } else if (imagePath.includes('\\reports\\')) {
-                                    // Windows path
+                                    // Windows legacy path handling
                                     const parts = imagePath.split('\\reports\\');
                                     if (parts.length > 1) {
                                         const afterReports = parts[1].replace(/\\/g, '/');
                                         const reportFolderMatch = afterReports.match(/^(report-[^/]+)\/(.*)/);                                        
                                         if (reportFolderMatch) {
-                                            imagePath = '../' + reportFolderMatch[2];
+                                            // Check if it's a screenshot path
+                                            if (reportFolderMatch[2].includes('screenshots/')) {
+                                                const filename = reportFolderMatch[2].split('screenshots/').pop();
+                                                imagePath = `evidence/screenshots/${filename}`;
+                                            } else {
+                                                imagePath = reportFolderMatch[2];
+                                            }
                                         } else {
-                                            imagePath = '../' + afterReports;
+                                            imagePath = afterReports;
                                         }
                                     }
-                                } else if (imagePath.includes('/screenshots/')) {
-                                    // Direct screenshots folder reference
-                                    imagePath = '../../screenshots/' + imagePath.split('/screenshots/').pop();
-                                } else if (imagePath.includes('\\screenshots\\')) {
-                                    imagePath = '../../screenshots/' + imagePath.split('\\screenshots\\').pop()?.replace(/\\/g, '/');
                                 }
                                 
                                 // Ensure proper path format for display

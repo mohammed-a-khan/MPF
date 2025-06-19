@@ -362,6 +362,32 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
         }
     }
 
+    @CSBDDStepDef('the error should be logged appropriately')
+    async verifyErrorLoggedAppropriately(): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        try {
+            // Verify that error logging is working with appropriate details
+            const logs = actionLogger.getRecentLogs();
+            const errorLogs = logs.filter(log => log.level === LogLevel.ERROR);
+            
+            expect(errorLogs.length).toBeGreaterThan(0);
+            
+            // Check that the most recent error log has appropriate details
+            const recentErrorLog = errorLogs[errorLogs.length - 1];
+            expect(recentErrorLog.message).toBeTruthy();
+            expect(recentErrorLog.timestamp).toBeTruthy();
+
+            await actionLogger.logAction('verify_error_logged_appropriately', {
+                error_logs_count: errorLogs.length,
+                recent_error_message: recentErrorLog.message,
+                recent_error_timestamp: recentErrorLog.timestamp
+            });
+        } catch (error) {
+            await actionLogger.logError(error as Error, { operation: 'verify_error_logged_appropriately' });
+            throw error;
+        }
+    }
+
     @CSBDDStepDef('I log the message {string}')
     async logMessage(message: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();

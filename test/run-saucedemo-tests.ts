@@ -36,10 +36,10 @@ async function main(): Promise<void> {
             adoIntegration: !options.skipADO
         });
         
-        // Define SauceDemo feature paths
-        const featurePaths = [
-            './test/saucedemo/features/*.feature'
-        ];
+        // Define SauceDemo feature paths - use command line features if provided, otherwise default
+        const featurePaths = options.features && options.features.length > 0 
+            ? options.features 
+            : ['./test/saucedemo/features/*.feature'];
         
         logger.info(`🚀 Executing SauceDemo features: ${featurePaths.join(', ')}`);
         

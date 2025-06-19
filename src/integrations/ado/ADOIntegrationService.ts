@@ -708,11 +708,25 @@ export class ADOIntegrationService {
       
       const testPoints = await this.testSuiteManager.getTestPoints(testPlanId, testSuiteId);
       
+      if (testPoints.length === 0) {
+        ADOIntegrationService.logger.warn(`No test points found for Test Plan ${testPlanId}, Suite ${testSuiteId}`);
+        return;
+      }
+      
+      ADOIntegrationService.logger.info(`Found ${testPoints.length} test points in Test Plan ${testPlanId}, Suite ${testSuiteId}`);
+      
+      let validTestPoints = 0;
+      let invalidTestPoints = 0;
+      
       for (const testPoint of testPoints) {
         if (!testPoint.testCaseId) {
-          ADOIntegrationService.logger.warn(`Test point ${testPoint.id} has no test case ID`);
+          invalidTestPoints++;
+          ADOIntegrationService.logger.debug(`Test point ${testPoint.id} has no test case ID - this test point needs to be configured in ADO`);
           continue;
         }
+        
+        validTestPoints++;
+        this.testCaseToTestPoint.set(testPoint.testCaseId, testPoint.id);
         
         try {
           const testCase = await this.getTestCase(testPoint.testCaseId);
@@ -720,13 +734,27 @@ export class ADOIntegrationService {
           
           if (automatedTestName) {
             this.testCaseMapping.set(automatedTestName, testCase.id);
+            ADOIntegrationService.logger.debug(`Mapped automated test "${automatedTestName}" to test case ${testCase.id}`);
+          } else {
+            ADOIntegrationService.logger.debug(`Test case ${testPoint.testCaseId} has no automated test name configured`);
           }
         } catch (error) {
           ADOIntegrationService.logger.warn(`Failed to load test case ${testPoint.testCaseId}:`, error as Error);
         }
       }
       
-      ADOIntegrationService.logger.info(`Loaded ${this.testCaseMapping.size} test case mappings`);
+      ADOIntegrationService.logger.info(`Test case mapping summary:`);
+      ADOIntegrationService.logger.info(`  - Valid test points with test cases: ${validTestPoints}`);
+      ADOIntegrationService.logger.info(`  - Test points without test cases: ${invalidTestPoints}`);
+      ADOIntegrationService.logger.info(`  - Automated test mappings loaded: ${this.testCaseMapping.size}`);
+      
+      if (invalidTestPoints > 0) {
+        ADOIntegrationService.logger.warn(
+          `⚠️  ${invalidTestPoints} test points in ADO Suite ${testSuiteId} don't have associated test cases. ` +
+          `To fix this: Go to Azure DevOps → Test Plans → Suite ${testSuiteId} → Add test cases to test points`
+        );
+      }
+      
     } catch (error) {
       ADOIntegrationService.logger.error('Failed to load test case mappings:', error as Error);
     }
@@ -1154,27 +1182,31 @@ export class ADOIntegrationService {
       }
       
       if (htmlReportPath && fs.existsSync(htmlReportPath)) {
-        archive.file(htmlReportPath, { name: 'html/index.html' });
-        ADOIntegrationService.logger.info(`Added HTML report to zip from: ${htmlReportPath}`);
+        // FIXED: Place HTML file directly in zip root (not in html/ folder)
+        archive.file(htmlReportPath, { name: 'index.html' });
+        ADOIntegrationService.logger.info(`Added HTML report to zip root from: ${htmlReportPath}`);
         
-        // Also add CSS and JS files if they exist
+        // Also add CSS and JS files if they exist (also in root)
         const htmlDir = path.dirname(htmlReportPath);
         const cssPath = path.join(htmlDir, 'styles.css');
         const jsPath = path.join(htmlDir, 'script.js');
         
         if (fs.existsSync(cssPath)) {
-          archive.file(cssPath, { name: 'html/styles.css' });
+          archive.file(cssPath, { name: 'styles.css' });
+          ADOIntegrationService.logger.info(`Added CSS file to zip root from: ${cssPath}`);
         }
         if (fs.existsSync(jsPath)) {
-          archive.file(jsPath, { name: 'html/script.js' });
+          archive.file(jsPath, { name: 'script.js' });
+          ADOIntegrationService.logger.info(`Added JS file to zip root from: ${jsPath}`);
         }
       } else {
         ADOIntegrationService.logger.warn(`HTML report not found at: ${htmlReportPath}`);
       }
       
       if (screenshotsPath && fs.existsSync(screenshotsPath)) {
-        archive.directory(screenshotsPath, 'screenshots');
-        ADOIntegrationService.logger.info('Added screenshots folder to zip');
+        // FIXED: Place screenshots in evidence/screenshots/ folder to preserve relative paths
+        archive.directory(screenshotsPath, 'evidence/screenshots');
+        ADOIntegrationService.logger.info('Added screenshots folder to zip at evidence/screenshots/');
       }
       
       if (!htmlReportPath || !fs.existsSync(htmlReportPath)) {
@@ -1379,9 +1411,10 @@ Timestamp: ${new Date().toISOString()}
     const processedTestCases = new Map<string, Set<number>>();
     
     for (const { scenario, feature } of scenarios) {
-      const featureName = feature.name || 'Unnamed Feature';
+      // FIXED: Get feature name from feature.feature.name (the nested Feature object) first, then fallback to feature.name
+      const featureName = feature.feature?.name || feature.name || 'Unnamed Feature';
       ADOIntegrationService.logger.info(
-        `In createFeaturesFromScenarios - scenario "${scenario.scenario}" adoMetadata before fix: ${JSON.stringify(scenario.adoMetadata)}`
+        `Processing scenario "${scenario.scenario}" for feature "${featureName}" (from feature.feature.name: ${feature.feature?.name}, feature.name: ${feature.name})`
       );
       
       // Fix metadata if it's in an incorrect format
@@ -1462,7 +1495,7 @@ Timestamp: ${new Date().toISOString()}
     const summary: ExecutionResult['summary'] = {
       total: scenarios.length,
       totalScenarios: scenarios.length,
-      totalFeatures: new Set(scenarios.map(s => s.feature.name)).size,
+      totalFeatures: new Set(scenarios.map(s => s.feature.feature?.name || s.feature.name || 'Unnamed Feature')).size,
       totalSteps: 0,
       passed: 0,
       failed: 0,

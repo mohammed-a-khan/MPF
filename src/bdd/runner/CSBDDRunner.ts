@@ -202,9 +202,20 @@ export class CSBDDRunner {
             }
         }
 
-        // Upload to ADO if configured (even for failed tests)
+        // ALWAYS generate reports first (regardless of success/failure)
         const logger = ActionLogger.getInstance();
+        try {
+            if (executionResult) {
+                logger.info('📊 Generating reports (regardless of test outcome)...');
+                await this.report(executionResult);
+                logger.info('✅ Reports generated successfully');
+            }
+        } catch (reportError) {
+            logger.error('❌ Report generation failed: ' + (reportError as Error).message);
+            // Don't let report failures prevent ADO upload
+        }
 
+        // Upload to ADO AFTER reports are generated (even for failed tests)
         try {
             // Check if ADO upload is enabled in configuration and not disabled by runtime options
             const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_UPLOAD_RESULTS', false) ||
@@ -214,25 +225,13 @@ export class CSBDDRunner {
             const adoRuntimeEnabled = options.adoEnabled !== false;
             
             if (adoConfigEnabled && adoRuntimeEnabled && executionResult) {
-                logger.info('📤 Uploading results to ADO...');
+                logger.info('📤 Uploading results to ADO (after report generation)...');
                 await this.uploadToADO(executionResult);
                 logger.info('✅ ADO upload completed');
             }
         } catch (adoError) {
             logger.error('❌ ADO upload failed: ' + (adoError as Error).message);
             // Don't let ADO failures prevent cleanup
-        }
-
-        // ALWAYS generate reports regardless of success/failure
-        try {
-            if (executionResult) {
-                logger.info('📊 Generating reports (regardless of test outcome)...');
-                await this.report(executionResult);
-                logger.info('✅ Reports generated successfully');
-            }
-        } catch (reportError) {
-            logger.error('❌ Report generation failed: ' + (reportError as Error).message);
-            // Don't let report failures prevent cleanup
         }
 
         // Save console logs including initialization messages after ADO upload

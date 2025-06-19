@@ -67,6 +67,7 @@ export class FeatureExecutor {
         const result: FeatureResult = {
             id: `feature-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             feature: feature,
+            name: feature.name,
             description: feature.description || '',
             uri: feature.file || feature.uri || 'unknown',
             tags: feature.tags || [],
