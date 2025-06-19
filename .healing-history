@@ -1,0 +1,130 @@
+{
+  "version": "1.0",
+  "savedAt": "2025-06-19T18:48:46.055Z",
+  "history": [
+    [
+      "CSWebElement_css_username",
+      [
+        {
+          "id": "1750356049970-0ca486e6a81b6d10",
+          "elementId": "CSWebElement_css_username",
+          "strategy": "all",
+          "success": false,
+          "timestamp": "2025-06-19T18:00:49.970Z",
+          "sessionId": "3a75f8c2f2f4aa010128761d9cac14c3",
+          "duration": 9,
+          "confidence": 0,
+          "errorMessage": "All healing strategies failed",
+          "elementType": "input",
+          "pageUrl": "about:blank"
+        }
+      ]
+    ],
+    [
+      "CSWebElement_css_user-name",
+      [
+        {
+          "id": "1750356947844-f9b64b6c94fec118",
+          "elementId": "CSWebElement_css_user-name",
+          "strategy": "all",
+          "success": false,
+          "timestamp": "2025-06-19T18:15:47.844Z",
+          "sessionId": "af5c691626513dc8daf5847a78fb7969",
+          "duration": 4,
+          "confidence": 0,
+          "errorMessage": "All healing strategies failed",
+          "elementType": "input",
+          "pageUrl": "https://www.saucedemo.com/"
+        }
+      ]
+    ],
+    [
+      "CSWebElement_testid_error",
+      [
+        {
+          "id": "1750358899416-263ee2e1af4594e8",
+          "elementId": "CSWebElement_testid_error",
+          "strategy": "all",
+          "success": false,
+          "timestamp": "2025-06-19T18:48:19.417Z",
+          "sessionId": "46606aaa51ad4ed50ae6b1428ba94ba2",
+          "duration": 8,
+          "confidence": 0,
+          "errorMessage": "All healing strategies failed",
+          "elementType": "element",
+          "pageUrl": "https://www.saucedemo.com/"
+        },
+        {
+          "id": "1750358903906-5edda46d5cc831ed",
+          "elementId": "CSWebElement_testid_error",
+          "strategy": "all",
+          "success": false,
+          "timestamp": "2025-06-19T18:48:23.908Z",
+          "sessionId": "46606aaa51ad4ed50ae6b1428ba94ba2",
+          "duration": 14,
+          "confidence": 0,
+          "errorMessage": "All healing strategies failed",
+          "elementType": "element",
+          "pageUrl": "https://www.saucedemo.com/"
+        }
+      ]
+    ]
+  ],
+  "strategyStats": [
+    [
+      "all",
+      {
+        "strategy": "all",
+        "totalAttempts": 4,
+        "successCount": 0,
+        "failureCount": 4,
+        "averageDuration": 8.75,
+        "lastUsed": "2025-06-19T18:48:23.908Z"
+      }
+    ]
+  ],
+  "elementStats": [
+    [
+      "CSWebElement_css_username",
+      {
+        "elementId": "CSWebElement_css_username",
+        "totalHealingAttempts": 1,
+        "successfulHealings": 0,
+        "failedHealings": 1,
+        "strategiesUsed": {},
+        "firstSeen": "2025-06-19T18:00:49.971Z",
+        "lastHealed": "2025-06-19T18:00:49.971Z",
+        "lastFailure": "2025-06-19T18:00:49.971Z",
+        "daysTracked": 1
+      }
+    ],
+    [
+      "CSWebElement_css_user-name",
+      {
+        "elementId": "CSWebElement_css_user-name",
+        "totalHealingAttempts": 1,
+        "successfulHealings": 0,
+        "failedHealings": 1,
+        "strategiesUsed": {},
+        "firstSeen": "2025-06-19T18:15:47.844Z",
+        "lastHealed": "2025-06-19T18:15:47.844Z",
+        "lastFailure": "2025-06-19T18:15:47.844Z",
+        "daysTracked": 1
+      }
+    ],
+    [
+      "CSWebElement_testid_error",
+      {
+        "elementId": "CSWebElement_testid_error",
+        "totalHealingAttempts": 2,
+        "successfulHealings": 0,
+        "failedHealings": 2,
+        "strategiesUsed": {},
+        "firstSeen": "2025-06-19T18:48:19.417Z",
+        "lastHealed": "2025-06-19T18:48:19.417Z",
+        "lastFailure": "2025-06-19T18:48:23.908Z",
+        "daysTracked": 1
+      }
+    ]
+  ]
+}

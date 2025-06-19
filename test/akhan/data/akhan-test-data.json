@@ -1,0 +1,142 @@
+{
+  "environment": {
+    "name": "AKHAN SIT",
+    "baseUrl": "https://akhan-ui-sit.myshare.net",
+    "timeout": 30000,
+    "retryAttempts": 3
+  },
+  "login_scenarios": [
+    {
+      "testId": "TC501",
+      "description": "Standard user login",
+      "username": "login",
+      "password": "passwd",
+      "expectedBehavior": "normal_flow",
+      "executeTest": true,
+      "adoTestCase": "501",
+      "priority": "high"
+    }
+  ],
+  "esss_search_scenarios": [
+    {
+      "testId": "TC504",
+      "description": "Search ESSS by Key",
+      "searchType": "ESSS",
+      "searchAttribute": "Key",
+      "searchValue": "MESA 2001-5",
+      "expectedBehavior": "normal_flow",
+      "executeTest": true,
+      "adoTestCase": "504",
+      "priority": "high"
+    }
+  ],
+  "navigation_scenarios": [
+    {
+      "testId": "TC502",
+      "description": "Verify all menu items",
+      "menuItems": [
+        "Home",
+        "ESSS/Series",
+        "Reference Interests",
+        "Interest History",
+        "External Interests",
+        "System Admin",
+        "Version Information",
+        "File Upload"
+      ],
+      "executeTest": true,
+      "adoTestCase": "502",
+      "priority": "medium"
+    }
+  ],
+  "module_navigation_scenarios": [
+    {
+      "testId": "TC503",
+      "description": "Verify navigation to each module",
+      "modules": [
+        {
+          "name": "ESSS/Series",
+          "headerType": "h1",
+          "expectedHeader": "ESSSs/Series"
+        },
+        {
+          "name": "Reference Interests",
+          "headerType": "h1",
+          "expectedHeader": "Reference Interests"
+        },
+        {
+          "name": "Interest History",
+          "headerType": "h1",
+          "expectedHeader": "Interest History"
+        },
+        {
+          "name": "External Interests",
+          "headerType": "h1",
+          "expectedHeader": "External Interests"
+        },
+        {
+          "name": "System Admin",
+          "headerType": "h1",
+          "expectedHeader": "System Admin"
+        },
+        {
+          "name": "Version Information",
+          "headerType": "h1",
+          "expectedHeader": "Version Information"
+        },
+        {
+          "name": "File Upload",
+          "headerType": "span",
+          "expectedHeader": "Add files"
+        }
+      ],
+      "executeTest": true,
+      "adoTestCase": "503",
+      "priority": "medium"
+    }
+  ],
+  "ado_configuration": {
+    "organization": "mdakhan",
+    "project": "myproject",
+    "testPlan": {
+      "id": 500,
+      "name": "AKHAN Test Plan"
+    },
+    "testSuite": {
+      "id": 500,
+      "name": "AKHAN Test Suite"
+    },
+    "testCases": [
+      {
+        "id": 501,
+        "title": "AKHAN Login Verification",
+        "priority": "High"
+      },
+      {
+        "id": 502,
+        "title": "AKHAN Menu Items Verification",
+        "priority": "Medium"
+      },
+      {
+        "id": 503,
+        "title": "AKHAN Module Navigation",
+        "priority": "Medium"
+      },
+      {
+        "id": 504,
+        "title": "AKHAN ESSS Search",
+        "priority": "High"
+      }
+    ]
+  },
+  "execution_flags": {
+    "enableScreenshots": true,
+    "enableVideoRecording": false,
+    "enableTracing": true,
+    "enableParallelExecution": false,
+    "maxWorkers": 1,
+    "retryFailedTests": true,
+    "generateReports": true,
+    "publishToADO": true
+  }
+} 

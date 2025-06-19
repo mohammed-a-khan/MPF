@@ -1,0 +1,6 @@
+testId,description,searchType,searchAttribute,searchValue,testType,priority,environment,status
+TC504,Search ESSS by Key,ESSS,Key,MESA 2001-5,regression,high,SIT,active
+TC504,Search ESSS by Name,ESSS,Name,MESA Series,regression,high,SIT,active
+TC504,Search ESSS by ID,ESSS,ID,MESA-001,regression,high,SIT,active
+TC504,Search Series by Key,Series,Key,MESA-S-001,regression,medium,SIT,inactive
+TC504,Search Reference Interest,Reference Interest,Key,REF-001,smoke,low,DEV,active 

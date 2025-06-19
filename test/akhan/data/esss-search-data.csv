@@ -1,0 +1,6 @@
+testId,description,searchType,searchAttribute,searchValue,environment,status,priority
+TC504,Search ESSS by Key,ESSS,Key,MESA 2001-5,SIT,active,high
+TC504,Search ESSS by Name,ESSS,Name,MESA Series,SIT,active,high
+TC504,Search ESSS by ID,ESSS,ID,MESA-001,SIT,active,high
+TC504,Search Series by Key,Series,Key,MESA-S-001,UAT,inactive,medium
+TC504,Search Reference Interest,Reference Interest,Key,REF-001,DEV,active,low 

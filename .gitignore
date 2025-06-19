@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+
+# Test outputs
+test-results/
+playwright-report/
+**/test-results/
+**/playwright-report/
+**/playwright/.cache/
+
+# Logs and reports
+logs/
+reports/
+console-logs/
+debug-output/
+*.log
+
+# Screenshots and videos
+screenshots/
+videos/
+
+# Environment files
+# *.env
+# .env*
+# !.env.example
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Downloaded files
+downloads/
+
+# Certificates
+# certificates/
+
+# Coverage reports
+coverage/
+.nyc_output/ 

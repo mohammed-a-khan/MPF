@@ -1,0 +1,83 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "downlevelIteration": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "outDir": "./dist",
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "paths": {
+      "@core/*": ["src/core/*"],
+      "@steps/*": ["src/steps/*"],
+      "@pages/*": ["src/pages/*"],
+      "@api/*": ["src/api/*"],
+      "@database/*": ["src/database/*"],
+      "@data/*": ["src/data/*"],
+      "@reporting/*": ["src/reporting/*"],
+      "@bdd/*": ["src/bdd/*"],
+      "@ai/*": ["src/core/ai/*"],
+      "@utils/*": ["src/core/utils/*"],
+      "@types/*": ["src/types/*"],
+      "@config/*": ["config/*"],
+      "@test/*": ["test/*"],
+      "@tests/*": ["tests/*"],
+      "@features/*": ["test/features/*", "tests/features/*"],
+      "@data-driven/*": ["test/data-driven/*", "tests/data-driven/*"],
+      "@steps-custom/*": ["test/steps/*", "tests/steps/*"],
+      "@fixtures/*": ["test/fixtures/*", "tests/fixtures/*"]
+    },
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "noEmitOnError": true,
+    "preserveConstEnums": true,
+    "declarationDir": "./dist/types",
+    "preserveWatchOutput": true
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ],
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true,
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  }
+}

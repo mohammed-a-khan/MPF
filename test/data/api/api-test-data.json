@@ -1,0 +1,45 @@
+{
+  "endpoints": {
+    "httpbin": {
+      "baseUrl": "https://httpbin.org",
+      "paths": {
+        "get": "/get",
+        "post": "/post",
+        "put": "/put",
+        "delete": "/delete"
+      }
+    },
+    "jsonplaceholder": {
+      "baseUrl": "https://jsonplaceholder.typicode.com",
+      "paths": {
+        "users": "/users",
+        "posts": "/posts",
+        "comments": "/comments"
+      }
+    }
+  },
+  "testUsers": [
+    {
+      "id": 1,
+      "name": "Test User 1",
+      "email": "user1@test.com"
+    },
+    {
+      "id": 2,
+      "name": "Test User 2",
+      "email": "user2@test.com"
+    }
+  ],
+  "testPosts": [
+    {
+      "title": "Test Post 1",
+      "body": "This is test post 1",
+      "userId": 1
+    },
+    {
+      "title": "Test Post 2",
+      "body": "This is test post 2",
+      "userId": 2
+    }
+  ]
+} 
