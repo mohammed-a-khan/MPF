@@ -412,8 +412,11 @@ export class CSBDDRunner {
             } as any);
             await this.reportOrchestrator.initialize(reportConfig);
 
-            // 7. Initialize ADO integration if enabled
-            if (ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false)) {
+            // 7. Initialize ADO integration if enabled (check both config and runtime options)
+            const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false);
+            const adoRuntimeEnabled = options.adoEnabled !== false; // Default to true unless explicitly disabled
+            
+            if (adoConfigEnabled && adoRuntimeEnabled) {
                 logger.info('Initializing ADO integration...');
 
                 // Initialize ADO configuration (reads from environment variables)
@@ -422,6 +425,8 @@ export class CSBDDRunner {
                 // Initialize ADO service
                 await ADOIntegrationService.getInstance().initialize();
                 logger.info('ADO integration initialized');
+            } else {
+                logger.info('ADO integration disabled - skipping initialization');
             }
 
             // 8. Execute global before hooks
@@ -445,7 +450,13 @@ export class CSBDDRunner {
         try {
             // Parse feature files with timeout
             const parser = FeatureFileParser.getInstance();
-            const parsePromise = parser.parseAll(options['features'] || '**/*.feature');
+            
+            // Get feature paths from options - check multiple possible property names for compatibility
+            const featurePaths = options['featurePaths'] || options['features'] || options['paths'] || options['featurePaths'] || ['**/*.feature'];
+            
+            logger.info(`Feature discovery - Using paths: ${JSON.stringify(featurePaths)}`);
+            
+            const parsePromise = parser.parseAll(featurePaths);
             const parseTimeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => reject(new Error('Feature parsing timeout')), 15000);
             });
@@ -693,12 +704,17 @@ export class CSBDDRunner {
             // Close browsers - SINGLE BROWSER ONLY (no pool)
             await BrowserManager.getInstance().closeBrowser();
 
-            // Reset and reinitialize ADO service
-            try {
-                ADOIntegrationService.getInstance().reset();
-                await ADOIntegrationService.getInstance().initialize();
-            } catch (adoError) {
-                logger.error('Failed to reset and reinitialize ADO service:', adoError as Error);
+            // Reset and reinitialize ADO service only if ADO is enabled
+            const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false);
+            const adoRuntimeEnabled = this.runOptions.adoEnabled !== false;
+            
+            if (adoConfigEnabled && adoRuntimeEnabled) {
+                try {
+                    ADOIntegrationService.getInstance().reset();
+                    await ADOIntegrationService.getInstance().initialize();
+                } catch (adoError) {
+                    logger.error('Failed to reset and reinitialize ADO service:', adoError as Error);
+                }
             }
 
             // Cleanup temporary files
@@ -909,7 +925,7 @@ export class CSBDDRunner {
                     name: f.feature?.name || f.name || '',
                     description: f.feature?.description || f.description || '',
                     uri: f.feature?.uri || f.uri || '',
-                    line: f.feature?.line || 0,
+                    line: (f.feature as any).line || 0,
                     keyword: 'Feature',
                     tags: f.feature?.tags || f.tags || [],
                     scenarios: (f.scenarios || []).map(s => ({
@@ -947,10 +963,10 @@ export class CSBDDRunner {
                         passedScenarios: (f.scenarios || []).filter(s => s.status === 'passed').length,
                         failedScenarios: (f.scenarios || []).filter(s => s.status === 'failed').length,
                         skippedScenarios: (f.scenarios || []).filter(s => s.status === 'skipped').length,
-                        totalSteps: (f.scenarios || []).reduce((acc, s) => acc + (s.steps || []).length, 0),
-                        passedSteps: (f.scenarios || []).reduce((acc, s) => acc + (s.steps || []).filter(st => st.status === 'passed').length, 0),
-                        failedSteps: (f.scenarios || []).reduce((acc, s) => acc + (s.steps || []).filter(st => st.status === 'failed').length, 0),
-                        skippedSteps: (f.scenarios || []).reduce((acc, s) => acc + (s.steps || []).filter(st => st.status === 'skipped').length, 0),
+                        totalSteps: (f.scenarios || []).reduce((acc, s) => acc + ((s as any).steps || []).length, 0),
+                        passedSteps: (f.scenarios || []).reduce((acc, s) => acc + ((s as any).steps || []).filter((st: any) => st.status === 'passed').length, 0),
+                        failedSteps: (f.scenarios || []).reduce((acc, s) => acc + ((s as any).steps || []).filter((st: any) => st.status === 'failed').length, 0),
+                        skippedSteps: (f.scenarios || []).reduce((acc, s) => acc + ((s as any).steps || []).filter((st: any) => st.status === 'skipped').length, 0),
                         avgScenarioDuration: f.scenarios?.length > 0 ? (f.scenarios.reduce((acc, s) => acc + (s.duration || 0), 0) / f.scenarios.length) : 0,
                         maxScenarioDuration: Math.max(...(f.scenarios || []).map(s => s.duration || 0), 0),
                         minScenarioDuration: f.scenarios?.length > 0 ? Math.min(...f.scenarios.map(s => s.duration || 0)) : 0,
@@ -960,32 +976,14 @@ export class CSBDDRunner {
                 })),
                 environment: result.environment || 'default'
             },
-            features: result.features.map(f => {
-                const feature = f.feature || f;
-                const scenarios = f.scenarios || [];
-                const scenarioSummaries = scenarios.map(s => ({
+            features: result.features.map((f, index) => {
+                const feature = result.features[index];
+                const scenarios = (f.scenarios || []).map(s => ({
                     scenarioId: s.id || '',
                     name: s.scenario || '',
                     status: this.mapScenarioStatusToTestStatus(s.status || 'failed'),
                     duration: s.duration || 0,
-                    retryCount: 0,
-                    description: s.scenarioRef?.description || '',
-                    tags: s.tags || [],
-                    line: s.scenarioRef?.line || 0,
-                    keyword: 'Scenario',
-                    startTime: s.startTime || now,
-                    endTime: s.endTime || now,
-                    error: s.error ? (typeof s.error === 'string' ? s.error : s.error.message || '') : '',
-                    errorStack: s.error && typeof s.error === 'object' ? (s.error.stack || '') : '',
-                    steps: (s.steps || []).map(st => ({
-                        keyword: st.keyword || 'Given',
-                        text: st.text || '',
-                        status: this.mapStepStatusToTestStatus(st.status || 'failed'),
-                        duration: st.duration || 0,
-                        line: st.line || 0,
-                        error: st.error ? (typeof st.error === 'string' ? st.error : st.error.message || '') : '',
-                        errorStack: st.error && typeof st.error === 'object' ? (st.error.stack || '') : ''
-                    }))
+                    retryCount: 0
                 }));
                 
                 return {
@@ -994,10 +992,10 @@ export class CSBDDRunner {
                     name: feature.name || f.name || '',
                     description: feature.description || f.description || '',
                     uri: feature.uri || f.uri || '',
-                    line: feature.line || 0,
+                    line: (feature as any).line || 0,
                     keyword: 'Feature',
                     tags: feature.tags || f.tags || [],
-                    scenarios: scenarioSummaries,
+                    scenarios: scenarios,
                     status: this.mapFeatureStatusToTestStatus(f.status || 'failed'),
                     startTime: f.startTime || now,
                     endTime: f.endTime || now,
@@ -1007,10 +1005,10 @@ export class CSBDDRunner {
                         passedScenarios: scenarios.filter(s => s.status === 'passed').length,
                         failedScenarios: scenarios.filter(s => s.status === 'failed').length,
                         skippedScenarios: scenarios.filter(s => s.status === 'skipped').length,
-                        totalSteps: scenarios.reduce((acc, s) => acc + (s.steps || []).length, 0),
-                        passedSteps: scenarios.reduce((acc, s) => acc + (s.steps || []).filter(st => st.status === 'passed').length, 0),
-                        failedSteps: scenarios.reduce((acc, s) => acc + (s.steps || []).filter(st => st.status === 'failed').length, 0),
-                        skippedSteps: scenarios.reduce((acc, s) => acc + (s.steps || []).filter(st => st.status === 'skipped').length, 0),
+                        totalSteps: scenarios.reduce((acc, s) => acc + ((s as any).steps || []).length, 0),
+                        passedSteps: scenarios.reduce((acc, s) => acc + ((s as any).steps || []).filter((st: any) => st.status === 'passed').length, 0),
+                        failedSteps: scenarios.reduce((acc, s) => acc + ((s as any).steps || []).filter((st: any) => st.status === 'failed').length, 0),
+                        skippedSteps: scenarios.reduce((acc, s) => acc + ((s as any).steps || []).filter((st: any) => st.status === 'skipped').length, 0),
                         avgScenarioDuration: scenarios.length > 0 ? scenarios.reduce((acc, s) => acc + (s.duration || 0), 0) / scenarios.length : 0,
                         maxScenarioDuration: Math.max(...scenarios.map(s => s.duration || 0), 0),
                         minScenarioDuration: scenarios.length > 0 ? Math.min(...scenarios.map(s => s.duration || 0)) : 0,
@@ -1242,17 +1240,33 @@ export class CSBDDRunner {
         const logger = ActionLogger.getInstance();
         logger.debug(`Applying filters to ${features.length} features`);
         
+        // 🔍 DEBUG: Check what options are available
+        logger.debug(`🔍 FILTER DEBUG: options keys = ${JSON.stringify(Object.keys(options))}`);
+        logger.debug(`🔍 FILTER DEBUG: options['features'] = ${JSON.stringify(options['features'])}`);
+        logger.debug(`🔍 FILTER DEBUG: options['featurePaths'] = ${JSON.stringify(options['featurePaths'])}`);
+        logger.debug(`🔍 FILTER DEBUG: options object = ${JSON.stringify(options, null, 2)}`);
+        
         let filtered = [...features];
 
         // Filter by feature names/patterns
-        if (options['features'] && options['features'].length > 0) {
-            logger.debug(`Filtering by feature patterns: ${JSON.stringify(options['features'])}`);
+        // TEMPORARILY DISABLED: Feature pattern filtering conflicts with file discovery patterns
+        // The --feature parameter is used for file discovery, not feature name filtering
+        /*
+        const featurePatterns = options['features'] || options.featurePaths;
+        if (featurePatterns && featurePatterns.length > 0) {
+            logger.debug(`Filtering by feature patterns: ${JSON.stringify(featurePatterns)}`);
             
             filtered = filtered.filter(feature => {
                 const featureName = feature.name || '';
                 const featureUri = feature.uri || '';
                 
-                return options['features']!.some((pattern: string) => {
+                logger.debug(`🔍 PATTERN MATCH DEBUG: Feature "${featureName}"`);
+                logger.debug(`🔍 PATTERN MATCH DEBUG: URI = "${featureUri}"`);
+                logger.debug(`🔍 PATTERN MATCH DEBUG: Patterns = ${JSON.stringify(featurePatterns)}`);
+                
+                return featurePatterns!.some((pattern: string) => {
+                    logger.debug(`🔍 PATTERN MATCH DEBUG: Testing pattern "${pattern}" against feature "${featureName}"`);
+                    
                     // Check feature name match
                     if (featureName.includes(pattern)) {
                         logger.debug(`Feature "${featureName}" matches pattern "${pattern}" by name`);
@@ -1270,6 +1284,9 @@ export class CSBDDRunner {
                         // Normalize paths for comparison (handle both forward and back slashes)
                         const normalizedUri = featureUri.replace(/\\/g, '/');
                         const normalizedPattern = pattern.replace(/\\/g, '/');
+                        
+                        logger.debug(`🔍 PATTERN MATCH DEBUG: Normalized URI = "${normalizedUri}"`);
+                        logger.debug(`🔍 PATTERN MATCH DEBUG: Normalized Pattern = "${normalizedPattern}"`);
                         
                         if (normalizedUri.includes(normalizedPattern)) {
                             logger.debug(`Feature "${featureName}" matches pattern "${pattern}" by URI (normalized)`);
@@ -1290,12 +1307,17 @@ export class CSBDDRunner {
                         }
                     }
                     
+                    logger.debug(`🔍 PATTERN MATCH DEBUG: NO MATCH for pattern "${pattern}"`);
                     return false;
                 });
             });
             
             logger.info(`Feature filtering: ${features.length} -> ${filtered.length} features after pattern filtering`);
         }
+        */
+        
+        // TEMPORARY FIX: Skip feature pattern filtering to allow all discovered features to execute
+        logger.info(`Feature pattern filtering DISABLED - all ${features.length} discovered features will be processed`);
 
         // Filter by tags
         if (options.tags) {

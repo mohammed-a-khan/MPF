@@ -8,7 +8,6 @@
 import { CSFramework } from '../src/core/CSFramework';
 import { CommandLineParser } from '../src/core/cli/CommandLineParser';
 import { Logger } from '../src/core/utils/Logger';
-import { ScenarioStatus } from '../src/bdd/types/bdd.types';
 
 async function main(): Promise<void> {
     const logger = Logger.getInstance('APITestRunner');
@@ -36,7 +35,7 @@ async function main(): Promise<void> {
         logger.info('📁 Feature paths:', featurePaths);
         
         // Execute tests with API-specific configuration
-        const results = await framework.executeTests(featurePaths, {
+        const testOptions: any = {
             environment: environment,
             parallel: options.parallel || false,
             workers: options.workers || 1,
@@ -49,9 +48,15 @@ async function main(): Promise<void> {
             browser: 'chromium', // Default browser for any UI components
             slowMo: 0, // No slow motion for API tests
             video: false, // No video recording for API tests
-            screenshot: 'on-failure', // Screenshots only on failure
             trace: false // No trace for API tests
-        });
+        };
+        
+        // Only set screenshot options if not in dry-run mode
+        if (!options.dryRun) {
+            testOptions.screenshot = 'on-failure'; // Screenshots only on failure
+        }
+        
+        const results = await framework.executeTests(featurePaths, testOptions);
         
         // Log results summary
         if (results) {

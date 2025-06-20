@@ -3,6 +3,7 @@
 import { CSBDDStepDef, StepDefinitions } from '../../bdd/decorators/CSBDDStepDef';
 import { CSBDDBaseStepDefinition } from '../../bdd/base/CSBDDBaseStepDefinition';
 import { APIContext } from '../../api/context/APIContext';
+import { APIContextManager } from '../../api/context/APIContextManager';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { FileUtils } from '../../core/utils/FileUtils';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
@@ -165,12 +166,65 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const credentials: any = {};
             
-            // Parse data table
-            const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
+            // Parse data table - handle both formats
+            let rows: any[] = [];
             
+            if (dataTable.hashes && typeof dataTable.hashes === 'function') {
+                // Cucumber format with headers - this creates objects with key-value pairs
+                const hashes = dataTable.hashes();
+                await actionLogger.logAction('dataTableHashesDebug', { 
+                    hashCount: hashes.length,
+                    firstHash: JSON.stringify(hashes[0], null, 2).substring(0, 200)
+                });
+                
+                // Convert hashes to rows format - each hash should be an object with key and value properties
+                rows = hashes.map((hash: any) => ({
+                    key: hash.key,
+                    value: hash.value
+                }));
+            } else if (dataTable.rows && typeof dataTable.rows === 'function') {
+                // Raw array format - skip header row and convert to key-value pairs
+                const rawRows = dataTable.rows();
+                await actionLogger.logAction('dataTableRowsDebug', { 
+                    rowCount: rawRows.length,
+                    firstRow: JSON.stringify(rawRows[0]),
+                    secondRow: rawRows.length > 1 ? JSON.stringify(rawRows[1]) : 'none'
+                });
+                
+                // Skip header row (first row) and convert to key-value pairs
+                const dataRows = rawRows.slice(1);
+                rows = dataRows.map((row: any[]) => ({
+                    key: row[0],
+                    value: row[1]
+                }));
+            } else if (Array.isArray(dataTable)) {
+                // Direct array format
+                rows = dataTable.map((row: any[]) => ({
+                    key: row[0],
+                    value: row[1]
+                }));
+            } else {
+                // Log the actual dataTable structure to help debug
+                await actionLogger.logAction('dataTableStructureDebug', { 
+                    type: typeof dataTable,
+                    keys: Object.keys(dataTable),
+                    value: JSON.stringify(dataTable, null, 2).substring(0, 500)
+                });
+                throw new Error(`Unsupported data table format: ${typeof dataTable}`);
+            }
+            
+            // Process rows to extract AWS config
             for (const row of rows) {
-                const key = row[0] || row.key || row.property;
-                const value = row[1] || row.value;
+                const key = row.key || row[0];
+                const value = row.value || row[1];
+                
+                // Debug logging for each row
+                await actionLogger.logAction('rowProcessing', { 
+                    rowIndex: rows.indexOf(row),
+                    key: key,
+                    value: value ? this.maskToken(String(value)) : 'undefined',
+                    rowStructure: JSON.stringify(row)
+                });
                 
                 if (key && value) {
                     credentials[key] = await this.interpolateValue(String(value));
@@ -441,12 +495,65 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const awsConfig: any = {};
             
-            // Parse data table
-            const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
+            // Parse data table - handle both formats
+            let rows: any[] = [];
             
+            if (dataTable.hashes && typeof dataTable.hashes === 'function') {
+                // Cucumber format with headers - this creates objects with key-value pairs
+                const hashes = dataTable.hashes();
+                await actionLogger.logAction('dataTableHashesDebug', { 
+                    hashCount: hashes.length,
+                    firstHash: JSON.stringify(hashes[0], null, 2).substring(0, 200)
+                });
+                
+                // Convert hashes to rows format - each hash should be an object with key and value properties
+                rows = hashes.map((hash: any) => ({
+                    key: hash.key,
+                    value: hash.value
+                }));
+            } else if (dataTable.rows && typeof dataTable.rows === 'function') {
+                // Raw array format - skip header row and convert to key-value pairs
+                const rawRows = dataTable.rows();
+                await actionLogger.logAction('dataTableRowsDebug', { 
+                    rowCount: rawRows.length,
+                    firstRow: JSON.stringify(rawRows[0]),
+                    secondRow: rawRows.length > 1 ? JSON.stringify(rawRows[1]) : 'none'
+                });
+                
+                // Skip header row (first row) and convert to key-value pairs
+                const dataRows = rawRows.slice(1);
+                rows = dataRows.map((row: any[]) => ({
+                    key: row[0],
+                    value: row[1]
+                }));
+            } else if (Array.isArray(dataTable)) {
+                // Direct array format
+                rows = dataTable.map((row: any[]) => ({
+                    key: row[0],
+                    value: row[1]
+                }));
+            } else {
+                // Log the actual dataTable structure to help debug
+                await actionLogger.logAction('dataTableStructureDebug', { 
+                    type: typeof dataTable,
+                    keys: Object.keys(dataTable),
+                    value: JSON.stringify(dataTable, null, 2).substring(0, 500)
+                });
+                throw new Error(`Unsupported data table format: ${typeof dataTable}`);
+            }
+            
+            // Process rows to extract AWS config
             for (const row of rows) {
-                const key = row[0] || row.key || row.property;
-                const value = row[1] || row.value;
+                const key = row.key || row[0];
+                const value = row.value || row[1];
+                
+                // Debug logging for each row
+                await actionLogger.logAction('rowProcessing', { 
+                    rowIndex: rows.indexOf(row),
+                    key: key,
+                    value: value ? this.maskToken(String(value)) : 'undefined',
+                    rowStructure: JSON.stringify(row)
+                });
                 
                 if (key && value) {
                     awsConfig[key] = await this.interpolateValue(String(value));
@@ -455,6 +562,12 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             
             // Validate required fields
             if (!awsConfig.accessKey || !awsConfig.secretKey) {
+                await actionLogger.logAction('awsConfigDebug', { 
+                    configKeys: Object.keys(awsConfig),
+                    hasAccessKey: !!awsConfig.accessKey,
+                    hasSecretKey: !!awsConfig.secretKey,
+                    rowCount: rows.length
+                });
                 throw new Error('AWS authentication requires: accessKey and secretKey');
             }
             
@@ -536,14 +649,47 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
     }
 
     /**
+     * Sets AWS authentication with detailed configuration (alias for AWS auth)
+     * Example: Given user sets AWS authentication:
+     *   | accessKey    | AKIAIOSFODNN7EXAMPLE |
+     *   | secretKey    | wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY |
+     *   | region       | us-east-1 |
+     *   | service      | execute-api |
+     *   | sessionToken | temporary-session-token |
+     */
+    @CSBDDStepDef("user sets AWS authentication:")
+    async setAWSAuthentication(dataTable: any): Promise<void> {
+        // Delegate to the existing AWS auth method
+        return this.setAWSAuthDetailed(dataTable);
+    }
+
+    /**
      * Helper method to get current API context
      */
     private getAPIContext(): APIContext {
-        const context = this.retrieve('currentAPIContext') as APIContext;
-        if (!context) {
-            throw new Error('No API context set. Please use "Given user is working with <api> API" first');
+        // Try to get from BDD context (only if scenario context is available)
+        try {
+            const context = this.retrieve('currentAPIContext') as APIContext;
+            if (context) {
+                return context;
+            }
+        } catch (error) {
+            // Scenario context not available - try alternative sources
         }
-        return context;
+        
+        // Try to get from APIContextManager
+        try {
+            const apiContextManager = APIContextManager.getInstance();
+            if (apiContextManager.hasContext('default')) {
+                return apiContextManager.getContext('default');
+            } else {
+                return apiContextManager.createContext('default');
+            }
+        } catch (error) {
+            // APIContextManager not available
+        }
+        
+        throw new Error('No API context available. Please use "Given user sets API base URL" first');
     }
 
     /**
@@ -616,15 +762,21 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             return value;
         }
         
-        // For now, just return the value as-is if no interpolation is needed
-        // In a real implementation, you'd get variables from the BDD context
-        let interpolated = value;
+        // Get variables from context - using retrieve for stored variables
+        const variables: Record<string, any> = {};
         
-        // Simple placeholder replacement for common variables
-        interpolated = interpolated.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
-            const varValue = this.retrieve(varName);
-            return varValue !== undefined ? String(varValue) : match;
-        });
+        // Try to get common variables from the BDD context
+        const currentContext = this.retrieve('currentAPIContext');
+        if (currentContext && typeof currentContext === 'object' && 'getVariables' in currentContext) {
+            const apiVars = (currentContext as APIContext).getVariables();
+            Object.assign(variables, apiVars);
+        }
+        
+        // Replace placeholders
+        let interpolated = value;
+        for (const [key, val] of Object.entries(variables)) {
+            interpolated = interpolated.replace(new RegExp(`{{${key}}}`, 'g'), String(val));
+        }
         
         return interpolated;
     }

@@ -53,7 +53,7 @@ async function main(): Promise<void> {
         logger.info('✅ SauceDemo test execution completed');
         
         // Exit with appropriate code
-        const exitCode = result.summary?.failed > 0 ? 1 : 0;
+        const exitCode = result.failed > 0 ? 1 : 0;
         process.exit(exitCode);
         
     } catch (error) {

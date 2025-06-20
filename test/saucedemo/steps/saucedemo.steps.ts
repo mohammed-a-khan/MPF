@@ -374,6 +374,10 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
             
             // Check that the most recent error log has appropriate details
             const recentErrorLog = errorLogs[errorLogs.length - 1];
+            if (!recentErrorLog) {
+                throw new Error('No recent error log found');
+            }
+            
             expect(recentErrorLog.message).toBeTruthy();
             expect(recentErrorLog.timestamp).toBeTruthy();
 

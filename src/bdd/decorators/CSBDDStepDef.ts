@@ -10,12 +10,23 @@ export interface StepDefinitionOptions {
 
 /**
  * Decorator for marking methods as step definitions
- * @param pattern - String or RegExp pattern to match step text
- * @param options - Optional step configuration
+ * @param pattern Gherkin pattern that this step will match
+ * @param options Optional configuration for the step
  */
 export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionOptions) {
-  return function (target: any, propertyKey: string | symbol, descriptor: any): any {
-    const originalMethod = descriptor.value;
+  return function <T extends (...args: any[]) => any>(
+    target: any, 
+    propertyKey: string | symbol, 
+    descriptor: TypedPropertyDescriptor<T>
+  ): TypedPropertyDescriptor<T> | void {
+    // Get the descriptor if it's not provided (for compatibility with different TypeScript versions)
+    const methodDescriptor = descriptor || Object.getOwnPropertyDescriptor(target, propertyKey) as TypedPropertyDescriptor<T>;
+    
+    if (!methodDescriptor) {
+      throw new Error(`Cannot find descriptor for method ${String(propertyKey)}`);
+    }
+    
+    const originalMethod = methodDescriptor.value;
     
     if (typeof originalMethod !== 'function') {
       throw new Error(`@CSBDDStepDef can only be applied to methods`);
@@ -51,10 +62,9 @@ export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionO
     
     // Log registration
     Logger.getInstance().debug(`Registered step definition: ${pattern.toString()} -> ${stepDefinition.location}`);
-    // ActionLogger instance will be used at runtime, not during decoration
     
     // Wrap the method to add error handling and logging
-    descriptor.value = async function(...args: any[]) {
+    const wrappedMethod = async function(this: any, ...args: any[]) {
       const stepText = args[args.length - 1]?.stepText || pattern.toString();
       const startTime = Date.now();
       
@@ -75,9 +85,12 @@ export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionO
         await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { stepText, duration });
         throw error;
       }
-    };
+    } as T;
     
-    return descriptor;
+    // Update the descriptor
+    methodDescriptor.value = wrappedMethod;
+    
+    return methodDescriptor;
   };
 }
 

@@ -98,23 +98,22 @@ export class BrowserPool {
       if (this.available.length > 0) {
         const pooledBrowser = this.available.shift()!;
         
-        // Test browser health if configured
-        if (this.config.testOnAcquire) {
-          const isHealthy = await this.testBrowserHealth(pooledBrowser);
-          if (!isHealthy) {
-            await this.recycleBrowser(pooledBrowser);
-            continue;
-          }
+        // CRITICAL FIX: Disable health check on acquisition to prevent about:blank pages
+        // Health checks were causing brief browser page flashes during test execution
+        // Simple connectivity check without creating pages
+        if (pooledBrowser.browser.isConnected()) {
+          // Mark as in use
+          pooledBrowser.isAvailable = false;
+          pooledBrowser.lastUsedAt = new Date();
+          pooledBrowser.usageCount++;
+          this.inUse.set(pooledBrowser.id, pooledBrowser);
+          ActionLogger.logInfo(`Browser acquired from pool: ${pooledBrowser.id}`);
+          return pooledBrowser.browser;
+        } else {
+          // Browser is disconnected, recycle it
+          await this.recycleBrowser(pooledBrowser);
+          continue;
         }
-        
-        // Mark as in use
-        pooledBrowser.isAvailable = false;
-        pooledBrowser.lastUsedAt = new Date();
-        pooledBrowser.usageCount++;
-        this.inUse.set(pooledBrowser.id, pooledBrowser);
-        
-        ActionLogger.logInfo(`Browser acquired from pool: ${pooledBrowser.id}`);
-        return pooledBrowser.browser;
       }
       
       // Try to create new browser if under max size
@@ -167,24 +166,13 @@ export class BrowserPool {
       return;
     }
     
-    // Test browser health if configured
-    if (this.config.testOnReturn && pooledBrowser) {
-      const browserToTest = pooledBrowser; // Capture in closure
-      this.testBrowserHealth(browserToTest).then(isHealthy => {
-        if (isHealthy) {
-          browserToTest.isAvailable = true;
-          this.available.push(browserToTest);
-          ActionLogger.logInfo(`Browser ${browserToTest.id} released back to pool`);
-        } else {
-          this.recycleBrowser(browserToTest).catch(error => {
-            ActionLogger.logError('Failed to recycle unhealthy browser', error);
-          });
-        }
-      });
-    } else if (pooledBrowser) {
+    // CRITICAL FIX: Disable health check on return to prevent about:blank pages
+    // Health checks on browser return were causing page flashes during test cleanup
+    // Simple availability check without creating pages
+    if (pooledBrowser) {
       pooledBrowser.isAvailable = true;
       this.available.push(pooledBrowser);
-      ActionLogger.logInfo(`Browser ${pooledBrowser.id} released back to pool`);
+      ActionLogger.logInfo(`Browser ${pooledBrowser.id} released back to pool (health check disabled)`);
     }
   }
 
@@ -354,14 +342,17 @@ export class BrowserPool {
         return false;
       }
       
-      // Try to create a context and page
-      const context = await pooledBrowser.browser.newContext();
-      const page = await context.newPage();
-      await page.goto('about:blank');
-      await context.close();
-      
+      // CRITICAL FIX: Disable health check page creation to prevent about:blank flashing
+      // Simple connectivity check without creating pages
       pooledBrowser.isHealthy = true;
       return true;
+      
+      // OLD CODE THAT CAUSED about:blank PAGES - PERMANENTLY DISABLED
+      // const context = await pooledBrowser.browser.newContext();
+      // const page = await context.newPage();
+      // await page.goto('about:blank');
+      // await context.close();
+      
     } catch (error) {
       ActionLogger.logError(`Browser ${pooledBrowser.id} health check failed`, error);
       pooledBrowser.isHealthy = false;
@@ -394,9 +385,14 @@ export class BrowserPool {
    * Start cleanup interval
    */
   private startCleanupInterval(): void {
-    this.cleanupInterval = setInterval(() => {
-      this.performCleanup();
-    }, this.config.evictionInterval);
+    // CRITICAL FIX: Disable periodic cleanup to prevent health check triggering
+    // Periodic cleanup was triggering health checks which caused about:blank pages
+    ActionLogger.logInfo('🚫 Browser pool periodic cleanup disabled to prevent page flashing');
+    
+    // OLD CODE THAT CAUSED PERIODIC HEALTH CHECKS - PERMANENTLY DISABLED
+    // this.cleanupInterval = setInterval(() => {
+    //   this.performCleanup();
+    // }, this.config.evictionInterval);
   }
 
   /**

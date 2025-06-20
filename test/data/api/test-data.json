@@ -1,94 +1,46 @@
-{
-  "api": {
-    "endpoints": {
-      "httpbin": {
-        "baseUrl": "https://httpbin.org",
-        "paths": {
-          "get": "/get",
-          "basicAuth": "/basic-auth/user/passwd"
-        },
-        "auth": {
-          "username": "user",
-          "password": "passwd"
-        }
-      },
-      "postmanEcho": {
-        "baseUrl": "https://postman-echo.com",
-        "paths": {
-          "basicAuth": "/basic-auth"
-        },
-        "auth": {
-          "username": "postman",
-          "password": "password"
-        }
-      },
-      "dummyJson": {
-        "baseUrl": "https://dummyjson.com",
-        "paths": {
-          "login": "/auth/login",
-          "profile": "/auth/me"
-        },
-        "auth": {
-          "username": "emilys",
-          "password": "emilyspass"
-        }
-      },
-      "badssl": {
-        "baseUrl": "https://client.badssl.com",
-        "paths": {
-          "root": "/"
-        },
-        "certificates": {
-          "p12": {
-            "path": "./certificates/badssl.com-client.p12",
-            "password": "badssl.com"
-          },
-          "pem": {
-            "certFile": "./certificates/badssl.com-client.pem",
-            "keyFile": "./certificates/badssl.com-client.key"
-          },
-          "pfx": {
-            "path": "./certificates/badssl.com-client.pfx",
-            "password": "badssl.com"
-          }
-        }
-      }
+﻿{
+  "users": [
+    {
+      "id": 1,
+      "name": "Test User",
+      "email": "test@example.com",
+      "username": "testuser",
+      "password": "testpass123"
     },
-    "testData": {
-      "users": [
-        {
-          "id": 1,
-          "username": "testuser1",
-          "email": "testuser1@example.com"
-        },
-        {
-          "id": 2,
-          "username": "testuser2",
-          "email": "testuser2@example.com"
-        }
-      ],
-      "posts": [
-        {
-          "id": 1,
-          "title": "Test Post 1",
-          "body": "This is test post 1"
-        },
-        {
-          "id": 2,
-          "title": "Test Post 2",
-          "body": "This is test post 2"
-        }
-      ]
+    {
+      "id": 2,
+      "name": "Demo User", 
+      "email": "demo@example.com",
+      "username": "demouser",
+      "password": "demopass123"
     }
+  ],
+  "api": {
+    "baseUrl": "https://httpbin.org",
+    "timeout": 30000,
+    "version": "v1"
   },
-  "ado": {
-    "testPlan": "413",
-    "testSuite": "414",
-    "testCases": {
-      "noAuth": "415",
-      "basicAuth": "416",
-      "bearerToken": "417",
-      "clientCert": "418"
+  "testCases": [
+    {
+      "id": "TC-001",
+      "description": "Basic GET request test",
+      "endpoint": "/get",
+      "method": "GET"
+    },
+    {
+      "id": "TC-002", 
+      "description": "POST request with JSON body",
+      "endpoint": "/post",
+      "method": "POST"
+    }
+  ],
+  "credentials": {
+    "basic": {
+      "username": "testuser",
+      "password": "testpass"
+    },
+    "bearer": {
+      "token": "sample-bearer-token-123"
     }
   }
-} 
+}

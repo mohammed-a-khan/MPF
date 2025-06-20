@@ -10,6 +10,7 @@ import { ConfigurationManager } from '../../core/configuration/ConfigurationMana
 import { RequestOptions, Response, HttpMethod } from '../../api/types/api.types';
 import * as fs from 'fs';
 import * as path from 'path';
+import { APIContextManager } from '../../api/context/APIContextManager';
 
 /**
  * Step definitions for executing API requests
@@ -138,6 +139,12 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
             
             this.currentRequest.method = 'POST';
             this.currentRequest.url = this.buildFullUrl(currentContext, interpolatedPath);
+            
+            // Retrieve and set the body from the context
+            const body = currentContext.getVariable('body');
+            if (body !== undefined && body !== null) {
+                this.currentRequest.body = body;
+            }
             
             await this.executeRequest(currentContext);
         } catch (error) {
@@ -419,26 +426,40 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
     }
 
     /**
-     * Executes a request with custom method
-     * Example: When user sends "CUSTOM" request to "/api/endpoint"
+     * Send custom HTTP request to a specific path
+     * Example: When user sends POST request to "/api/users"
      */
     @CSBDDStepDef("user sends {string} request to {string}")
     async sendCustomRequest(method: string, path: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logAction('sendCustomRequest', { method, path });
-        
+
         try {
             const currentContext = this.getAPIContext();
-            const interpolatedPath = await this.interpolateValue(path);
             
+            // Set the method and path in current request
             this.currentRequest.method = method.toUpperCase() as HttpMethod;
-            this.currentRequest.url = this.buildFullUrl(currentContext, interpolatedPath);
+            this.currentRequest.url = path;
             
             await this.executeRequest(currentContext);
+            
+            await actionLogger.logAction('customRequestSent', { 
+                method: method.toUpperCase(),
+                fullUrl: this.buildFullUrl(currentContext, path)
+            });
         } catch (error) {
-            await actionLogger.logError('Failed to send custom request', error instanceof Error ? error : new Error(String(error)));
-            throw new Error(`Failed to send ${method} request to '${path}': ${error instanceof Error ? error.message : String(error)}`);
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to send custom request' });
+            throw new Error(`Failed to send ${method.toUpperCase()} request to '${path}': ${error instanceof Error ? error.message : String(error)}`);
         }
+    }
+
+    /**
+     * Send generic HTTP request with method parameter (supports scenario outlines)
+     * Example: When user sends "GET" request to "/get"
+     */
+    @CSBDDStepDef("user sends {word} request to {string}")
+    async sendGenericRequest(method: string, path: string): Promise<void> {
+        return await this.sendCustomRequest(method, path);
     }
 
     /**
@@ -456,12 +477,21 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
         };
         context.storeResponse('last', response, requestOptions);
         
-        // Store in BDD context for validation steps
-        this.store('lastAPIResponse', response);
+        // Store in BDD context for validation steps (only if scenario context is available)
+        try {
+            this.store('lastAPIResponse', response);
+        } catch (error) {
+            // Scenario context not available - this is fine for standalone API tests
+        }
         
-        // Add to response storage
-        const scenarioId = this.scenarioContext.getScenarioId();
-        this.responseStorage.store('last', response, scenarioId);
+        // Add to response storage (only if scenario context is available)
+        try {
+            const scenarioId = this.scenarioContext.getScenarioId();
+            this.responseStorage.store('last', response, scenarioId);
+        } catch (error) {
+            // Scenario context not available - store with a default key
+            this.responseStorage.store('last', response, 'standalone');
+        }
         
         // Log response summary
         const actionLogger = ActionLogger.getInstance();
@@ -519,17 +549,35 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
     private buildFullUrl(context: APIContext, path: string): string {
         const baseUrl = context.getBaseUrl();
         
-        let url = baseUrl;
-        
-        // Add path
-        if (path) {
-            if (!baseUrl.endsWith('/') && !path.startsWith('/')) {
-                url += '/';
-            }
-            url += path;
+        // Handle empty or null baseUrl
+        if (!baseUrl) {
+            throw new Error('Base URL is not set in API context');
         }
         
-        return url;
+        // If path is empty, return baseUrl as-is
+        if (!path) {
+            return baseUrl;
+        }
+        
+        // Check if path is already a full URL (starts with http:// or https://)
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+            return path; // Return the full URL as-is
+        }
+        
+        // Ensure proper URL concatenation for relative paths
+        let url = baseUrl;
+        
+        // Remove trailing slash from baseUrl if present
+        if (url.endsWith('/')) {
+            url = url.slice(0, -1);
+        }
+        
+        // Ensure path starts with slash
+        if (!path.startsWith('/')) {
+            path = '/' + path;
+        }
+        
+        return url + path;
     }
 
     /**
@@ -549,14 +597,39 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
      * Helper method to get current API context
      */
     private getAPIContext(): APIContext {
-        if (!this.currentContext) {
-            // Try to get from BDD context
-            this.currentContext = this.retrieve<APIContext>('currentAPIContext');
-            if (!this.currentContext) {
-                throw new Error('No API context set. Please use "Given user is working with <api> API" first');
+        // Always try to get the latest context first, don't rely on cached instance variable
+        let retrievedContext: APIContext | null = null;
+        
+        // Try to get from BDD context first (only if scenario context is available)
+        try {
+            retrievedContext = this.retrieve<APIContext>('currentAPIContext');
+            if (retrievedContext) {
+                this.currentContext = retrievedContext;
+                return this.currentContext;
             }
+        } catch (error) {
+            // Scenario context not available or no context stored
         }
-        return this.currentContext;
+        
+        // Try to get current context from APIContextManager
+        try {
+            const apiContextManager = APIContextManager.getInstance();
+            retrievedContext = apiContextManager.getCurrentContext();
+            if (retrievedContext) {
+                this.currentContext = retrievedContext;
+                return this.currentContext;
+            }
+        } catch (managerError) {
+            // APIContextManager has no current context
+        }
+        
+        // If we still have a cached context, return it
+        if (this.currentContext) {
+            return this.currentContext;
+        }
+        
+        // If no current context found anywhere, throw a helpful error
+        throw new Error('No API context set. Please use "Given user is working with <api> API" first');
     }
 
     /**
@@ -575,7 +648,13 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
         while ((match = regex.exec(value)) !== null) {
             const varName = match[1];
             if (varName) {
-                const varValue = this.retrieve(varName) || '';
+                let varValue = '';
+                try {
+                    varValue = this.retrieve(varName) || '';
+                } catch (error) {
+                    // Scenario context not available - use empty string
+                    varValue = '';
+                }
                 interpolated = interpolated.replace(match[0], String(varValue));
             }
         }
@@ -643,7 +722,12 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
      */
     public setAPIContext(context: APIContext): void {
         this.currentContext = context;
-        this.store('currentAPIContext', context);
+        try {
+            this.store('currentAPIContext', context);
+        } catch (error) {
+            // Scenario context not available - this is fine for standalone API tests
+            // The context is still stored in the instance variable
+        }
     }
 
     /**

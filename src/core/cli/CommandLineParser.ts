@@ -14,6 +14,17 @@ export class CommandLineParser {
   
   // Argument definitions with full metadata
   private static readonly ARGUMENTS: Map<string, CLIArgument> = new Map([
+    ['project', {
+      name: 'project',
+      aliases: ['p', 'proj'],
+      type: 'string',
+      required: true,
+      description: 'Target project for test execution (auto-discovered from config/ directory)',
+      validate: (value: string) => {
+        console.log(`🔍 VALIDATE FUNCTION CALLED with value: "${value}"`);
+        return CommandLineParser.validateProjectExists(value);
+      }
+    }],
     ['env', {
       name: 'env',
       aliases: ['e', 'environment'],
@@ -595,6 +606,12 @@ export class CommandLineParser {
       }
 
       if (arg.startsWith('--')) {
+        // Handle special case of "--" separator (end of options)
+        if (arg === '--') {
+          i++;
+          continue;
+        }
+        
         // Long option: --option or --option=value
         const equalIndex = arg.indexOf('=');
         
@@ -929,7 +946,8 @@ export class CommandLineParser {
     if (this.parsedArgs!['dry-run']) {
       const conflictingOptions = ['video', 'trace', 'screenshot'];
       for (const opt of conflictingOptions) {
-        if (this.parsedArgs![opt]) {
+        // Only check for conflicts if the option was explicitly set by the user
+        if (this.parsedArgs![opt] && this.wasExplicitlySet(opt)) {
           this.validationErrors.push({
             argument: opt,
             message: `Cannot use --${opt} with --dry-run`
@@ -1006,7 +1024,8 @@ export class CommandLineParser {
    */
   private static buildExecutionOptions(): ExecutionOptions {
     const options: any = {
-      // Environment
+      // Project and Environment
+      project: this.parsedArgs!['project'] as string,
       environment: this.parsedArgs!['env'] as string || 'dev',
       
       // Test selection
@@ -1564,5 +1583,85 @@ For more information, visit: https://github.com/company/cs-test-framework`);
    */
   private static wasExplicitlySet(name: string): boolean {
     return this.explicitlySetArgs.has(name);
+  }
+
+  private static validateProjectExists(value: string): boolean {
+    console.log(`🔍 DEBUG: validateProjectExists called with value: "${value}"`);
+    
+    try {
+      const configDir = path.join(process.cwd(), 'config');
+      console.log(`🔍 DEBUG: Config directory path: ${configDir}`);
+      
+      // Check if config directory exists
+      if (!fs.existsSync(configDir)) {
+        throw new Error('Configuration directory not found: config/');
+      }
+
+      // Get list of available projects from config directory
+      const availableProjects = this.getAvailableProjects();
+      console.log(`🔍 DEBUG: Available projects: ${JSON.stringify(availableProjects)}`);
+      
+      if (availableProjects.length === 0) {
+        throw new Error('No projects found in config/ directory');
+      }
+
+      // Check if the specified project exists
+      if (!availableProjects.includes(value)) {
+        throw new Error(`Invalid project: ${value}. Available projects: ${availableProjects.join(', ')}`);
+      }
+
+      console.log(`✅ DEBUG: Project validation passed for: "${value}"`);
+      return true;
+    } catch (error) {
+      console.log(`❌ DEBUG: Project validation failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`Project validation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Get list of available projects from config directory
+   */
+  private static getAvailableProjects(): string[] {
+    console.log(`🔍 DEBUG: getAvailableProjects called`);
+    
+    try {
+      const configDir = path.join(process.cwd(), 'config');
+      console.log(`🔍 DEBUG: Scanning config directory: ${configDir}`);
+      
+      if (!fs.existsSync(configDir)) {
+        console.log(`❌ DEBUG: Config directory does not exist: ${configDir}`);
+        return [];
+      }
+
+      const entries = fs.readdirSync(configDir, { withFileTypes: true });
+      console.log(`🔍 DEBUG: Found ${entries.length} entries in config directory`);
+      
+      const projects: string[] = [];
+
+      for (const entry of entries) {
+        console.log(`🔍 DEBUG: Checking entry: ${entry.name}, isDirectory: ${entry.isDirectory()}`);
+        
+        if (entry.isDirectory()) {
+          const projectPath = path.join(configDir, entry.name);
+          
+          // Check if it's a valid project directory (has environments subdirectory)
+          const environmentsPath = path.join(projectPath, 'environments');
+          const hasEnvironments = fs.existsSync(environmentsPath) && fs.statSync(environmentsPath).isDirectory();
+          
+          console.log(`🔍 DEBUG: Project "${entry.name}" - environments path: ${environmentsPath}, hasEnvironments: ${hasEnvironments}`);
+          
+          if (hasEnvironments) {
+            projects.push(entry.name);
+            console.log(`✅ DEBUG: Added project: ${entry.name}`);
+          }
+        }
+      }
+
+      console.log(`🔍 DEBUG: Final projects list: ${JSON.stringify(projects.sort())}`);
+      return projects.sort();
+    } catch (error) {
+      console.warn(`Warning: Could not scan projects from config directory: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
   }
 }

@@ -49,6 +49,9 @@ let isShuttingDown = false;
  * Main CLI Entry Point
  */
 async function main(): Promise<void> {
+    console.log('🔍 DEBUG: main() function called');
+    console.log('🔍 DEBUG: process.argv =', JSON.stringify(process.argv));
+    
     const startTime = performance.now();
     let executionResult: any = null;
 
@@ -145,16 +148,28 @@ async function runTests(options: ExecutionOptions): Promise<any> {
         // 🔥 FIX: Add initialization timeout protection (30 seconds)
         logger.info('🚀 Starting CS Framework with timeout protection...');
         
-        const initPromise = framework.initialize(options.environment || 'dev', {
-            parallel: options.parallel,
-            workers: options.workers,
-            timeout: options.timeout,
-            debug: options.debug,
-            headless: !options.headed,
-            proxy: !!options.proxy,
-            reporting: !options.skipReport,
-            adoIntegration: !options.skipADO
-        });
+        // Extract project and environment from options
+        const project = options.project || 'saucedemo'; // Default to saucedemo if not specified
+        const environment = options.environment || 'dev';
+        
+        console.log(`🔍 DEBUG: options.project = '${options.project}', project = '${project}'`);
+        console.log(`🔍 DEBUG: options.environment = '${options.environment}', environment = '${environment}'`);
+        console.log(`🔍 DEBUG: Full options:`, JSON.stringify(options, null, 2));
+        
+        const initPromise = framework.initialize(
+            project, 
+            environment, 
+            {
+                parallel: options.parallel,
+                workers: options.workers,
+                timeout: options.timeout,
+                debug: options.debug,
+                headless: !options.headed,
+                proxy: !!options.proxy,
+                reporting: !options.skipReport,
+                adoIntegration: !options.skipADO
+            }
+        );
         
         const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Framework initialization timeout after 30 seconds')), 30000)
@@ -178,6 +193,9 @@ async function runTests(options: ExecutionOptions): Promise<any> {
 
         // Determine feature paths to execute
         const featurePaths: string[] = [];
+        console.log(`🔍 DEBUG: options.features = ${JSON.stringify(options.features)}`);
+        console.log(`🔍 DEBUG: options object keys:`, Object.keys(options));
+        
         if (options.features) {
             if (Array.isArray(options.features)) {
                 featurePaths.push(...options.features);
@@ -188,6 +206,8 @@ async function runTests(options: ExecutionOptions): Promise<any> {
             // Default feature discovery
             featurePaths.push('./features/**/*.feature');
         }
+        
+        console.log(`🔍 DEBUG: Final featurePaths = ${JSON.stringify(featurePaths)}`);
 
         // Execute tests using the framework
         logger.info('Starting test execution with CS Framework...');
@@ -264,8 +284,18 @@ async function validateEnvironment(): Promise<void> {
     }
 
     // Check for config directory (required)
-    if (!fs.existsSync('config/environments')) {
-        throw new Error('Configuration directory not found: config/environments');
+    if (!fs.existsSync('config')) {
+        throw new Error('Configuration directory not found: config');
+    }
+
+    // Check for global.env file (required)
+    if (!fs.existsSync('config/global.env')) {
+        throw new Error('Global configuration file not found: config/global.env');
+    }
+
+    // Check for common directory (required)
+    if (!fs.existsSync('config/common')) {
+        throw new Error('Common configuration directory not found: config/common');
     }
 
     // Check optional directories and create if missing

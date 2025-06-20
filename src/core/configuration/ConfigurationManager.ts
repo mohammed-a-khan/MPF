@@ -1,6 +1,7 @@
 // src/core/configuration/ConfigurationManager.ts
 
 import { EnvironmentLoader } from './EnvironmentLoader';
+import { HierarchicalEnvironmentLoader } from './HierarchicalEnvironmentLoader';
 import { ConfigurationValidator } from './ConfigurationValidator';
 import { 
   ConfigMap, 
@@ -16,6 +17,7 @@ export class ConfigurationManager {
   private static config: ConfigMap = {};
   private static loadedConfiguration: LoadedConfiguration | null = null;
   private static readonly environmentLoader = new EnvironmentLoader();
+  private static readonly hierarchicalLoader = new HierarchicalEnvironmentLoader();
   private static readonly validator = new ConfigurationValidator();
   private static isInitialized = false;
 
@@ -32,412 +34,339 @@ export class ConfigurationManager {
   }
 
   /**
-   * Load configuration for specified environment
+   * Load configuration with method overloading support
+   * Supports both new (project, environment) and legacy (environment only) signatures
    */
-  static async loadConfiguration(environment: string, options?: Partial<ConfigurationOptions>): Promise<void> {
-    try {
-      console.log(`Loading configuration for environment: ${environment}`);
-      
-      // Validate environment exists
-      const isValidEnv = await this.environmentLoader.validateEnvironment(environment);
-      if (!isValidEnv) {
-        throw new Error(`Invalid environment: ${environment}. Available environments: ${await this.environmentLoader.getAvailableEnvironments()}`);
-      }
-      
-      // Load environment files
-      const loadedConfig = await this.environmentLoader.loadEnvironmentFiles(environment);
-      
-      // Apply overrides if provided
-      if (options?.overrides) {
-        Object.assign(loadedConfig, options.overrides);
-      }
-      
-      // Validate configuration
-      const validationResult = this.validator.validate(loadedConfig);
-      if (!validationResult.valid) {
-        throw new Error(`Configuration validation failed:\n${validationResult.errors.join('\n')}`);
-      }
-      
-      // Store configuration
-      this.config = loadedConfig;
-      console.log(`DEBUG ConfigurationManager: Configuration stored with ${Object.keys(loadedConfig).length} keys`);
-      console.log(`DEBUG ConfigurationManager: Sample keys after storing:`, Object.keys(loadedConfig).slice(0, 15));
-      console.log(`DEBUG ConfigurationManager: STEP_DEFINITION_PATHS after storing:`, loadedConfig['STEP_DEFINITION_PATHS']);
-      console.log(`DEBUG ConfigurationManager: this.config has ${Object.keys(this.config).length} keys`);
-      console.log(`DEBUG ConfigurationManager: this.config STEP_DEFINITION_PATHS:`, this.config['STEP_DEFINITION_PATHS']);
-      
-      this.loadedConfiguration = {
-        raw: loadedConfig,
-        parsed: this.parseConfiguration(loadedConfig),
-        environment,
-        loadedAt: new Date(),
-        sources: [`${environment}.env`, 'global.env']
-      };
-      
-      console.log(`DEBUG ConfigurationManager: After setting loadedConfiguration, this.config has ${Object.keys(this.config).length} keys`);
-      console.log(`DEBUG ConfigurationManager: Final this.config STEP_DEFINITION_PATHS:`, this.config['STEP_DEFINITION_PATHS']);
+  static async loadConfiguration(environment: string, options?: Partial<ConfigurationOptions>): Promise<void>;
+  static async loadConfiguration(project: string, environment: string, options?: Partial<ConfigurationOptions>): Promise<void>;
+  static async loadConfiguration(projectOrEnvironment: string, environmentOrOptions?: string | Partial<ConfigurationOptions>, options?: Partial<ConfigurationOptions>): Promise<void> {
+    // Handle method overloading
+    let project: string;
+    let environment: string;
+    let actualOptions: Partial<ConfigurationOptions> | undefined;
 
-      this.isInitialized = true;
-      console.log(`Configuration loaded successfully for ${environment}`);
+    if (typeof environmentOrOptions === 'string') {
+      // New signature: loadConfiguration(project, environment, options?)
+      project = projectOrEnvironment;
+      environment = environmentOrOptions;
+      actualOptions = options;
+      console.log(`🚀 Loading configuration for project: ${project}, environment: ${environment}`);
+    } else {
+      // Legacy signature: loadConfiguration(environment, options?)
+      environment = projectOrEnvironment;
+      actualOptions = environmentOrOptions;
+      
+      // Infer project from environment or use default
+      project = ConfigurationManager.inferProjectFromEnvironment(environment);
+      console.log(`🔄 Legacy mode: inferred project '${project}' for environment '${environment}'`);
+    }
+
+    try {
+      // Use hierarchical loader for new project-based structure
+      const hierarchicalConfig = await ConfigurationManager.hierarchicalLoader.loadConfiguration(project, environment);
+      
+      // Merge with any legacy configuration if needed
+      const legacyConfig = await ConfigurationManager.loadLegacyConfiguration(environment, actualOptions);
+      
+      // Merge configurations (hierarchical takes precedence)
+      ConfigurationManager.config = { ...legacyConfig, ...hierarchicalConfig };
+      
+      // Create loaded configuration metadata
+      ConfigurationManager.loadedConfiguration = {
+        raw: ConfigurationManager.config,
+        parsed: ConfigurationManager.parseConfiguration(ConfigurationManager.config),
+        project: project,
+        environment: environment,
+        loadedAt: new Date(),
+        sources: [`${project}/hierarchical`, 'legacy-fallback']
+      };
+
+      ConfigurationManager.isInitialized = true;
+      console.log(`✅ Configuration loaded successfully: ${Object.keys(ConfigurationManager.config).length} total keys`);
       
     } catch (error) {
-      console.error('Failed to load configuration:', error);
-      throw error;
+      console.error('❌ Failed to load configuration:', error);
+      throw new Error(`Configuration loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Get configuration value
+   * Load legacy configuration as fallback
    */
-  static get(key: string, defaultValue?: string): string {
-    // 🔥 FIX: Reduce debug logging spam - only log in verbose mode
-    const isVerbose = process.env['CS_DEBUG'] === 'true';
-    if (isVerbose) {
-      console.log(`DEBUG ConfigurationManager.get: key=${key}, defaultValue='${defaultValue}', isInitialized=${this.isInitialized}`);
+  private static async loadLegacyConfiguration(environment: string, options?: Partial<ConfigurationOptions>): Promise<ConfigMap> {
+    try {
+      return await ConfigurationManager.environmentLoader.loadEnvironmentFiles(environment);
+    } catch (error) {
+      console.log(`⚠️  Legacy configuration loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return {};
     }
-    
-    // If not initialized, check process.env first, then return default
-    if (!this.isInitialized) {
-      const envValue = process.env[key];
-      if (isVerbose) {
-        console.log(`DEBUG ConfigurationManager.get: not initialized, checking process.env[${key}]='${envValue}'`);
-      }
-      if (envValue !== undefined) {
-        if (isVerbose) {
-          console.log(`DEBUG ConfigurationManager.get: returning from process.env: '${envValue}'`);
-        }
-        return envValue;
-      }
-      if (isVerbose) {
-        console.log(`DEBUG ConfigurationManager.get: returning default: '${defaultValue || ''}'`);
-      }
-      return defaultValue || '';
-    }
-    
-    const configValue = this.config[key];
-    const result = configValue || defaultValue || '';
-    if (isVerbose) {
-      console.log(`DEBUG ConfigurationManager.get: config[${key}]='${configValue}', returning='${result}'`);
-      console.log(`DEBUG ConfigurationManager.get: available config keys:`, Object.keys(this.config).slice(0, 10));
-    }
-    return result;
   }
 
   /**
-   * Get required configuration value
+   * Infer project from environment name or use default
+   */
+  private static inferProjectFromEnvironment(environment: string): string {
+    // You can add logic here to infer project from environment
+    // For now, default to 'saucedemo'
+    return 'saucedemo';
+  }
+
+  /**
+   * Parse raw configuration into typed configuration object
+   */
+  private static parseConfiguration(config: ConfigMap): Partial<FrameworkConfig> {
+    return {
+      // Framework metadata
+      frameworkName: config['FRAMEWORK_NAME'] || 'CS Framework',
+      logLevel: (config['LOG_LEVEL'] as any) || 'info',
+      
+      // Environment
+      environment: {
+        name: config['ENVIRONMENT_NAME'] || 'unknown',
+        baseURL: config['BASE_URL'] || '',
+        apiBaseURL: config['API_BASE_URL']
+      },
+      
+      // Browser settings
+      browser: {
+        browser: (config['BROWSER_TYPE'] || config['DEFAULT_BROWSER'] || 'chromium') as any,
+        headless: ConfigurationManager.parseBoolean(config['BROWSER_HEADLESS'] || config['HEADLESS_MODE']) || false,
+        slowMo: ConfigurationManager.parseNumber(config['BROWSER_SLOW_MO']) || 0,
+        timeout: ConfigurationManager.parseNumber(config['DEFAULT_TIMEOUT']) || 30000,
+        viewport: {
+          width: ConfigurationManager.parseNumber(config['VIEWPORT_WIDTH']) || 1280,
+          height: ConfigurationManager.parseNumber(config['VIEWPORT_HEIGHT']) || 720
+        },
+        downloadsPath: config['DOWNLOADS_PATH'] || './downloads',
+        ignoreHTTPSErrors: ConfigurationManager.parseBoolean(config['IGNORE_HTTPS_ERRORS']) || false
+      },
+      
+      // Database (only if host is provided)
+      ...(config['DATABASE_HOST'] ? {
+        database: {
+          type: (config['DATABASE_TYPE'] as any) || 'sqlserver',
+          host: config['DATABASE_HOST'],
+          port: ConfigurationManager.parseNumber(config['DATABASE_PORT']) || 1433,
+          database: config['DATABASE_NAME'] || '',
+          username: config['DATABASE_USERNAME'] || '',
+          password: config['DATABASE_PASSWORD'] || '',
+          connectionPoolSize: ConfigurationManager.parseNumber(config['DATABASE_POOL_SIZE']) || 10
+        }
+      } : {}),
+      
+      // API settings
+      api: {
+        timeout: ConfigurationManager.parseNumber(config['API_TIMEOUT']) || 30000,
+        retryCount: ConfigurationManager.parseNumber(config['API_RETRY_COUNT']) || 3,
+        retryDelay: ConfigurationManager.parseNumber(config['API_RETRY_DELAY']) || 1000,
+        validateSSL: ConfigurationManager.parseBoolean(config['API_VALIDATE_SSL']) !== false,
+        logRequestBody: ConfigurationManager.parseBoolean(config['API_LOG_REQUEST_BODY']) || false,
+        logResponseBody: ConfigurationManager.parseBoolean(config['API_LOG_RESPONSE_BODY']) || false,
+        baseURL: config['API_BASE_URL'],
+        headers: config['API_DEFAULT_HEADERS'] ? JSON.parse(config['API_DEFAULT_HEADERS']) : undefined
+      },
+      
+      // Execution settings
+      execution: {
+        parallel: ConfigurationManager.parseBoolean(config['PARALLEL_EXECUTION']) || false,
+        maxWorkers: ConfigurationManager.parseNumber(config['MAX_WORKERS']) || 1,
+        retryCount: ConfigurationManager.parseNumber(config['RETRY_COUNT'] || config['DEFAULT_RETRY_COUNT']) || 0,
+        retryDelay: ConfigurationManager.parseNumber(config['RETRY_DELAY']) || 1000,
+        timeout: ConfigurationManager.parseNumber(config['DEFAULT_TIMEOUT']) || 30000,
+        screenshotOnFailure: ConfigurationManager.parseBoolean(config['SCREENSHOT_ON_FAILURE']) || true
+      },
+      
+      // Report settings
+      report: {
+        path: config['REPORT_PATH'] || './reports',
+        themePrimaryColor: config['REPORT_THEME_PRIMARY'] || '#007bff',
+        generatePDF: ConfigurationManager.parseBoolean(config['REPORT_GENERATE_PDF']) || false,
+        generateExcel: ConfigurationManager.parseBoolean(config['REPORT_GENERATE_EXCEL']) || false,
+        includeScreenshots: ConfigurationManager.parseBoolean(config['REPORT_INCLUDE_SCREENSHOTS']) || true,
+        includeVideos: ConfigurationManager.parseBoolean(config['REPORT_INCLUDE_VIDEOS']) || true,
+        includeLogs: ConfigurationManager.parseBoolean(config['REPORT_INCLUDE_LOGS']) || true
+      },
+      
+      // AI settings
+      ai: {
+        enabled: ConfigurationManager.parseBoolean(config['AI_ENABLED']) || false,
+        selfHealingEnabled: ConfigurationManager.parseBoolean(config['AI_SELF_HEALING_ENABLED']) || false,
+        confidenceThreshold: ConfigurationManager.parseNumber(config['AI_CONFIDENCE_THRESHOLD']) || 0.8,
+        maxHealingAttempts: ConfigurationManager.parseNumber(config['AI_MAX_HEALING_ATTEMPTS']) || 3,
+        cacheEnabled: ConfigurationManager.parseBoolean(config['AI_CACHE_ENABLED']) || true,
+        cacheTTL: ConfigurationManager.parseNumber(config['AI_CACHE_TTL']) || 3600
+      }
+    };
+  }
+
+  /**
+   * Get configuration value by key
+   */
+  static get(key: string, defaultValue: string = ''): string {
+    if (!ConfigurationManager.isInitialized) {
+      console.warn('⚠️  Configuration not initialized. Call loadConfiguration() first.');
+      return defaultValue;
+    }
+    return ConfigurationManager.config[key] || defaultValue;
+  }
+
+  /**
+   * Get configuration value as boolean
+   */
+  static getBoolean(key: string, defaultValue: boolean = false): boolean {
+    const value = ConfigurationManager.get(key);
+    return ConfigurationManager.parseBoolean(value) ?? defaultValue;
+  }
+
+  /**
+   * Get configuration value as number
+   */
+  static getNumber(key: string, defaultValue?: number): number | undefined {
+    const value = ConfigurationManager.get(key);
+    return ConfigurationManager.parseNumber(value) ?? defaultValue;
+  }
+
+  /**
+   * Get configuration value as integer
+   */
+  static getInt(key: string, defaultValue: number = 0): number {
+    const value = ConfigurationManager.get(key);
+    return ConfigurationManager.parseNumber(value) ?? defaultValue;
+  }
+
+  /**
+   * Get configuration value as float
+   */
+  static getFloat(key: string, defaultValue: number = 0.0): number {
+    const value = ConfigurationManager.get(key);
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? defaultValue : parsed;
+  }
+
+  /**
+   * Get required configuration value (throws if missing)
    */
   static getRequired(key: string): string {
-    // If not initialized, check process.env first
-    if (!this.isInitialized) {
-      const envValue = process.env[key];
-      if (envValue !== undefined && envValue !== '') {
-        return envValue;
-      }
-      throw new Error(`Required configuration key not found: ${key} (configuration not initialized)`);
-    }
-    
-    // Check process.env first, then config
-    const envValue = process.env[key];
-    if (envValue !== undefined && envValue !== '') {
-      return envValue;
-    }
-    
-    const value = this.config[key];
-    if (!value) {
-      throw new Error(`Required configuration key not found: ${key}`);
+    const value = ConfigurationManager.get(key);
+    if (value === undefined || value === '') {
+      throw new Error(`Required configuration key '${key}' is missing or empty`);
     }
     return value;
   }
 
   /**
-   * Get integer configuration value
+   * Get configuration value as array (split by delimiter)
    */
-  static getInt(key: string, defaultValue?: number): number {
-    const value = this.get(key);
-    if (!value && defaultValue !== undefined) {
-      return defaultValue;
-    }
-    if (!value) {
-      return 0;
-    }
-    const parsed = parseInt(value, 10);
-    if (isNaN(parsed)) {
-      if (defaultValue !== undefined) {
-        return defaultValue;
-      }
-      throw new Error(`Configuration value for ${key} is not a valid integer: ${value}`);
-    }
-    return parsed;
-  }
-
-  /**
-   * Get float configuration value
-   */
-  static getFloat(key: string, defaultValue?: number): number {
-    const value = this.get(key);
-    if (!value && defaultValue !== undefined) {
-      return defaultValue;
-    }
-    const parsed = parseFloat(value);
-    if (isNaN(parsed)) {
-      throw new Error(`Configuration value for ${key} is not a valid float: ${value}`);
-    }
-    return parsed;
-  }
-
-  /**
-   * Get boolean configuration value
-   */
-  static getBoolean(key: string, defaultValue?: boolean): boolean {
-    const value = this.get(key);
-    if (!value && defaultValue !== undefined) {
-      return defaultValue;
-    }
-    if (!value) {
-      return false;
-    }
-    if (value.toLowerCase() === 'true') return true;
-    if (value.toLowerCase() === 'false') return false;
-    if (defaultValue !== undefined) {
-      return defaultValue;
-    }
-    throw new Error(`Configuration value for ${key} is not a valid boolean: ${value}`);
-  }
-
-  /**
-   * Get array configuration value
-   */
-  static getArray(key: string, separator: string = ','): string[] {
-    const value = this.get(key);
-    // 🔥 FIX: Reduce debug logging spam - only log in verbose mode
-    const isVerbose = process.env['CS_DEBUG'] === 'true';
-    if (isVerbose) {
-      console.log(`DEBUG ConfigurationManager.getArray: key=${key}, value='${value}', typeof='${typeof value}'`);
-      console.log(`DEBUG ConfigurationManager.getArray: isInitialized=${this.isInitialized}, config keys:`, Object.keys(this.config || {}));
-    }
-    if (!value) {
-      if (isVerbose) {
-        console.log(`DEBUG ConfigurationManager.getArray: returning empty array for key=${key}`);
-      }
-      return [];
-    }
-    const result = value.split(separator).map(item => item.trim()).filter(item => item.length > 0);
-    if (isVerbose) {
-      console.log(`DEBUG ConfigurationManager.getArray: returning:`, result);
-    }
-    return result;
-  }
-
-  /**
-   * Get JSON configuration value
-   */
-  static getJSON<T>(key: string): T {
-    const value = this.get(key);
-    if (!value) {
-      throw new Error(`Configuration key not found: ${key}`);
-    }
-    try {
-      return JSON.parse(value) as T;
-    } catch (error) {
-      throw new Error(`Configuration value for ${key} is not valid JSON: ${value}`);
-    }
-  }
-
-  /**
-   * Reload configuration
-   */
-  static async reload(): Promise<void> {
-    if (!this.loadedConfiguration) {
-      throw new Error('No configuration loaded to reload');
-    }
-    await this.loadConfiguration(this.loadedConfiguration.environment);
-  }
-
-  /**
-   * Set configuration value (runtime only)
-   */
-  static set(key: string, value: string): void {
-    this.ensureInitialized();
-    this.config[key] = value;
+  static getArray(key: string, delimiter: string = ','): string[] {
+    const value = ConfigurationManager.get(key);
+    if (!value) return [];
+    return value.split(delimiter).map(item => item.trim()).filter(item => item.length > 0);
   }
 
   /**
    * Check if configuration key exists
    */
   static has(key: string): boolean {
-    this.ensureInitialized();
-    return key in this.config;
+    return ConfigurationManager.config[key] !== undefined;
   }
 
   /**
-   * Get environment name
+   * Set configuration value (for runtime updates)
    */
-  static getEnvironmentName(): string {
-    this.ensureInitialized();
-    return this.loadedConfiguration?.environment || 'unknown';
-  }
-
-  /**
-   * Validate current configuration
-   */
-  static validate(): ValidationResult {
-    this.ensureInitialized();
-    return this.validator.validate(this.config);
+  static set(key: string, value: string): void {
+    ConfigurationManager.config[key] = value;
   }
 
   /**
    * Get all configuration keys
    */
   static getAllKeys(): string[] {
-    this.ensureInitialized();
-    return Object.keys(this.config);
+    return Object.keys(ConfigurationManager.config);
   }
 
   /**
-   * Get configuration by prefix
+   * Get environment name
    */
-  static getByPrefix(prefix: string): ConfigMap {
-    this.ensureInitialized();
-    const filtered: ConfigMap = {};
-    Object.entries(this.config).forEach(([key, value]) => {
-      if (key.startsWith(prefix)) {
-        filtered[key] = value;
-      }
-    });
-    return filtered;
+  static getEnvironmentName(): string {
+    return ConfigurationManager.get('ENVIRONMENT_NAME') || 
+           ConfigurationManager.get('ENV') || 
+           'unknown';
   }
 
   /**
-   * Export configuration (excludes sensitive data)
+   * Get all configuration
    */
-  static export(includeSensitive: boolean = false): ConfigMap {
-    this.ensureInitialized();
-    const exported: ConfigMap = {};
-    const sensitivePatterns = [/PASSWORD/i, /SECRET/i, /KEY/i, /TOKEN/i];
-    
-    Object.entries(this.config).forEach(([key, value]) => {
-      const isSensitive = sensitivePatterns.some(pattern => pattern.test(key));
-      if (includeSensitive || !isSensitive) {
-        exported[key] = isSensitive && !includeSensitive ? '***' : value;
-      }
-    });
-    
-    return exported;
+  static getAll(): ConfigMap {
+    return { ...ConfigurationManager.config };
   }
 
   /**
-   * Get parsed framework configuration
+   * Get loaded configuration metadata
    */
-  static getFrameworkConfig(): Partial<FrameworkConfig> {
-    this.ensureInitialized();
-    return this.loadedConfiguration?.parsed || {};
+  static getLoadedConfiguration(): LoadedConfiguration | null {
+    return ConfigurationManager.loadedConfiguration;
   }
 
   /**
-   * Parse raw configuration into typed structure
+   * Validate current configuration
    */
-  private static parseConfiguration(raw: ConfigMap): Partial<FrameworkConfig> {
-    const apiConfig: APIConfig = {
-      timeout: this.parseNumber(raw['API_DEFAULT_TIMEOUT'], 60000),
-      retryCount: this.parseNumber(raw['API_RETRY_COUNT'], 3),
-      retryDelay: this.parseNumber(raw['API_RETRY_DELAY'], 1000),
-      validateSSL: this.parseBoolean(raw['API_VALIDATE_SSL'], true),
-      logRequestBody: this.parseBoolean(raw['API_LOG_REQUEST_BODY']),
-      logResponseBody: this.parseBoolean(raw['API_LOG_RESPONSE_BODY'])
-    };
-    
-    if (raw['API_BASE_URL']) {
-      apiConfig.baseURL = raw['API_BASE_URL'];
+  static validate(): ValidationResult {
+    if (!ConfigurationManager.isInitialized) {
+      return {
+        valid: false,
+        errors: ['Configuration not initialized'],
+        warnings: []
+      };
     }
     
-    const config: Partial<FrameworkConfig> = {};
-    
-    if (raw['FRAMEWORK_NAME']) {
-      config.frameworkName = raw['FRAMEWORK_NAME'];
-    }
-    
-    if (raw['LOG_LEVEL']) {
-      config.logLevel = raw['LOG_LEVEL'] as any;
-    }
-    
-    config.browser = {
-      browser: raw['DEFAULT_BROWSER'] as any,
-      headless: this.parseBoolean(raw['HEADLESS_MODE']),
-      slowMo: this.parseNumber(raw['BROWSER_SLOWMO'], 0),
-      timeout: this.parseNumber(raw['DEFAULT_TIMEOUT'], 30000),
-      viewport: {
-        width: this.parseNumber(raw['VIEWPORT_WIDTH'], 1920),
-        height: this.parseNumber(raw['VIEWPORT_HEIGHT'], 1080)
-      },
-      downloadsPath: raw['DOWNLOADS_PATH'] || './downloads',
-      ignoreHTTPSErrors: this.parseBoolean(raw['IGNORE_HTTPS_ERRORS'])
-    };
-    
-    config.api = apiConfig;
-    
-    config.report = {
-      path: raw['REPORT_PATH'] || './reports',
-      themePrimaryColor: raw['REPORT_THEME_PRIMARY_COLOR'] || '#93186C',
-      generatePDF: this.parseBoolean(raw['GENERATE_PDF_REPORT']),
-      generateExcel: this.parseBoolean(raw['GENERATE_EXCEL_REPORT']),
-      includeScreenshots: this.parseBoolean(raw['INCLUDE_SCREENSHOTS'], true),
-      includeVideos: this.parseBoolean(raw['INCLUDE_VIDEOS']),
-      includeLogs: this.parseBoolean(raw['INCLUDE_LOGS'], true)
-    };
-    
-    config.ai = {
-      enabled: this.parseBoolean(raw['AI_ENABLED']),
-      selfHealingEnabled: this.parseBoolean(raw['AI_SELF_HEALING_ENABLED']),
-      confidenceThreshold: this.parseNumber(raw['AI_CONFIDENCE_THRESHOLD'], 0.75),
-      maxHealingAttempts: this.parseNumber(raw['AI_MAX_HEALING_ATTEMPTS'], 3),
-      cacheEnabled: this.parseBoolean(raw['AI_CACHE_ENABLED'], true),
-      cacheTTL: this.parseNumber(raw['AI_CACHE_TTL'], 3600)
-    };
-    
-    config.execution = {
-      parallel: this.parseBoolean(raw['PARALLEL_EXECUTION']),
-      maxWorkers: this.parseNumber(raw['MAX_PARALLEL_WORKERS'], 4),
-      retryCount: this.parseNumber(raw['RETRY_COUNT'], 2),
-      retryDelay: this.parseNumber(raw['RETRY_DELAY'], 1000),
-      timeout: this.parseNumber(raw['EXECUTION_TIMEOUT'], 300000),
-      screenshotOnFailure: this.parseBoolean(raw['SCREENSHOT_ON_FAILURE'], true)
-    };
-    
-    return config;
+    return ConfigurationManager.validator.validate(ConfigurationManager.config);
   }
 
   /**
-   * Helper to parse boolean values
+   * Parse string value to boolean
    */
-  private static parseBoolean(value: string | undefined, defaultValue: boolean = false): boolean {
-    if (!value) return defaultValue;
-    return value.toLowerCase() === 'true';
+  private static parseBoolean(value: string | undefined): boolean | undefined {
+    if (value === undefined) return undefined;
+    const lower = value.toLowerCase().trim();
+    return lower === 'true' || lower === '1' || lower === 'yes' || lower === 'on';
   }
 
   /**
-   * Helper to parse number values
+   * Parse string value to number
    */
-  private static parseNumber(value: string | undefined, defaultValue: number): number {
-    if (!value) return defaultValue;
+  private static parseNumber(value: string | undefined): number | undefined {
+    if (value === undefined) return undefined;
     const parsed = parseInt(value, 10);
-    return isNaN(parsed) ? defaultValue : parsed;
-  }
-
-  /**
-   * Ensure configuration is initialized
-   */
-  private static ensureInitialized(): void {
-    if (!this.isInitialized) {
-      throw new Error('Configuration not initialized. Call loadConfiguration() first.');
-    }
+    return isNaN(parsed) ? undefined : parsed;
   }
 
   /**
    * Reset configuration (for testing)
    */
   static reset(): void {
-    this.config = {};
-    this.loadedConfiguration = null;
-    this.isInitialized = false;
+    ConfigurationManager.config = {};
+    ConfigurationManager.loadedConfiguration = null;
+    ConfigurationManager.isInitialized = false;
+  }
+
+  /**
+   * Get configuration value as JSON
+   */
+  static getJSON<T = any>(key: string, defaultValue?: T): T {
+    const value = ConfigurationManager.get(key);
+    if (!value) return defaultValue as T;
+    try {
+      return JSON.parse(value) as T;
+    } catch (error) {
+      console.warn(`⚠️  Failed to parse JSON for key '${key}':`, error);
+      return defaultValue as T;
+    }
+  }
+
+  /**
+   * Export all configuration for external use
+   */
+  static export(): ConfigMap {
+    return { ...ConfigurationManager.config };
   }
 }

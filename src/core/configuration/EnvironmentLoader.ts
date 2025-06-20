@@ -5,7 +5,8 @@ import * as path from 'path';
 import { ConfigMap } from './types/config.types';
 
 export class EnvironmentLoader {
-  private static readonly CONFIG_DIR = path.join(process.cwd(), 'config', 'environments');
+  private static readonly CONFIG_DIR = path.join(process.cwd(), 'config');
+  private static readonly ENVIRONMENTS_DIR = path.join(process.cwd(), 'config', 'environments');
   private static readonly ENCODING = 'utf-8';
   private static readonly ENV_FILE_PATTERN = /^(.+)\.env$/;
   private static readonly VARIABLE_PATTERN = /\${([^}]+)}/g;
@@ -16,20 +17,17 @@ export class EnvironmentLoader {
   async loadEnvironmentFiles(environment: string): Promise<ConfigMap> {
     console.log(`DEBUG EnvironmentLoader: Loading files for environment: ${environment}`);
     
-    const globalConfig = await this.loadEnvFile('global.env');
+    // Load global.env from config root
+    const globalConfig = await this.loadGlobalEnvFile();
     console.log(`DEBUG EnvironmentLoader: Global config loaded, keys: ${Object.keys(globalConfig).length}`);
-    console.log(`DEBUG EnvironmentLoader: Global config sample keys:`, Object.keys(globalConfig).slice(0, 10));
     
-    const envConfig = await this.loadEnvFile(`${environment}.env`);
+    // Load environment-specific file from config/environments
+    const envConfig = await this.loadEnvironmentEnvFile(environment);
     console.log(`DEBUG EnvironmentLoader: Environment config loaded, keys: ${Object.keys(envConfig).length}`);
-    console.log(`DEBUG EnvironmentLoader: Environment config sample keys:`, Object.keys(envConfig).slice(0, 10));
-    console.log(`DEBUG EnvironmentLoader: Environment config has STEP_DEFINITION_PATHS:`, 'STEP_DEFINITION_PATHS' in envConfig);
     
     // Merge configurations with environment-specific overriding global
     let mergedConfig = this.mergeConfigurations(globalConfig, envConfig);
     console.log(`DEBUG EnvironmentLoader: After merging global+env, keys: ${Object.keys(mergedConfig).length}`);
-    console.log(`DEBUG EnvironmentLoader: Merged config has STEP_DEFINITION_PATHS:`, 'STEP_DEFINITION_PATHS' in mergedConfig);
-    console.log(`DEBUG EnvironmentLoader: STEP_DEFINITION_PATHS value:`, mergedConfig['STEP_DEFINITION_PATHS']);
     
     // Load additional configuration files if they exist
     const additionalConfigs = await this.loadAdditionalConfigs(mergedConfig);
@@ -37,7 +35,6 @@ export class EnvironmentLoader {
     
     mergedConfig = this.mergeConfigurations(mergedConfig, additionalConfigs);
     console.log(`DEBUG EnvironmentLoader: After merging additional configs, keys: ${Object.keys(mergedConfig).length}`);
-    console.log(`DEBUG EnvironmentLoader: Final merged config has STEP_DEFINITION_PATHS:`, 'STEP_DEFINITION_PATHS' in mergedConfig);
     
     // Interpolate variables
     mergedConfig = this.interpolateVariables(mergedConfig);
@@ -46,25 +43,36 @@ export class EnvironmentLoader {
     mergedConfig = this.addRuntimeVariables(mergedConfig, environment);
     
     console.log(`DEBUG EnvironmentLoader: Final config keys: ${Object.keys(mergedConfig).length}`);
-    console.log(`DEBUG EnvironmentLoader: Final config sample keys:`, Object.keys(mergedConfig).slice(0, 15));
-    console.log(`DEBUG EnvironmentLoader: Final STEP_DEFINITION_PATHS value:`, mergedConfig['STEP_DEFINITION_PATHS']);
     
     return mergedConfig;
   }
 
   /**
-   * Load a single environment file
+   * Load global.env from config root directory
    */
-  private async loadEnvFile(fileName: string): Promise<ConfigMap> {
-    const filePath = path.join(EnvironmentLoader.CONFIG_DIR, fileName);
-    
+  private async loadGlobalEnvFile(): Promise<ConfigMap> {
+    const filePath = path.join(EnvironmentLoader.CONFIG_DIR, 'global.env');
+    return await this.loadEnvFileFromPath(filePath, 'global.env');
+  }
+
+  /**
+   * Load environment-specific file from config/environments
+   */
+  private async loadEnvironmentEnvFile(environment: string): Promise<ConfigMap> {
+    const filePath = path.join(EnvironmentLoader.ENVIRONMENTS_DIR, `${environment}.env`);
+    return await this.loadEnvFileFromPath(filePath, `${environment}.env`);
+  }
+
+  /**
+   * Load a single environment file from specific path
+   */
+  private async loadEnvFileFromPath(filePath: string, fileName: string): Promise<ConfigMap> {
     try {
       await this.validateEnvFile(filePath);
       const content = await fs.readFile(filePath, EnvironmentLoader.ENCODING);
       console.log(`DEBUG EnvironmentLoader: Loading file ${fileName} from ${filePath}`);
       const config = this.parseEnvFile(content, filePath);
       console.log(`DEBUG EnvironmentLoader: Loaded ${Object.keys(config).length} keys from ${fileName}`);
-      console.log(`DEBUG EnvironmentLoader: Sample keys from ${fileName}:`, Object.keys(config).slice(0, 10));
       return config;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -149,20 +157,23 @@ export class EnvironmentLoader {
     
     // Load database queries if database testing is enabled
     if (config['DATABASE_ENABLED'] === 'true') {
-      const dbQueryConfig = await this.loadEnvFile('../database.query.env');
+      const dbQueryPath = path.join(EnvironmentLoader.CONFIG_DIR, 'database.query.env');
+      const dbQueryConfig = await this.loadEnvFileFromPath(dbQueryPath, 'database.query.env');
       additionalConfig = this.mergeConfigurations(additionalConfig, 
         this.prefixKeys(dbQueryConfig, 'QUERY_'));
     }
     
     // Load API endpoints if API testing is enabled
     if (config['API_ENABLED'] === 'true') {
-      const apiEndpointConfig = await this.loadEnvFile('../api.endpoints.env');
+      const apiEndpointPath = path.join(EnvironmentLoader.CONFIG_DIR, 'api.endpoints.env');
+      const apiEndpointConfig = await this.loadEnvFileFromPath(apiEndpointPath, 'api.endpoints.env');
       additionalConfig = this.mergeConfigurations(additionalConfig, 
         this.prefixKeys(apiEndpointConfig, 'ENDPOINT_'));
     }
     
     // Load test configuration
-    const testConfig = await this.loadEnvFile('../test.config.env');
+    const testConfigPath = path.join(EnvironmentLoader.CONFIG_DIR, 'test.config.env');
+    const testConfig = await this.loadEnvFileFromPath(testConfigPath, 'test.config.env');
     additionalConfig = this.mergeConfigurations(additionalConfig, testConfig);
     
     return additionalConfig;
@@ -223,7 +234,7 @@ export class EnvironmentLoader {
   }
 
   /**
-   * Add runtime variables
+   * Add runtime environment variables
    */
   private addRuntimeVariables(config: ConfigMap, environment: string): ConfigMap {
     return {
@@ -253,7 +264,7 @@ export class EnvironmentLoader {
    */
   async getAvailableEnvironments(): Promise<string[]> {
     try {
-      const files = await fs.readdir(EnvironmentLoader.CONFIG_DIR);
+      const files = await fs.readdir(EnvironmentLoader.ENVIRONMENTS_DIR);
       return files
         .filter(file => EnvironmentLoader.ENV_FILE_PATTERN.test(file) && file !== 'global.env')
         .map(file => file.replace('.env', ''));

@@ -1,6 +1,6 @@
 // src/steps/api/APIGenericSteps.ts
 
-import { CSBDDStepDef } from '../../bdd/decorators/CSBDDStepDef';
+import { CSBDDStepDef, StepDefinitions } from '../../bdd/decorators/CSBDDStepDef';
 import { CSBDDBaseStepDefinition } from '../../bdd/base/CSBDDBaseStepDefinition';
 import { APIContext } from '../../api/context/APIContext';
 import { APIContextManager } from '../../api/context/APIContextManager';
@@ -14,6 +14,7 @@ import { ValidationUtils } from '../../core/utils/ValidationUtils';
  * Generic API testing step definitions for core operations
  * Provides fundamental API testing capabilities
  */
+@StepDefinitions
 export class APIGenericSteps extends CSBDDBaseStepDefinition {
     private apiContextManager: APIContextManager;
     private currentContext: APIContext | null = null;
@@ -21,21 +22,8 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
 
     constructor() {
         super();
-        try {
-            this.apiContextManager = APIContextManager.getInstance();
-            this.responseStorage = ResponseStorage.getInstance();
-            
-            // Verify initialization
-            if (!this.apiContextManager) {
-                throw new Error('Failed to initialize APIContextManager');
-            }
-            if (!this.responseStorage) {
-                throw new Error('Failed to initialize ResponseStorage');
-            }
-        } catch (error) {
-            console.error('APIGenericSteps initialization failed:', error);
-            throw error;
-        }
+        this.apiContextManager = APIContextManager.getInstance();
+        this.responseStorage = ResponseStorage.getInstance();
     }
 
     /**
@@ -57,7 +45,18 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
             }
             
             // Create or get existing context
-            this.currentContext = this.apiContextManager.createContext(apiName);
+            if (this.apiContextManager.hasContext(apiName)) {
+                // Context already exists, get it
+                this.currentContext = this.apiContextManager.getContext(apiName);
+                await actionLogger.logAction('contextReused', { apiName });
+            } else {
+                // Context doesn't exist, create it
+                this.currentContext = this.apiContextManager.createContext(apiName);
+                await actionLogger.logAction('contextCreated', { apiName });
+            }
+            
+            // Switch to the newly created context so it becomes the current context
+            this.apiContextManager.switchContext(apiName);
             
             // Load API-specific configuration
             const apiConfig = await this.loadAPIConfig(apiName);
@@ -69,9 +68,14 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 this.currentContext.setTimeout(apiConfig.timeout || 30000);
             }
             
-            // Store in BDD context for other steps
-            this.store('currentAPIContext', this.currentContext);
-            this.store('currentAPIName', apiName);
+            // Store in BDD context for other steps (only if scenario context is available)
+            try {
+                this.store('currentAPIContext', this.currentContext);
+                this.store('currentAPIName', apiName);
+            } catch (error) {
+                // Scenario context not available - this is fine for standalone API tests
+                // The context is still stored in the instance variables
+            }
             
             await actionLogger.logAction('contextSet', { 
                 apiName, 
@@ -101,7 +105,11 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
             
             // Get current context or create default
             if (!this.currentContext) {
-                this.currentContext = await this.apiContextManager.createContext('default');
+                if (this.apiContextManager.hasContext('default')) {
+                    this.currentContext = this.apiContextManager.getContext('default');
+                } else {
+                    this.currentContext = this.apiContextManager.createContext('default');
+                }
             }
             
             // Interpolate variables if present
@@ -584,5 +592,234 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
         
         return interpolated;
+    }
+
+    /**
+     * Sets base URL (alias for user sets API base URL to)
+     * Example: Given user sets base URL to "https://api.example.com"
+     */
+    @CSBDDStepDef("user sets base URL to {string}")
+    async setBaseURL(baseUrl: string): Promise<void> {
+        return await this.setAPIBaseURL(baseUrl);
+    }
+
+    /**
+     * Loads test data from a file
+     * Example: Given user loads test data from "api/test-data.json" as "testData"
+     */
+    @CSBDDStepDef("user loads test data from {string} as {string}")
+    async loadTestData(filePath: string, dataName: string): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        await actionLogger.logAction('loadTestData', { filePath, dataName });
+        
+        try {
+            const resolvedPath = await this.resolveDataFilePath(filePath);
+            
+            // Check if file exists
+            if (!require('fs').existsSync(resolvedPath)) {
+                throw new Error(`Test data file not found: ${resolvedPath}`);
+            }
+            
+            // Read file content
+            const content = require('fs').readFileSync(resolvedPath);
+            const contentString = content.toString('utf8');
+            let data: any;
+            
+            // Parse based on file extension
+            if (filePath.endsWith('.json')) {
+                try {
+                    if (contentString.trim()) {
+                        data = JSON.parse(contentString);
+                    } else {
+                        throw new Error('File is empty');
+                    }
+                } catch (parseError) {
+                    throw new Error(`Invalid JSON format in ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+                }
+            } else if (filePath.endsWith('.csv')) {
+                try {
+                    if (contentString.trim()) {
+                        data = this.parseCSV(contentString);
+                    } else {
+                        throw new Error('File is empty');
+                    }
+                } catch (parseError) {
+                    throw new Error(`Invalid CSV format in ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+                }
+            } else {
+                throw new Error(`Unsupported file format: ${filePath}. Supported formats: .json, .csv`);
+            }
+            
+            // Store the data in context with the given name
+            this.store(dataName, data);
+            
+            await actionLogger.logAction('testDataLoaded', { 
+                filePath: resolvedPath,
+                dataName,
+                recordCount: Array.isArray(data) ? data.length : (data ? Object.keys(data).length : 0)
+            });
+            
+        } catch (error) {
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to load test data' });
+            throw new Error(`Failed to load test data: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Sets ADO test case ID for tracking
+     * Example: Given user sets ADO test case ID "TC-001"
+     */
+    @CSBDDStepDef("user sets ADO test case ID {string}")
+    async setADOTestCaseID(testCaseId: string): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        await actionLogger.logAction('setADOTestCaseID', { testCaseId });
+        
+        try {
+            const interpolatedId = await this.interpolateValue(testCaseId);
+            this.store('adoTestCaseId', interpolatedId);
+            
+            await actionLogger.logAction('adoTestCaseIdSet', { 
+                originalId: testCaseId,
+                interpolatedId
+            });
+        } catch (error) {
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set ADO test case ID' });
+            throw new Error(`Failed to set ADO test case ID: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Stores response JSON value as a variable
+     * Example: Given user stores response JSON "token" as "auth_token"
+     */
+    @CSBDDStepDef("user stores response JSON {string} as {string}")
+    async storeResponseJSONValue(jsonPath: string, variableName: string): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        await actionLogger.logAction('storeResponseJSONValue', { jsonPath, variableName });
+        
+        try {
+            const response = this.responseStorage.retrieve('last');
+            if (!response) {
+                throw new Error('No response available to extract value from');
+            }
+            
+            // Parse response body as JSON
+            let responseBody: any;
+            try {
+                responseBody = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+            } catch (parseError) {
+                throw new Error(`Response body is not valid JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            }
+            
+            // Extract value using simple path (e.g., "token", "user.id")
+            let value = responseBody;
+            const pathParts = jsonPath.split('.');
+            
+            for (const part of pathParts) {
+                if (value && typeof value === 'object' && part in value) {
+                    value = value[part];
+                } else {
+                    throw new Error(`JSON path '${jsonPath}' not found in response`);
+                }
+            }
+            
+            // Store the value
+            this.store(variableName, value);
+            
+            if (!this.currentContext) {
+                this.currentContext = await this.apiContextManager.createContext('default');
+            }
+            this.currentContext.setVariable(variableName, value);
+            
+            await actionLogger.logAction('responseJSONValueStored', { 
+                jsonPath,
+                variableName,
+                valueType: typeof value,
+                valuePreview: String(value).substring(0, 100)
+            });
+        } catch (error) {
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to store response JSON value' });
+            throw new Error(`Failed to store response JSON value: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Captures response as ADO evidence
+     * Example: Given user captures response as ADO evidence
+     */
+    @CSBDDStepDef("user captures response as ADO evidence")
+    async captureResponseAsADOEvidence(): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        await actionLogger.logAction('captureResponseAsADOEvidence', {});
+        
+        try {
+            const response = this.responseStorage.retrieve('last');
+            if (!response) {
+                throw new Error('No response available to capture as evidence');
+            }
+            
+            // Store response data for ADO evidence collection
+            const evidenceData = {
+                timestamp: new Date().toISOString(),
+                statusCode: response.status,
+                headers: response.headers,
+                body: response.body,
+                responseTime: response.responseTime || 0
+            };
+            
+            this.store('adoResponseEvidence', evidenceData);
+            
+            await actionLogger.logAction('responseEvidenceCaptured', { 
+                statusCode: response.status,
+                responseTime: response.responseTime,
+                bodySize: typeof response.body === 'string' ? response.body.length : 0
+            });
+        } catch (error) {
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to capture response as ADO evidence' });
+            throw new Error(`Failed to capture response as ADO evidence: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Helper method to resolve data file paths
+     */
+    private async resolveDataFilePath(filePath: string): Promise<string> {
+        const path = await import('path');
+        
+        // Check if absolute path
+        if (path.isAbsolute(filePath)) {
+            return filePath;
+        }
+        
+        // Try relative to test data directory
+        const testDataPath = ConfigurationManager.get('TEST_DATA_PATH', './test/data');
+        const resolvedPath = path.join(testDataPath, filePath);
+        
+        if (await FileUtils.exists(resolvedPath)) {
+            return resolvedPath;
+        }
+        
+        // Try relative to project root
+        return filePath;
+    }
+
+    /**
+     * Helper method to parse CSV content
+     */
+    private parseCSV(content: string): any {
+        const lines = content.split('\n');
+        if (lines.length > 0 && lines[0]) {
+            const headers = lines[0].split(',');
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                const row: any = {};
+                headers.forEach((header, index) => {
+                    row[header.trim()] = values[index]?.trim() || '';
+                });
+                return row;
+            });
+        } else {
+            return [];
+        }
     }
 }

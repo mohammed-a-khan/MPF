@@ -7,6 +7,7 @@ import { RequestTemplateEngine } from '../../api/templates/RequestTemplateEngine
 import { FileUtils } from '../../core/utils/FileUtils';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
+import { APIContextManager } from '../../api/context/APIContextManager';
 
 /**
  * Step definitions for configuring API request body
@@ -15,6 +16,7 @@ import { ConfigurationManager } from '../../core/configuration/ConfigurationMana
 @StepDefinitions
 export class RequestBodySteps extends CSBDDBaseStepDefinition {
     private templateEngine: RequestTemplateEngine;
+    private currentContext: APIContext | null = null;
 
     constructor() {
         super();
@@ -222,44 +224,82 @@ export class RequestBodySteps extends CSBDDBaseStepDefinition {
     }
 
     /**
-     * Sets JSON body from object notation
-     * Example: Given user sets JSON body:
+     * Sets JSON body from object notation or raw JSON
+     * Example with data table: Given user sets JSON body:
      *   | name  | John Doe |
      *   | age   | 30       |
      *   | email | {{email}} |
+     * 
+     * Example with DocString: Given user sets JSON body:
+     *   """
+     *   {
+     *     "name": "John Doe",
+     *     "email": "{{email}}"
+     *   }
+     *   """
      */
     @CSBDDStepDef("user sets JSON body:")
-    async setJSONBody(dataTable: any): Promise<void> {
+    async setJSONBody(dataTableOrDocString: any): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('setJSONBody', { data: dataTable });
+        await actionLogger.logAction('setJSONBody', { data: dataTableOrDocString });
         
         try {
             const currentContext = this.getAPIContext();
-            const jsonObject: Record<string, any> = {};
             
-            // Parse data table
-            const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
-            
-            for (const row of rows) {
-                const key = row[0] || row.key || row.property;
-                const value = row[1] || row.value;
+            // Check if input is a string (DocString) or data table
+            if (typeof dataTableOrDocString === 'string') {
+                // Handle DocString - raw JSON input
+                const jsonContent = dataTableOrDocString.trim();
                 
-                if (!key) {
-                    throw new Error('JSON property name cannot be empty');
+                // Process template variables
+                const variables: Record<string, any> = {};
+                const processedJSON = await this.templateEngine.processTemplate(jsonContent, variables);
+                
+                // Parse and validate JSON
+                let jsonObject;
+                try {
+                    jsonObject = JSON.parse(processedJSON);
+                } catch (parseError) {
+                    throw new Error(`Invalid JSON format: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
                 }
                 
-                // Interpolate and parse value
-                const interpolatedValue = await this.interpolateValue(String(value || ''));
-                jsonObject[key] = this.parseJSONValue(interpolatedValue);
+                currentContext.setVariable('body', jsonObject);
+                currentContext.setHeader('Content-Type', 'application/json');
+                
+                await actionLogger.logAction('jsonBodySet', { 
+                    source: 'docstring',
+                    bodySize: processedJSON.length,
+                    isTemplated: jsonContent !== processedJSON
+                });
+            } else {
+                // Handle data table - key-value pairs  
+                const jsonObject: Record<string, any> = {};
+                
+                // Parse data table
+                const rows = dataTableOrDocString.hashes ? dataTableOrDocString.hashes() : dataTableOrDocString.rows();
+                
+                for (const row of rows) {
+                    const key = row[0] || row.key || row.property;
+                    const value = row[1] || row.value;
+                    
+                    if (!key) {
+                        throw new Error('JSON property name cannot be empty');
+                    }
+                    
+                    // Interpolate and parse value
+                    const interpolatedValue = await this.interpolateValue(String(value || ''));
+                    jsonObject[key] = this.parseJSONValue(interpolatedValue);
+                }
+                
+                currentContext.setVariable('body', jsonObject);
+                currentContext.setHeader('Content-Type', 'application/json');
+                
+                await actionLogger.logAction('jsonBodySet', { 
+                    source: 'datatable',
+                    properties: Object.keys(jsonObject).length,
+                    body: jsonObject
+                });
             }
-            
-            currentContext.setVariable('body', jsonObject);
-            currentContext.setHeader('Content-Type', 'application/json');
-            
-            await actionLogger.logAction('jsonBodySet', { 
-                properties: Object.keys(jsonObject).length,
-                body: jsonObject
-            });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set JSON body' });
             throw new Error(`Failed to set JSON body: ${error instanceof Error ? error.message : String(error)}`);
@@ -573,14 +613,91 @@ export class RequestBodySteps extends CSBDDBaseStepDefinition {
     }
 
     /**
+     * Sets request body to JSON from docstring
+     * Example: Given user sets request body to JSON:
+     *   """
+     *   {
+     *     "name": "{{userName}}",
+     *     "email": "{{userEmail}}"
+     *   }
+     *   """
+     */
+    @CSBDDStepDef("user sets request body to JSON:")
+    async setRequestBodyToJSON(jsonContent: string): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        await actionLogger.logAction('setRequestBodyToJSON', { 
+            contentLength: jsonContent.length 
+        });
+        
+        try {
+            const currentContext = this.getAPIContext();
+            
+            // Debug: Log the raw JSON content
+            console.log('🔍 DEBUG - Raw JSON content:', JSON.stringify(jsonContent));
+            console.log('🔍 DEBUG - Raw JSON content length:', jsonContent.length);
+            console.log('🔍 DEBUG - First 20 chars:', JSON.stringify(jsonContent.substring(0, 20)));
+            
+            // Interpolate variables
+            const interpolatedJson = await this.interpolateValue(jsonContent);
+            
+            // Debug: Log the interpolated JSON
+            console.log('🔍 DEBUG - Interpolated JSON:', JSON.stringify(interpolatedJson));
+            console.log('🔍 DEBUG - About to parse JSON...');
+            
+            // Parse and validate JSON
+            const jsonBody = JSON.parse(interpolatedJson);
+            
+            currentContext.setVariable('body', jsonBody);
+            
+            // Set content type header
+            currentContext.setHeader('Content-Type', 'application/json');
+            
+            await actionLogger.logAction('requestBodySetToJSON', { 
+                bodySize: interpolatedJson.length,
+                isTemplated: jsonContent !== interpolatedJson
+            });
+        } catch (error) {
+            console.log('🔍 DEBUG - JSON Parse Error:', error);
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set JSON request body' });
+            throw new Error(`Failed to set JSON request body: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
      * Helper method to get current API context
      */
     private getAPIContext(): APIContext {
-        const context = this.retrieve('currentAPIContext') as APIContext;
-        if (!context) {
-            throw new Error('No API context set. Please use "Given user is working with <api> API" first');
+        // Try to get from instance context first (if available)
+        if (this.currentContext) {
+            return this.currentContext;
         }
-        return context;
+        
+        // Try to get from BDD context (only if scenario context is available)
+        try {
+            const context = this.retrieve('currentAPIContext') as APIContext;
+            if (context) {
+                this.currentContext = context;
+                return context;
+            }
+        } catch (error) {
+            // Scenario context not available - try alternative sources
+        }
+        
+        // Try to get from APIContextManager
+        try {
+            const apiContextManager = APIContextManager.getInstance();
+            if (apiContextManager.hasContext('default')) {
+                this.currentContext = apiContextManager.getContext('default');
+                return this.currentContext;
+            } else {
+                this.currentContext = apiContextManager.createContext('default');
+                return this.currentContext;
+            }
+        } catch (error) {
+            // APIContextManager not available
+        }
+        
+        throw new Error('No API context available. Please use "Given user sets API base URL" first');
     }
 
     /**
@@ -785,5 +902,33 @@ export class RequestBodySteps extends CSBDDBaseStepDefinition {
         });
         
         return interpolated;
+    }
+
+    /**
+     * Sets content type header
+     * Example: Given user sets content type to "application/json"
+     */
+    @CSBDDStepDef("user sets content type to {string}")
+    async setContentType(contentType: string): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        await actionLogger.logAction('setContentType', { contentType });
+        
+        try {
+            const currentContext = this.getAPIContext();
+            
+            // Interpolate content type
+            const interpolatedContentType = await this.interpolateValue(contentType);
+            
+            // Set content type header
+            currentContext.setHeader('Content-Type', interpolatedContentType);
+            
+            await actionLogger.logAction('contentTypeSet', { 
+                originalContentType: contentType,
+                interpolatedContentType
+            });
+        } catch (error) {
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set content type' });
+            throw new Error(`Failed to set content type: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 }

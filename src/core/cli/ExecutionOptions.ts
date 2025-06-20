@@ -11,7 +11,8 @@ import { ExecutionStatus } from '../../bdd/types/bdd.types';
 * Main execution options interface containing all possible configuration
 */
 export interface ExecutionOptions {
- // Environment Configuration
+ // Project and Environment Configuration
+ project: string;
  environment: string;
  environmentVariables?: Record<string, string>;
  

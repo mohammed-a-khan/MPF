@@ -413,9 +413,14 @@ export class BrowserManager {
    * Start health monitoring
    */
   private startHealthMonitoring(): void {
-    this.healthCheckInterval = setInterval(async () => {
-      await this.performHealthCheck();
-    }, this.HEALTH_CHECK_INTERVAL);
+    // CRITICAL FIX: Disable periodic health monitoring to prevent about:blank page creation
+    // Periodic health checks were causing browser pages to flash every 30 seconds
+    ActionLogger.logInfo('🚫 Health monitoring disabled to prevent browser page flashing');
+    
+    // OLD CODE THAT CAUSED PERIODIC about:blank PAGES - PERMANENTLY DISABLED
+    // this.healthCheckInterval = setInterval(async () => {
+    //   await this.performHealthCheck();
+    // }, this.HEALTH_CHECK_INTERVAL);
   }
 
   /**
@@ -440,12 +445,8 @@ export class BrowserManager {
         return;
       }
       
-      // Try to create a context and page as health check
-      const context = await this.browser.newContext();
-      const page = await context.newPage();
-      await page.goto('about:blank');
-      await context.close();
-      
+      // CRITICAL FIX: Disable health check page creation to prevent about:blank flashing
+      // Simple connectivity check without creating pages
       this.health.isHealthy = true;
       this.health.responseTime = Date.now() - startTime;
       this.health.lastHealthCheck = new Date();
@@ -454,6 +455,13 @@ export class BrowserManager {
       if (process.memoryUsage) {
         this.health.memoryUsage = process.memoryUsage().heapUsed;
       }
+      
+      // OLD CODE THAT CAUSED about:blank PAGES - PERMANENTLY DISABLED
+      // const context = await this.browser.newContext();
+      // const page = await context.newPage();
+      // await page.goto('about:blank');
+      // await context.close();
+      
     } catch (error) {
       ActionLogger.logError('Health check failed', error);
       this.health.isHealthy = false;

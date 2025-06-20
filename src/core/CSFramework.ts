@@ -97,22 +97,44 @@ export class CSFramework {
     }
 
     /**
-     * Initialize framework with environment - Implements parallel bootstrap for improved performance
+     * Initialize framework with project and environment - Implements parallel bootstrap for improved performance
      */
-    async initialize(environment: string, config?: Partial<FrameworkConfig>): Promise<void> {
+    async initialize(project: string, environment: string, config?: Partial<FrameworkConfig>): Promise<void>;
+    async initialize(environment: string, config?: Partial<FrameworkConfig>): Promise<void>;
+    async initialize(projectOrEnvironment: string, environmentOrConfig?: string | Partial<FrameworkConfig>, config?: Partial<FrameworkConfig>): Promise<void> {
         const initStartTime = performance.now();
         
+        // Handle method overloading
+        let project: string;
+        let environment: string;
+        let actualConfig: Partial<FrameworkConfig> | undefined;
+
+        if (typeof environmentOrConfig === 'string') {
+            // New signature: initialize(project, environment, config?)
+            project = projectOrEnvironment;
+            environment = environmentOrConfig;
+            actualConfig = config;
+        } else {
+            // Legacy signature: initialize(environment, config?)
+            environment = projectOrEnvironment;
+            actualConfig = environmentOrConfig;
+            
+            // Try to determine project from environment name or use default
+            project = this.inferProjectFromEnvironment(environment);
+            console.log(`🔄 Legacy mode: inferred project '${project}' for environment '${environment}'`);
+        }
+        
         try {
-            logger.info(`🚀 Starting CS Framework v${CSFramework.version} parallel initialization for environment: ${environment}`);
+            logger.info(`🚀 Starting CS Framework v${CSFramework.version} parallel initialization for project: ${project}, environment: ${environment}`);
             this.startTime = new Date();
             this.currentEnvironment = environment;
 
-            await this.initializeCoreModulesParallel(environment, config);
-            await this.initializeServiceModulesParallel(config);
-            await this.initializeDependentModules(config);
+            await this.initializeCoreModulesParallel(project, environment, actualConfig);
+            await this.initializeServiceModulesParallel(actualConfig);
+            await this.initializeDependentModules(actualConfig);
 
-            if (config?.timeout) {
-                this.setGlobalTimeout(config.timeout);
+            if (actualConfig?.timeout) {
+                this.setGlobalTimeout(actualConfig.timeout);
             }
 
             this.isInitialized = true;
@@ -127,10 +149,23 @@ export class CSFramework {
     }
 
     /**
+     * Infer project from environment name (for backward compatibility)
+     */
+    private inferProjectFromEnvironment(environment: string): string {
+        // Check if environment contains project hints
+        if (environment.includes('api') || environment === 'demo') {
+            return 'api';
+        }
+        
+        // Default to saucedemo for most environments
+        return 'saucedemo';
+    }
+
+    /**
      * Phase 1: Initialize core independent modules with configuration first
      */
-    private async initializeCoreModulesParallel(environment: string, config?: Partial<FrameworkConfig>): Promise<void> {
-        await this.initializeConfigurationWithFallback(environment);
+    private async initializeCoreModulesParallel(project: string, environment: string, config?: Partial<FrameworkConfig>): Promise<void> {
+        await this.initializeConfigurationWithFallback(project, environment);
         this.updateComponentStatus('ConfigurationManager', true, true);
         logger.info('✅ Configuration loaded - proceeding with parallel initialization');
         
@@ -532,10 +567,10 @@ export class CSFramework {
     /**
      * Initialize configuration manager with fallback to default configuration
      */
-    private async initializeConfigurationWithFallback(environment: string): Promise<void> {
+    private async initializeConfigurationWithFallback(project: string, environment: string): Promise<void> {
         logger.info('Initializing configuration manager with fallback...');
         try {
-            await ConfigurationManager.loadConfiguration(environment);
+            await ConfigurationManager.loadConfiguration(project, environment);
             
             const validation = ConfigurationManager.validate();
             if (!validation.valid) {

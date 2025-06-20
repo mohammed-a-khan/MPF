@@ -11,6 +11,8 @@ import { XMLValidator } from '../../api/validators/XMLValidator';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { FileUtils } from '../../core/utils/FileUtils';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
+import { ResponseStorage } from '../../bdd/context/ResponseStorage';
+import { APIContextManager } from '../../api/context/APIContextManager';
 
 /**
  * Step definitions for validating API responses
@@ -24,6 +26,8 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
     private schemaValidator: SchemaValidator;
     private jsonPathValidator: JSONPathValidator;
     private xmlValidator: XMLValidator;
+    private responseStorage: ResponseStorage;
+    private apiContextManager: APIContextManager;
 
     constructor() {
         super();
@@ -33,6 +37,8 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         this.schemaValidator = SchemaValidator.getInstance();
         this.jsonPathValidator = JSONPathValidator.getInstance();
         this.xmlValidator = XMLValidator.getInstance();
+        this.responseStorage = ResponseStorage.getInstance();
+        this.apiContextManager = APIContextManager.getInstance();
     }
 
     /**
@@ -46,15 +52,15 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         
         try {
             const response = this.getLastResponse();
-            const result = this.statusCodeValidator.validate(response.statusCode, expectedCode);
+            const result = this.statusCodeValidator.validate(response.status, expectedCode);
             
             if (!result.valid) {
-                throw new Error(`Status code validation failed: Expected ${expectedCode} but got ${response.statusCode}. ${result.message || ''}`);
+                throw new Error(`Status code validation failed: Expected ${expectedCode} but got ${response.status}. ${result.message || ''}`);
             }
             
             await actionLogger.logAction('statusCodeValidated', { 
                 expected: expectedCode,
-                actual: response.statusCode
+                actual: response.status
             });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Status code validation failed' });
@@ -73,15 +79,15 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         
         try {
             const response = this.getLastResponse();
-            const result = this.statusCodeValidator.validateRange(response.statusCode, minCode, maxCode);
+            const result = this.statusCodeValidator.validateRange(response.status, minCode, maxCode);
             
             if (!result.valid) {
-                throw new Error(`Status code validation failed: Expected code between ${minCode} and ${maxCode} but got ${response.statusCode}`);
+                throw new Error(`Status code validation failed: Expected code between ${minCode} and ${maxCode} but got ${response.status}`);
             }
             
             await actionLogger.logAction('statusCodeRangeValidated', { 
                 range: `${minCode}-${maxCode}`,
-                actual: response.statusCode
+                actual: response.status
             });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Status code range validation failed' });
@@ -588,11 +594,39 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
      * Helper method to get last response
      */
     private getLastResponse(): any {
-        const response = this.retrieve('lastAPIResponse');
-        if (!response) {
-            throw new Error('No API response found. Please execute a request first');
+        // Try to get from BDD context first (only if scenario context is available)
+        try {
+            const response = this.retrieve('lastAPIResponse');
+            if (response) {
+                return response;
+            }
+        } catch (error) {
+            // Scenario context not available - try alternative sources
         }
-        return response;
+        
+        // Try to get from ResponseStorage with standalone key
+        try {
+            const response = this.responseStorage.retrieve('last', 'standalone');
+            if (response) {
+                return response;
+            }
+        } catch (error) {
+            // ResponseStorage not available or no response found
+        }
+        
+        // Try to get from current API context
+        try {
+            const apiContextManager = APIContextManager.getInstance();
+            const currentContext = apiContextManager.getCurrentContext();
+            const response = currentContext.getResponse('last');
+            if (response) {
+                return response;
+            }
+        } catch (error) {
+            // API context not available or no response found
+        }
+        
+        throw new Error('No API response found. Please execute a request first');
     }
 
     /**
@@ -701,5 +735,73 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         });
         
         return interpolated;
+    }
+
+    /**
+     * Validates response contains JSON with data table
+     * Example: Then response should contain JSON:
+     *   | path | type |
+     *   | token | string |
+     *   | user.id | number |
+     */
+    @CSBDDStepDef("response should contain JSON:")
+    async validateResponseContainsJSON(dataTable: any): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        await actionLogger.logAction('validateResponseContainsJSON', {});
+        
+        try {
+            const response = this.getLastResponse();
+            const jsonBody = this.parseResponseAsJSON(response);
+            
+            // Parse data table
+            const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
+            
+            for (const row of rows) {
+                const path = row.path || row[0];
+                const expectedType = row.type || row[1];
+                const expectedValue = row.value || row[2];
+                
+                if (!path) {
+                    throw new Error('JSON path cannot be empty');
+                }
+                
+                // Extract value using JSON path
+                let actualValue = jsonBody;
+                const pathParts = path.split('.');
+                
+                for (const part of pathParts) {
+                    if (actualValue && typeof actualValue === 'object' && part in actualValue) {
+                        actualValue = actualValue[part];
+                    } else {
+                        throw new Error(`JSON path '${path}' not found in response`);
+                    }
+                }
+                
+                // Validate type if specified
+                if (expectedType) {
+                    const actualType = Array.isArray(actualValue) ? 'array' : typeof actualValue;
+                    if (actualType !== expectedType) {
+                        throw new Error(`JSON path '${path}' type mismatch. Expected: ${expectedType}, Actual: ${actualType}`);
+                    }
+                }
+                
+                // Validate value if specified
+                if (expectedValue !== undefined && expectedValue !== '') {
+                    const interpolatedExpectedValue = await this.interpolateValue(String(expectedValue));
+                    const parsedExpectedValue = this.parseExpectedValue(interpolatedExpectedValue);
+                    
+                    if (actualValue !== parsedExpectedValue) {
+                        throw new Error(`JSON path '${path}' value mismatch. Expected: ${parsedExpectedValue}, Actual: ${actualValue}`);
+                    }
+                }
+            }
+            
+            await actionLogger.logAction('responseJSONValidated', { 
+                validationCount: Array.isArray(rows) ? rows.length : 0
+            });
+        } catch (error) {
+            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Response JSON validation failed' });
+            throw error;
+        }
     }
 }

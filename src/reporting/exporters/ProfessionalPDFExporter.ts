@@ -308,7 +308,7 @@ export class ProfessionalPDFExporter {
         const metadata = reportData.metadata || {};
         return `
         <div style="font-size: 10px; color: #666; width: 100%; text-align: center; margin: 0; padding: 5px 0;">
-            <span>CS Test Automation Framework - ${metadata.environment || 'Test'} Environment Report</span>
+            <span>CS Test Automation Framework - ${(metadata as any).environment || 'Test'} Environment Report</span>
         </div>`;
     }
 

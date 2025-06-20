@@ -7,6 +7,7 @@ export interface ConfigMap {
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
+  warnings?: string[];
 }
 
 export interface BrowserConfig {
@@ -158,6 +159,7 @@ export interface ConfigDependency {
 export interface LoadedConfiguration {
   raw: ConfigMap;
   parsed: Partial<FrameworkConfig>;
+  project: string;
   environment: string;
   loadedAt: Date;
   sources: string[];

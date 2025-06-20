@@ -11,7 +11,7 @@
   "scripts": {
     "//": "=== BUILD & QUALITY SCRIPTS ===",
     "postinstall": "playwright install",
-    "test": "ts-node --transpile-only --files src/index.ts",
+    "test": "ts-node src/index.ts --",
     "test:pure-ts": "ts-node --transpile-only --files --esm src/index.ts",
     "test-original": "ts-node --transpile-only src/index.ts",
     "test:debug": "node --inspect-brk -r ts-node/register src/index.ts",

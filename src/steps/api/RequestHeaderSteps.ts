@@ -158,27 +158,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
     }
 
     /**
-     * Sets Content-Type header
-     * Example: Given user sets content type to "application/json"
-     */
-    @CSBDDStepDef("user sets content type to {string}")
-    async setContentTypeHeader(contentType: string): Promise<void> {
-        const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('setContentType', { contentType });
-        
-        try {
-            const currentContext = this.getAPIContext();
-            
-            currentContext.setHeader('Content-Type', contentType);
-            
-            await actionLogger.logAction('contentTypeSet', { contentType });
-        } catch (error) {
-            await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set Content-Type header' });
-            throw new Error(`Failed to set Content-Type header: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
-
-    /**
      * Sets a default header that will be used for all requests
      * Example: Given user sets default header "X-Client-ID" to "test-client"
      */

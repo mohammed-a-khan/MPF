@@ -66,7 +66,9 @@ export class StepDefinitionLoader {
             '**/test/**/*.steps.ts',
             '**/test/**/*.step.ts',
             '**/test/**/steps/**/*.ts',
-            '**/test/**/step/**/*.ts'
+            '**/test/**/step/**/*.ts',
+            '**/src/steps/**/*.ts',
+            '**/src/**/steps/**/*.ts'
         ];
         
         const files = new Set<string>();

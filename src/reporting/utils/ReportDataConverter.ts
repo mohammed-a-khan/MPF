@@ -80,8 +80,8 @@ export class ReportDataConverter {
             feature: feature.feature || feature.name || 'Unknown Feature',
             scenarios: feature.scenarios || [],
             status: feature.status || this.determineFeatureStatus(feature),
-            startTime: feature.startTime || Date.now(),
-            endTime: feature.endTime || Date.now(),
+            startTime: new Date(feature.startTime || Date.now()),
+            endTime: new Date(feature.endTime || Date.now()),
             duration: feature.duration || 0,
             tags: feature.tags || []
         }));
