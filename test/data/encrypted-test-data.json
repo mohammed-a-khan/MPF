@@ -1,0 +1,37 @@
+[
+  {
+    "testId": "TC001",
+    "username": "testuser1",
+    "password": "ENCRYPTED:eyJlbmNyeXB0ZWQiOiJqS3hOaWVWVlJrb2t6MVNHcWFBdz09IiwiaXYiOiJOS3NlSjlkcmlJNjZpdVVTIiwidGFnIjoiZ2VHM1pGWGhmVnVhZ2hDZHFoeGZxdz09In0=",
+    "api_key": "ENCRYPTED:eyJlbmNyeXB0ZWQiOiJyT0h2YjVGcW5QM2JUZ2JKWHRuRGZnPT0iLCJpdiI6IlVmN1BpeW9YWDBBRmZ4VWQiLCJ0YWciOiJQT2N1RFRRdU9zVWdJWnlMTEtyYXV3PT0ifQ==",
+    "email": "testuser1@example.com",
+    "role": "admin",
+    "executeTest": true
+  },
+  {
+    "testId": "TC002", 
+    "username": "testuser2",
+    "password": "ENCRYPTED:eyJlbmNyeXB0ZWQiOiJzbE5ZZmx3SkE5WlF0S0F6V2dJZnNnPT0iLCJpdiI6IlVmN1BpeW9YWDBBRmZ4VWQiLCJ0YWciOiJQT2N1RFRRdU9zVWdJWnlMTEtyYXV3PT0ifQ==",
+    "database_password": "ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ5bWJuVUVtdEtCdndWV2QzS0ppeXNnPT0iLCJpdiI6IlVmN1BpeW9YWDBBRmZ4VWQiLCJ0YWciOiJQT2N1RFRRdU9zVWdJWnlMTEtyYXV3PT0ifQ==",
+    "email": "testuser2@example.com", 
+    "role": "user",
+    "executeTest": true
+  },
+  {
+    "testId": "TC003",
+    "username": "serviceaccount",
+    "personal_access_token": "ENCRYPTED:eyJlbmNyeXB0ZWQiOiJqS3hOaWVWVlJrb2t6MVNHcWFBdz09IiwiaXYiOiJOS3NlSjlkcmlJNjZpdVVTIiwidGFnIjoiZ2VHM1pGWGhmVnVhZ2hDZHFoeGZxdz09In0=",
+    "client_secret": "ENCRYPTED:eyJlbmNyeXB0ZWQiOiJyT0h2YjVGcW5QM2JUZ2JKWHRuRGZnPT0iLCJpdiI6IlVmN1BpeW9YWDBBRmZ4VWQiLCJ0YWciOiJQT2N1RFRRdU9zVWdJWnlMTEtyYXV3PT0ifQ==",
+    "environment": "production",
+    "executeTest": false
+  },
+  {
+    "testId": "TC004",
+    "username": "admin_user",
+    "password": "plaintext_password_not_encrypted",
+    "secret_key": "ENCRYPTED:eyJlbmNyeXB0ZWQiOiJzbE5ZZmx3SkE5WlF0S0F6V2dJZnNnPT0iLCJpdiI6IlVmN1BpeW9YWDBBRmZ4VWQiLCJ0YWciOiJQT2N1RFRRdU9zVWdJWnlMTEtyYXV3PT0ifQ==",
+    "email": "admin@example.com",
+    "role": "admin",
+    "executeTest": true
+  }
+] 

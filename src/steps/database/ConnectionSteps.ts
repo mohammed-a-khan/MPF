@@ -7,6 +7,7 @@ import { CSDatabase } from '../../database/client/CSDatabase';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { DatabaseConfig, DatabaseType } from '../../database/types/database.types';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
+import { EncryptionConfigurationManager } from '../../core/configuration/EncryptionConfigurationManager';
 
 export class ConnectionSteps extends CSBDDBaseStepDefinition {
     private databaseContext: DatabaseContext;
@@ -62,7 +63,7 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
 
         try {
             const options = this.parseDataTable(dataTable);
-            const config = this.buildDatabaseConfig(options);
+            const config = await this.buildDatabaseConfig(options);
             
             const database = await CSDatabase.getInstance(config.database || 'default');
             await database.connect();
@@ -406,7 +407,7 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
     /**
      * Build database config from data table
      */
-    private buildDatabaseConfig(options: Record<string, any>): DatabaseConfig {
+    private async buildDatabaseConfig(options: Record<string, any>): Promise<DatabaseConfig> {
         // Required fields
         const type = this.validateDatabaseType(options['type'] || options['database_type']);
         const host = options['host'] || options['server'] || 'localhost';
@@ -428,7 +429,18 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         };
 
         // Handle encrypted passwords
-        if (config.password && config.password.startsWith('encrypted:')) {
+        if (config.password && config.password.startsWith('ENCRYPTED:')) {
+            // Use EncryptionConfigurationManager for consistent decryption
+            try {
+                const testResult = await EncryptionConfigurationManager.testDecryption(config.password);
+                if (testResult.success && testResult.decrypted) {
+                    config.password = testResult.decrypted;
+                }
+            } catch (error) {
+                this.logger.error('Failed to decrypt database password', error);
+            }
+        } else if (config.password && config.password.startsWith('encrypted:')) {
+            // Handle legacy format
             config.password = config.password.substring(10);
         } else if (config.password && config.password.startsWith('enc:')) {
             config.password = config.password.substring(4);
@@ -503,14 +515,14 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         
         if (ConfigurationManager.has(configKey)) {
             const config = ConfigurationManager.get(configKey) as unknown as Record<string, any>;
-            return this.buildDatabaseConfig(config);
+            return await this.buildDatabaseConfig(config);
         }
 
         // Try to load from environment-specific config
         const envConfigKey = `${ConfigurationManager.getEnvironmentName()}.database.${alias}`;
         if (ConfigurationManager.has(envConfigKey)) {
             const config = ConfigurationManager.get(envConfigKey) as unknown as Record<string, any>;
-            return this.buildDatabaseConfig(config);
+            return await this.buildDatabaseConfig(config);
         }
 
         throw new Error(`Database configuration not found for alias: ${alias}`);

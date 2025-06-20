@@ -334,6 +334,13 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
             const errorMessage = await this.loginPage.getErrorMessage();
             expect(errorMessage).toBeTruthy();
 
+            // Log the error message as an error since this indicates a failed operation
+            await actionLogger.logError(`Login failed: ${errorMessage}`, {
+                operation: 'login_failure',
+                error_message: errorMessage,
+                error_type: 'authentication_error'
+            });
+
             await actionLogger.logAction('verify_error_message', {
                 error_message: errorMessage
             });

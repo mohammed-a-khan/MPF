@@ -4,6 +4,7 @@ import { DataHandler, DataProviderOptions, DataProviderResult, TestData, Validat
 import { CSVParser } from '../parsers/CSVParser';
 import { DataValidator } from '../validators/DataValidator';
 import { DataTransformer } from '../transformers/DataTransformer';
+import { DataEncryptionManager } from '../provider/DataEncryptionManager';
 import { logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import * as fs from 'fs/promises';
@@ -82,6 +83,9 @@ export class CSVHandler implements DataHandler {
             if (options.transformations && options.transformations.length > 0) {
                 data = await this.transformer.transform(data, options.transformations);
             }
+            
+            // Process encrypted data (decrypt sensitive fields)
+            data = await DataEncryptionManager.processTestData(data);
             
             const loadTime = Date.now() - startTime;
             

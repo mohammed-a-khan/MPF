@@ -9,6 +9,7 @@ import {
 import { CryptoUtils } from '../utils/CryptoUtils';
 import { FileUtils } from '../utils/FileUtils';
 import { ActionLogger } from '../logging/ActionLogger';
+import { EncryptionConfigurationManager } from '../configuration/EncryptionConfigurationManager';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -147,8 +148,14 @@ export class AuthenticationManager {
       if (proxy.username && proxy.password) {
         // Decrypt password if encrypted
         let decryptedPassword = proxy.password;
-        if (decryptedPassword.startsWith('encrypted:')) {
-          // Extract encrypted data
+                  if (decryptedPassword.startsWith('ENCRYPTED:')) {
+            // Use EncryptionConfigurationManager for consistent decryption
+            const testResult = await EncryptionConfigurationManager.testDecryption(decryptedPassword);
+            if (testResult.success && testResult.decrypted) {
+              decryptedPassword = testResult.decrypted;
+            }
+        } else if (decryptedPassword.startsWith('encrypted:')) {
+          // Handle legacy format
           const encryptedParts = decryptedPassword.substring(10).split(':');
           if (encryptedParts.length >= 3) {
             const encrypted = encryptedParts[0];
@@ -157,9 +164,10 @@ export class AuthenticationManager {
             const tag = encryptedParts[3] || '';
             
             if (encrypted && salt && iv) {
-              // Use a default password or get from environment
-              const cryptoPassword = process.env['CRYPTO_PASSWORD'] || 'default-password';
-              decryptedPassword = await CryptoUtils.decrypt(encrypted, cryptoPassword, salt, iv, tag);
+              const internalKey = 'CS-Framework-2024-Internal-Encryption-Key-V1';
+              decryptedPassword = await CryptoUtils.decrypt(encrypted, internalKey, salt, iv, tag, {
+                iterations: 10000
+              });
             }
           }
         }
@@ -517,9 +525,18 @@ export class AuthenticationManager {
   }
 
   private async encryptValue(value: string): Promise<any> {
-    const password = process.env['CRYPTO_PASSWORD'] || 'default-password';
-    const result = await CryptoUtils.encrypt(value, password);
-    return result;
+    const internalKey = 'CS-Framework-2024-Internal-Encryption-Key-V1';
+    const result = await CryptoUtils.encrypt(value, internalKey, {
+      saltLength: 16,
+      iterations: 10000
+    });
+    
+    // Return simplified format without salt
+    return {
+      encrypted: result.encrypted,
+      iv: result.iv,
+      tag: result.tag
+    };
   }
 
   private async decryptValue(encryptedData: any): Promise<string> {
@@ -528,13 +545,18 @@ export class AuthenticationManager {
       return encryptedData;
     }
     
-    const password = process.env['CRYPTO_PASSWORD'] || 'default-password';
+    const internalKey = 'CS-Framework-2024-Internal-Encryption-Key-V1';
+    const fixedSalt = Buffer.from('CS-Framework-Salt-2024').toString('base64');
+    
     return await CryptoUtils.decrypt(
       encryptedData.encrypted,
-      password,
-      encryptedData.salt,
+      internalKey,
+      fixedSalt,
       encryptedData.iv,
-      encryptedData.tag || ''
+      encryptedData.tag || '',
+      {
+        iterations: 10000
+      }
     );
   }
 

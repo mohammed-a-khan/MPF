@@ -1409,17 +1409,14 @@ export class ImprovedProductionHTMLReportGenerator {
                         <div class="chart-legend">
                             <div class="legend-item">
                                 <div class="legend-color" style="background: ${this.theme.successColor}"></div>
-                                {/* @ts-ignore */}
                                 <span>Passed (${summary.passedScenarios || 0})</span>
                             </div>
                             <div class="legend-item">
                                 <div class="legend-color" style="background: ${this.theme.failureColor}"></div>
-                                {/* @ts-ignore */}
                                 <span>Failed (${summary.failedScenarios || 0})</span>
                             </div>
                             <div class="legend-item">
                                 <div class="legend-color" style="background: ${this.theme.warningColor}"></div>
-                                {/* @ts-ignore */}
                                 <span>Skipped (${summary.skippedScenarios || 0})</span>
                             </div>
                         </div>

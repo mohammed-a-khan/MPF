@@ -4,6 +4,7 @@ import { DataProviderFactory } from './DataProviderFactory';
 import { DataCache } from './DataCache';
 import { DataIterator } from './DataIterator';
 import { DataCleanupManager } from './DataCleanupManager';
+import { DataEncryptionManager } from './DataEncryptionManager';
 import { DataValidator } from '../validators/DataValidator';
 import { ExecutionFlagValidator } from '../validators/ExecutionFlagValidator';
 import { SchemaValidator } from '../validators/SchemaValidator';
@@ -46,6 +47,11 @@ export class CSDataProvider {
         this.cleanupManager = DataCleanupManager.getInstance();
         this.config = this.createDefaultConfig();
         this.initializeConfig();
+        
+        // Initialize data encryption manager
+        DataEncryptionManager.initialize({
+            enableAutoDecryption: true
+        });
     }
 
     /**

@@ -12,6 +12,9 @@ import {
   APIConfig
 } from './types/config.types';
 
+// Import encryption support for transparent background decryption
+import { CryptoUtils } from '../utils/CryptoUtils';
+
 export class ConfigurationManager {
   private static instance: ConfigurationManager;
   private static config: ConfigMap = {};
@@ -20,6 +23,10 @@ export class ConfigurationManager {
   private static readonly hierarchicalLoader = new HierarchicalEnvironmentLoader();
   private static readonly validator = new ConfigurationValidator();
   private static isInitialized = false;
+  
+  // Transparent encryption support
+  private static encryptionEnabled = true; // Auto-enable encryption
+  private static decryptionCache = new Map<string, string>();
 
   private constructor() {}
 
@@ -200,14 +207,22 @@ export class ConfigurationManager {
   }
 
   /**
-   * Get configuration value by key
+   * Get configuration value by key with automatic encryption detection and decryption
    */
   static get(key: string, defaultValue: string = ''): string {
     if (!ConfigurationManager.isInitialized) {
       console.warn('⚠️  Configuration not initialized. Call loadConfiguration() first.');
       return defaultValue;
     }
-    return ConfigurationManager.config[key] || defaultValue;
+    
+    const rawValue = ConfigurationManager.config[key] || defaultValue;
+    
+    // Transparent encryption support - automatically decrypt if encrypted
+    if (ConfigurationManager.encryptionEnabled && rawValue.startsWith('ENCRYPTED:')) {
+      return ConfigurationManager.decryptValue(rawValue, key);
+    }
+    
+    return rawValue;
   }
 
   /**
@@ -368,5 +383,94 @@ export class ConfigurationManager {
    */
   static export(): ConfigMap {
     return { ...ConfigurationManager.config };
+  }
+
+  /**
+   * Transparently decrypt encrypted configuration values
+   * Uses internal encryption key - no passwords needed
+   */
+  private static decryptValue(encryptedValue: string, key: string): string {
+    try {
+      // Check cache first for performance
+      const cacheKey = `${key}:${encryptedValue}`;
+      if (ConfigurationManager.decryptionCache.has(cacheKey)) {
+        return ConfigurationManager.decryptionCache.get(cacheKey)!;
+      }
+
+      // Remove ENCRYPTED: prefix
+      const base64Data = encryptedValue.replace('ENCRYPTED:', '');
+      
+      // Parse the encryption data (same format as encryption tool)
+      const encryptionData = JSON.parse(atob(base64Data));
+      
+      // Use Node.js crypto directly for synchronous decryption
+      const crypto = require('crypto');
+      const internalKey = 'CS-Framework-2024-Internal-Encryption-Key-V1';
+      const fixedSalt = Buffer.from('CS-Framework-Salt-2024');
+      
+      // Derive key using PBKDF2 (synchronous)
+      const derivedKey = crypto.pbkdf2Sync(internalKey, fixedSalt, 10000, 32, 'sha256');
+      
+      // Create decipher
+      const decipher = crypto.createDecipheriv('aes-256-gcm', derivedKey, Buffer.from(encryptionData.iv, 'base64'));
+      
+      // Set auth tag if present
+      if (encryptionData.tag) {
+        decipher.setAuthTag(Buffer.from(encryptionData.tag, 'base64'));
+      }
+      
+      // Decrypt
+      let decrypted = decipher.update(encryptionData.encrypted, 'base64', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      // Cache the result for performance
+      ConfigurationManager.decryptionCache.set(cacheKey, decrypted);
+      
+      // Log decryption (without showing sensitive data)
+      if (ConfigurationManager.isSensitiveKey(key)) {
+        console.log(`🔓 Decrypted sensitive configuration: ${key} (length: ${decrypted.length})`);
+      }
+      
+      return decrypted;
+    } catch (error) {
+      console.error(`❌ Failed to decrypt configuration value for key '${key}':`, error);
+      // Return the encrypted value as fallback to prevent breaking the application
+      return encryptedValue;
+    }
+  }
+
+  /**
+   * Check if a configuration key contains sensitive data
+   */
+  private static isSensitiveKey(key: string): boolean {
+    const sensitivePatterns = [
+      'password', 'passwd', 'pwd', 'secret', 'token', 'key', 'credential', 'auth',
+      'api_key', 'apikey', 'access_token', 'refresh_token', 'bearer_token',
+      'pat_token', 'personal_access_token', 'private_key', 'client_secret',
+      'connection_string', 'database_password', 'db_password'
+    ];
+    
+    return sensitivePatterns.some(pattern => 
+      key.toLowerCase().includes(pattern.toLowerCase())
+    );
+  }
+
+  /**
+   * Clear decryption cache (for security)
+   */
+  static clearDecryptionCache(): void {
+    ConfigurationManager.decryptionCache.clear();
+    console.log('🧹 Configuration decryption cache cleared');
+  }
+
+  /**
+   * Enable or disable transparent encryption
+   */
+  static setEncryptionEnabled(enabled: boolean): void {
+    ConfigurationManager.encryptionEnabled = enabled;
+    if (!enabled) {
+      ConfigurationManager.clearDecryptionCache();
+    }
+    console.log(`🔐 Transparent encryption ${enabled ? 'enabled' : 'disabled'}`);
   }
 }
