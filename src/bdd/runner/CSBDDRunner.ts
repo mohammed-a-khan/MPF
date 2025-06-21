@@ -49,12 +49,22 @@ import {
     FeatureStatus
 } from '../types/bdd.types';
 
-// Force import API step definitions to ensure they are registered
-import '../../steps/api/index';
+// CONDITIONAL IMPORTS - Only import step definitions when needed
+// import '../../steps/api/index'; // REMOVED - Now conditionally loaded
 
-// Force import API step definitions to ensure they are registered
-import '../../steps/api/index';
-
+// Test execution types
+export interface TestExecutionProfile {
+    requiresBrowser: boolean;
+    requiresAPI: boolean;
+    requiresDatabase: boolean;
+    stepDefinitionPaths: string[];
+    componentInitialization: {
+        browser: boolean;
+        api: boolean;
+        database: boolean;
+        proxy: boolean;
+    };
+}
 
 /**
  * Main BDD test runner that orchestrates the entire test execution lifecycle
@@ -69,6 +79,9 @@ export class CSBDDRunner {
     private runOptions!: RunOptions;
     private abortController: AbortController;
     private reportOrchestrator: ReportOrchestrator;
+    
+    // NEW: Test execution profile
+    private executionProfile: TestExecutionProfile | null = null;
 
     private constructor() {
         // Defer instantiation to avoid circular dependencies and blocking
@@ -301,6 +314,178 @@ export class CSBDDRunner {
     }
 
     /**
+     * Analyze features to determine test execution profile
+     */
+    private async analyzeTestExecutionProfile(options: RunOptions): Promise<TestExecutionProfile> {
+        const logger = ActionLogger.getInstance();
+        logger.info('🔍 Analyzing test execution profile...');
+
+        // Get feature paths for analysis
+        const featurePaths = options['featurePaths'] || options['features'] || options['paths'] || ['**/*.feature'];
+        
+        // Parse features to analyze tags and content
+        const parser = FeatureFileParser.getInstance();
+        const features = await parser.parseAll(featurePaths);
+        
+        // Analyze tags across all scenarios
+        const allTags = new Set<string>();
+        let hasUISteps = false;
+        let hasAPISteps = false;
+        let hasDatabaseSteps = false;
+        
+        for (const feature of features) {
+            for (const scenario of feature.scenarios) {
+                // Collect tags
+                scenario.tags?.forEach(tag => allTags.add(tag));
+                
+                // Analyze step content for type detection
+                for (const step of scenario.steps) {
+                    const stepText = step.text.toLowerCase();
+                    
+                    // UI step patterns
+                    if (stepText.includes('click') || stepText.includes('navigate') || 
+                        stepText.includes('browser') || stepText.includes('page') ||
+                        stepText.includes('element') || stepText.includes('login') ||
+                        stepText.includes('enter') || stepText.includes('type')) {
+                        hasUISteps = true;
+                    }
+                    
+                    // API step patterns
+                    if (stepText.includes('api') || stepText.includes('request') || 
+                        stepText.includes('response') || stepText.includes('http') ||
+                        stepText.includes('get ') || stepText.includes('post ') ||
+                        stepText.includes('put ') || stepText.includes('delete ') ||
+                        stepText.includes('endpoint') || stepText.includes('header')) {
+                        hasAPISteps = true;
+                    }
+                    
+                    // Database step patterns
+                    if (stepText.includes('database') || stepText.includes('query') || 
+                        stepText.includes('sql') || stepText.includes('table') ||
+                        stepText.includes('record') || stepText.includes('connect')) {
+                        hasDatabaseSteps = true;
+                    }
+                }
+            }
+        }
+
+        // Check configuration flags
+        const configRequiresBrowser = ConfigurationManager.getBoolean('BROWSER_REQUIRED', false);
+        const configUIEnabled = ConfigurationManager.getBoolean('UI_ENABLED', true);
+        const configAPIEnabled = ConfigurationManager.getBoolean('API_ENABLED', true);
+        const configDatabaseEnabled = ConfigurationManager.getBoolean('DATABASE_ENABLED', false);
+
+        // Tag-based detection
+        const hasAPITags = allTags.has('@api');
+        const hasDatabaseTags = allTags.has('@database');
+        const hasUITags = !hasAPITags && !hasDatabaseTags; // Default to UI if no specific tags
+
+        // Determine requirements
+        const requiresAPI = hasAPITags || hasAPISteps || configAPIEnabled;
+        const requiresDatabase = hasDatabaseTags || hasDatabaseSteps || configDatabaseEnabled;
+        const requiresBrowser = (hasUITags || hasUISteps || configRequiresBrowser || configUIEnabled) && 
+                               !options.headless && // Don't require browser for headless API tests
+                               !(hasAPITags && !hasUISteps); // Don't require browser for pure API tests
+
+        // Determine step definition paths
+        const stepDefinitionPaths: string[] = [];
+        if (requiresBrowser || hasUISteps) {
+            stepDefinitionPaths.push('src/steps/ui/**/*.ts', 'test/**/steps/**/*.ts');
+        }
+        if (requiresAPI || hasAPISteps) {
+            stepDefinitionPaths.push('src/steps/api/**/*.ts');
+        }
+        if (requiresDatabase || hasDatabaseSteps) {
+            stepDefinitionPaths.push('src/steps/database/**/*.ts');
+        }
+
+        const profile: TestExecutionProfile = {
+            requiresBrowser,
+            requiresAPI,
+            requiresDatabase,
+            stepDefinitionPaths,
+            componentInitialization: {
+                browser: requiresBrowser,
+                api: requiresAPI,
+                database: requiresDatabase,
+                proxy: ConfigurationManager.getBoolean('PROXY_ENABLED', false)
+            }
+        };
+
+        logger.info(`🎯 Test Execution Profile Determined:`);
+        logger.info(`   Browser Required: ${requiresBrowser}`);
+        logger.info(`   API Required: ${requiresAPI}`);
+        logger.info(`   Database Required: ${requiresDatabase}`);
+        logger.info(`   Tags Found: [${Array.from(allTags).join(', ')}]`);
+        logger.info(`   Step Types: UI=${hasUISteps}, API=${hasAPISteps}, DB=${hasDatabaseSteps}`);
+
+        return profile;
+    }
+
+    /**
+     * Load step definitions based on execution profile
+     */
+    private async loadStepDefinitionsConditionally(profile: TestExecutionProfile): Promise<void> {
+        const logger = ActionLogger.getInstance();
+        logger.info('📚 Loading step definitions conditionally...');
+
+        // Clear any existing step definitions
+        const stepLoader = StepDefinitionLoader.getInstance();
+        stepLoader.reset();
+
+        // Load step definitions based on profile
+        if (profile.requiresAPI) {
+            logger.info('🔌 Loading API step definitions...');
+            await import('../../steps/api/index');
+        }
+
+        if (profile.requiresBrowser) {
+            logger.info('🖥️  Loading UI step definitions...');
+            // Import UI steps dynamically
+            try {
+                await import('../../steps/ui/InteractionSteps');
+                await import('../../steps/ui/NavigationSteps');
+                await import('../../steps/ui/ValidationSteps');
+                await import('../../steps/ui/StorageSteps');
+                await import('../../steps/ui/FrameSteps');
+                await import('../../steps/ui/AdvancedInteractionSteps');
+                await import('../../steps/ui/DebugSteps');
+                
+                // Load test-specific step definitions
+                await import('../../../test/saucedemo/steps/saucedemo.steps');
+                logger.info('✅ UI and test-specific step definitions loaded');
+            } catch (error) {
+                logger.warn('⚠️  Some UI step definitions could not be loaded:', error as Error);
+            }
+        }
+
+        if (profile.requiresDatabase) {
+            logger.info('🗄️  Loading Database step definitions...');
+            try {
+                await import('../../steps/database/ConnectionSteps');
+                await import('../../steps/database/DatabaseGenericSteps');
+                await import('../../steps/database/DatabaseUtilitySteps');
+                await import('../../steps/database/QueryExecutionSteps');
+                await import('../../steps/database/DataValidationSteps');
+                await import('../../steps/database/TransactionSteps');
+                await import('../../steps/database/StoredProcedureSteps');
+                logger.info('✅ Database step definitions loaded');
+            } catch (error) {
+                logger.warn('⚠️  Some Database step definitions could not be loaded:', error as Error);
+            }
+        }
+
+        // Load all step definitions
+        await stepLoader.loadAll();
+        
+        // Debug: Check what step definitions are loaded
+        const stats = stepRegistry.getStats();
+        logger.info(`✅ Step definitions loaded conditionally - Total steps: ${stats.totalSteps}`);
+        logger.info(`🔍 DEBUG: Registered class instances: ${Array.from(stepRegistry['classInstances'].keys()).join(', ')}`);
+        logger.info(`🔍 DEBUG: Total step definitions: ${stepRegistry.getAllStepDefinitions().length}`);
+    }
+
+    /**
      * Initialize framework components
      */
     private async initialize(options: RunOptions): Promise<void> {
@@ -326,53 +511,53 @@ export class CSBDDRunner {
                 logPath: ConfigurationManager.get('LOG_PATH', './logs')
             } as any);
 
-            // 4. Load step definitions
-            const loader = StepDefinitionLoader.getInstance();
-            await loader.loadAll();
+            // 4. ANALYZE TEST EXECUTION PROFILE FIRST
+            this.executionProfile = await this.analyzeTestExecutionProfile(options);
+            logger.info('✅ Test execution profile analyzed');
+
+            // 5. Load ALL step definitions (conditional loading disabled for now)
+            const stepLoader = StepDefinitionLoader.getInstance();
+            await stepLoader.loadAll();
             const stats = stepRegistry.getStats();
             const stepCount = stats.totalSteps;
-            logger.info('Step definitions loaded - Total steps: ' + stepCount);
+            logger.info('All step definitions loaded - Total steps: ' + stepCount);
 
-            // 5. Initialize SINGLE browser manager (NO POOL for single test execution)
-            // CRITICAL FIX: Use single browser instance instead of pool to prevent multiple browsers
-            const browserConfig = {
-                browser: (options.browser || ConfigurationManager.get('DEFAULT_BROWSER', 'chromium')) as 'chromium' | 'firefox' | 'webkit',
-                headless: false, // FORCE HEADED MODE - Always show browser window
-                slowMo: 1000, // Slow down significantly for visibility
-                timeout: ConfigurationManager.getInt('DEFAULT_TIMEOUT', 30000),
-                viewport: {
-                    width: ConfigurationManager.getInt('VIEWPORT_WIDTH', 1920),
-                    height: ConfigurationManager.getInt('VIEWPORT_HEIGHT', 1080)
-                },
-                downloadsPath: ConfigurationManager.get('DOWNLOADS_PATH', './downloads'),
-                ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false),
-                tracesDir: './traces',
-                videosDir: './videos'
-            };
+            // 6. Initialize browser ONLY if required (CONDITIONAL INITIALIZATION)
+            if (this.executionProfile.componentInitialization.browser) {
+                logger.info('🖥️  Browser required - initializing browser...');
+                const browserConfig = {
+                    browser: (options.browser || ConfigurationManager.get('DEFAULT_BROWSER', 'chromium')) as 'chromium' | 'firefox' | 'webkit',
+                    headless: options.headless !== false ? ConfigurationManager.getBoolean('HEADLESS_MODE', false) : false,
+                    slowMo: ConfigurationManager.getInt('BROWSER_SLOWMO', 0),
+                    timeout: ConfigurationManager.getInt('DEFAULT_TIMEOUT', 30000),
+                    viewport: {
+                        width: ConfigurationManager.getInt('VIEWPORT_WIDTH', 1920),
+                        height: ConfigurationManager.getInt('VIEWPORT_HEIGHT', 1080)
+                    },
+                    downloadsPath: ConfigurationManager.get('DOWNLOADS_PATH', './downloads'),
+                    ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false),
+                    tracesDir: './traces',
+                    videosDir: './videos'
+                };
 
-            // CRITICAL FIX: Completely disable browser pool and force single browser
-            logger.info('🚫 BROWSER POOL PERMANENTLY DISABLED - Using single browser only');
-            
-            // Use ONLY single browser manager
-            const browserManager = BrowserManager.getInstance();
-            try {
-                // CRITICAL FIX: Check if browser is already initialized to prevent multiple launches
-                if (browserManager.isHealthy()) {
-                    logger.info('✅ Browser already initialized and healthy - reusing existing browser');
-                } else {
-                    logger.info('🚀 Initializing browser (will reuse if already exists)...');
-                    await browserManager.initialize(browserConfig);
-                    logger.info('✅ Browser instance ready for test execution');
+                // Use ONLY single browser manager
+                const browserManager = BrowserManager.getInstance();
+                try {
+                    // Check if browser is already initialized to prevent multiple launches
+                    if (browserManager.isHealthy()) {
+                        logger.info('✅ Browser already initialized and healthy - reusing existing browser');
+                    } else {
+                        logger.info('🚀 Initializing browser...');
+                        await browserManager.initialize(browserConfig);
+                        logger.info('✅ Browser instance ready for test execution');
+                    }
+                } catch (error) {
+                    logger.error('❌ Failed to initialize browser:', error);
+                    throw error;
                 }
-            } catch (error) {
-                logger.error('❌ Failed to initialize browser:', error);
-                throw error;
+            } else {
+                logger.info('🚫 Browser initialization SKIPPED - not required for this test type');
             }
-
-            // FORCE HEADED MODE - Set configuration to ensure browser opens visibly
-            ConfigurationManager.set('HEADLESS_MODE', 'false');
-            ConfigurationManager.set('BROWSER_SLOWMO', '1000');
-            logger.info(`🖥️  FORCED HEADED MODE - Browser will open visibly with slowMo: 1000ms`);
 
             // Set screenshot mode from command line options
             // Check if screenshot option was passed (could be boolean or string)
@@ -915,7 +1100,9 @@ export class CSBDDRunner {
                             error: st.error ? (typeof st.error === 'string' ? st.error : st.error.message || '') : '',
                             errorStack: st.error && typeof st.error === 'object' ? (st.error.stack || '') : '',
                             // Add attachments if available
-                            attachments: st.attachments || []
+                            attachments: st.attachments || [],
+                            // CRITICAL: Include actionDetails from step execution
+                            actionDetails: (st as any).actionDetails || null
                         }))
                     }))
                 ),
@@ -951,7 +1138,9 @@ export class CSBDDRunner {
                             error: st.error ? (typeof st.error === 'string' ? st.error : st.error.message || '') : '',
                             errorStack: st.error && typeof st.error === 'object' ? (st.error.stack || '') : '',
                             // Add attachments if available
-                            attachments: st.attachments || []
+                            attachments: st.attachments || [],
+                            // CRITICAL: Include actionDetails from step execution
+                            actionDetails: (st as any).actionDetails || null
                         }))
                     })),
                     status: this.mapFeatureStatusToTestStatus(f.status || 'failed'),
@@ -983,7 +1172,23 @@ export class CSBDDRunner {
                     name: s.scenario || '',
                     status: this.mapScenarioStatusToTestStatus(s.status || 'failed'),
                     duration: s.duration || 0,
-                    retryCount: 0
+                    retryCount: 0,
+                    // CRITICAL: Include steps with actionDetails for proper reporting
+                    steps: (s.steps || []).map(st => ({
+                        stepId: st.id || '',
+                        keyword: st.keyword || 'Given',
+                        text: st.text || '',
+                        line: st.line || 0,
+                        status: this.mapStepStatusToTestStatus(st.status || 'failed'),
+                        startTime: st.startTime || now,
+                        endTime: st.endTime || now,
+                        duration: st.duration || 0,
+                        // CRITICAL: Include actionDetails from step execution
+                        actionDetails: (st as any).actionDetails || null,
+                        attachments: st.attachments || [],
+                        error: st.error ? (typeof st.error === 'string' ? st.error : (st.error.message || '')) : undefined,
+                        errorStack: st.error && typeof st.error === 'object' ? (st.error.stack || '') : undefined
+                    }))
                 }));
                 
                 return {
@@ -1015,7 +1220,7 @@ export class CSBDDRunner {
                         passRate: scenarios.length > 0 ? (scenarios.filter(s => s.status === 'passed').length / scenarios.length) * 100 : 0
                     },
                     metadata: {}
-                } as FeatureReport;
+                } as unknown as FeatureReport;
             }),
             scenarios: result.features.flatMap(f => 
                 (f.scenarios || []).map(s => ({
@@ -1067,7 +1272,9 @@ export class CSBDDRunner {
                         embeddings: [],
                         actions: [],
                         // Add attachments if available
-                        attachments: st.attachments || []
+                        attachments: st.attachments || [],
+                        // CRITICAL: Include actionDetails from step execution
+                        actionDetails: (st as any).actionDetails || null
                     })),
                     status: this.mapScenarioStatusToTestStatus(s.status || 'failed'),
                     startTime: s.startTime || now,

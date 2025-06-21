@@ -297,7 +297,8 @@ export class ScenarioExecutor {
                         duration: 0,
                         startTime: new Date(),
                         endTime: new Date(),
-                        skippedReason: 'Previous step failed'
+                        skippedReason: 'Previous step failed',
+                        actionDetails: null
                     });
                 }
                 break;
@@ -334,12 +335,19 @@ export class ScenarioExecutor {
         const browserContext = executionContext.getBrowserContext();
         let page = executionContext.getPage();
         
-        // Navigate to about:blank before each scenario for clean state
+        // BROWSER FLASHING FIX: Remove about:blank navigation that caused page flashing
+        // Instead, just validate the page is usable without navigating
         try {
-            await page.goto('about:blank');
+            // Simple page validation without navigation to prevent flashing
+            if (!page || page.isClosed()) {
+                throw new Error('Page is closed, need new page');
+            }
+            // Just check if page is responsive without navigating
+            await page.evaluate(() => document.readyState);
+            ActionLogger.logInfo(`Reusing existing page for scenario: ${scenario.name}`);
         } catch (error) {
-            // If page is closed, create a new one
-            ActionLogger.logInfo('Creating new page for scenario', scenario.name);
+            // If page is closed or unresponsive, create a new one
+            ActionLogger.logInfo(`Creating new page for scenario: ${scenario.name}`);
             page = await executionContext.createPage(browserContext);
             executionContext.setMetadata('page', page);
         }

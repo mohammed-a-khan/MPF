@@ -1,4 +1,4 @@
-import { Page } from 'playwright';
+import { Page, Locator, Download, ElementHandle } from 'playwright';
 import { logger } from '../utils/Logger';
 import { ActionLogger } from '../logging/ActionLogger';
 import { CSWebElement } from '../elements/CSWebElement';
@@ -6,6 +6,12 @@ import { ElementMetadata } from '../elements/decorators/ElementMetadata';
 import { PageContext } from './PageContext';
 import { WaitOptions, ValidationError } from './types/page.types';
 import { expect } from '@playwright/test';
+import { ConfigurationManager } from '../configuration/ConfigurationManager';
+
+interface NavigationOptions {
+    waitUntil?: 'load' | 'domcontentloaded' | 'networkidle' | 'commit';
+    timeout?: number;
+}
 
 /**
  * CSBasePage - Base class for all page objects
@@ -76,34 +82,82 @@ export abstract class CSBasePage {
     }
 
     /**
-     * Navigate to this page
+     * PERFORMANCE OPTIMIZED: Navigate to a URL with proper context management
      */
-    async navigateTo(url?: string): Promise<void> {
+    async navigateTo(url: string, options?: NavigationOptions): Promise<void> {
         try {
-            const targetUrl = url || this.pageUrl;
+            // BROWSER FLASHING FIX: Improved page validation
+            if (!this.page || this.page.isClosed()) {
+                throw new Error('Page is not available or has been closed - please reinitialize the page object');
+            }
+
+            // Check if browser context is still valid
+            const context = this.page.context();
+            if (!context) {
+                throw new Error('Browser context is not available - page may have been closed');
+            }
+
+            // Additional context validation
+            try {
+                const pages = context.pages();
+                if (pages.length === 0 || !pages.includes(this.page)) {
+                    throw new Error('Page is no longer part of the browser context');
+                }
+            } catch (contextError) {
+                throw new Error('Browser context is not available or has been closed');
+            }
+
+            // Validate URL
+            if (!url || typeof url !== 'string') {
+                throw new Error('Invalid URL provided for navigation');
+            }
+
+            // Ensure URL is properly formatted
+            const navigateUrl = url.startsWith('http') ? url : `https://${url}`;
             
-            if (!targetUrl) {
-                throw new Error('No URL specified for navigation');
+            ActionLogger.logInfo(`Navigating to: ${navigateUrl}`);
+            
+            // PERFORMANCE FIX: Use optimized navigation options
+            const navigationOptions = {
+                waitUntil: options?.waitUntil || 'domcontentloaded', // Faster than 'load'
+                timeout: options?.timeout || 30000,
+                ...options
+            };
+
+            // Navigate with retry logic for robustness
+            let lastError: Error | null = null;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    // Double-check page is still valid before each attempt
+                    if (this.page.isClosed()) {
+                        throw new Error('Page was closed during navigation attempt');
+                    }
+
+                    await this.page.goto(navigateUrl, navigationOptions);
+                    ActionLogger.logInfo(`Successfully navigated to: ${navigateUrl}`);
+                    return; // Success, exit retry loop
+                } catch (error) {
+                    lastError = error as Error;
+                    ActionLogger.logWarn(`Navigation attempt ${attempt} failed: ${lastError.message}`);
+                    
+                    // Check if page/context is still valid before retrying
+                    if (this.page.isClosed() || !this.page.context()) {
+                        throw new Error('Page or context was closed during navigation');
+                    }
+                    
+                    if (attempt < 3) {
+                        // Wait before retry
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    }
+                }
             }
             
-            const startTime = Date.now();
+            // If all retries failed, throw the last error
+            throw lastError || new Error('Navigation failed after multiple attempts');
             
-            await this.page.goto(targetUrl, {
-                waitUntil: 'networkidle',
-                timeout: 60000
-            });
-            
-            // Wait for page load without re-initializing
-            await this.waitForPageLoad();
-            
-            const navigationTime = Date.now() - startTime;
-            
-            ActionLogger.logPageOperation('page_navigate', this.constructor.name, {
-                url: targetUrl,
-                navigationTime
-            });
         } catch (error) {
-            logger.error(`${this.constructor.name}: Navigation failed`, error as Error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown navigation error';
+            ActionLogger.logError(`Navigation failed to ${url}: ${errorMessage}`, error as Error);
             throw error;
         }
     }
@@ -1042,5 +1096,23 @@ export abstract class CSBasePage {
      */
     protected async expectDataTestVisible(value: string): Promise<void> {
         await this.expectElementVisible('css', `[data-test="${value}"]`);
+    }
+
+    /**
+     * Check if page needs reinitialization
+     */
+    public needsReinitialization(): boolean {
+        return !this.page || this.page.isClosed() || !this._initialized;
+    }
+
+    /**
+     * Get current page URL safely
+     */
+    public getCurrentUrl(): string {
+        try {
+            return this.page ? this.page.url() : '';
+        } catch (error) {
+            return '';
+        }
     }
 }

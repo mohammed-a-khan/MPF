@@ -6,13 +6,16 @@ export interface BrowserConfig {
   headless: boolean;
   slowMo: number;
   timeout: number;
-  viewport: ViewportSize;
+  viewport: {
+    width: number;
+    height: number;
+  };
   downloadsPath: string;
   ignoreHTTPSErrors: boolean;
+  tracesDir?: string;
+  videosDir?: string;
   args?: string[];
   proxy?: ProxySettings;
-  tracesDir: string;
-  videosDir: string;
 }
 
 export interface ContextOptions {

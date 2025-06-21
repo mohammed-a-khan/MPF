@@ -45,6 +45,9 @@ export class StepExecutor {
         const startTime = Date.now();
         let screenshotPath: string | undefined;
         
+        // Record current timestamp to capture step actions (BEFORE try block)
+        const stepStartTime = new Date();
+        
         try {
             this.currentContext = context;
             this.executionMonitor.emit('stepStart', step);
@@ -59,14 +62,13 @@ export class StepExecutor {
                 }
             }
             
-            // Record current action log position to capture step actions
-            const logStartIndex = ActionLogger.getInstance().getCurrentLogIndex();
-            
             // Execute the step
             await this.executeStepDefinitionWithoutResult(step, context);
             
-            // Capture action details from logs generated during step execution
-            const actionDetails = this.extractActionDetails(logStartIndex);
+            // Capture action details from logs generated during step execution (passed step)
+            const actionDetails = this.extractActionDetailsByTime(stepStartTime, StepStatus.PASSED);
+            
+            // Action details captured successfully using timestamp-based approach
             
             // Create successful result
             const result: StepResult = {
@@ -134,6 +136,10 @@ export class StepExecutor {
                 ActionLogger.logWarn('Failed to take failure screenshot', screenshotError as Error);
             }
             
+            // Capture action details from logs generated during step execution (failed step)
+            // Note: stepStartTime was captured before the try block, so it includes all step execution logs
+            const actionDetails = this.extractActionDetailsByTime(stepStartTime, StepStatus.FAILED, error);
+            
             // Create comprehensive failure result
             const failureResult: StepResult = {
                 id: stepId,
@@ -147,6 +153,7 @@ export class StepExecutor {
                 error: this.formatError(error),
                 errorMessage: (error as Error).message,
                 stackTrace: (error as Error).stack || '',
+                actionDetails, // Add captured action details with error information
                 attachments: screenshotPath ? [{
                     data: screenshotPath,
                     mimeType: 'image/png',
@@ -299,6 +306,10 @@ export class StepExecutor {
         // Get the class instance for proper 'this' binding
         const className = definition.metadata['className'];
         const classInstance = className ? this.stepRegistry.getClassInstance(className) : null;
+        
+        if (!classInstance) {
+            throw new Error(`No class instance found for step definition. ClassName: ${className}`);
+        }
         
         // Bind the step function to the correct context (class instance)
         const boundFunction = definition.implementation.bind(classInstance);
@@ -480,51 +491,363 @@ export class StepExecutor {
         };
     }
 
-    /**
-     * Extract action details from logs generated during step execution
-     */
-    private extractActionDetails(logStartIndex: number): any {
+    private extractActionDetailsByTime(stepStartTime: Date, stepStatus?: StepStatus, error?: any): any {
         try {
-            const actionLogger = ActionLogger.getInstance();
-            const currentLogIndex = actionLogger.getCurrentLogIndex();
-            const logs = actionLogger.getLogsInRange(logStartIndex, currentLogIndex);
-            
-            // Find the most relevant action log
-            for (const log of logs) {
-                if (log.type === 'action' && log.context) {
-                    return {
-                        action: log.context['action'] || log.message || 'Unknown Action',
-                        target: log.context['target'] || log.context['selector'] || log.context['element'],
-                        value: log.context['value'] || log.context['text'] || log.context['data'],
-                        description: log.context['description'] || log.message || ''
-                    };
-                }
-            }
-            
-            // If no specific action log found, try to extract from general logs
-            const actionLog = logs.find(log => 
-                log.message && (
-                    log.message.includes('Click') || 
-                    log.message.includes('Type') || 
-                    log.message.includes('Navigate') ||
-                    log.message.includes('Wait') ||
-                    log.message.includes('Select') ||
-                    log.message.includes('Assert')
-                )
-            );
-            
-            if (actionLog) {
+            // For skipped steps, return minimal action details with no actions
+            if (stepStatus === StepStatus.SKIPPED) {
                 return {
-                    action: 'Step Execution',
-                    description: actionLog.message
+                    actions: [],
+                    primaryAction: null,
+                    description: "Step was skipped",
+                    target: null,
+                    value: null,
+                    locator: null,
+                    current_url: null,
+                    final_url: null,
+                    target_url: null,
+                    page_title: null,
+                    expected_title: null,
+                    expected_state: null,
+                    products_count: null,
+                    wait_condition: null,
+                    page_object: null,
+                    elements_verified: null,
+                    elements_to_check: null,
+                    page_elements_verified: null,
+                    metrics: null,
+                    performance_grade: null,
+                    validation_status: null,
+                    username: null,
+                    field: null,
+                    button: null,
+                    skipped: true
                 };
             }
+
+            const actionLogger = ActionLogger.getInstance();
             
-            return null;
+            // Get all recent logs and filter by timestamp
+            const allLogs = actionLogger.getAllBufferedLogs();
+            const stepEndTime = new Date();
+            
+            // Filter logs that occurred during step execution
+            const logs = allLogs.filter(log => {
+                const logTime = new Date(log.timestamp);
+                return logTime >= stepStartTime && logTime <= stepEndTime;
+            });
+            
+            // Process the filtered logs using the same logic as the original method
+            return this.processLogsForActionDetails(logs, stepStatus, error);
+            
         } catch (error) {
-            ActionLogger.logDebug('Failed to extract action details', error as Error);
-            return null;
+            console.error('Error extracting action details by time:', error);
+            return {
+                actions: [],
+                primaryAction: null,
+                description: "Failed to extract action details",
+                target: null,
+                value: null,
+                locator: null
+            };
         }
+    }
+
+    private processLogsForActionDetails(logs: any[], stepStatus?: StepStatus, error?: any): any {
+        // Collect all action details from different log types
+        const actionDetails: any = {
+            actions: [],
+            primaryAction: null,
+            description: null,
+            target: null,
+            value: null,
+            locator: null,
+            current_url: null,
+            final_url: null,
+            target_url: null,
+            page_title: null,
+            expected_title: null,
+            expected_state: null,
+            products_count: null,
+            wait_condition: null,
+            page_object: null,
+            elements_verified: null,
+            elements_to_check: null,
+            page_elements_verified: null,
+            metrics: null,
+            performance_grade: null,
+            validation_status: null,
+            username: null,
+            field: null,
+            button: null
+        };
+
+        // For failed steps, add detailed error information
+        if (stepStatus === StepStatus.FAILED && error) {
+            actionDetails.error = {
+                message: error.message || 'Step execution failed',
+                name: error.name || 'Error',
+                stack: error.stack || '',
+                type: error.constructor?.name || 'Unknown',
+                details: {
+                    errorCode: error.code,
+                    timeout: error.timeout,
+                    selector: error.selector,
+                    url: error.url,
+                    expected: error.expected,
+                    actual: error.actual,
+                    diff: error.diff,
+                    context: error.context,
+                    cause: error.cause
+                }
+            };
+            
+            // Set description to include error information
+            actionDetails.description = `Step failed: ${error.message || 'Unknown error'}`;
+            
+            // Add error action as primary action
+            actionDetails.primaryAction = {
+                action: 'Error',
+                description: actionDetails.description,
+                success: false,
+                error: actionDetails.error
+            };
+            
+            // Add error details to actions
+            actionDetails.actions.push({
+                action: 'step_execution_failed',
+                details: {
+                    description: actionDetails.description,
+                    error_type: error.name || 'Error',
+                    error_message: error.message || 'Step execution failed',
+                    error_stack: error.stack || '',
+                    failure_context: error.context || {}
+                },
+                timestamp: new Date().toISOString(),
+                success: false,
+                error: actionDetails.error
+            });
+        }
+        
+        // Process logs to extract detailed action information (for both passed and failed steps)
+        for (const log of logs) {
+            // Handle action logs created by logAction() method
+            if (log.type === 'action' && 'details' in log && (log as any).details) {
+                const actionLog = log as any; // Cast to access action and details properties
+                const details = actionLog.details;
+                
+                // Extract all available details
+                if (details.description) actionDetails.description = details.description;
+                if (details.target) actionDetails.target = details.target;
+                if (details.value) actionDetails.value = details.value;
+                if (details.locator) actionDetails.locator = details.locator;
+                if (details.current_url) actionDetails.current_url = details.current_url;
+                if (details.final_url) actionDetails.final_url = details.final_url;
+                if (details.target_url) actionDetails.target_url = details.target_url;
+                if (details.page_title) actionDetails.page_title = details.page_title;
+                if (details.expected_title) actionDetails.expected_title = details.expected_title;
+                if (details.expected_state) actionDetails.expected_state = details.expected_state;
+                if (details.products_count !== undefined) actionDetails.products_count = details.products_count;
+                if (details.wait_condition) actionDetails.wait_condition = details.wait_condition;
+                if (details.page_object) actionDetails.page_object = details.page_object;
+                if (details.elements_verified) actionDetails.elements_verified = details.elements_verified;
+                if (details.elements_to_check) actionDetails.elements_to_check = details.elements_to_check;
+                if (details.page_elements_verified) actionDetails.page_elements_verified = details.page_elements_verified;
+                if (details.metrics) actionDetails.metrics = details.metrics;
+                if (details.performance_grade) actionDetails.performance_grade = details.performance_grade;
+                if (details.validation_status) actionDetails.validation_status = details.validation_status;
+                if (details.username) actionDetails.username = details.username;
+                if (details.field) actionDetails.field = details.field;
+                if (details.button) actionDetails.button = details.button;
+                
+                // Set primary action if not already set (and not an error step)
+                if (!actionDetails.primaryAction && stepStatus !== StepStatus.FAILED) {
+                    actionDetails.primaryAction = {
+                        action: this.inferActionFromLogAction(actionLog.action, details),
+                        description: details.description,
+                        success: true
+                    };
+                    actionDetails.action = actionDetails.primaryAction.action;
+                }
+                
+                // Store the action info
+                actionDetails.actions.push({
+                    action: actionLog.action,
+                    details: details,
+                    timestamp: log.timestamp,
+                    success: stepStatus !== StepStatus.FAILED
+                });
+            }
+            
+            // Handle error logs for failed steps
+            if (log.type === 'error' && stepStatus === StepStatus.FAILED) {
+                const errorLog = log as any;
+                actionDetails.actions.push({
+                    action: 'error_logged',
+                    details: {
+                        description: `Error occurred: ${errorLog.message || log.message}`,
+                        error_type: errorLog.name || 'Error',
+                        error_message: errorLog.message || log.message,
+                        timestamp: log.timestamp,
+                        context: errorLog.context || {}
+                    },
+                    timestamp: log.timestamp,
+                    success: false,
+                    error: true
+                });
+            }
+            
+            // Handle other log types for backward compatibility
+            if (stepStatus !== undefined) {
+                if (log.type === 'element') {
+                    const elementLog = log as any; // Cast to access element-specific properties
+                    const elementInfo = {
+                        action: elementLog.action || 'Element Action',
+                        target: elementLog.elementDescription || 'Unknown Element',
+                        locator: elementLog.locator || '',
+                        success: elementLog.success || false,
+                        duration: elementLog.duration || 0,
+                        timestamp: log.timestamp
+                    };
+                    actionDetails.actions.push(elementInfo);
+                    
+                    // Set as primary action if no primary action set
+                    if (!actionDetails.primaryAction) {
+                        actionDetails.primaryAction = {
+                            action: this.formatActionName(elementLog.action || 'Element Action'),
+                            target: elementLog.elementDescription,
+                            value: elementLog.locator ? `Locator: ${elementLog.locator}` : undefined,
+                            success: elementLog.success
+                        };
+                    }
+                }
+            }
+        }
+
+        // If no primary action was set from logs, try to infer from step text or provide fallback
+        if (!actionDetails.primaryAction && stepStatus !== StepStatus.FAILED) {
+            actionDetails.primaryAction = {
+                action: 'General',
+                description: actionDetails.description || 'Step executed successfully',
+                success: true
+            };
+        }
+
+        return actionDetails;
+    }
+
+    /**
+     * Infer action type from log action name
+     */
+    private inferActionFromLogAction(logAction: string, details: any): string {
+        if (!logAction) return 'Unknown';
+        
+        // Map specific log action names to user-friendly action types
+        const actionMappings: { [key: string]: string } = {
+            'navigate_to_login_page': 'Navigate',
+            'page_navigation_completed': 'Navigate',
+            'page_object_initialized': 'Initialize',
+            'verify_page_loaded': 'Verify',
+            'verify_login_elements': 'Verify',
+            'login_page_verification_completed': 'Verify',
+            'login_process_started': 'Login',
+            'fill_username_field': 'Fill',
+            'fill_password_field': 'Fill',
+            'click_login_button': 'Click',
+            'wait_for_navigation': 'Wait',
+            'login_completed': 'Login',
+            'wait_for_page_navigation': 'Wait',
+            'verify_products_page_title': 'Verify',
+            'verify_products_list_visible': 'Verify',
+            'products_page_verification_completed': 'Verify',
+            'start_performance_metrics_collection': 'Performance',
+            'validate_performance_thresholds': 'Validate',
+            'performance_metrics_validation_completed': 'Performance'
+        };
+        
+        // Check for exact match first
+        if (actionMappings[logAction]) {
+            return actionMappings[logAction];
+        }
+        
+        // Check for pattern matches
+        if (logAction.includes('navigate') || logAction.includes('navigation')) return 'Navigate';
+        if (logAction.includes('login')) return 'Login';
+        if (logAction.includes('verify') || logAction.includes('validation')) return 'Verify';
+        if (logAction.includes('fill') || logAction.includes('enter')) return 'Fill';
+        if (logAction.includes('click') || logAction.includes('press')) return 'Click';
+        if (logAction.includes('wait')) return 'Wait';
+        if (logAction.includes('performance') || logAction.includes('metrics')) return 'Performance';
+        if (logAction.includes('initialize') || logAction.includes('setup')) return 'Initialize';
+        
+        // Default to capitalize first letter
+        return logAction.charAt(0).toUpperCase() + logAction.slice(1).replace(/_/g, ' ');
+    }
+    
+    /**
+     * Format action name for display
+     */
+    private formatActionName(action: string): string {
+        if (!action) return 'Unknown Action';
+        
+        // Convert snake_case and camelCase to Title Case
+        return action
+            .replace(/[_-]/g, ' ')
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+    }
+    
+    /**
+     * Extract target element/object from log message
+     */
+    private extractTargetFromMessage(message: string): string | undefined {
+        // Look for common target patterns
+        const targetPatterns = [
+            /(?:clicked?|pressed|tapped)\s+(?:on\s+)?(?:the\s+)?([^.]+)/i,
+            /(?:filled?|typed?|entered?)\s+(?:in\s+|into\s+)?(?:the\s+)?([^.]+)/i,
+            /(?:selected?|chose)\s+(?:from\s+)?(?:the\s+)?([^.]+)/i,
+            /(?:navigated?\s+to|visited?|opened?)\s+(?:the\s+)?([^.]+)/i,
+            /(?:verified?|checked?)\s+(?:that\s+)?(?:the\s+)?([^.]+)/i,
+            /element\s+([^:]+):/i,
+            /button\s+([^.]+)/i,
+            /field\s+([^.]+)/i,
+            /page\s+([^.]+)/i
+        ];
+        
+        for (const pattern of targetPatterns) {
+            const match = message.match(pattern);
+            if (match && match[1]) {
+                return match[1].trim();
+            }
+        }
+        
+        return undefined;
+    }
+
+    /**
+     * Extract value/data from log message
+     */
+    private extractValueFromMessage(message: string): string | undefined {
+        // Look for common value patterns
+        const valuePatterns = [
+            /(?:with\s+text|with\s+value|using)\s+"([^"]+)"/i,
+            /(?:with\s+text|with\s+value|using)\s+'([^']+)'/i,
+            /(?:filled?\s+with|entered?|typed?)\s+"([^"]+)"/i,
+            /(?:filled?\s+with|entered?|typed?)\s+'([^']+)'/i,
+            /(?:username|password|text)\s+"([^"]+)"/i,
+            /(?:username|password|text)\s+'([^']+)'/i,
+            /:\s*([^,\s.]+)/
+        ];
+        
+        for (const pattern of valuePatterns) {
+            const match = message.match(pattern);
+            if (match && match[1]) {
+                return match[1].trim();
+            }
+        }
+        
+        return undefined;
     }
 
     /**

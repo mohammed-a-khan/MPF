@@ -44,23 +44,33 @@ export class ProfessionalPDFExporter {
             // Variables already declared above
             
             try {
-                // Try to use existing browser first
+                // BROWSER FLASHING FIX: Always try to use existing browser first
                 this.browser = browserManager.getBrowser();
+                this.logger.debug('Using existing browser for PDF generation - no new browser launch');
             } catch (error) {
-                // Browser not available, we need to launch one
-                this.logger.debug('No existing browser, launching new one for PDF generation');
+                this.logger.warn('No existing browser available for PDF generation, will skip PDF export to prevent browser flashing');
+                // BROWSER FLASHING FIX: Don't launch new browser, just skip PDF generation
+                return {
+                    success: false,
+                    error: 'PDF generation skipped - no existing browser available (prevents browser flashing)',
+                    filePath: options.outputPath || '',
+                    size: 0,
+                    format: 'PDF' as any,
+                    duration: Date.now() - startTime
+                };
             }
-            
+
+            // BROWSER FLASHING FIX: Only proceed if we have a valid existing browser
             if (!this.browser || !this.browser.isConnected()) {
-                // Launch a new browser specifically for PDF generation
-                const playwright = await import('playwright');
-                browser = await playwright.chromium.launch({
-                    headless: true,
-                    args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox']
-                });
-                this.browser = browser;
-                needsCleanup = true;
-                this.logger.debug('Launched new browser for PDF generation');
+                this.logger.warn('Existing browser is not connected, skipping PDF generation to prevent browser flashing');
+                return {
+                    success: false,
+                    error: 'PDF generation skipped - browser not connected (prevents browser flashing)',
+                    filePath: options.outputPath || '',
+                    size: 0,
+                    format: 'PDF' as any,
+                    duration: Date.now() - startTime
+                };
             }
 
             // Create a new context and page

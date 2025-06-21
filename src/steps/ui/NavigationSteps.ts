@@ -323,39 +323,8 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    @CSBDDStepDef('I login with username {string} and password {string}')
-    async loginToSauceDemo(username: string, password: string): Promise<void> {
-        const actionLogger = ActionLogger.getInstance();
-        try {
-            const page = BDDContext.getCurrentPage();
-            
-            // Fill username
-            await page.locator('[data-test="username"]').fill(username);
-            
-            // Fill password
-            await page.locator('[data-test="password"]').fill(password);
-            
-            // Click login button
-            await page.locator('[data-test="login-button"]').click();
-            
-            // Wait for products page
-            await page.locator('.inventory_list').waitFor({
-                state: 'visible',
-                timeout: 5000
-            });
-            
-            await actionLogger.logAction('login', {
-                username: username,
-                success: true
-            });
-        } catch (error) {
-            await actionLogger.logError(error as Error, { 
-                operation: 'login',
-                username: username
-            });
-            throw error;
-        }
-    }
+    // Removed duplicate step definition - using SauceDemoSteps.loginWithCredentials() instead
+    // which provides more detailed action logging
 
     @CSBDDStepDef('I should see the products page')
     async validateProductsPage(): Promise<void> {

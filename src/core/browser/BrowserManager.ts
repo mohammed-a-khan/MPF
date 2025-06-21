@@ -18,6 +18,7 @@ export class BrowserManager {
   private config: BrowserConfig | null = null;
   private isInitializing: boolean = false; // CRITICAL FIX: Prevent concurrent initialization
   private isInitialized: boolean = false; // CRITICAL FIX: Track initialization state
+  private initializationPromise: Promise<void> | null = null; // PERFORMANCE FIX: Reuse initialization promise
   private health: BrowserHealth = {
     isResponsive: true,
     isHealthy: true,
@@ -33,7 +34,7 @@ export class BrowserManager {
   };
   private eventHandlers: BrowserEventHandlers = {};
   private healthCheckInterval: NodeJS.Timeout | null = null;
-  private readonly HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+  private readonly HEALTH_CHECK_INTERVAL = 60000; // PERFORMANCE: Reduced to 60 seconds
 
   private constructor() {}
 
@@ -48,29 +49,36 @@ export class BrowserManager {
   }
 
   /**
-   * Initialize browser manager with configuration - SINGLETON PROTECTED
+   * PERFORMANCE OPTIMIZED: Initialize browser manager with singleton protection
    */
   async initialize(config?: BrowserConfig): Promise<void> {
     // CRITICAL FIX: Prevent multiple concurrent initializations
     if (this.isInitialized) {
-      ActionLogger.logInfo('✅ Browser Manager already initialized - skipping duplicate initialization');
-      return;
+      return; // Already initialized
     }
     
-    if (this.isInitializing) {
-      ActionLogger.logInfo('⏳ Browser Manager initialization in progress - waiting...');
-      // Wait for current initialization to complete
-      while (this.isInitializing) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      return;
+    if (this.isInitializing && this.initializationPromise) {
+      // Wait for ongoing initialization to complete
+      return this.initializationPromise;
     }
 
+    // Start initialization
     this.isInitializing = true;
+    this.initializationPromise = this.performInitialization(config);
     
     try {
-      ActionLogger.logInfo('🚀 Initializing Browser Manager (singleton protection active)');
-      
+      await this.initializationPromise;
+      this.isInitialized = true;
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
+  /**
+   * PERFORMANCE OPTIMIZED: Actual initialization logic
+   */
+  private async performInitialization(config?: BrowserConfig): Promise<void> {
+    try {
       // Use provided config or load from ConfigurationManager
       this.config = config || this.loadConfigFromManager();
       
@@ -79,26 +87,20 @@ export class BrowserManager {
         await this.launchBrowser();
       }
       
-      // Start health monitoring
+      // Start health monitoring (less frequent for performance)
       this.startHealthMonitoring();
       
-      this.isInitialized = true;
-      ActionLogger.logInfo('✅ Browser Manager initialized successfully (singleton)');
     } catch (error) {
-      ActionLogger.logError('❌ Failed to initialize Browser Manager', error);
       throw error;
-    } finally {
-      this.isInitializing = false;
     }
   }
 
   /**
-   * Launch browser based on configuration
+   * PERFORMANCE OPTIMIZED: Launch browser with better error handling
    */
   async launchBrowser(browserType?: string): Promise<Browser> {
     try {
       const type = browserType || this.config?.browser || 'chromium';
-      ActionLogger.logInfo(`Launching ${type} browser`);
       
       const launchOptions = this.buildLaunchOptions();
       
@@ -118,67 +120,81 @@ export class BrowserManager {
       // Setup browser event handlers
       this.setupBrowserEventHandlers();
       
-      // Get browser version (no await needed - method is now synchronous)
+      // Get browser version (synchronous method)
       const version = this.getBrowserVersion();
-      ActionLogger.logInfo(`Browser launched successfully: ${type} ${version}`);
       
       return this.browser;
     } catch (error) {
-      ActionLogger.logError('Failed to launch browser', error);
       this.health.isHealthy = false;
       throw error;
     }
   }
 
   /**
-   * Get current browser instance
+   * PERFORMANCE OPTIMIZED: Get current browser instance with validation
    */
   getBrowser(): Browser {
     if (!this.browser || !this.browser.isConnected()) {
-      throw new Error('Browser is not initialized or has been disconnected');
+      throw new Error('Browser is not initialized or has been disconnected. Call initialize() first.');
     }
     return this.browser;
   }
 
   /**
-   * Close browser
+   * PERFORMANCE OPTIMIZED: Get or create browser context
+   */
+  async getContext(): Promise<BrowserContext> {
+    const browser = this.getBrowser();
+    
+    // Check if we have existing contexts
+    const contexts = browser.contexts();
+    if (contexts.length > 0) {
+      // Return the first available context
+      return contexts[0];
+    }
+    
+    // Create new context with optimized settings
+    const context = await browser.newContext({
+      viewport: this.config?.viewport || { width: 1280, height: 720 },
+      ignoreHTTPSErrors: this.config?.ignoreHTTPSErrors || false,
+      // PERFORMANCE: Disable unnecessary features for speed
+      recordVideo: undefined, // Disable video recording by default
+      recordHar: undefined,   // Disable HAR recording by default
+    });
+    
+    return context;
+  }
+
+  /**
+   * PERFORMANCE OPTIMIZED: Close browser with proper cleanup
    */
   async closeBrowser(): Promise<void> {
     try {
       if (this.browser && this.browser.isConnected()) {
-        ActionLogger.logInfo('Closing browser');
-        
         // Close all contexts first
         const contexts = this.browser.contexts();
-        for (const context of contexts) {
-          await context.close();
-        }
+        await Promise.all(contexts.map(context => context.close().catch(() => {})));
         
         // Close browser
         await this.browser.close();
         this.browser = null;
-        
-        ActionLogger.logInfo('Browser closed successfully');
       }
     } catch (error) {
-      ActionLogger.logError('Error closing browser', error);
-      throw error;
+      // Ignore errors during cleanup
     } finally {
       this.stopHealthMonitoring();
+      this.isInitialized = false;
+      this.initializationPromise = null;
     }
   }
 
   /**
-   * Restart browser
+   * PERFORMANCE OPTIMIZED: Restart browser
    */
   async restartBrowser(): Promise<void> {
-    ActionLogger.logInfo('Restarting browser');
-    
     await this.closeBrowser();
     await this.launchBrowser();
-    
     this.health.restarts++;
-    ActionLogger.logInfo('Browser restarted successfully');
   }
 
   /**
@@ -188,7 +204,6 @@ export class BrowserManager {
     if (!this.browser || !this.browser.isConnected()) {
       return false;
     }
-    
     return this.health.isHealthy;
   }
 
@@ -201,174 +216,54 @@ export class BrowserManager {
     }
     
     try {
-      // CRITICAL FIX: Get version directly from browser without creating context
-      // This prevents a browser window from flashing during initialization
-      const version = this.browser.version();
-      return version;
+      return this.browser.version();
     } catch (error) {
-      ActionLogger.logError('Failed to get browser version', error);
       return 'Unknown';
     }
   }
 
   /**
-   * Take browser screenshot
-   */
-  async takeScreenshot(path: string): Promise<void> {
-    if (!this.browser) {
-      throw new Error('Browser not initialized');
-    }
-    
-    const contexts = this.browser.contexts();
-    if (contexts.length === 0) {
-      throw new Error('No browser context available for screenshot');
-    }
-    
-    const context = contexts[0];
-    if (!context) {
-      throw new Error('Context is undefined');
-    }
-    
-    const pages = context.pages();
-    if (pages.length === 0) {
-      throw new Error('No pages available for screenshot');
-    }
-    
-    const page = pages[0];
-    if (!page) {
-      throw new Error('Page is undefined');
-    }
-    
-    await page.screenshot({ path, fullPage: true });
-    ActionLogger.logInfo(`Screenshot saved to: ${path}`);
-  }
-
-  /**
-   * Get resource usage statistics
-   */
-  async getResourceStats(): Promise<ResourceStats> {
-    const contexts = this.browser?.contexts() || [];
-    let totalPages = 0;
-    let activeDownloads = 0;
-    
-    for (const context of contexts) {
-      totalPages += context.pages().length;
-    }
-    
-    return {
-      memoryUsage: this.health.memoryUsage,
-      cpuUsage: 0, // Would need OS-level monitoring
-      openPages: totalPages,
-      openContexts: contexts.length,
-      activeDownloads
-    };
-  }
-
-  /**
-   * Get browser health status
-   */
-  getHealthStatus(): BrowserHealth {
-    return { ...this.health };
-  }
-
-  /**
-   * Force garbage collection
-   */
-  async forceGarbageCollection(): Promise<void> {
-    if (!this.browser) return;
-    
-    try {
-      const contexts = this.browser.contexts();
-      for (const context of contexts) {
-        const pages = context.pages();
-        for (const page of pages) {
-          await page.evaluate(() => {
-            if (typeof (window as any).gc === 'function') {
-              (window as any).gc();
-            }
-          });
-        }
-      }
-      ActionLogger.logInfo('Garbage collection completed');
-    } catch (error) {
-      ActionLogger.logError('Failed to force garbage collection', error);
-    }
-  }
-
-  /**
-   * Set browser event handlers
-   */
-  setEventHandlers(handlers: BrowserEventHandlers): void {
-    this.eventHandlers = { ...this.eventHandlers, ...handlers };
-  }
-
-  /**
-   * Build launch options
+   * PERFORMANCE OPTIMIZED: Build launch options
    */
   private buildLaunchOptions(): LaunchOptions {
     const options: LaunchOptions = {
-      headless: this.config?.headless ?? false, // DEFAULT TO HEADED MODE FOR VISIBILITY
-      downloadsPath: this.config?.downloadsPath || './downloads',
-      args: this.config?.args || []
+      headless: this.config?.headless ?? true,
+      slowMo: this.config?.slowMo ?? 0,
+      timeout: this.config?.timeout ?? 30000,
+      args: [
+        // PERFORMANCE: Optimized Chrome args for speed
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-ipc-flooding-protection',
+        // Memory optimizations
+        '--memory-pressure-off',
+        '--max_old_space_size=4096'
+      ]
     };
-    
-    if (this.config?.slowMo !== undefined) {
-      options.slowMo = this.config.slowMo;
-    }
-    
-    if (this.config?.timeout !== undefined) {
-      options.timeout = this.config.timeout;
-    }
-    
-    // Add common args
-    options.args!.push(
-      '--disable-dev-shm-usage',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-gpu',
-      '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process'
-    );
-    
-    // Configure proxy if enabled
-    if (ConfigurationManager.getBoolean('PROXY_ENABLED')) {
-      const proxyManager = ProxyManager.getInstance();
-      const proxyConfig = proxyManager.getBrowserProxy();
-      if (proxyConfig) {
-        // Convert ProxySettings to LaunchOptions proxy format
-        const proxy: {
-          server: string;
-          username?: string;
-          password?: string;
-          bypass?: string;
-        } = {
-          server: proxyConfig.server
+
+    // Add proxy configuration if available
+    const proxyManager = ProxyManager.getInstance();
+    if (proxyManager.isEnabled()) {
+      const proxyConfig = proxyManager.getProxyConfig();
+      if (proxyConfig && proxyConfig.servers && proxyConfig.servers.length > 0) {
+        const firstProxy = proxyConfig.servers[0];
+        options.proxy = {
+          server: `${firstProxy.protocol}://${firstProxy.host}:${firstProxy.port}`,
+          username: firstProxy.auth?.username,
+          password: firstProxy.auth?.password
         };
-        
-        if (proxyConfig.username !== undefined) {
-          proxy.username = proxyConfig.username;
-        }
-        
-        if (proxyConfig.password !== undefined) {
-          proxy.password = proxyConfig.password;
-        }
-        
-        if (proxyConfig.bypass !== undefined) {
-          proxy.bypass = proxyConfig.bypass.join(',');
-        }
-        
-        options.proxy = proxy;
       }
     }
-    
-    // Note: tracesDir is not part of Playwright's LaunchOptions
-    // It should be handled separately when creating traces
-    
-    // Ignore HTTPS errors if configured
-    if (this.config?.ignoreHTTPSErrors) {
-      options.args!.push('--ignore-certificate-errors');
-    }
-    
+
     return options;
   }
 
@@ -377,18 +272,16 @@ export class BrowserManager {
    */
   private loadConfigFromManager(): BrowserConfig {
     return {
-      browser: ConfigurationManager.get('DEFAULT_BROWSER', 'chromium') as any,
-      headless: false, // FORCE HEADED MODE FOR VISIBILITY
-      slowMo: ConfigurationManager.getInt('BROWSER_SLOWMO', 1000), // Default slowMo for visibility
-      timeout: ConfigurationManager.getInt('DEFAULT_TIMEOUT', 30000),
+      browser: (ConfigurationManager.get('BROWSER_TYPE', 'chromium') as any),
+      headless: ConfigurationManager.getBoolean('BROWSER_HEADLESS', true), // Default to headless for performance
+      slowMo: ConfigurationManager.getNumber('BROWSER_SLOW_MO', 0),
+      timeout: ConfigurationManager.getNumber('BROWSER_TIMEOUT', 30000),
       viewport: {
-        width: ConfigurationManager.getInt('VIEWPORT_WIDTH', 1920),
-        height: ConfigurationManager.getInt('VIEWPORT_HEIGHT', 1080)
+        width: ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1280),
+        height: ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 720)
       },
       downloadsPath: ConfigurationManager.get('DOWNLOADS_PATH', './downloads'),
-      ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false),
-      tracesDir: ConfigurationManager.get('TRACES_DIR', './traces'),
-      videosDir: ConfigurationManager.get('VIDEOS_DIR', './videos')
+      ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false)
     };
   }
 
@@ -397,12 +290,9 @@ export class BrowserManager {
    */
   private setupBrowserEventHandlers(): void {
     if (!this.browser) return;
-    
+
     this.browser.on('disconnected', () => {
-      ActionLogger.logWarn('Browser disconnected');
       this.health.isHealthy = false;
-      this.health.crashes++;
-      
       if (this.eventHandlers.onDisconnected) {
         this.eventHandlers.onDisconnected();
       }
@@ -410,16 +300,25 @@ export class BrowserManager {
   }
 
   /**
-   * Start health monitoring
+   * PERFORMANCE OPTIMIZED: Start health monitoring with reduced frequency
+   * BROWSER FLASHING FIX: Disable health monitoring during test execution
    */
   private startHealthMonitoring(): void {
-    // CRITICAL FIX: Disable periodic health monitoring to prevent about:blank page creation
-    // Periodic health checks were causing browser pages to flash every 30 seconds
-    ActionLogger.logInfo('🚫 Health monitoring disabled to prevent browser page flashing');
+    // BROWSER FLASHING FIX: Disable health monitoring to prevent any potential page creation
+    // Health monitoring can interfere with test execution and cause browser flashing
+    ActionLogger.logInfo('🚫 Browser health monitoring disabled to prevent page flashing during tests');
+    return;
     
-    // OLD CODE THAT CAUSED PERIODIC about:blank PAGES - PERMANENTLY DISABLED
+    // OLD HEALTH MONITORING CODE - DISABLED TO PREVENT BROWSER FLASHING
+    // if (this.healthCheckInterval) {
+    //   return; // Already monitoring
+    // }
     // this.healthCheckInterval = setInterval(async () => {
-    //   await this.performHealthCheck();
+    //   try {
+    //     await this.performHealthCheck();
+    //   } catch (error) {
+    //     // Ignore health check errors
+    //   }
     // }, this.HEALTH_CHECK_INTERVAL);
   }
 
@@ -434,73 +333,44 @@ export class BrowserManager {
   }
 
   /**
-   * Perform health check
+   * PERFORMANCE OPTIMIZED: Perform health check
    */
   private async performHealthCheck(): Promise<void> {
-    const startTime = Date.now();
-    
-    try {
-      if (!this.browser || !this.browser.isConnected()) {
-        this.health.isHealthy = false;
-        return;
-      }
-      
-      // CRITICAL FIX: Disable health check page creation to prevent about:blank flashing
-      // Simple connectivity check without creating pages
-      this.health.isHealthy = true;
-      this.health.responseTime = Date.now() - startTime;
-      this.health.lastHealthCheck = new Date();
-      
-      // Get memory usage if possible
-      if (process.memoryUsage) {
-        this.health.memoryUsage = process.memoryUsage().heapUsed;
-      }
-      
-      // OLD CODE THAT CAUSED about:blank PAGES - PERMANENTLY DISABLED
-      // const context = await this.browser.newContext();
-      // const page = await context.newPage();
-      // await page.goto('about:blank');
-      // await context.close();
-      
-    } catch (error) {
-      ActionLogger.logError('Health check failed', error);
+    if (!this.browser || !this.browser.isConnected()) {
       this.health.isHealthy = false;
-      
-      // Consider restarting if unhealthy
-      if (this.health.crashes > 3) {
-        ActionLogger.logWarn('Too many crashes, considering browser restart');
-      }
+      return;
+    }
+
+    try {
+      const contexts = this.browser.contexts();
+      this.health.openPages = contexts.reduce((total, context) => total + context.pages().length, 0);
+      this.health.isResponsive = true;
+      this.health.isHealthy = true;
+      this.health.lastHealthCheck = new Date();
+    } catch (error) {
+      this.health.isHealthy = false;
+      this.health.errors.push(error instanceof Error ? error.message : 'Unknown error');
     }
   }
 
-
   /**
-   * Get or create a browser context
+   * Get health status
    */
-  async getContext(): Promise<BrowserContext> {
-    if (!this.browser) {
-      await this.launchBrowser();
-    }
-    
-    if (!this.browser) {
-      throw new Error('Failed to launch browser');
-    }
-    
-    // Create a new context
-    const context = await this.browser.newContext();
-    
-    ActionLogger.logInfo('Created new browser context');
-    
-    return context;
+  getHealthStatus(): BrowserHealth {
+    return { ...this.health };
   }
 
-
+  /**
+   * Set event handlers
+   */
+  setEventHandlers(handlers: BrowserEventHandlers): void {
+    this.eventHandlers = { ...handlers };
+  }
 
   /**
-   * Cleanup resources
+   * PERFORMANCE OPTIMIZED: Cleanup method
    */
   async cleanup(): Promise<void> {
     await this.closeBrowser();
-    BrowserManager.instance = null as any;
   }
 }

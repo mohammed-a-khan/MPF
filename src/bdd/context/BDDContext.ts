@@ -233,13 +233,38 @@ export class BDDContext {
   }
 
   /**
-   * Get current page
+   * Get current page with improved validation
    */
   public static getCurrentPage(): Page {
     const instance = BDDContext.getInstance();
-    if (!instance.currentPage) {
-      throw new Error('No page is currently active');
+    
+    // BROWSER FLASHING FIX: Improved page validation
+    if (!instance.currentPage || instance.currentPage.isClosed()) {
+      // Try to get page from execution context
+      if (instance.executionContext) {
+        try {
+          // Use the new getOrCreatePage method if available
+          if (instance.executionContext.isPageValid()) {
+            instance.currentPage = instance.executionContext.getPage();
+            ActionLogger.logInfo('Reusing valid page from execution context');
+          } else {
+            ActionLogger.logWarn('Current page is invalid, will need reinitialization');
+            throw new Error('Page is not available or has been closed - please reinitialize');
+          }
+        } catch (error) {
+          ActionLogger.logError('Failed to get page from execution context', error as Error);
+          throw new Error('Page is not available or has been closed - please reinitialize');
+        }
+      } else {
+        throw new Error('No execution context available - BDD context not properly initialized');
+      }
     }
+
+    // Final validation
+    if (!instance.currentPage || instance.currentPage.isClosed()) {
+      throw new Error('Page is not available or has been closed - please reinitialize');
+    }
+
     return instance.currentPage;
   }
 

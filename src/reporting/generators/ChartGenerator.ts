@@ -122,10 +122,13 @@ export class ChartGenerator {
   ): string {
     const width = options.width || 400;
     const height = options.height || 400;
-    const centerX = width / 2;
+    // Adjust for right-side legend
+    const legendWidth = 160;
+    const chartWidth = width - legendWidth;
+    const centerX = chartWidth / 2;
     const centerY = height / 2;
-    const outerRadius = Math.min(width, height) / 2 - 40;
-    const innerRadius = outerRadius * 0.6;
+    const outerRadius = Math.min(chartWidth, height) / 2 - 30;
+    const innerRadius = outerRadius * 0.4;
     
     // Defensive check for data.values
     if (!data.values || !Array.isArray(data.values)) {
@@ -149,7 +152,8 @@ export class ChartGenerator {
         startAngle,
         endAngle,
         label: data.labels[index],
-        color: colors.dataColors[index % colors.dataColors.length]
+        // FIXED: Use data.colors (from PieChartData) for consistent colors with legend
+        color: (data as any).colors && (data as any).colors[index] ? (data as any).colors[index] : colors.dataColors[index % colors.dataColors.length]
       };
     });
     
@@ -176,6 +180,12 @@ export class ChartGenerator {
           segment.startAngle, segment.endAngle
         );
         
+        const labelRadius = (innerRadius + outerRadius) / 2;
+        const labelAngle = (segment.startAngle + segment.endAngle) / 2;
+        const labelX = Math.cos(labelAngle) * labelRadius;
+        const labelY = Math.sin(labelAngle) * labelRadius;
+        const percentage = Math.round(segment.percentage * 100);
+        
         return `
         <g class="segment" data-index="${index}">
           <path
@@ -186,14 +196,26 @@ export class ChartGenerator {
             class="segment-path"
             data-value="${segment.value}"
             data-label="${segment.label}"
+            data-percentage="${percentage}"
             style="cursor: pointer; transition: all 0.3s ease;"
             onmouseover="chartHover_${id}(event, ${index})"
             onmouseout="chartUnhover_${id}(event, ${index})"
             onclick="chartClick_${id}(event, ${index})"
           />
           
-          <!-- Label -->
-          ${options.showLegend === false ? '' : this.createSegmentLabel(segment, innerRadius, outerRadius)}
+          <!-- Percentage Label on Segment -->
+          ${segment.value > 0 ? `
+          <text
+            x="${labelX}"
+            y="${labelY}"
+            text-anchor="middle"
+            dominant-baseline="central"
+            class="segment-label"
+            style="fill: white; font-size: 14px; font-weight: bold; pointer-events: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"
+          >
+            ${percentage}%
+          </text>
+          ` : ''}
         </g>`;
       }).join('')}
     </g>

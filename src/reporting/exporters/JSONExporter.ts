@@ -280,6 +280,9 @@ export class JSONExporter {
           stack: step.errorStack
         }
       }),
+      ...(step.actionDetails && {
+        actionDetails: step.actionDetails
+      }),
       ...(options.includeEvidence && {
         evidence: {
           screenshots: step.screenshots || [],

@@ -1893,6 +1893,21 @@ export class ProxyManager extends EventEmitter {
     return Array.from(this.tunnels.values());
   }
 
+  /**
+   * Check if proxy is enabled and configured
+   */
+  isEnabled(): boolean {
+    return this.isInitialized && this.config && this.config.enabled && 
+           this.config.servers && this.config.servers.length > 0;
+  }
+
+  /**
+   * Get the current proxy configuration
+   */
+  getProxyConfig(): ProxyConfig | null {
+    return this.isInitialized ? this.config : null;
+  }
+
   async testProxy(proxy: ProxyConfig, testUrl?: string): Promise<boolean> {
     const url = testUrl || 'https://www.google.com';
     

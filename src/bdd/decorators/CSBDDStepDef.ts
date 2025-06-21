@@ -63,32 +63,11 @@ export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionO
     // Log registration
     Logger.getInstance().debug(`Registered step definition: ${pattern.toString()} -> ${stepDefinition.location}`);
     
-    // Wrap the method to add error handling and logging
-    const wrappedMethod = async function(this: any, ...args: any[]) {
-      const stepText = args[args.length - 1]?.stepText || pattern.toString();
-      const startTime = Date.now();
-      
-      try {
-        const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('step_start', { stepText, location: stepDefinition.location });
-        
-        // Bind 'this' context properly
-        const result = await originalMethod.apply(this, args);
-        
-        const duration = Date.now() - startTime;
-        await actionLogger.logAction('step_pass', { stepText, duration });
-        
-        return result;
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { stepText, duration });
-        throw error;
-      }
-    } as T;
+    // Don't wrap the method - let the StepExecutor handle the execution
+    // This preserves the original method for proper binding
+    // The wrapping was causing 'this' context issues
     
-    // Update the descriptor
-    methodDescriptor.value = wrappedMethod;
+    // Keep the original method - no wrapping needed
     
     return methodDescriptor;
   };

@@ -318,7 +318,9 @@ export class ReportOrchestrator {
                     
                 case 'json':
                     const jsonPath = path.join(report.reportPath, 'exports', `report_${Date.now()}.json`);
-                    const jsonResult = await this.jsonExporter.export(reportData as any, jsonPath);
+                    // Convert ReportData to ExecutionResult format
+                    const executionResultForJson = ReportDataConverter.toExecutionResult(reportData);
+                    const jsonResult = await this.jsonExporter.export(executionResultForJson, jsonPath);
                     exportPath = jsonResult.filePath || '';
                     break;
                     
@@ -613,10 +615,8 @@ export class ReportOrchestrator {
         await FileUtils.createDir(path.join(reportDir, 'exports'));
         
         // Export to JSON
-        const result = await this.jsonExporter.export(reportData as any, jsonPath, {
-            format: ExportFormat.JSON,
-            pretty: true
-        });
+        const executionResultForJson = ReportDataConverter.toExecutionResult(reportData);
+        const result = await this.jsonExporter.export(executionResultForJson, jsonPath);
         
         return result.filePath || '';
     }

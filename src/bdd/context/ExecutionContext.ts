@@ -72,52 +72,31 @@ export class ExecutionContext {
     try {
       ActionLogger.logExecutionStart(this.executionId);
       
-      // Initialize proxy if configured
-      if (ConfigurationManager.getBoolean('PROXY_ENABLED', false)) {
-        const proxyConfig = new ProxyConfig();
-        proxyConfig.enabled = true;
-        const proxyServer = ConfigurationManager.get('PROXY_SERVER');
-        if (proxyServer) {
-          const [host, portStr] = proxyServer.split(':');
-          if (host) {
-            const username = ConfigurationManager.get('PROXY_USERNAME');
-            const password = ConfigurationManager.get('PROXY_PASSWORD');
-            
-            const serverConfig: any = {
-              protocol: 'http',
-              host: host,
-              port: parseInt(portStr || '8080') || 8080
-            };
-            
-            if (username && password) {
-              serverConfig.auth = {
-                username,
-                password
-              };
-            }
-            
-            proxyConfig.addServer(serverConfig);
-          }
-        }
-        const bypassList = ConfigurationManager.get('PROXY_BYPASS');
-        if (bypassList) {
-          proxyConfig.bypass = bypassList.split(',').map(s => s.trim());
-        }
-        await ProxyManager.getInstance().initialize(proxyConfig);
-        this.logger.info('Proxy manager initialized');
-      }
-
-      // Initialize browser
-      await this.initializeBrowser();
+      // Initialize browser ONLY if UI testing is enabled
+      const uiEnabled = ConfigurationManager.getBoolean('UI_ENABLED', true);
+      const browserRequired = ConfigurationManager.getBoolean('BROWSER_REQUIRED', false);
       
-      // Initialize API connection pool
-      if (ConfigurationManager.getBoolean('API_TESTING_ENABLED', true)) {
+      if (uiEnabled || browserRequired) {
+        this.logger.info('UI testing enabled - initializing browser');
+        await this.initializeBrowser();
+      } else {
+        this.logger.info('🚫 Browser initialization SKIPPED - UI testing disabled');
+      }
+      
+      // Initialize API connection pool ONLY if API testing is enabled
+      if (ConfigurationManager.getBoolean('API_ENABLED', true) || ConfigurationManager.getBoolean('API_TESTING_ENABLED', true)) {
+        this.logger.info('API testing enabled - initializing API connections');
         await this.initializeAPIConnections();
+      } else {
+        this.logger.info('🚫 API initialization SKIPPED - API testing disabled');
       }
 
-      // Initialize database connections
-      if (ConfigurationManager.getBoolean('DATABASE_TESTING_ENABLED', false)) {
+      // Initialize database connections ONLY if database testing is enabled
+      if (ConfigurationManager.getBoolean('DATABASE_ENABLED', false) || ConfigurationManager.getBoolean('DATABASE_TESTING_ENABLED', false)) {
+        this.logger.info('Database testing enabled - initializing database connections');
         await this.initializeDatabaseConnections();
+      } else {
+        this.logger.info('🚫 Database initialization SKIPPED - Database testing disabled');
       }
 
       this.isInitialized = true;
@@ -158,12 +137,44 @@ export class ExecutionContext {
   }
 
   /**
-   * Get current page
+   * Get current page, creating one if needed
    */
   public getPage(): Page {
-    if (!this.page) {
-      throw new Error('Page not initialized');
+    if (!this.page || this.page.isClosed()) {
+      throw new Error('Page is not available. Call initialize() first.');
     }
+    return this.page;
+  }
+
+  /**
+   * Check if current page is valid and can be reused
+   */
+  public isPageValid(): boolean {
+    return this.page !== undefined && 
+           !this.page.isClosed() && 
+           this.browserContext !== undefined &&
+           this.browserContext.pages().length > 0;
+  }
+
+  /**
+   * Get or create a valid page
+   */
+  public async getOrCreatePage(): Promise<Page> {
+    if (this.isPageValid()) {
+      this.logger.info(`Reusing existing page: ${this.executionId}`);
+      return this.page!;
+    }
+
+    this.logger.info(`Creating new page: ${this.executionId}`);
+    
+    // Ensure we have a valid browser context
+    if (!this.browserContext || this.browserContext.pages().length === 0) {
+      this.browserContext = await this.createBrowserContext();
+    }
+
+    this.page = await this.createPage(this.browserContext);
+    await this.setupPageListeners(this.page);
+    
     return this.page;
   }
 
@@ -279,11 +290,11 @@ export class ExecutionContext {
   private async initializeBrowser(): Promise<void> {
     this.logger.info('🔧 Initializing browser with centralized management...');
     
-    // Get browser configuration - FORCE HEADED MODE FOR VISIBILITY
+    // Get browser configuration - OPTIMIZED FOR SPEED
     const browserConfig = {
       browser: ConfigurationManager.get('DEFAULT_BROWSER', 'chromium') as any,
-      headless: false, // FORCE HEADED MODE - ALWAYS SHOW BROWSER WINDOW
-      slowMo: 1000, // Slow down significantly for visibility
+      headless: false, // Keep headed mode but optimize
+      slowMo: 0, // SPEED FIX: Remove slowMo for faster execution
       timeout: ConfigurationManager.getInt('DEFAULT_TIMEOUT', 30000),
       viewport: {
         width: ConfigurationManager.getInt('VIEWPORT_WIDTH', 1920),
@@ -301,7 +312,7 @@ export class ExecutionContext {
     try {
       // CRITICAL FIX: Always try to get existing browser first
       this.browser = browserManager.getBrowser();
-      this.logger.info(`✅ Using existing browser instance (headless: ${browserConfig.headless})`);
+      this.logger.info(`✅ Using existing browser instance - FAST MODE`);
     } catch (error) {
       // Browser doesn't exist, but DON'T call initialize() here since it's called elsewhere
       // This prevents multiple browser launches from ExecutionContext instances
@@ -309,42 +320,43 @@ export class ExecutionContext {
       throw new Error('Browser not available - framework initialization may have failed');
     }
 
-    // CRITICAL FIX: Reuse existing browser context instead of creating new ones
-    // This prevents multiple browser contexts (and browser instances) from opening
-    
-    // Check if browser already has contexts we can reuse
+    // CRITICAL FIX: ALWAYS reuse existing browser context to prevent multiple browser opens
     const existingContexts = this.browser.contexts();
     if (existingContexts.length > 0 && existingContexts[0]) {
       this.browserContext = existingContexts[0];
-      this.logger.info('✅ Reusing existing browser context (no new browser instance created)');
+      this.logger.info('✅ Reusing existing browser context - FAST MODE');
+      
+      // SPEED FIX: Also reuse existing page from context
+      const existingPages = this.browserContext.pages();
+      if (existingPages.length > 0 && existingPages[0]) {
+        this.page = existingPages[0];
+        this.logger.info('✅ Reusing existing page - FAST MODE');
+        
+        // Set the page in BDDContext so step definitions can access it
+        BDDContext.getInstance().setCurrentPage(this.page);
+        this.logger.info('✅ Browser context reused successfully - FAST EXECUTION MODE');
+        return; // Exit early - no need to create new page
+      }
     } else {
-      // CRITICAL FIX: Create context directly using browser.newContext() instead of createBrowserContext()
-      // This prevents the infinite loop through ContextManager
+      // Only create new context if none exists
       this.browserContext = await this.browser.newContext({
         viewport: browserConfig.viewport,
         ignoreHTTPSErrors: browserConfig.ignoreHTTPSErrors
       });
-      this.logger.info('✅ Created new browser context directly (reusing existing browser)');
+      this.logger.info('✅ Created new browser context - FAST MODE');
     }
 
-    // CRITICAL FIX: Reuse existing page or create new page in same context
-    if (this.browserContext) {
-      const existingPages = this.browserContext.pages();
-      if (existingPages.length > 0 && existingPages[0]) {
-        this.page = existingPages[0];
-        this.logger.info('✅ Reusing existing page (no new browser instance created)');
-      } else {
-        // Create page directly within the existing context
-        this.page = await this.browserContext.newPage();
-        await this.setupPageListeners(this.page);
-        this.logger.info('✅ Created new page in existing context (no new browser instance created)');
-      }
+    // Only create new page if we don't have one
+    if (!this.page && this.browserContext) {
+      this.page = await this.browserContext.newPage();
+      await this.setupPageListeners(this.page);
+      this.logger.info('✅ Created new page - FAST MODE');
     }
 
     // Set the page in BDDContext so step definitions can access it
     if (this.page) {
       BDDContext.getInstance().setCurrentPage(this.page);
-      this.logger.info('✅ Browser context reused successfully - NO NEW BROWSER INSTANCES CREATED');
+      this.logger.info('✅ Browser context initialized successfully - FAST EXECUTION MODE');
     } else {
       throw new Error('Failed to initialize page - no page available');
     }
@@ -518,9 +530,23 @@ export class ExecutionContext {
       // await this.resourceManager.cleanupPageResources(this.page);
     }
 
-    // Close browser context
-    if (this.browserContext) {
-      await this.browserContext.close();
+    // BROWSER FLASHING FIX: Don't close browser context during execution
+    // Only close browser context if this is the final cleanup
+    const isFinalCleanup = this.executionId.includes('shared_execution') || 
+                          this.executionId.includes('background') ||
+                          process.env.FORCE_CONTEXT_CLEANUP === 'true';
+    
+    if (isFinalCleanup && this.browserContext) {
+      try {
+        this.logger.info(`Closing browser context for final cleanup: ${this.executionId}`);
+        await this.browserContext.close();
+        this.browserContext = undefined;
+        this.page = undefined;
+      } catch (error) {
+        this.logger.error('Failed to close browser context:', error instanceof Error ? error : new Error(String(error)));
+      }
+    } else if (this.browserContext) {
+      this.logger.info(`Preserving browser context for continued execution: ${this.executionId}`);
     }
 
     // Note: Browser is managed by BrowserManager singleton, not closed here

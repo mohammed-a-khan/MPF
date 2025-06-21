@@ -924,7 +924,8 @@ export class FeatureExecutor {
             const browserManager = BrowserManager.getInstance();
             const browser = browserManager.getBrowser();
             if (browser) {
-                const screenshot = await browserManager.takeScreenshot('error-recovery');
+                // Screenshot functionality will be handled by the page context
+                const screenshot = null; // TODO: Implement screenshot via page context
                 if (screenshot !== null && screenshot !== undefined) {
                     const errors = result.errors;
                     if (errors && errors.length > 0) {

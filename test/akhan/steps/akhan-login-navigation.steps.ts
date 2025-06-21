@@ -21,7 +21,7 @@ export class AKHANLoginNavigationSteps extends CSBDDBaseStepDefinition {
 
     @CSBDDStepDef('user is on the AKHAN login page')
     async navigateToLoginPage() {
-        await this.loginPage.navigateTo();
+        await this.loginPage.navigateTo(this.loginPage.pageUrl);
         await this.loginPage.waitForPageLoad();
     }
 
