@@ -1672,7 +1672,31 @@ export class ActionLogger extends EventEmitter {
 
   // PERFORMANCE OPTIMIZATION: Check if action is critical and should be logged even in performance mode
   private isCriticalAction(action: string): boolean {
-    const criticalActions = ['login', 'error', 'failure', 'crash', 'timeout', 'authentication', 'authorization'];
+    const criticalActions = [
+      // Core critical actions
+      'login', 'error', 'failure', 'crash', 'timeout', 'authentication', 'authorization',
+      // Navigation and page actions
+      'navigate', 'navigation', 'page', 'goto', 'visit',
+      // User interactions
+      'click', 'fill', 'type', 'enter', 'select', 'press', 'tap',
+      // Verification and validation
+      'verify', 'validate', 'check', 'assert', 'expect',
+      // Wait and timing
+      'wait', 'delay', 'pause',
+      // Form interactions
+      'submit', 'upload', 'download',
+      // Element actions
+      'element', 'locator', 'find',
+      // Performance and metrics
+      'performance', 'metrics', 'measure',
+      // Initialization and setup
+      'initialize', 'setup', 'start', 'begin',
+      // Completion and finish
+      'complete', 'finish', 'end', 'done',
+      // API Testing actions
+      'api', 'http', 'request', 'response', 'certificate', 'status', 'json', 'body',
+      'context', 'base url', 'timeout', 'logging', 'path', 'validation', 'ready'
+    ];
     return criticalActions.some(critical => action.toLowerCase().includes(critical));
   }
 

@@ -181,8 +181,16 @@ export class ImprovedProductionHTMLReportGenerator {
         const metadata = reportData.metadata || {};
         const summary = reportData.summary || {};
         
-        // Get ALL console logs
-        const logs = await this.getCompleteLogs();
+        // 🔥 FIX: Use logs from reportData.evidence.consoleLogs first, then fallback to getCompleteLogs
+        let logs = reportData.evidence?.consoleLogs || [];
+        
+        // If no logs in evidence, try to get from other sources
+        if (logs.length === 0) {
+            this.logger.info('🔥 LOG DEBUG: No logs found in reportData.evidence.consoleLogs, trying getCompleteLogs()');
+            logs = await this.getCompleteLogs();
+        } else {
+            this.logger.info(`🔥 LOG DEBUG: Found ${logs.length} logs in reportData.evidence.consoleLogs`);
+        }
         
         // Get enhanced environment details
         const environment = this.getEnhancedEnvironment(metadata);
@@ -1939,6 +1947,150 @@ export class ImprovedProductionHTMLReportGenerator {
         .log-category-performance .log-entry-header {
             border-left: 3px solid #e83e8c;
         }
+        
+        /* 🔥 MODERN LOG STYLES - Better format and readability */
+        .modern-log-entry {
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border: 1px solid #e1e5e9;
+            background: #ffffff;
+            transition: all 0.2s ease;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', 'Roboto Mono', monospace;
+        }
+        
+        .modern-log-entry:hover {
+            border-color: #c6cbd1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .log-entry-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f6f8fa;
+            border-bottom: 1px solid #e1e5e9;
+            border-radius: 6px 6px 0 0;
+            font-size: 12px;
+        }
+        
+        .log-entry-content {
+            padding: 12px;
+        }
+        
+        .log-timestamp {
+            color: #656d76;
+            font-weight: 500;
+            font-family: monospace;
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+        
+        .log-level-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .log-level-ERROR {
+            background: #ffeaea;
+            color: #d73a49;
+            border: 1px solid #f1b2b2;
+        }
+        
+        .log-level-WARN {
+            background: #fff8dc;
+            color: #b08800;
+            border: 1px solid #f4d03f;
+        }
+        
+        .log-level-INFO {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #90caf9;
+        }
+        
+        .log-level-DEBUG {
+            background: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #ce93d8;
+        }
+        
+        .log-category-badge {
+            font-size: 10px;
+            font-weight: 500;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #e1e5e9;
+            color: #24292f;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        
+        .log-icon {
+            font-size: 14px;
+            margin-left: auto;
+        }
+        
+        .log-message {
+            color: #24292f;
+            line-height: 1.5;
+            word-wrap: break-word;
+            font-size: 13px;
+            margin: 0;
+        }
+        
+        .log-source {
+            font-size: 11px;
+            color: #656d76;
+            margin-top: 6px;
+            font-style: italic;
+        }
+        
+        /* Category-specific styling */
+        .log-category-errors .log-entry-header {
+            background: #ffeaea;
+            border-color: #f1b2b2;
+        }
+        
+        .log-category-warnings .log-entry-header {
+            background: #fff8dc;
+            border-color: #f4d03f;
+        }
+        
+        .log-category-auth .log-entry-header {
+            background: #f0f9ff;
+            border-color: #bae6fd;
+        }
+        
+        .log-category-navigation .log-entry-header {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+        
+        .log-category-performance .log-entry-header {
+            background: #fef3c7;
+            border-color: #fcd34d;
+        }
+        
+        .log-category-test .log-entry-header {
+            background: #ede9fe;
+            border-color: #c4b5fd;
+        }
+        
+        .log-entry {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f0f0f0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            transition: background-color 0.2s ease;
+        }
     </style>`;
     }
 
@@ -2535,7 +2687,7 @@ export class ImprovedProductionHTMLReportGenerator {
                                                 <span class="action-icon">${action.success ? '✓' : '✗'}</span>
                                                 <span class="action-name">${action.action.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</span>
                                             </div>
-                                            <div class="action-description">${action.details?.description || 'No description available'}</div>
+                                            <div class="action-description">${action.details?.description || action.description || (action.details?.details || 'No description available')}</div>
                                             ${action.details?.target_url ? `<div class="action-detail"><strong>URL:</strong> ${action.details.target_url}</div>` : ''}
                                             ${action.details?.final_url ? `<div class="action-detail"><strong>Final URL:</strong> ${action.details.final_url}</div>` : ''}
                                             ${action.details?.page_object ? `<div class="action-detail"><strong>Page Object:</strong> ${action.details.page_object}</div>` : ''}
@@ -2937,7 +3089,7 @@ export class ImprovedProductionHTMLReportGenerator {
     }
 
     private generateImprovedLogsTab(logs: any[]): string {
-        // Enhanced log processing with better categorization and filtering
+        // Enhanced log processing with better timestamp handling and formatting
         const processedLogs = logs.map(log => {
             let message = log.message || '';
             
@@ -2946,89 +3098,161 @@ export class ImprovedProductionHTMLReportGenerator {
                 return null;
             }
             
+            // 🔥 FIX: Better timestamp processing
+            let displayTime = 'N/A';
+            let fullTimestamp = 'Unknown time';
+            
+            if (log.timestamp) {
+                try {
+                    let dateObj: Date;
+                    
+                    // Handle different timestamp formats
+                    if (typeof log.timestamp === 'string') {
+                        // Try parsing as ISO string first
+                        dateObj = new Date(log.timestamp);
+                        
+                        // If invalid, try other formats
+                        if (isNaN(dateObj.getTime())) {
+                            // Try parsing as number (Unix timestamp)
+                            const numTimestamp = parseInt(log.timestamp);
+                            if (!isNaN(numTimestamp)) {
+                                dateObj = new Date(numTimestamp);
+                            }
+                        }
+                    } else if (typeof log.timestamp === 'number') {
+                        dateObj = new Date(log.timestamp);
+                    } else {
+                        dateObj = new Date();
+                    }
+                    
+                    // Validate the date object
+                    if (!isNaN(dateObj.getTime())) {
+                        displayTime = dateObj.toLocaleTimeString('en-US', { 
+                            hour12: false, 
+                            hour: '2-digit', 
+                            minute: '2-digit', 
+                            second: '2-digit' 
+                        });
+                        
+                        fullTimestamp = dateObj.toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                        });
+                    } else {
+                        // Use current time as fallback
+                        const now = new Date();
+                        displayTime = now.toLocaleTimeString('en-US', { 
+                            hour12: false, 
+                            hour: '2-digit', 
+                            minute: '2-digit', 
+                            second: '2-digit' 
+                        });
+                        fullTimestamp = now.toLocaleString('en-US');
+                    }
+                } catch (error) {
+                    // Use current time as fallback
+                    const now = new Date();
+                    displayTime = now.toLocaleTimeString('en-US', { 
+                        hour12: false, 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit' 
+                    });
+                    fullTimestamp = now.toLocaleString('en-US');
+                }
+            } else {
+                // No timestamp provided, use current time
+                const now = new Date();
+                displayTime = now.toLocaleTimeString('en-US', { 
+                    hour12: false, 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                });
+                fullTimestamp = now.toLocaleString('en-US');
+            }
+            
             // Categorize and beautify logs
-            let category = 'general';
-            let icon = 'ℹ️';
+            let category = log.category || 'general';
+            let icon = '📝';
             let beautifiedMessage = message;
             let priority = 3; // 1=high, 2=medium, 3=low
+            let logLevel = (log.level || 'info').toLowerCase();
             
-            // Test execution logs
-            if (message.includes('Screenshot')) {
+            // Enhanced categorization and beautification
+            if (message.includes('Screenshot') || message.includes('screenshot')) {
                 category = 'screenshots';
                 icon = '📸';
                 priority = 2;
-                if (message.includes('captured:')) {
-                    beautifiedMessage = `Screenshot saved: ${message.split('captured: ')[1] || ''}`;
-                } else if (message.includes('taken')) {
-                    beautifiedMessage = 'Screenshot captured successfully';
-                }
+                beautifiedMessage = message.replace(/screenshot/gi, '📸 Screenshot');
             }
-            // Navigation logs
-            else if (message.includes('Navigating') || message.includes('navigate')) {
+            else if (message.includes('Navigating') || message.includes('navigate') || message.includes('URL')) {
                 category = 'navigation';
                 icon = '🌐';
                 priority = 2;
-                beautifiedMessage = message.replace('Navigating to', 'Opening page:').replace('Successfully navigated to', 'Page loaded:');
+                beautifiedMessage = message.replace(/Navigating to/gi, '🌐 Navigating to').replace(/navigate/gi, '🌐 navigate');
             }
-            // Authentication logs
             else if (message.includes('login') || message.includes('Login') || message.includes('password') || message.includes('username')) {
                 category = 'auth';
                 icon = '🔐';
                 priority = 2;
-                if (message.includes('Starting login process')) {
-                    beautifiedMessage = `Login initiated for user: ${message.split('username: ')[1] || 'unknown'}`;
-                } else if (message.includes('Login completed')) {
-                    beautifiedMessage = 'User authentication successful';
-                } else if (message.includes('Entering username')) {
-                    beautifiedMessage = `Username entered: ${message.split('username ')[1] || ''}`;
-                } else if (message.includes('password')) {
-                    beautifiedMessage = 'Password field completed';
-                }
+                beautifiedMessage = message.replace(/login/gi, '🔐 Login').replace(/password/gi, '🔑 Password');
             }
-            // Performance logs
-            else if (message.includes('Performance') || message.includes('metrics') || message.includes('duration')) {
+            else if (message.includes('Performance') || message.includes('metrics') || message.includes('duration') || message.includes('ms')) {
                 category = 'performance';
-                icon = '📊';
+                icon = '⚡';
                 priority = 2;
-                beautifiedMessage = message.replace('Performance metrics', 'Performance data collected');
+                beautifiedMessage = message.replace(/Performance/gi, '⚡ Performance').replace(/metrics/gi, '📊 Metrics');
             }
-            // Cleanup logs
             else if (message.includes('cleanup') || message.includes('Cleanup')) {
                 category = 'cleanup';
                 icon = '🧹';
                 priority = 3;
-                beautifiedMessage = message.replace('Scenario cleanup completed', 'Test scenario cleanup completed');
+                beautifiedMessage = message.replace(/cleanup/gi, '🧹 Cleanup');
             }
-            // Browser/System logs
-            else if (message.includes('Browser') || message.includes('browser')) {
+            else if (message.includes('Browser') || message.includes('browser') || message.includes('page')) {
                 category = 'browser';
                 icon = '🌐';
                 priority = 2;
+                beautifiedMessage = message.replace(/Browser/gi, '🌐 Browser').replace(/page/gi, '📄 Page');
             }
-            // Error logs
             else if (message.includes('Error') || message.includes('error') || message.includes('Failed') || message.includes('failed')) {
                 category = 'errors';
                 icon = '❌';
                 priority = 1;
+                logLevel = 'error';
+                beautifiedMessage = message.replace(/Error/gi, '❌ Error').replace(/Failed/gi, '❌ Failed');
             }
-            // Warning logs
             else if (message.includes('Warning') || message.includes('warning') || message.includes('Warn')) {
                 category = 'warnings';
                 icon = '⚠️';
                 priority = 1;
+                logLevel = 'warn';
+                beautifiedMessage = message.replace(/Warning/gi, '⚠️ Warning').replace(/Warn/gi, '⚠️ Warn');
             }
-            // Debug logs
             else if (message.includes('Debug') || message.includes('debug')) {
                 category = 'debug';
                 icon = '🐛';
                 priority = 3;
+                logLevel = 'debug';
+                beautifiedMessage = message.replace(/Debug/gi, '🐛 Debug');
             }
-            // Console logs
-            else if (message.includes('[Console]')) {
+            else if (message.includes('[Console]') || message.includes('console')) {
                 category = 'console';
                 icon = '💻';
                 priority = 2;
-                beautifiedMessage = message.replace('[Console] ', '');
+                beautifiedMessage = message.replace(/\[Console\]/gi, '💻 Console').replace(/console/gi, '💻 Console');
+            }
+            else if (message.includes('Test') || message.includes('test') || message.includes('Step') || message.includes('step')) {
+                category = 'test';
+                icon = '🧪';
+                priority = 2;
+                beautifiedMessage = message.replace(/Test/gi, '🧪 Test').replace(/Step/gi, '📋 Step');
             }
             
             return {
@@ -3037,7 +3261,10 @@ export class ImprovedProductionHTMLReportGenerator {
                 icon,
                 beautifiedMessage,
                 priority,
-                timestamp: new Date(log.timestamp).toLocaleTimeString()
+                level: logLevel,
+                displayTime,
+                fullTimestamp,
+                cleanMessage: this.escapeHtml(beautifiedMessage)
             };
         }).filter(log => log !== null);
         
@@ -3048,20 +3275,21 @@ export class ImprovedProductionHTMLReportGenerator {
             return acc;
         }, {} as Record<string, any[]>);
         
-        // Generate category tabs
+        // Generate category tabs with better counts
         const categories = [
             { key: 'all', label: 'All Logs', icon: '📋', count: processedLogs.length },
             { key: 'errors', label: 'Errors', icon: '❌', count: categorizedLogs.errors?.length || 0 },
             { key: 'warnings', label: 'Warnings', icon: '⚠️', count: categorizedLogs.warnings?.length || 0 },
+            { key: 'test', label: 'Test Steps', icon: '🧪', count: categorizedLogs.test?.length || 0 },
             { key: 'auth', label: 'Authentication', icon: '🔐', count: categorizedLogs.auth?.length || 0 },
             { key: 'navigation', label: 'Navigation', icon: '🌐', count: categorizedLogs.navigation?.length || 0 },
             { key: 'screenshots', label: 'Screenshots', icon: '📸', count: categorizedLogs.screenshots?.length || 0 },
-            { key: 'performance', label: 'Performance', icon: '📊', count: categorizedLogs.performance?.length || 0 },
+            { key: 'performance', label: 'Performance', icon: '⚡', count: categorizedLogs.performance?.length || 0 },
             { key: 'console', label: 'Console', icon: '💻', count: categorizedLogs.console?.length || 0 },
             { key: 'browser', label: 'Browser', icon: '🌐', count: categorizedLogs.browser?.length || 0 },
             { key: 'cleanup', label: 'Cleanup', icon: '🧹', count: categorizedLogs.cleanup?.length || 0 },
             { key: 'debug', label: 'Debug', icon: '🐛', count: categorizedLogs.debug?.length || 0 },
-            { key: 'general', label: 'General', icon: 'ℹ️', count: categorizedLogs.general?.length || 0 }
+            { key: 'general', label: 'General', icon: '📝', count: categorizedLogs.general?.length || 0 }
         ].filter(cat => cat.count > 0 || cat.key === 'all');
         
         return `
@@ -3092,44 +3320,40 @@ export class ImprovedProductionHTMLReportGenerator {
             </div>
         </div>
         
-        <!-- Enhanced Log Container -->
+        <!-- Enhanced Log Container with Better Format -->
         <div class="card">
             <div class="card-body p-0">
                 <div class="enhanced-log-container" id="enhanced-log-container">
                     ${processedLogs.map(log => {
-                        // Format timestamp properly
-                        let displayTime = 'Unknown';
-                        try {
-                            if (log.timestamp) {
-                                const date = new Date(log.timestamp);
-                                if (!isNaN(date.getTime())) {
-                                    displayTime = date.toLocaleTimeString('en-US', { 
-                                        hour12: false, 
-                                        hour: '2-digit', 
-                                        minute: '2-digit', 
-                                        second: '2-digit' 
-                                    });
-                                }
-                            }
-                        } catch {
-                            displayTime = 'Unknown';
-                        }
+                        const levelClass = `log-level-${log.level.toUpperCase()}`;
+                        const categoryClass = `log-category-${log.category}`;
                         
                         return `
-                        <div class="enhanced-log-entry log-category-${log.category}" data-category="${log.category}" data-level="${log.level}">
-                            <span class="log-timestamp">${displayTime}</span>
-                            <span class="log-level log-level-${(log.level || 'info').toUpperCase()}">${(log.level || 'info').toUpperCase()}</span>
-                            <span class="log-category">[${(log.category || 'general').toUpperCase()}]</span>
-                            <span class="log-message">${this.escapeHtml(log.message || log.beautifiedMessage || 'No message')}</span>
+                        <div class="modern-log-entry ${categoryClass}" data-category="${log.category}" data-level="${log.level}" title="${log.fullTimestamp}">
+                            <div class="log-entry-header">
+                                <span class="log-timestamp">${log.displayTime}</span>
+                                <span class="log-level-badge ${levelClass}">${log.level.toUpperCase()}</span>
+                                <span class="log-category-badge">${log.category.toUpperCase()}</span>
+                                <span class="log-icon">${log.icon}</span>
+                            </div>
+                            <div class="log-entry-content">
+                                <div class="log-message">${log.cleanMessage}</div>
+                                ${log.context && log.context.source ? `<div class="log-source">Source: ${log.context.source}</div>` : ''}
+                            </div>
                         </div>`;
                     }).join('')}
                     
                     ${processedLogs.length === 0 ? `
                     <div class="no-logs-message">
-                        <span class="log-timestamp">--:--:--</span>
-                        <span class="log-level log-level-INFO">INFO</span>
-                        <span class="log-category">[SYSTEM]</span>
-                        <span class="log-message">No logs found for the current execution</span>
+                        <div class="log-entry-header">
+                            <span class="log-timestamp">--:--:--</span>
+                            <span class="log-level-badge log-level-INFO">INFO</span>
+                            <span class="log-category-badge">SYSTEM</span>
+                            <span class="log-icon">ℹ️</span>
+                        </div>
+                        <div class="log-entry-content">
+                            <div class="log-message">No logs found for the current execution</div>
+                        </div>
                     </div>
                     ` : ''}
                 </div>

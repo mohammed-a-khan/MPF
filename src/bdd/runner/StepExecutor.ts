@@ -541,6 +541,7 @@ export class StepExecutor {
             
         } catch (error) {
             console.error('Error extracting action details by time:', error);
+            ActionLogger.logError(`🔥 STEP DEBUG: Error extracting action details`, error as Error);
             return {
                 actions: [],
                 primaryAction: null,
@@ -661,8 +662,10 @@ export class StepExecutor {
                 
                 // Set primary action if not already set (and not an error step)
                 if (!actionDetails.primaryAction && stepStatus !== StepStatus.FAILED) {
+                    const inferredAction = this.inferActionFromLogAction(actionLog.action, details);
+                    
                     actionDetails.primaryAction = {
-                        action: this.inferActionFromLogAction(actionLog.action, details),
+                        action: inferredAction,
                         description: details.description,
                         success: true
                     };

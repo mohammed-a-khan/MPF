@@ -2,6 +2,7 @@ import { CSBasePage } from '../../../src/core/pages/CSBasePage';
 import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement';
 import { CSWebElement } from '../../../src/core/elements/CSWebElement';
 import { PageRegistry } from '../../../src/core/pages/PageRegistry';
+import { ActionLogger } from '../../../src/core/logging/ActionLogger';
 
 /**
  * SauceDemo Login Page Object
@@ -97,13 +98,32 @@ export class SauceDemoLoginPage extends CSBasePage {
 
     // Required abstract method implementation
     protected async waitForPageLoad(): Promise<void> {
-        // Use framework methods instead of raw Playwright selectors
-        await this.waitForId('user-name', 30000);
-        await this.waitForId('password', 30000);
-        await this.waitForId('login-button', 30000);
-        
-        // Wait for page stability
-        await this.waitForPageStability();
+        try {
+            // ELEMENT RESOLUTION FIX: Use actual page object elements instead of dynamic elements
+            // Wait for the page to load and elements to be available
+            await this.page.waitForLoadState('domcontentloaded');
+            
+            // Wait for the main login form elements using the actual page object elements
+            await this.usernameInput.waitFor({ state: 'visible', timeout: 30000 });
+            await this.passwordInput.waitFor({ state: 'visible', timeout: 30000 });
+            await this.loginButton.waitFor({ state: 'visible', timeout: 30000 });
+            
+            // Additional wait for page stability
+            await this.waitForPageStability();
+            
+            ActionLogger.logInfo('SauceDemo login page loaded successfully');
+        } catch (error) {
+            ActionLogger.logError('Failed to load SauceDemo login page', error instanceof Error ? error : new Error(String(error)));
+            
+            // Fallback: Try to check if we're on the right page
+            const currentUrl = this.page.url();
+            if (!currentUrl.includes('saucedemo.com')) {
+                throw new Error(`Not on SauceDemo page. Current URL: ${currentUrl}`);
+            }
+            
+            // If elements are still not found, provide helpful error message
+            throw new Error(`SauceDemo login page elements not found. Current URL: ${currentUrl}. Error: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     // Custom page initialization
@@ -219,12 +239,12 @@ export class SauceDemoLoginPage extends CSBasePage {
      * Validate login form is ready
      */
     private async validateLoginForm(): Promise<void> {
-        // Use framework methods instead of raw Playwright selectors
-        
+        // ELEMENT RESOLUTION FIX: Use actual page object elements instead of creating dynamic elements
         try {
-            const usernameExists = await this.existsById('user-name');
-            const passwordExists = await this.existsById('password');
-            const loginButtonExists = await this.existsById('login-button');
+            // Check if the page object elements are present and visible
+            const usernameExists = await this.usernameInput.isPresent();
+            const passwordExists = await this.passwordInput.isPresent();
+            const loginButtonExists = await this.loginButton.isPresent();
             
             if (!usernameExists) {
                 throw new Error('Login form element missing: Username input field');
@@ -237,7 +257,10 @@ export class SauceDemoLoginPage extends CSBasePage {
             if (!loginButtonExists) {
                 throw new Error('Login form element missing: Login button');
             }
+            
+            console.log('Login form validation completed successfully');
         } catch (error) {
+            console.error('Login form validation failed:', error);
             throw new Error(`Login form validation failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }

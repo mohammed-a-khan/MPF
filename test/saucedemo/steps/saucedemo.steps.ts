@@ -21,27 +21,41 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
 
     @CSBDDStepDef('I navigate to the SauceDemo application')
     async navigateToSauceDemo(): Promise<void> {
-        const actionLogger = ActionLogger.getInstance();
         try {
             const page = BDDContext.getCurrentPage();
             
-            // BROWSER FLASHING FIX: Check if page object needs reinitialization
+            // ELEMENT RESOLUTION FIX: Navigate first, then initialize page object
+            ActionLogger.logInfo('Navigating to SauceDemo website...');
+            
+            // Navigate to the website first
+            await page.goto('https://www.saucedemo.com', { 
+                waitUntil: 'domcontentloaded',
+                timeout: 30000 
+            });
+            
+            // Wait for page to be fully loaded
+            await page.waitForLoadState('networkidle');
+            
+            // Verify we're on the correct page
+            const currentUrl = page.url();
+            if (!currentUrl.includes('saucedemo.com')) {
+                throw new Error(`Failed to navigate to SauceDemo. Current URL: ${currentUrl}`);
+            }
+            
+            ActionLogger.logInfo(`Successfully navigated to: ${currentUrl}`);
+            
+            // Now initialize the page object with the loaded page
             if (!this.loginPage || this.loginPage.needsReinitialization()) {
-                ActionLogger.logInfo('Page object needs reinitialization - creating new instance');
+                ActionLogger.logInfo('Initializing SauceDemo login page object...');
                 this.loginPage = new SauceDemoLoginPage();
             }
             
-            // BROWSER FLASHING FIX: Always reinitialize with current page to ensure sync
+            // Initialize with current page
             await this.loginPage.initialize(page);
             
-            // Navigate using the page object
-            await this.loginPage.navigateTo('https://www.saucedemo.com');
-            
-            await actionLogger.logAction('navigate_to_saucedemo', {
-                url: this.loginPage.getURL()
-            });
+            ActionLogger.logInfo('SauceDemo application navigation completed successfully');
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'navigate_to_saucedemo' });
+            ActionLogger.logError('Failed to navigate to SauceDemo application', error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }
@@ -60,7 +74,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 elements_verified: ['username', 'password', 'login-button', 'logo']
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_login_page_elements' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_login_page_elements' });
             throw error;
         }
     }
@@ -145,7 +159,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 page_ready: true
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { 
+            await ActionLogger.logError((error as Error).message, { 
                 operation: 'verify_on_saucedemo_login_page',
                 description: `Failed to verify SauceDemo login page - ${(error as Error).message}`
             });
@@ -210,7 +224,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 final_url: page.url()
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, {
+            await ActionLogger.logError((error as Error).message, {
                 operation: 'login',
                 username,
                 description: `Login failed for username: ${username}`
@@ -266,7 +280,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 success: true
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { 
+            await ActionLogger.logError((error as Error).message, { 
                 operation: 'verify_products_page',
                 description: `Failed to verify products page - ${(error as Error).message}`
             });
@@ -298,7 +312,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 test_id: productTestId
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, {
+            await ActionLogger.logError((error as Error).message, {
                 operation: 'add_to_cart_failed',
                 product_name: productName
             });
@@ -333,7 +347,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 cart_badge_count: expectedCount > 0 ? parseInt((await page.locator('.shopping_cart_badge').textContent()) || '0') : 0
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'validate_cart_item_count' });
+            await ActionLogger.logError((error as Error).message, { operation: 'validate_cart_item_count' });
             throw error;
         }
     }
@@ -386,7 +400,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 performance_grade: performanceData.loadTime < 3000 ? 'excellent' : performanceData.loadTime < 5000 ? 'good' : 'needs_improvement'
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { 
+            await ActionLogger.logError((error as Error).message, { 
                 operation: 'validate_performance_metrics',
                 description: `Failed to capture or validate performance metrics - ${(error as Error).message}`
             });
@@ -412,7 +426,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 cart_count: parseInt(cartCount || '0')
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_cart_updated' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_cart_updated' });
             throw error;
         }
     }
@@ -432,7 +446,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 actual_count: await cartBadge.textContent()
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_cart_badge_count' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_cart_badge_count' });
             throw error;
         }
     }
@@ -458,7 +472,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 actual_count: actualCount
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_cart_items_count' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_cart_items_count' });
             throw error;
         }
     }
@@ -479,7 +493,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 load_time_ms: metrics.pageLoadTime
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_page_load_time' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_page_load_time' });
             throw error;
         }
     }
@@ -496,7 +510,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
             expect(errorMessage).toBeTruthy();
 
             // Log the error message as an error since this indicates a failed operation
-            await actionLogger.logError(`Login failed: ${errorMessage}`, {
+            await ActionLogger.logError(`Login failed: ${errorMessage}`, {
                 operation: 'login_failure',
                 error_message: errorMessage,
                 error_type: 'authentication_error'
@@ -506,7 +520,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 error_message: errorMessage
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_error_message' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_error_message' });
             throw error;
         }
     }
@@ -525,7 +539,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 error_logs_count: errorLogs.length
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_error_logged' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_error_logged' });
             throw error;
         }
     }
@@ -555,7 +569,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 recent_error_timestamp: recentErrorLog.timestamp
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'verify_error_logged_appropriately' });
+            await ActionLogger.logError((error as Error).message, { operation: 'verify_error_logged_appropriately' });
             throw error;
         }
     }
@@ -569,7 +583,7 @@ export class SauceDemoSteps extends CSBDDBaseStepDefinition {
                 timestamp: new Date().toISOString()
             });
         } catch (error) {
-            await actionLogger.logError(error as Error, { operation: 'log_message' });
+            await ActionLogger.logError((error as Error).message, { operation: 'log_message' });
             throw error;
         }
     }

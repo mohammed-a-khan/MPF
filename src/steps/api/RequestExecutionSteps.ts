@@ -88,7 +88,11 @@ export class RequestExecutionSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef("user sends GET request to {string}")
     async sendGETRequestTo(path: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('sendGETRequestTo', { path });
+        await actionLogger.logAction('HTTP GET Request', { 
+            description: `Sending GET request to '${path}'`,
+            path,
+            details: `Executing HTTP GET request to retrieve data from endpoint`
+        });
         
         try {
             const currentContext = this.getAPIContext();

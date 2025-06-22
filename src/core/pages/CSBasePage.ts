@@ -82,82 +82,58 @@ export abstract class CSBasePage {
     }
 
     /**
-     * PERFORMANCE OPTIMIZED: Navigate to a URL with proper context management
+     * Navigate to this page
      */
-    async navigateTo(url: string, options?: NavigationOptions): Promise<void> {
+    async navigateTo(url?: string): Promise<void> {
+        const actionLogger = ActionLogger.getInstance();
+        const targetUrl = url || this.pageUrl;
+        
+        await actionLogger.logAction('Page Navigation', { 
+            description: `Navigating to ${this.constructor.name} page`,
+            url: targetUrl,
+            pageName: this.constructor.name,
+            details: `Opening ${this.constructor.name} at ${targetUrl}`
+        });
+        
         try {
-            // BROWSER FLASHING FIX: Improved page validation
-            if (!this.page || this.page.isClosed()) {
-                throw new Error('Page is not available or has been closed - please reinitialize the page object');
-            }
-
-            // Check if browser context is still valid
-            const context = this.page.context();
-            if (!context) {
-                throw new Error('Browser context is not available - page may have been closed');
-            }
-
-            // Additional context validation
-            try {
-                const pages = context.pages();
-                if (pages.length === 0 || !pages.includes(this.page)) {
-                    throw new Error('Page is no longer part of the browser context');
-                }
-            } catch (contextError) {
-                throw new Error('Browser context is not available or has been closed');
-            }
-
-            // Validate URL
-            if (!url || typeof url !== 'string') {
-                throw new Error('Invalid URL provided for navigation');
-            }
-
-            // Ensure URL is properly formatted
-            const navigateUrl = url.startsWith('http') ? url : `https://${url}`;
-            
-            ActionLogger.logInfo(`Navigating to: ${navigateUrl}`);
-            
-            // PERFORMANCE FIX: Use optimized navigation options
-            const navigationOptions = {
-                waitUntil: options?.waitUntil || 'domcontentloaded', // Faster than 'load'
-                timeout: options?.timeout || 30000,
-                ...options
-            };
-
-            // Navigate with retry logic for robustness
-            let lastError: Error | null = null;
-            for (let attempt = 1; attempt <= 3; attempt++) {
-                try {
-                    // Double-check page is still valid before each attempt
-                    if (this.page.isClosed()) {
-                        throw new Error('Page was closed during navigation attempt');
-                    }
-
-                    await this.page.goto(navigateUrl, navigationOptions);
-                    ActionLogger.logInfo(`Successfully navigated to: ${navigateUrl}`);
-                    return; // Success, exit retry loop
-                } catch (error) {
-                    lastError = error as Error;
-                    ActionLogger.logWarn(`Navigation attempt ${attempt} failed: ${lastError.message}`);
-                    
-                    // Check if page/context is still valid before retrying
-                    if (this.page.isClosed() || !this.page.context()) {
-                        throw new Error('Page or context was closed during navigation');
-                    }
-                    
-                    if (attempt < 3) {
-                        // Wait before retry
-                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                    }
-                }
+            if (!targetUrl) {
+                throw new Error('No URL specified for navigation');
             }
             
-            // If all retries failed, throw the last error
-            throw lastError || new Error('Navigation failed after multiple attempts');
+            const startTime = Date.now();
             
+            await this.page.goto(targetUrl, {
+                waitUntil: 'networkidle',
+                timeout: 60000
+            });
+
+            // Wait for page load without re-initializing
+            await this.waitForPageLoad();
+            
+            const navigationTime = Date.now() - startTime;
+            
+            await actionLogger.logAction('Navigation Success', { 
+                description: `Successfully navigated to ${this.constructor.name}`,
+                url: targetUrl,
+                pageName: this.constructor.name,
+                navigationTime: navigationTime,
+                details: `${this.constructor.name} loaded successfully in ${navigationTime}ms`
+            });
+            
+            ActionLogger.logPageOperation('page_navigate', this.constructor.name, {
+                url: targetUrl,
+                navigationTime
+            });
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown navigation error';
-            ActionLogger.logError(`Navigation failed to ${url}: ${errorMessage}`, error as Error);
+            await actionLogger.logAction('Navigation Failed', { 
+                description: `Failed to navigate to ${this.constructor.name}`,
+                url: targetUrl,
+                pageName: this.constructor.name,
+                error: (error as Error).message,
+                details: `Navigation to ${this.constructor.name} failed: ${(error as Error).message}`
+            });
+            
+            logger.error(`${this.constructor.name}: Navigation failed`, error);
             throw error;
         }
     }
@@ -733,16 +709,78 @@ export abstract class CSBasePage {
      * Click element using framework methods
      */
     protected async clickElement(locatorType: 'css' | 'xpath' | 'id' | 'testid', locatorValue: string): Promise<void> {
-        const element = this.createElement(locatorType, locatorValue);
-        await element.click();
+        const actionLogger = ActionLogger.getInstance();
+        const elementDescription = `${locatorType}=${locatorValue}`;
+        
+        await actionLogger.logAction('Page Element Click', { 
+            description: `Clicking element on ${this.constructor.name} page`,
+            element: elementDescription,
+            locatorType,
+            locatorValue,
+            pageName: this.constructor.name,
+            details: `Performing click action on ${elementDescription} in ${this.constructor.name}`
+        });
+        
+        try {
+            const element = this.createElement(locatorType, locatorValue);
+            await element.click();
+            
+            await actionLogger.logAction('Page Element Click Success', { 
+                description: `Successfully clicked element on ${this.constructor.name}`,
+                element: elementDescription,
+                pageName: this.constructor.name,
+                details: `Click action completed successfully on ${elementDescription}`
+            });
+        } catch (error) {
+            await actionLogger.logAction('Page Element Click Failed', { 
+                description: `Failed to click element on ${this.constructor.name}`,
+                element: elementDescription,
+                pageName: this.constructor.name,
+                error: (error as Error).message,
+                details: `Click action failed on ${elementDescription}: ${(error as Error).message}`
+            });
+            throw error;
+        }
     }
 
     /**
      * Fill element using framework methods
      */
     protected async fillElement(locatorType: 'css' | 'xpath' | 'id' | 'testid', locatorValue: string, text: string): Promise<void> {
-        const element = this.createElement(locatorType, locatorValue);
-        await element.fill(text);
+        const actionLogger = ActionLogger.getInstance();
+        const elementDescription = `${locatorType}=${locatorValue}`;
+        
+        await actionLogger.logAction('Page Element Fill', { 
+            description: `Filling element on ${this.constructor.name} page`,
+            element: elementDescription,
+            locatorType,
+            locatorValue,
+            textLength: text.length,
+            pageName: this.constructor.name,
+            details: `Entering text into ${elementDescription} in ${this.constructor.name} (${text.length} characters)`
+        });
+        
+        try {
+            const element = this.createElement(locatorType, locatorValue);
+            await element.fill(text);
+            
+            await actionLogger.logAction('Page Element Fill Success', { 
+                description: `Successfully filled element on ${this.constructor.name}`,
+                element: elementDescription,
+                textLength: text.length,
+                pageName: this.constructor.name,
+                details: `Text entry completed successfully on ${elementDescription}`
+            });
+        } catch (error) {
+            await actionLogger.logAction('Page Element Fill Failed', { 
+                description: `Failed to fill element on ${this.constructor.name}`,
+                element: elementDescription,
+                pageName: this.constructor.name,
+                error: (error as Error).message,
+                details: `Text entry failed on ${elementDescription}: ${(error as Error).message}`
+            });
+            throw error;
+        }
     }
 
     /**

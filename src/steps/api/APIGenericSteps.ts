@@ -33,7 +33,11 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef("user is working with {string} API")
     async setAPIContext(apiName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('setContext', { apiName });
+        await actionLogger.logAction('API Context Setup', { 
+            description: `Setting up API context for '${apiName}' API`,
+            apiName,
+            details: `Initializing API testing environment for ${apiName}`
+        });
         
         try {
             // Verify apiContextManager is available
@@ -48,11 +52,19 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
             if (this.apiContextManager.hasContext(apiName)) {
                 // Context already exists, get it
                 this.currentContext = this.apiContextManager.getContext(apiName);
-                await actionLogger.logAction('contextReused', { apiName });
+                await actionLogger.logAction('API Context Reused', { 
+                    description: `Reusing existing API context for '${apiName}'`,
+                    apiName,
+                    details: `Found existing context configuration for ${apiName}`
+                });
             } else {
                 // Context doesn't exist, create it
                 this.currentContext = this.apiContextManager.createContext(apiName);
-                await actionLogger.logAction('contextCreated', { apiName });
+                await actionLogger.logAction('API Context Created', { 
+                    description: `Created new API context for '${apiName}'`,
+                    apiName,
+                    details: `New context initialized with default settings`
+                });
             }
             
             // Switch to the newly created context so it becomes the current context
@@ -77,10 +89,12 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 // The context is still stored in the instance variables
             }
             
-            await actionLogger.logAction('contextSet', { 
+            await actionLogger.logAction('API Context Ready', { 
+                description: `API context '${apiName}' is ready for testing`,
                 apiName, 
                 baseUrl: this.currentContext.getBaseUrl(),
-                timeout: this.currentContext.getTimeout()
+                timeout: this.currentContext.getTimeout(),
+                details: `Context configured with base URL: ${this.currentContext.getBaseUrl()}, timeout: ${this.currentContext.getTimeout()}ms`
             });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set API context' });
@@ -95,7 +109,11 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef("user sets API base URL to {string}")
     async setAPIBaseURL(baseUrl: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('setBaseURL', { baseUrl });
+        await actionLogger.logAction('Base URL Configuration', { 
+            description: `Setting API base URL to '${baseUrl}'`,
+            baseUrl,
+            details: `Configuring the base endpoint for all API requests`
+        });
         
         try {
             // Validate URL format
@@ -117,9 +135,11 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
             
             this.currentContext.setBaseUrl(interpolatedUrl);
             
-            await actionLogger.logAction('baseURLSet', { 
+            await actionLogger.logAction('Base URL Set', { 
+                description: `API base URL configured successfully`,
                 originalUrl: baseUrl,
-                interpolatedUrl: interpolatedUrl
+                interpolatedUrl: interpolatedUrl,
+                details: `All API requests will use base URL: ${interpolatedUrl}`
             });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set base URL' });
@@ -134,7 +154,11 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef("user sets API timeout to {int} seconds")
     async setAPITimeout(timeoutSeconds: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('setTimeout', { timeoutSeconds });
+        await actionLogger.logAction('Timeout Configuration', { 
+            description: `Setting API request timeout to ${timeoutSeconds} seconds`,
+            timeoutSeconds,
+            details: `Configuring maximum wait time for API responses`
+        });
         
         try {
             if (timeoutSeconds <= 0) {
@@ -148,9 +172,11 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
             const timeoutMs = timeoutSeconds * 1000;
             this.currentContext.setTimeout(timeoutMs);
             
-            await actionLogger.logAction('timeoutSet', { 
+            await actionLogger.logAction('Timeout Applied', { 
+                description: `API timeout set to ${timeoutSeconds} seconds`,
                 seconds: timeoutSeconds,
-                milliseconds: timeoutMs
+                milliseconds: timeoutMs,
+                details: `Requests will timeout after ${timeoutSeconds} seconds (${timeoutMs}ms)`
             });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to set timeout' });
@@ -268,26 +294,31 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
     }
 
     /**
-     * Enables request/response logging
+     * Enables request logging for debugging
      * Example: Given user enables API request logging
      */
     @CSBDDStepDef("user enables API request logging")
     async enableRequestLogging(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('enableRequestLogging', {});
+        await actionLogger.logAction('Request Logging Enabled', { 
+            description: `Enabling detailed API request/response logging`,
+            details: `All API requests and responses will be logged for debugging`
+        });
         
         try {
             if (!this.currentContext) {
                 this.currentContext = await this.apiContextManager.createContext('default');
             }
             
-            // Store request logging preference in variables
-            this.currentContext.setVariable('requestLogging', true);
+            this.currentContext.setVariable('enableLogging', true);
             
-            await actionLogger.logAction('requestLoggingEnabled', {});
+            await actionLogger.logAction('Logging Active', { 
+                description: `API request logging is now active`,
+                details: `Request/response details will be captured in logs`
+            });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to enable request logging' });
-            throw error;
+            throw new Error(`Failed to enable request logging: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 

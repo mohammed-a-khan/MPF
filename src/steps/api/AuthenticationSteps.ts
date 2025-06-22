@@ -294,7 +294,11 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef("user loads certificate from {string} with password {string}")
     async loadCertificate(certPath: string, password: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
-        await actionLogger.logAction('loadCertificate', { certPath });
+        await actionLogger.logAction('Certificate Loading', { 
+            description: `Loading client certificate from '${certPath}'`,
+            certPath,
+            details: `Preparing certificate-based authentication for secure API access`
+        });
         
         try {
             const currentContext = this.getAPIContext();
@@ -324,10 +328,12 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             currentContext.setVariable('certPassphrase', interpolatedPassword);
             currentContext.setVariable('certType', certConfig.type);
             
-            await actionLogger.logAction('certificateLoaded', { 
+            await actionLogger.logAction('Certificate Ready', { 
+                description: `Client certificate loaded and configured successfully`,
                 certPath: resolvedPath,
                 type: certConfig.type,
-                hasPassphrase: !!interpolatedPassword
+                hasPassphrase: !!interpolatedPassword,
+                details: `Certificate-based authentication is ready for API requests`
             });
         } catch (error) {
             await actionLogger.logError(error instanceof Error ? error : new Error(String(error)), { context: 'Failed to load certificate' });
