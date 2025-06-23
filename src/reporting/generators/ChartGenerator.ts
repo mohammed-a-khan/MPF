@@ -133,27 +133,72 @@ export class ChartGenerator {
     // Defensive check for data.values
     if (!data.values || !Array.isArray(data.values)) {
       console.error('DoughnutChart: data.values is undefined or not an array');
-      return '<svg width="' + width + '" height="' + height + '"><text x="' + (width/2) + '" y="' + (height/2) + '" text-anchor="middle">No data available</text></svg>';
+      return `<div style="display: flex; align-items: center; justify-content: center; width: ${width}px; height: ${height}px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
+                <div style="text-align: center; color: #6c757d;">
+                  <i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                  <div style="font-size: 16px; font-weight: 500;">No data available</div>
+                </div>
+              </div>`;
     }
     
+    // Calculate total and filter out zero values
     const total = data.values.reduce((sum: number, val: number) => sum + val, 0);
+    
+    // If total is 0, show empty state
+    if (total === 0) {
+      return `<div style="display: flex; align-items: center; justify-content: center; width: ${width}px; height: ${height}px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
+                <div style="text-align: center; color: #6c757d;">
+                  <i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                  <div style="font-size: 16px; font-weight: 500;">No execution data</div>
+                  <div style="font-size: 14px; margin-top: 8px;">Run some tests to see results</div>
+                </div>
+              </div>`;
+    }
+    
     let currentAngle = -Math.PI / 2; // Start at top
     
-    const segments = data.values.map((value: number, index: number) => {
-      const percentage = value / total;
-      const angle = percentage * 2 * Math.PI;
-      const startAngle = currentAngle;
-      const endAngle = currentAngle + angle;
+    // Filter out zero values and create segments
+    const validSegments = data.values
+      .map((value: number, index: number) => ({
+        value,
+        index,
+        label: data.labels[index],
+        color: (data as any).colors && (data as any).colors[index] ? (data as any).colors[index] : colors.dataColors[index % colors.dataColors.length]
+      }))
+      .filter(segment => segment.value > 0);
+    
+    // If no valid segments, show empty state
+    if (validSegments.length === 0) {
+      return `<div style="display: flex; align-items: center; justify-content: center; width: ${width}px; height: ${height}px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
+                <div style="text-align: center; color: #6c757d;">
+                  <i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                  <div style="font-size: 16px; font-weight: 500;">No valid data</div>
+                </div>
+              </div>`;
+    }
+    
+    // SPECIAL HANDLING: For single segment (100% scenarios), create a visible doughnut
+    const segments = validSegments.map((segment: any) => {
+      let percentage = segment.value / total;
+      let angle = percentage * 2 * Math.PI;
+      let startAngle = currentAngle;
+      let endAngle = currentAngle + angle;
+      
+      // For single segment (100%), leave a small gap to make it visible as a doughnut
+      if (validSegments.length === 1) {
+        angle = 2 * Math.PI - 0.1; // Leave small gap (0.1 radians ≈ 6 degrees)
+        endAngle = startAngle + angle;
+      }
+      
       currentAngle = endAngle;
       
       return {
-        value,
+        value: segment.value,
         percentage,
         startAngle,
         endAngle,
-        label: data.labels[index],
-        // FIXED: Use data.colors (from PieChartData) for consistent colors with legend
-        color: (data as any).colors && (data as any).colors[index] ? (data as any).colors[index] : colors.dataColors[index % colors.dataColors.length]
+        label: segment.label,
+        color: segment.color
       };
     });
     
@@ -163,6 +208,15 @@ export class ChartGenerator {
     <defs>
       ${this.generateChartFilters()}
       ${this.generateChartGradients(colors)}
+      <!-- Enhanced gradient for single segment -->
+      ${validSegments.length === 1 ? `
+      <defs>
+        <linearGradient id="singleSegmentGradient_${id}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${validSegments[0].color};stop-opacity:1" />
+          <stop offset="100%" style="stop-color:${this.darkenColor(validSegments[0].color, 20)};stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      ` : ''}
     </defs>
     
     <!-- Chart Title -->
@@ -186,18 +240,21 @@ export class ChartGenerator {
         const labelY = Math.sin(labelAngle) * labelRadius;
         const percentage = Math.round(segment.percentage * 100);
         
+        // Use gradient fill for single segment to make it more visible
+        const fillColor = validSegments.length === 1 ? `url(#singleSegmentGradient_${id})` : segment.color;
+        
         return `
         <g class="segment" data-index="${index}">
           <path
             d="${path}"
-            fill="${segment.color}"
+            fill="${fillColor}"
             stroke="white"
-            stroke-width="2"
+            stroke-width="${validSegments.length === 1 ? '4' : '2'}"
             class="segment-path"
             data-value="${segment.value}"
             data-label="${segment.label}"
             data-percentage="${percentage}"
-            style="cursor: pointer; transition: all 0.3s ease;"
+            style="cursor: pointer; transition: all 0.3s ease; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2));"
             onmouseover="chartHover_${id}(event, ${index})"
             onmouseout="chartUnhover_${id}(event, ${index})"
             onclick="chartClick_${id}(event, ${index})"
@@ -211,23 +268,42 @@ export class ChartGenerator {
             text-anchor="middle"
             dominant-baseline="central"
             class="segment-label"
-            style="fill: white; font-size: 14px; font-weight: bold; pointer-events: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);"
+            style="fill: white; font-size: ${validSegments.length === 1 ? '18px' : '14px'}; font-weight: bold; pointer-events: none; text-shadow: 2px 2px 4px rgba(0,0,0,0.7);"
           >
             ${percentage}%
           </text>
           ` : ''}
         </g>`;
       }).join('')}
+      
+      <!-- Additional visual indicator for 100% scenarios -->
+      ${validSegments.length === 1 ? `
+      <circle
+        cx="0"
+        cy="0"
+        r="${innerRadius - 8}"
+        fill="none"
+        stroke="${validSegments[0].color}"
+        stroke-width="2"
+        stroke-dasharray="5,5"
+        opacity="0.3"
+      />
+      ` : ''}
     </g>
     
     <!-- Center Text -->
     <g class="center-text" transform="translate(${centerX}, ${centerY})">
-      <text y="-10" text-anchor="middle" class="center-value">
+      <text y="-10" text-anchor="middle" class="center-value" style="font-size: 24px; font-weight: bold; fill: #333;">
         ${data.centerText?.value || total}
       </text>
-      <text y="10" text-anchor="middle" class="center-label">
+      <text y="10" text-anchor="middle" class="center-label" style="font-size: 14px; fill: #666;">
         ${data.centerText?.label || 'Total'}
       </text>
+      ${validSegments.length === 1 ? `
+      <text y="30" text-anchor="middle" style="font-size: 12px; fill: ${validSegments[0].color}; font-weight: bold;">
+        ${validSegments[0].label}
+      </text>
+      ` : ''}
     </g>
     
     <!-- Legend -->
@@ -238,7 +314,7 @@ export class ChartGenerator {
   </svg>
   
   <!-- Tooltip -->
-  <div class="chart-tooltip" id="${id}-tooltip" style="display: none;">
+  <div class="chart-tooltip" id="${id}-tooltip" style="display: none; position: absolute; background: rgba(0,0,0,0.8); color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 1000;">
     <div class="tooltip-content"></div>
   </div>
 </div>

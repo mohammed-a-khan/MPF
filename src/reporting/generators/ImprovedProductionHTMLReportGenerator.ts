@@ -2254,17 +2254,42 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         };
         
-        const statusChartHtml = await this.chartGenerator.generateChart(
-            ChartType.DOUGHNUT,
-            statusChartData,
-            {
-                width: 450,
-                height: 350,
-                showLegend: false, // Use manual legend below for better control
-                animations: true
-            },
-            this.theme
-        );
+        // FIXED: Ensure we have valid data for the chart
+        const chartTotalScenarios = statusChartData.values.reduce((sum, val) => sum + val, 0);
+        let statusChartHtml = '';
+        
+        if (chartTotalScenarios > 0) {
+            // Filter out zero values to prevent empty segments
+            const filteredData = {
+                ...statusChartData,
+                labels: statusChartData.labels.filter((_, index) => statusChartData.values[index] > 0),
+                values: statusChartData.values.filter(value => value > 0),
+                colors: statusChartData.colors.filter((_, index) => statusChartData.values[index] > 0)
+            };
+            
+            statusChartHtml = await this.chartGenerator.generateChart(
+                ChartType.DOUGHNUT,
+                filteredData,
+                {
+                    width: 450,
+                    height: 350,
+                    showLegend: false, // Use manual legend below for better control
+                    animations: true
+                },
+                this.theme
+            );
+        } else {
+            // Fallback when no data is available
+            statusChartHtml = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 350px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
+                    <div style="text-align: center; color: #6c757d;">
+                        <i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                        <div style="font-size: 16px; font-weight: 500;">No execution data available</div>
+                        <div style="font-size: 14px; margin-top: 8px;">Run some tests to see the execution status chart</div>
+                    </div>
+                </div>
+            `;
+        }
         
         // Feature performance chart with correct structure
         const featureChartData: any = {
