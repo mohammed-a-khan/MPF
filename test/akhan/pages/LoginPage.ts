@@ -3,25 +3,26 @@ import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement
 import { CSWebElement } from '../../../src/core/elements/CSWebElement';
 
 export class LoginPage extends CSBasePage {
-    pageUrl = process.env['AKHAN_SIT_URL'] || 'https://akhan-ui-sit.myshare.net/';
+    pageUrl = process.env['APP_BASE_URL'] || 'https://opensource-demo.orangehrmlive.com/web/index.php/auth/login';
 
     @CSGetElement({
         locatorType: 'xpath',
-        locatorValue: '//input[@id="login"]',
+        locatorValue: '//input[@id="login" or @name="username"]',
         description: 'Username input field'
     })
     private usernameInput!: CSWebElement;
 
     @CSGetElement({
         locatorType: 'xpath',
-        locatorValue: '//input[@id="passwd"]',
+        locatorValue: '//input[@id="passwd" or @name="password"]',
         description: 'Password input field'
     })
     private passwordInput!: CSWebElement;
 
     @CSGetElement({
         locatorType: 'xpath',
-        locatorValue: '//a[normalize-space(text())="Log On"]',
+        // locatorValue: '//a[normalize-space(text())="Log On"]',
+        locatorValue: '//button[@type="submit" or @name="submit"]',
         description: 'Log On link'
     })
     private logOnLink!: CSWebElement;

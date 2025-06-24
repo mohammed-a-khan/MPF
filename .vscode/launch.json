@@ -1,0 +1,184 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "🔍 Debug CS Framework - Main Entry",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/index.ts",
+            "args": [],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**",
+                "node_modules/**"
+            ],
+            "env": {
+                "NODE_ENV": "development",
+                "DEBUG": "true",
+                "BROWSER_DEBUG": "true"
+            },
+            "runtimeArgs": [
+                "--require", "ts-node/register",
+                "--inspect-brk=9229"
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}",
+            "outputCapture": "console"
+        },
+        {
+            "name": "🔍 Debug Browser Manager",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/index.ts",
+            "args": [],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**",
+                "node_modules/**"
+            ],
+            "env": {
+                "NODE_ENV": "development",
+                "DEBUG": "true",
+                "BROWSER_DEBUG": "true"
+            },
+            "runtimeArgs": [
+                "--require", "ts-node/register"
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}",
+            "outputCapture": "console",
+            "preLaunchTask": "tsc: build - tsconfig.json"
+        },
+        {
+            "name": "🔍 Debug BDD Runner",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/bdd/runner/CSBDDRunner.ts",
+            "args": [],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**",
+                "node_modules/**"
+            ],
+            "env": {
+                "NODE_ENV": "development",
+                "DEBUG": "true",
+                "BROWSER_DEBUG": "true"
+            },
+            "runtimeArgs": [
+                "--require", "ts-node/register"
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}",
+            "outputCapture": "console"
+        },
+        {
+            "name": "🔍 Debug Step by Step Execution",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/index.ts",
+            "args": [],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**",
+                "node_modules/**"
+            ],
+            "env": {
+                "NODE_ENV": "development",
+                "DEBUG": "true",
+                "BROWSER_DEBUG": "true",
+                "STEP_DEBUG": "true"
+            },
+            "runtimeArgs": [
+                "--require", "ts-node/register"
+            ],
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}",
+            "outputCapture": "console",
+            "trace": true
+        },
+        {
+            "name": "🔍 Debug NPM Test Command",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run-script",
+                "test"
+            ],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**",
+                "node_modules/**"
+            ],
+            "env": {
+                "NODE_ENV": "development",
+                "DEBUG": "true",
+                "BROWSER_DEBUG": "true"
+            },
+            "cwd": "${workspaceFolder}",
+            "outputCapture": "console"
+        },
+        {
+            "name": "🔍 Debug ADO Integration",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "node",
+            "runtimeArgs": [
+                "--inspect-brk",
+                "--require",
+                "ts-node/register"
+            ],
+            "args": [
+                "${workspaceFolder}/src/index.ts",
+                "--env=demo",
+                "--feature=test/saucedemo/features/ado-integration-test.feature"
+            ],
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "skipFiles": [
+                "<node_internals>/**",
+                "node_modules/**"
+            ],
+            "env": {
+                "TS_NODE_TRANSPILE_ONLY": "true",
+                "DEBUG": "true",
+                "BROWSER_DEBUG": "true",
+                "NODE_ENV": "development"
+            },
+            "sourceMaps": true,
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/**",
+                "!**/node_modules/**"
+            ],
+            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}",
+            "outputCapture": "console"
+        }
+    ]
+} 

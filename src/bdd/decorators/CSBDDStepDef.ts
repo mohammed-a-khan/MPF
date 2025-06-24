@@ -58,7 +58,9 @@ export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionO
     };
     
     // Register the step definition
+    console.log(`🔍 DEBUG: CSBDDStepDef decorator registering step: ${pattern.toString()} -> ${stepDefinition.location}`);
     stepRegistry.registerStep(pattern, originalMethod, metadata);
+    console.log(`🔍 DEBUG: Step registered successfully: ${pattern.toString()}`);
     
     // Log registration
     Logger.getInstance().debug(`Registered step definition: ${pattern.toString()} -> ${stepDefinition.location}`);
@@ -234,88 +236,21 @@ export function AfterStep(options?: { tags?: string; order?: number; timeout?: n
 }
 
 /**
- * Decorator for marking methods as BeforeAll hooks
- */
-export function BeforeAll(options?: { order?: number; timeout?: number }) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const hook = {
-      type: 'beforeAll' as const,
-      method: descriptor.value,
-      methodName: String(propertyKey),
-      className: target.constructor.name,
-      order: options?.order || 0,
-      timeout: options?.timeout,
-      location: `${target.constructor.name}.${propertyKey}`
-    };
-    
-    const registerOptions: {
-      tags?: string;
-      order?: number;
-      timeout?: number;
-      name?: string;
-    } = {
-      name: `${target.constructor.name}.${propertyKey}`
-    };
-    
-    if (options?.order !== undefined) {
-      registerOptions.order = options.order;
-    }
-    if (options?.timeout !== undefined) {
-      registerOptions.timeout = options.timeout;
-    }
-    
-    stepRegistry.registerHook('BeforeAll', descriptor.value, registerOptions);
-    Logger.getInstance().debug(`Registered BeforeAll hook: ${hook.location}`);
-  };
-}
-
-/**
- * Decorator for marking methods as AfterAll hooks
- */
-export function AfterAll(options?: { order?: number; timeout?: number }) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    const hook = {
-      type: 'afterAll' as const,
-      method: descriptor.value,
-      methodName: String(propertyKey),
-      className: target.constructor.name,
-      order: options?.order || 0,
-      timeout: options?.timeout,
-      location: `${target.constructor.name}.${propertyKey}`
-    };
-    
-    const registerOptions: {
-      tags?: string;
-      order?: number;
-      timeout?: number;
-      name?: string;
-    } = {
-      name: `${target.constructor.name}.${propertyKey}`
-    };
-    
-    if (options?.order !== undefined) {
-      registerOptions.order = options.order;
-    }
-    if (options?.timeout !== undefined) {
-      registerOptions.timeout = options.timeout;
-    }
-    
-    stepRegistry.registerHook('AfterAll', descriptor.value, registerOptions);
-    Logger.getInstance().debug(`Registered AfterAll hook: ${hook.location}`);
-  };
-}
-
-/**
  * Decorator for marking a class as containing step definitions
  * Automatically instantiates the class
  */
 export function StepDefinitions(target: any) {
+  console.log(`🔍 DEBUG: StepDefinitions decorator called for class: ${target.name}`);
+  
   // Create instance of the class to trigger decorator registration
   // This ensures all decorated methods are registered
+  console.log(`🔍 DEBUG: Creating instance of ${target.name}`);
   const instance = new target();
+  console.log(`🔍 DEBUG: Instance created for ${target.name}`);
   
   // Store the instance in the step registry for later use
   stepRegistry.registerClassInstance(target.name, instance);
+  console.log(`🔍 DEBUG: Class instance registered for ${target.name}`);
   
   // Log class registration
   Logger.getInstance().debug(`Registered step definition class: ${target.name}`);
@@ -323,6 +258,7 @@ export function StepDefinitions(target: any) {
     className: target.name
   });
   
+  console.log(`🔍 DEBUG: StepDefinitions decorator completed for ${target.name}`);
   return target;
 }
 

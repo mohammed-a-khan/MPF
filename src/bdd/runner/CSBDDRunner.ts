@@ -451,9 +451,8 @@ export class CSBDDRunner {
                 await import('../../steps/ui/AdvancedInteractionSteps');
                 await import('../../steps/ui/DebugSteps');
                 
-                // Load test-specific step definitions
-                await import('../../../test/saucedemo/steps/saucedemo.steps');
-                logger.info('✅ UI and test-specific step definitions loaded');
+                // Load test-specific step definitions will be loaded automatically by StepDefinitionLoader
+                logger.info('✅ UI step definitions loaded');
             } catch (error) {
                 logger.warn('⚠️  Some UI step definitions could not be loaded:', error as Error);
             }
@@ -515,12 +514,19 @@ export class CSBDDRunner {
             this.executionProfile = await this.analyzeTestExecutionProfile(options);
             logger.info('✅ Test execution profile analyzed');
 
-            // 5. Load ALL step definitions (conditional loading disabled for now)
+            // 5. Load step definitions conditionally based on test execution profile
+            console.log('🔍 DEBUG: About to create StepDefinitionLoader instance');
             const stepLoader = StepDefinitionLoader.getInstance();
+            console.log('🔍 DEBUG: StepDefinitionLoader instance created, about to call loadStepDefinitionsConditionally()');
+            
+            // LOAD ALL STEP DEFINITIONS (including test-specific ones like AKHAN)
+            console.log('🔍 DEBUG: Loading ALL step definitions (including test-specific AKHAN steps)...');
             await stepLoader.loadAll();
+            console.log('🔍 DEBUG: loadStepDefinitionsConditionally() completed');
             const stats = stepRegistry.getStats();
             const stepCount = stats.totalSteps;
-            logger.info('All step definitions loaded - Total steps: ' + stepCount);
+            console.log(`🔍 DEBUG: Step count from registry: ${stepCount}`);
+            logger.info('Step definitions loaded conditionally - Total steps: ' + stepCount);
 
             // 6. Initialize browser ONLY if required (CONDITIONAL INITIALIZATION)
             if (this.executionProfile.componentInitialization.browser) {

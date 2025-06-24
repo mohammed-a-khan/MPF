@@ -271,14 +271,19 @@ export class ScenarioExecutor {
      * Execute scenario steps
      */
     public async executeSteps(steps: Step[], context: any): Promise<StepResult[]> {
+        console.log(`🔍 DEBUG: executeSteps called with ${steps.length} steps`);
         const results: StepResult[] = [];
 
         for (const step of steps) {
+            console.log(`🔍 DEBUG: About to execute step: ${step.keyword} ${step.text}`);
+            
             // Execute before step hooks
             await this.executeBeforeStepHooks(step, context);
 
             // Execute step
+            console.log(`🔍 DEBUG: Calling stepExecutor.execute for: ${step.keyword} ${step.text}`);
             const stepResult = await this.stepExecutor.execute(step, context);
+            console.log(`🔍 DEBUG: Step execution completed with status: ${stepResult.status}`);
             results.push(stepResult);
 
             // Execute after step hooks
@@ -286,6 +291,7 @@ export class ScenarioExecutor {
 
             // Stop execution if step failed
             if (stepResult.status === StepStatus.FAILED) {
+                console.log(`🔍 DEBUG: Step failed, marking remaining steps as skipped`);
                 // Mark remaining steps as skipped
                 const remainingSteps = steps.slice(steps.indexOf(step) + 1);
                 for (const remaining of remainingSteps) {
@@ -305,6 +311,7 @@ export class ScenarioExecutor {
             }
         }
 
+        console.log(`🔍 DEBUG: executeSteps completed with ${results.length} results`);
         return results;
     }
 
