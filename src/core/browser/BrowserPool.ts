@@ -281,7 +281,7 @@ export class BrowserPool {
       }
       
       const browserManager = BrowserManager.getInstance();
-      await browserManager.initialize(this.browserConfig);
+      await browserManager.initialize();
       const browser = await browserManager.launchBrowser();
       
       const pooledBrowser: PooledBrowser = {

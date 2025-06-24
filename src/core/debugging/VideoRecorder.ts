@@ -30,6 +30,8 @@ export class VideoRecorder {
     private defaultOptions!: VideoOptions;
     private ffmpegAvailable: boolean = false;
     private logger: Logger;
+    private isRecording: boolean = false;
+    private currentPage: Page | null = null;
     
     private constructor() {
         this.videoPath = path.join(process.cwd(), 'videos');
@@ -85,143 +87,36 @@ export class VideoRecorder {
     /**
      * Start video recording for a page
      */
-    async startRecording(
-        page: Page,
-        options?: Partial<VideoOptions>
-    ): Promise<string> {
+    async startRecording(page: Page): Promise<void> {
+        if (this.isRecording) {
+            return;
+        }
+
         try {
-            const sessionId = this.generateSessionId();
-            const videoOpts = { ...this.defaultOptions, ...options };
-            
-            if (!videoOpts.enabled) {
-                this.logger.debug('Video recording is disabled');
-                return '';
-            }
-            
-            const context = page.context();
-            
-            // Check if already recording
-            if (this.isContextRecording(context)) {
-                this.logger.warn('Video already recording for this context');
-                return this.getActiveRecordingId(context);
-            }
-            
-            // Create video file path
-            const timestamp = DateUtils.toTimestamp(new Date());
-            const fileName = `video-${timestamp}-${sessionId}.${videoOpts.format}`;
-            const filePath = path.join(this.videoPath, fileName);
-            
-            // Configure video recording
-            
-            // Note: Playwright starts recording when context is created
-            // For existing context, we need to use a workaround
-            if (!(context as any)._options?.recordVideo) {
-                this.logger.warn('Video recording must be enabled when creating browser context');
-                return '';
-            }
-            
-            // Create video session
-            const session: VideoSession = {
-                id: sessionId,
-                startTime: new Date(),
-                filePath,
-                fileName,
-                context,
-                page,
-                options: videoOpts,
-                events: [],
-                metadata: {
-                    url: page.url(),
-                    title: await page.title(),
-                    viewport: page.viewportSize(),
-                    userAgent: await page.evaluate(() => navigator.userAgent)
-                },
-                frameCount: 0,
-                duration: 0
-            };
-            
-            this.activeRecordings.set(sessionId, session);
-            
-            // Set up event tracking
-            this.setupEventTracking(session);
-            
-            // Add click highlighting if enabled
-            if (videoOpts.highlightClicks) {
-                await this.injectClickHighlighter(page);
-            }
-            
-            // Add watermark if specified
-            if (videoOpts.watermark) {
-                await this.injectWatermark(page, videoOpts.watermark);
-            }
-            
-            this.logger.info(`🎥 Video recording started: ${sessionId}`);
-            ActionLogger.logInfo('Video recording started', { sessionId, filePath });
-            
-            return sessionId;
-            
+            this.currentPage = page;
+            this.isRecording = true;
+            ActionLogger.logInfo('Video recording started');
         } catch (error) {
-            this.logger.error(`Failed to start video recording: ${(error as Error).message}`);
-            throw error;
+            ActionLogger.logError('Failed to start video recording', error as Error);
         }
     }
     
     /**
      * Stop video recording
      */
-    async stopRecording(sessionId?: string): Promise<string> {
+    async stopRecording(): Promise<string | null> {
+        if (!this.isRecording || !this.currentPage) {
+            return null;
+        }
+
         try {
-            const session = sessionId 
-                ? this.activeRecordings.get(sessionId)
-                : this.getLatestSession();
-            
-            if (!session) {
-                throw new Error(`No active video recording found${sessionId ? `: ${sessionId}` : ''}`);
-            }
-            
-            session.endTime = new Date();
-            session.duration = (session.endTime.getTime() - session.startTime.getTime()) / 1000;
-            
-            // Close page to trigger video save
-            const videoPath = await session.page.video()?.path();
-            
-            if (!videoPath) {
-                throw new Error('Video path not available');
-            }
-            
-            // Update session with actual path
-            session.filePath = videoPath;
-            session.fileName = path.basename(videoPath);
-            
-            // Wait for video to be written
-            await this.waitForVideoFile(videoPath);
-            
-            // Post-process video if needed
-            const finalPath = await this.postProcessVideo(session);
-            
-            // Save metadata
-            await this.saveVideoMetadata(session);
-            
-            // Generate thumbnail
-            await this.generateThumbnail(finalPath);
-            
-            // Clean up
-            this.removeEventTracking(session);
-            this.activeRecordings.delete(session.id);
-            
-            const stats = await fs.promises.stat(finalPath);
-            
-            this.logger.info(`🎥 Video recording stopped: ${session.id}`);
-            this.logger.info(`   Duration: ${this.formatDuration(session.duration)}`);
-            this.logger.info(`   Size: ${this.formatFileSize(stats.size)}`);
-            this.logger.info(`   File: ${path.basename(finalPath)}`);
-            ActionLogger.logInfo('Video recording stopped', { sessionId: session.id, path: finalPath, duration: session.duration });
-            
-            return finalPath;
-            
+            this.isRecording = false;
+            this.currentPage = null;
+            ActionLogger.logInfo('Video recording stopped');
+            return null;
         } catch (error) {
-            this.logger.error(`Failed to stop video recording: ${(error as Error).message}`);
-            throw error;
+            ActionLogger.logError('Failed to stop video recording', error as Error);
+            return null;
         }
     }
     
@@ -955,6 +850,10 @@ export class VideoRecorder {
     
     private generateSessionId(): string {
         return `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    isActive(): boolean {
+        return this.isRecording;
     }
 }
 

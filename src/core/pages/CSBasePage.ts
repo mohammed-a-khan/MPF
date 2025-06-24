@@ -133,7 +133,7 @@ export abstract class CSBasePage {
                 details: `Navigation to ${this.constructor.name} failed: ${(error as Error).message}`
             });
             
-            logger.error(`${this.constructor.name}: Navigation failed`, error);
+            logger.error(`${this.constructor.name}: Navigation failed`, error instanceof Error ? error : new Error(String(error)));
             throw error;
         }
     }

@@ -1,6 +1,6 @@
 // src/bdd/decorators/StepRegistry.ts
 
-import { StepDefinition, StepPattern, Hook, HookType, StepDefinitionMetadata, RegistryStats } from '../types/bdd.types';
+import { StepDefinition, StepPattern, Hook, HookType, HookFn, StepDefinitionMetadata, RegistryStats } from '../types/bdd.types';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
@@ -9,7 +9,7 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
  * Thread-safe singleton implementation for managing all BDD components
  */
 export class StepRegistry {
-  private static instance: StepRegistry;
+  private static instance: StepRegistry | null = null;
   private readonly stepDefinitions: Map<string, StepDefinition>;
   private readonly hooks: Map<HookType, Hook[]>;
   private readonly patternCache: Map<string, RegExp>;
@@ -18,6 +18,7 @@ export class StepRegistry {
   private readonly classInstances: Map<string, any>;
   private readonly logger: Logger;
   private isLocked: boolean = false;
+  private isInitialized: boolean = false;
 
   private constructor() {
     this.stepDefinitions = new Map();
@@ -41,10 +42,32 @@ export class StepRegistry {
   }
 
   /**
+   * Initialize registry
+   */
+  public initialize(): void {
+    if (this.isInitialized) {
+      this.logger.debug('StepRegistry already initialized');
+      return;
+    }
+
+    this.clear();
+    this.isInitialized = true;
+    this.isLocked = false;
+    this.logger.info('StepRegistry initialized');
+  }
+
+  /**
    * Initialize hook types map
    */
   private initializeHookTypes(): void {
-    const hookTypes: HookType[] = ['Before', 'After', 'BeforeStep', 'AfterStep', 'BeforeAll', 'AfterAll'];
+    const hookTypes: HookType[] = [
+      HookType.Before,
+      HookType.After,
+      HookType.BeforeStep,
+      HookType.AfterStep,
+      HookType.BeforeAll,
+      HookType.AfterAll
+    ];
     hookTypes.forEach(type => {
       this.hooks.set(type, []);
     });
@@ -73,6 +96,10 @@ export class StepRegistry {
     implementation: Function,
     metadata: StepDefinitionMetadata
   ): void {
+    if (!this.isInitialized) {
+      this.initialize();
+    }
+
     if (this.isLocked) {
       throw new Error('StepRegistry is locked. Cannot register new steps after test execution has started.');
     }
@@ -121,7 +148,7 @@ export class StepRegistry {
    */
   public registerHook(
     type: HookType,
-    implementation: Function,
+    implementation: HookFn,
     options?: {
       tags?: string;
       order?: number;
@@ -129,7 +156,7 @@ export class StepRegistry {
       name?: string;
     }
   ): void {
-    if (this.isLocked && type !== 'BeforeAll' && type !== 'AfterAll') {
+    if (this.isLocked && type !== HookType.BeforeAll && type !== HookType.AfterAll) {
       throw new Error('StepRegistry is locked. Cannot register new hooks after test execution has started.');
     }
 
@@ -299,20 +326,20 @@ export class StepRegistry {
   }
 
   /**
-   * Clear all registrations (for testing)
+   * Clear registry and reset state
    */
   public clear(): void {
     if (this.isLocked) {
-      throw new Error('Cannot clear locked registry');
+      throw new Error('Cannot clear StepRegistry while locked');
     }
-    
     this.stepDefinitions.clear();
     this.hooks.clear();
     this.patternCache.clear();
     this.duplicateChecker.clear();
     this.loadedFiles.clear();
+    this.classInstances.clear();
     this.initializeHookTypes();
-    
+    this.isInitialized = false;
     this.logger.info('StepRegistry cleared');
   }
 
@@ -496,7 +523,14 @@ export class StepRegistry {
       stats: this.getStats()
     };
   }
+
+  /**
+   * Get total number of registered steps
+   */
+  public getStepCount(): number {
+    return this.stepDefinitions.size;
+  }
 }
 
-// Export singleton instance
+// Export the singleton instance
 export const stepRegistry = StepRegistry.getInstance();

@@ -1,5 +1,6 @@
 import { ExecutionContext } from '../context/ExecutionContext';
 import { HookRegistry } from './HookRegistry';
+import { HookType } from '../types/bdd.types';
 import { BrowserManager } from '../../core/browser/BrowserManager';
 import { ContextManager } from '../../core/browser/ContextManager';
 import { StorageManager } from '../../core/storage/StorageManager';
@@ -143,7 +144,7 @@ export class CleanupHooks {
 
     // After scenario hook
     hookRegistry.registerHook(
-      'After',
+      HookType.After,
       async (context: ExecutionContext) => {
         await this.runCleanupTasks(['screenshots', 'videos', 'traces', 'elements'], context);
       },
@@ -156,7 +157,7 @@ export class CleanupHooks {
 
     // After feature hook
     hookRegistry.registerHook(
-      'AfterAll',
+      HookType.AfterAll,
       async (context: ExecutionContext) => {
         await this.runCleanupTasks(['pages', 'storage', 'network'], context);
       },
@@ -169,7 +170,7 @@ export class CleanupHooks {
 
     // Final cleanup hook
     hookRegistry.registerHook(
-      'AfterAll',
+      HookType.AfterAll,
       async (context: ExecutionContext) => {
         await this.runAllCleanupTasks(context);
       },
@@ -334,7 +335,7 @@ export class CleanupHooks {
       // const traceRecorder = TraceRecorder.getInstance();
       
       // Stop any active traces
-      const browserContext = context.getBrowserContext();
+      const browserContext = context.getContext();
       if (browserContext) {
         try {
           // Check if tracing is active on the context
@@ -384,7 +385,7 @@ export class CleanupHooks {
    */
   private async cleanupStorage(context: ExecutionContext): Promise<void> {
     try {
-      const browserContext = context.getBrowserContext();
+      const browserContext = context.getContext();
       if (browserContext) {
         const storageManager = new StorageManager();
         await storageManager.clearAllStorage(browserContext);
@@ -425,7 +426,7 @@ export class CleanupHooks {
    */
   private async cleanupPages(_context: ExecutionContext): Promise<void> {
     try {
-      const browserContext = _context.getBrowserContext();
+      const browserContext = _context.getContext();
       if (browserContext) {
         const pages = browserContext.pages();
         for (const page of pages) {

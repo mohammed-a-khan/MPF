@@ -156,8 +156,9 @@
             ],
             "args": [
                 "${workspaceFolder}/src/index.ts",
-                "--env=demo",
-                "--feature=test/saucedemo/features/ado-integration-test.feature"
+                "--env=dev",
+                "--project=akhan",
+                "--feature=test/akhan/features/akhan-login-navigation.feature"
             ],
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",

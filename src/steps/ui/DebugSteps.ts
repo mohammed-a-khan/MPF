@@ -250,10 +250,7 @@ export class DebugSteps extends CSBDDBaseStepDefinition {
         await actionLogger.logAction('Start video recording');
         
         try {
-            await this.videoRecorder.startRecording(this.page, {
-                width: 1920,
-                height: 1080
-            });
+            await this.videoRecorder.startRecording(this.page);
             
             await actionLogger.logAction('Video recording started');
         } catch (error) {

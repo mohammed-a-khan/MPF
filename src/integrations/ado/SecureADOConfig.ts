@@ -66,6 +66,9 @@ export class SecureADOConfig {
       });
 
       // Load configuration with automatic decryption
+      const testPlanId = EncryptionConfigurationManager.getNumber('ADO_TEST_PLAN_ID');
+      const testSuiteId = EncryptionConfigurationManager.getNumber('ADO_TEST_SUITE_ID');
+      
       this.config = {
         enabled: EncryptionConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false),
         uploadResults: EncryptionConfigurationManager.getBoolean('ADO_UPLOAD_RESULTS', false),
@@ -80,17 +83,17 @@ export class SecureADOConfig {
         
         // Other configuration
         apiVersion: EncryptionConfigurationManager.get('ADO_API_VERSION', '7.0'),
-        testPlanId: EncryptionConfigurationManager.getNumber('ADO_TEST_PLAN_ID'),
-        testSuiteId: EncryptionConfigurationManager.getNumber('ADO_TEST_SUITE_ID'),
+        ...(testPlanId !== undefined && { testPlanId }),
+        ...(testSuiteId !== undefined && { testSuiteId }),
         uploadAttachments: EncryptionConfigurationManager.getBoolean('ADO_UPLOAD_ATTACHMENTS', false),
         uploadScreenshots: EncryptionConfigurationManager.getBoolean('ADO_UPLOAD_SCREENSHOTS', false),
         uploadLogs: EncryptionConfigurationManager.getBoolean('ADO_UPLOAD_LOGS', false),
         
         // Advanced settings
-        timeout: EncryptionConfigurationManager.getNumber('ADO_TIMEOUT', 30000),
-        retryCount: EncryptionConfigurationManager.getNumber('ADO_RETRY_COUNT', 3),
-        retryDelay: EncryptionConfigurationManager.getNumber('ADO_RETRY_DELAY', 1000),
-        maxConcurrentRequests: EncryptionConfigurationManager.getNumber('ADO_MAX_CONCURRENT_REQUESTS', 5),
+        timeout: EncryptionConfigurationManager.getNumber('ADO_TIMEOUT', 30000) || 30000,
+        retryCount: EncryptionConfigurationManager.getNumber('ADO_RETRY_COUNT', 3) || 3,
+        retryDelay: EncryptionConfigurationManager.getNumber('ADO_RETRY_DELAY', 1000) || 1000,
+        maxConcurrentRequests: EncryptionConfigurationManager.getNumber('ADO_MAX_CONCURRENT_REQUESTS', 5) || 5,
         enableCaching: EncryptionConfigurationManager.getBoolean('ADO_ENABLE_CACHING', true),
         
         // Test run configuration
@@ -101,15 +104,15 @@ export class SecureADOConfig {
       this.validateConfiguration();
       
       this.logger.info('Secure ADO configuration initialized successfully', {
-        organizationUrl: this.config.organizationUrl,
-        projectName: this.config.projectName,
-        authType: this.config.authType,
-        hasToken: !!this.config.personalAccessToken,
-        uploadResults: this.config.uploadResults
+        organizationUrl: SecureADOConfig.config?.organizationUrl || '',
+        projectName: SecureADOConfig.config?.projectName || '',
+        authType: SecureADOConfig.config?.authType || 'basic',
+        hasToken: !!SecureADOConfig.config?.personalAccessToken,
+        uploadResults: SecureADOConfig.config?.uploadResults || false
       });
 
     } catch (error) {
-      this.logger.error('Failed to initialize secure ADO configuration', error);
+      this.logger.error('Failed to initialize secure ADO configuration', error instanceof Error ? error : new Error(String(error)));
       throw new Error(`ADO Configuration initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -283,11 +286,11 @@ export class SecureADOConfig {
    */
   private static getTestRunConfig(): ADOTestRunConfig {
     return {
-      testPlanId: EncryptionConfigurationManager.getNumber('ADO_TEST_PLAN_ID'),
-      testSuiteId: EncryptionConfigurationManager.getNumber('ADO_TEST_SUITE_ID'),
-      buildId: EncryptionConfigurationManager.getNumber('ADO_BUILD_ID'),
-      releaseId: EncryptionConfigurationManager.getNumber('ADO_RELEASE_ID'),
-      releaseEnvironmentId: EncryptionConfigurationManager.getNumber('ADO_RELEASE_ENVIRONMENT_ID'),
+      testPlanId: EncryptionConfigurationManager.getNumber('ADO_TEST_PLAN_ID') || 0,
+      testSuiteId: EncryptionConfigurationManager.getNumber('ADO_TEST_SUITE_ID') || 0,
+      buildId: EncryptionConfigurationManager.getNumber('ADO_BUILD_ID') || 0,
+      releaseId: EncryptionConfigurationManager.getNumber('ADO_RELEASE_ID') || 0,
+      releaseEnvironmentId: EncryptionConfigurationManager.getNumber('ADO_RELEASE_ENVIRONMENT_ID') || 0,
       runTitle: EncryptionConfigurationManager.get('ADO_RUN_TITLE', ''),
       buildNumber: EncryptionConfigurationManager.get('ADO_BUILD_NUMBER', ''),
       owner: EncryptionConfigurationManager.get('ADO_RUN_OWNER', ''),

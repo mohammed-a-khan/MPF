@@ -32,7 +32,7 @@ export class AKHANLoginNavigationSteps extends CSBDDBaseStepDefinition {
         console.log('✅ Successfully navigated to AKHAN login page');
     }
 
-    @CSBDDStepDef('I enter username "{string}" and password "{string}"')
+    @CSBDDStepDef('I enter username {string} and password {string}')
     async enterCredentials(username: string, password: string) {
         console.log(`📝 Step: I enter username "${username}" and password "${password}"`);
         
@@ -150,12 +150,12 @@ export class AKHANLoginNavigationSteps extends CSBDDBaseStepDefinition {
         console.log('✅ Menu items verification completed');
     }
 
-    @CSBDDStepDef('I click on "{string}" menu item')
+    @CSBDDStepDef('I click on {string} menu item')
     async clickMenuItem(menuItem: string) {
         await this.navigationPage.clickMenuItem(menuItem);
     }
 
-    @CSBDDStepDef('I should see the "{string}" header of type "{string}"')
+    @CSBDDStepDef('I should see the {string} header of type {string}')
     async verifyHeader(expectedHeader: string, headerType: string) {
         await this.navigationPage.verifyHeader(expectedHeader);
     }

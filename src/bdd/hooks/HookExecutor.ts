@@ -6,7 +6,8 @@ import {
   AfterHookFn,
   BeforeStepHookFn,
   AfterStepHookFn,
-  StepStatus
+  StepStatus,
+  Step
 } from '../types/bdd.types';
 import { HookRegistry } from './HookRegistry';
 import { ExecutionContext } from '../context/ExecutionContext';
@@ -50,11 +51,27 @@ export class HookExecutor {
   private hookRegistry: HookRegistry;
   private executionStats: Map<string, HookExecutionStats>;
   private currentlyExecuting: Set<string>;
+  private hooks: Map<HookType, Hook[]>;
 
   private constructor() {
     this.hookRegistry = HookRegistry.getInstance();
     this.executionStats = new Map();
     this.currentlyExecuting = new Set();
+    this.hooks = new Map();
+    
+    // Initialize with enum values
+    const hookTypes = [
+      HookType.Before,
+      HookType.After,
+      HookType.BeforeStep,
+      HookType.AfterStep,
+      HookType.BeforeAll,
+      HookType.AfterAll
+    ] as const;
+    
+    hookTypes.forEach(type => {
+      this.hooks.set(type, []);
+    });
   }
 
   static getInstance(): HookExecutor {
@@ -64,12 +81,18 @@ export class HookExecutor {
     return HookExecutor.instance;
   }
 
+  registerHook(type: HookType, hook: Hook): void {
+    const hooks = this.hooks.get(type) || [];
+    hooks.push(hook);
+    this.hooks.set(type, hooks);
+  }
+
   /**
    * Execute all before hooks
    */
   async executeBeforeHooks(context: ExecutionContext): Promise<HookResult[]> {
     ActionLogger.logDebug('Executing before hooks');
-    return this.executeHooksOfType('Before', context);
+    return this.executeHooksOfType(HookType.Before, context);
   }
 
   /**
@@ -77,7 +100,7 @@ export class HookExecutor {
    */
   async executeAfterHooks(context: ExecutionContext): Promise<HookResult[]> {
     ActionLogger.logDebug('Executing after hooks');
-    return this.executeHooksOfType('After', context);
+    return this.executeHooksOfType(HookType.After, context);
   }
 
   /**
@@ -85,7 +108,7 @@ export class HookExecutor {
    */
   async executeBeforeStepHooks(context: ExecutionContext): Promise<HookResult[]> {
     ActionLogger.logDebug('Executing before step hooks');
-    return this.executeHooksOfType('BeforeStep', context);
+    return this.executeHooksOfType(HookType.BeforeStep, context);
   }
 
   /**
@@ -93,7 +116,7 @@ export class HookExecutor {
    */
   async executeAfterStepHooks(context: ExecutionContext): Promise<HookResult[]> {
     ActionLogger.logDebug('Executing after step hooks');
-    return this.executeHooksOfType('AfterStep', context);
+    return this.executeHooksOfType(HookType.AfterStep, context);
   }
 
   /**
@@ -122,7 +145,7 @@ export class HookExecutor {
       results.push(result);
 
       // Stop execution if hook failed and not set to always run
-      if (result.status === 'failed' && !this.shouldContinueAfterFailure(type, hook)) {
+      if (result.status === StepStatus.FAILED && !this.shouldContinueAfterFailure(type, hook)) {
         ActionLogger.logWarn(`Stopping ${type} hook execution due to failure in: ${hook.name}`);
         break;
       }
@@ -135,7 +158,7 @@ export class HookExecutor {
    * Get applicable hooks based on type and context
    */
   private getApplicableHooks(type: HookType, context: ExecutionContext): Hook[] {
-    const allHooks = this.hookRegistry.getHooks(type);
+    const allHooks = this.hooks.get(type) || [];
     
     // Filter by tags
     const filteredHooks = allHooks.filter((hook: Hook) => 
@@ -191,43 +214,22 @@ export class HookExecutor {
   }
 
   /**
-   * Execute a single hook
+   * Execute a single hook with timeout and error handling
    */
   private async executeHook(hook: Hook, context: ExecutionContext): Promise<HookResult> {
-    const hookId = `${hook.type}:${hook.name}`;
     const timer = new Timer();
-    
-    // Check for circular execution
-    if (this.currentlyExecuting.has(hookId)) {
-      ActionLogger.logError(`Circular hook execution detected: ${hookId}`);
-      return {
-        hook,
-        status: StepStatus.FAILED,
-        duration: 0,
-        error: new Error('Circular hook execution detected'),
-        timestamp: new Date()
-      };
-    }
-
-    this.currentlyExecuting.add(hookId);
     timer.start();
 
-    ActionLogger.logDebug(`Executing ${hook.type} hook: ${hook.name}`);
-
     try {
-      // Execute with timeout
+      // Execute hook with timeout
       await this.executeWithTimeout(
-        () => this.invokeHookFunction(hook, context),
+        async () => await this.invokeHookFunction(hook, context),
         hook.timeout || 30000,
         hook.name
       );
 
       const duration = timer.stop();
-      
-      // Update stats
-      this.updateExecutionStats(hookId, true, duration);
-
-      ActionLogger.logDebug(`Hook ${hook.name} executed successfully in ${duration}ms`);
+      this.updateExecutionStats(hook.name, true, duration);
 
       return {
         hook,
@@ -235,17 +237,12 @@ export class HookExecutor {
         duration,
         timestamp: new Date()
       };
-
     } catch (error) {
       const duration = timer.stop();
-      
-      // Update stats
-      this.updateExecutionStats(hookId, false, duration);
-
-      ActionLogger.logError(`Hook ${hook.name} failed after ${duration}ms`, error);
+      this.updateExecutionStats(hook.name, false, duration);
 
       // Store error in context metadata for after hooks
-      if (hook.type === 'Before' || hook.type === 'BeforeStep') {
+      if (hook.type === HookType.Before || hook.type === HookType.BeforeStep) {
         context.setMetadata('hookError', error);
       }
 
@@ -253,43 +250,41 @@ export class HookExecutor {
         hook,
         status: StepStatus.FAILED,
         duration,
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: error as Error,
         timestamp: new Date()
       };
-
-    } finally {
-      this.currentlyExecuting.delete(hookId);
     }
   }
 
   /**
-   * Invoke the hook function with proper typing
+   * Execute hook function based on type
    */
   private async invokeHookFunction(hook: Hook, context: ExecutionContext): Promise<void> {
     switch (hook.type) {
-      case 'Before':
-      case 'After':
-      case 'BeforeAll':
-      case 'AfterAll':
-        await (hook.implementation as BeforeHookFn | AfterHookFn)(context);
+      case HookType.Before:
+        await (hook.fn as BeforeHookFn)(context);
         break;
-        
-      case 'BeforeStep':
-      case 'AfterStep':
-        // Get current step from context metadata
-        const currentStep = context.getMetadata('currentStep');
-        if (currentStep) {
-          await (hook.implementation as BeforeStepHookFn | AfterStepHookFn)(
-            context,
-            currentStep
-          );
+
+      case HookType.After:
+        await (hook.fn as AfterHookFn)(context);
+        break;
+
+      case HookType.BeforeStep:
+      case HookType.AfterStep:
+        const currentStep = context.getMetadata('currentStep') as Step;
+        if (!currentStep) {
+          throw new Error(`No current step found for ${hook.type} hook`);
+        }
+
+        if (hook.type === HookType.BeforeStep) {
+          await (hook.fn as BeforeStepHookFn)(context, currentStep);
         } else {
-          await (hook.implementation as BeforeHookFn | AfterHookFn)(context);
+          await (hook.fn as AfterStepHookFn)(context, currentStep);
         }
         break;
-        
+
       default:
-        throw new Error(`Unsupported hook type: ${hook.type}`);
+        throw new Error(`Unknown hook type: ${hook.type}`);
     }
   }
 
@@ -322,8 +317,8 @@ export class HookExecutor {
    * Determine if execution should continue after hook failure
    */
   private shouldContinueAfterFailure(type: HookType, hook: Hook): boolean {
-    // Always continue for cleanup hooks (after/afterStep)
-    if (type === 'After' || type === 'AfterStep') {
+    // Always continue for cleanup hooks (After/AfterStep)
+    if (type === HookType.After || type === HookType.AfterStep) {
       return true;
     }
 
@@ -396,7 +391,7 @@ export class HookExecutor {
     const warnings: string[] = [];
 
     try {
-      const allHooks = this.hookRegistry.getAllHooks('Before');
+      const allHooks = this.hookRegistry.getAllHooks(HookType.Before);
       
       // Check for duplicate hook names within same type
       const hooksByType = new Map<HookType, Hook[]>();
@@ -457,6 +452,35 @@ export class HookExecutor {
         lastExecution: stat.lastExecution
       }))
     };
+  }
+
+  async executeHooks(type: HookType, context: ExecutionContext, data?: any): Promise<void> {
+    const hookTimeout = context.getMetadata('hookTimeout') || 5000;
+    const step: Step = {
+      keyword: type,
+      text: `${type} hook execution`,
+      line: 0,
+      metadata: {
+        timeout: hookTimeout
+      }
+    };
+    await this.executeHooksOfType(type, context);
+  }
+
+  clearHooks(): void {
+    this.hooks.clear();
+    const hookTypes = [
+      HookType.Before,
+      HookType.After,
+      HookType.BeforeStep,
+      HookType.AfterStep,
+      HookType.BeforeAll,
+      HookType.AfterAll
+    ] as const;
+    
+    hookTypes.forEach(type => {
+      this.hooks.set(type, []);
+    });
   }
 }
 

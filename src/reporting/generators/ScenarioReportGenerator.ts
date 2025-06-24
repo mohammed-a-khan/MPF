@@ -24,6 +24,7 @@ import {
   MimeType
 } from '../types/reporting.types';
 import { Logger } from '../../core/utils/Logger';
+import { HookType } from '../../bdd/types/bdd.types';
 
 /**
  * Scenario Report Generator - Creates Detailed Scenario-Level Reports
@@ -282,8 +283,8 @@ ${this.generateScenarioScripts()}`;
         <div class="metadata-item">
             <span class="metadata-label">Hooks</span>
             <span class="metadata-value">
-                ${scenario.hooks.filter(h => h.type === 'before').length} before, 
-                ${scenario.hooks.filter(h => h.type === 'after').length} after
+                ${scenario.hooks.filter(h => h.type === HookType.Before).length} before, 
+                ${scenario.hooks.filter(h => h.type === HookType.After).length} after
             </span>
         </div>
         ` : ''}
@@ -357,7 +358,7 @@ ${this.generateScenarioScripts()}`;
     
     <div class="timeline-visualization">
         <div class="timeline-track">
-            ${scenario.hooks.filter((h: HookReport) => h.type === 'before').map((hook: HookReport) => 
+            ${scenario.hooks.filter((h: HookReport) => h.type === HookType.Before).map((hook: HookReport) => 
               this.generateTimelineSegment(hook, 'hook before', scenario.startTime, totalDuration)
             ).join('')}
             
@@ -365,7 +366,7 @@ ${this.generateScenarioScripts()}`;
               this.generateTimelineSegment(step, 'step', scenario.startTime, totalDuration)
             ).join('')}
             
-            ${scenario.hooks.filter((h: HookReport) => h.type === 'after').map((hook: HookReport) => 
+            ${scenario.hooks.filter((h: HookReport) => h.type === HookType.After).map((hook: HookReport) => 
               this.generateTimelineSegment(hook, 'hook after', scenario.startTime, totalDuration)
             ).join('')}
         </div>
@@ -423,10 +424,10 @@ ${this.generateScenarioScripts()}`;
 <section class="steps-section">
     <h3 class="section-title">Steps Execution</h3>
     
-    ${scenario.hooks.filter(h => h.type === 'before').length > 0 ? `
+    ${scenario.hooks.filter(h => h.type === HookType.Before).length > 0 ? `
     <div class="hooks-container before-hooks">
         <h4 class="hooks-label">Before Hooks</h4>
-        ${scenario.hooks.filter((h: HookReport) => h.type === 'before').map((hook: HookReport) => 
+        ${scenario.hooks.filter((h: HookReport) => h.type === HookType.Before).map((hook: HookReport) => 
           this.generateHook(hook)
         ).join('')}
     </div>
@@ -438,10 +439,10 @@ ${this.generateScenarioScripts()}`;
         ).join('')}
     </div>
     
-    ${scenario.hooks.filter(h => h.type === 'after').length > 0 ? `
+    ${scenario.hooks.filter(h => h.type === HookType.After).length > 0 ? `
     <div class="hooks-container after-hooks">
         <h4 class="hooks-label">After Hooks</h4>
-        ${scenario.hooks.filter((h: HookReport) => h.type === 'after').map((hook: HookReport) => 
+        ${scenario.hooks.filter((h: HookReport) => h.type === HookType.After).map((hook: HookReport) => 
           this.generateHook(hook)
         ).join('')}
     </div>

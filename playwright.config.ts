@@ -6,6 +6,7 @@ const environment = process.env['TEST_ENV'] || 'ado-test';
 
 const config: PlaywrightTestConfig = {
   testDir: './test',
+  testMatch: ['**/*.feature', '**/*.spec.ts', '**/*.test.ts'],
   timeout: 30 * 1000,
   expect: {
     timeout: 5000

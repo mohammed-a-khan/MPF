@@ -209,7 +209,7 @@ export class ChartGenerator {
       ${this.generateChartFilters()}
       ${this.generateChartGradients(colors)}
       <!-- Enhanced gradient for single segment -->
-      ${validSegments.length === 1 ? `
+      ${validSegments.length === 1 && validSegments[0] ? `
       <defs>
         <linearGradient id="singleSegmentGradient_${id}" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style="stop-color:${validSegments[0].color};stop-opacity:1" />
@@ -277,7 +277,7 @@ export class ChartGenerator {
       }).join('')}
       
       <!-- Additional visual indicator for 100% scenarios -->
-      ${validSegments.length === 1 ? `
+      ${validSegments.length === 1 && validSegments[0] ? `
       <circle
         cx="0"
         cy="0"
@@ -299,7 +299,7 @@ export class ChartGenerator {
       <text y="10" text-anchor="middle" class="center-label" style="font-size: 14px; fill: #666;">
         ${data.centerText?.label || 'Total'}
       </text>
-      ${validSegments.length === 1 ? `
+      ${validSegments.length === 1 && validSegments[0] ? `
       <text y="30" text-anchor="middle" style="font-size: 12px; fill: ${validSegments[0].color}; font-weight: bold;">
         ${validSegments[0].label}
       </text>

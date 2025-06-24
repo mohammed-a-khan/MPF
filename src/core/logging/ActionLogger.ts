@@ -259,7 +259,9 @@ export class ActionLogger extends EventEmitter {
     this.updateStats('element');
 
     if (!success) {
-      this.metricsCollector.recordElementFailure(elementDescription, action);
+      if (this.metricsCollector) {
+        this.metricsCollector.recordElementFailure(elementDescription, action);
+      }
     }
   }
 
@@ -307,7 +309,9 @@ export class ActionLogger extends EventEmitter {
     await this.writeLog(entry);
     this.updateStats('api');
     
-    this.metricsCollector.recordAPICall(method, url, statusCode, duration);
+    if (this.metricsCollector) {
+      this.metricsCollector.recordAPICall(method, url, statusCode, duration);
+    }
   }
 
   async logAPIRequest(
@@ -376,12 +380,14 @@ export class ActionLogger extends EventEmitter {
     await this.writeLog(entry);
     this.updateStats('api');
     
-    this.metricsCollector.recordAPICall(
-      response.method || 'GET', 
-      response.url || 'unknown', 
-      response.statusCode || 0, 
-      metadata?.duration || 0
-    );
+    if (this.metricsCollector) {
+      this.metricsCollector.recordAPICall(
+        response.method || 'GET', 
+        response.url || 'unknown', 
+        response.statusCode || 0, 
+        metadata?.duration || 0
+      );
+    }
   }
 
   async logAPIError(
@@ -418,7 +424,9 @@ export class ActionLogger extends EventEmitter {
     await this.writeLog(entry);
     this.updateStats('error');
     
-    this.metricsCollector.recordError(error.name || 'APIError');
+    if (this.metricsCollector) {
+      this.metricsCollector.recordError(error.name || 'APIError');
+    }
     
     // Emit error event for real-time monitoring
     this.emit('error', entry);
@@ -461,7 +469,9 @@ export class ActionLogger extends EventEmitter {
     await this.writeLog(entry);
     this.updateStats('database');
     
-    this.metricsCollector.recordDatabaseQuery(operation, duration, rowCount || 0);
+    if (this.metricsCollector) {
+      this.metricsCollector.recordDatabaseQuery(operation, duration, rowCount || 0);
+    }
   }
 
   async logValidation(
@@ -500,7 +510,9 @@ export class ActionLogger extends EventEmitter {
     this.updateStats('validation');
     
     if (!passed) {
-      this.metricsCollector.recordValidationFailure(type);
+      if (this.metricsCollector) {
+        this.metricsCollector.recordValidationFailure(type);
+      }
     }
   }
 
@@ -534,7 +546,9 @@ export class ActionLogger extends EventEmitter {
       await this.writeLog(entry);
       this.updateStats('error');
       
-      this.metricsCollector.recordError(error instanceof Error ? error.name : 'UnknownError');
+      if (this.metricsCollector) {
+        this.metricsCollector.recordError(error instanceof Error ? error.name : 'UnknownError');
+      }
       
       // Emit error event safely - prevent unhandled rejection crashes
       try {
@@ -581,7 +595,9 @@ export class ActionLogger extends EventEmitter {
     await this.writeLog(entry);
     this.updateStats('performance');
     
-    this.metricsCollector.recordPerformanceMetric(metric, value);
+    if (this.metricsCollector) {
+      this.metricsCollector.recordPerformanceMetric(metric, value);
+    }
   }
 
   async logScreenshot(
@@ -745,11 +761,11 @@ export class ActionLogger extends EventEmitter {
   // Query and Analysis
 
   async query(query: LogQuery): Promise<LogEntry[]> {
-    return this.collector.query(query);
+    return this.collector ? this.collector.query(query) : [];
   }
 
   async aggregate(aggregation: LogAggregation): Promise<any> {
-    return this.collector.aggregate(aggregation);
+    return this.collector ? this.collector.aggregate(aggregation) : null;
   }
 
   async getStats(): Promise<LogStats> {
@@ -931,7 +947,7 @@ export class ActionLogger extends EventEmitter {
   private async writeToTransport(transport: LogTransport, entries: LogEntry[]): Promise<void> {
     try {
       const formattedEntries = entries.map(entry => 
-        this.formatter.format(entry, transport.format)
+        this.formatter ? this.formatter.format(entry, transport.format) : JSON.stringify(entry)
       );
 
       await transport.write(formattedEntries);
@@ -1047,7 +1063,7 @@ export class ActionLogger extends EventEmitter {
       await transport.close();
 
       // Archive current file
-      const archivePath = await this.archiveManager.archive(transport.config.path!);
+      const archivePath = this.archiveManager ? await this.archiveManager.archive(transport.config.path!) : null;
 
       // Create new transport
       const newTransport = await this.createTransport(name, transport.config);
@@ -1060,7 +1076,9 @@ export class ActionLogger extends EventEmitter {
       });
 
       // Cleanup old archives
-      await this.archiveManager.cleanup(this.config.rotation!);
+      if (this.archiveManager) {
+        await this.archiveManager.cleanup(this.config.rotation!);
+      }
     } catch (error) {
       this.error('Log rotation failed', error);
     }
@@ -1727,7 +1745,7 @@ export class ActionLogger extends EventEmitter {
   }
 
   private async logCorrelationSummary(context: CorrelationContext, duration: number): Promise<void> {
-    const summary = await this.collector.getCorrelationSummary(context.correlationId);
+    const summary = this.collector ? await this.collector.getCorrelationSummary(context.correlationId) : null;
     
     this.debug('Correlation completed', {
       correlationId: context.correlationId,

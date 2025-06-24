@@ -72,7 +72,7 @@ export class ContextManager {
   async createScenarioContext(scenarioId: string): Promise<BrowserContext> {
     try {
       const browserManager = BrowserManager.getInstance();
-      const browser = browserManager.getBrowser();
+      const browser = await browserManager.getBrowser();
       
       // Get scenario-specific options
       const options = this.getScenarioContextOptions(scenarioId);

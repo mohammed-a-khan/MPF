@@ -18,7 +18,10 @@ import {
     ScenarioResult,
     Step,
     StepResult,
+    HookType,
     Hook,
+    BeforeHookFn,
+    AfterHookFn,
     FeatureMetrics,
     ExecutionError,
     StepStatus,
@@ -109,8 +112,8 @@ export class FeatureExecutor {
 
             // Load feature hooks
             // Get hooks for the feature
-            const beforeHooks = await this.hookExecutor.getHooks('Before', feature.tags);
-            const afterHooks = await this.hookExecutor.getHooks('After', feature.tags);
+            const beforeHooks = await this.hookExecutor.getHooks(HookType.Before, feature.tags);
+            const afterHooks = await this.hookExecutor.getHooks(HookType.After, feature.tags);
             this.featureHooks = { before: beforeHooks, after: afterHooks };
 
             // Execute before feature hooks
@@ -471,11 +474,20 @@ export class FeatureExecutor {
                     `Before feature hook timeout: ${hook.name}`
                 );
 
-                // Execute hook
+                // Create execution context for hook
+                const hookContext = new ExecutionContext(`hook-${hook.name}-${Date.now()}`);
+                await hookContext.initialize();
+                
+                // Execute hook (Before hooks only take ExecutionContext)
+                const hookFn = hook.fn || hook.implementation;
+                // Cast to BeforeHookFn since these are Before feature hooks
                 await Promise.race([
-                    (hook.fn || hook.implementation)(this.featureContext!),
+                    (hookFn as BeforeHookFn)(hookContext),
                     timeoutPromise
                 ]);
+                
+                // Cleanup hook context
+                await hookContext.cleanup();
 
                 const logger = ActionLogger.getInstance();
                 logger.info(`Before-feature hook completed: ${hook.name || 'Anonymous'} (${Date.now() - hookStartTime}ms)`);
@@ -511,11 +523,10 @@ export class FeatureExecutor {
                 const actionLogger = ActionLogger.getInstance();
                 actionLogger.info(`Executing after-feature hook: ${hook.name || 'Anonymous'}`);
                 
-                // Pass result to after hooks
-                const hookContext = {
-                    ...this.featureContext!,
-                    result: result
-                };
+                // Create execution context for hook
+                const hookContext = new ExecutionContext(`hook-${hook.name}-${Date.now()}`);
+                await hookContext.initialize();
+                hookContext.setMetadata('featureResult', result);
 
                 // Set hook timeout
                 const timeoutPromise = this.createTimeoutPromise(
@@ -523,11 +534,16 @@ export class FeatureExecutor {
                     `After feature hook timeout: ${hook.name}`
                 );
 
-                // Execute hook
+                // Execute hook (After hooks only take ExecutionContext)
+                const hookFn = hook.fn || hook.implementation;
+                // Cast to AfterHookFn since these are After feature hooks
                 await Promise.race([
-                    (hook.fn || hook.implementation)(hookContext),
+                    (hookFn as AfterHookFn)(hookContext),
                     timeoutPromise
                 ]);
+                
+                // Cleanup hook context
+                await hookContext.cleanup();
 
                 actionLogger.info(`After-feature hook completed: ${hook.name || 'Anonymous'} (${Date.now() - hookStartTime}ms)`);
 
@@ -922,7 +938,7 @@ export class FeatureExecutor {
             
             // Take screenshot of error state
             const browserManager = BrowserManager.getInstance();
-            const browser = browserManager.getBrowser();
+            const browser = await browserManager.getBrowser();
             if (browser) {
                 // Screenshot functionality will be handled by the page context
                 const screenshot = null; // TODO: Implement screenshot via page context

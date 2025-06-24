@@ -1,9 +1,12 @@
 import { CSBasePage } from '../../../src/core/pages/CSBasePage';
 import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement';
 import { CSWebElement } from '../../../src/core/elements/CSWebElement';
+import { Page } from '@playwright/test';
 
 export class LoginPage extends CSBasePage {
-    pageUrl = process.env['APP_BASE_URL'] || 'https://opensource-demo.orangehrmlive.com/web/index.php/auth/login';
+    protected get pageUrl(): string {
+        return process.env['APP_BASE_URL'] || 'https://opensource-demo.orangehrmlive.com/web/index.php/auth/login';
+    }
 
     @CSGetElement({
         locatorType: 'xpath',
@@ -21,7 +24,6 @@ export class LoginPage extends CSBasePage {
 
     @CSGetElement({
         locatorType: 'xpath',
-        // locatorValue: '//a[normalize-space(text())="Log On"]',
         locatorValue: '//button[@type="submit" or @name="submit"]',
         description: 'Log On link'
     })
@@ -40,6 +42,10 @@ export class LoginPage extends CSBasePage {
         description: 'Welcome message with username'
     })
     private welcomeMessage!: CSWebElement;
+
+    protected async waitForPageLoad(): Promise<void> {
+        await this.page.waitForLoadState('networkidle');
+    }
 
     async enterUsername(username: string) {
         await this.usernameInput.fill(username);
@@ -63,9 +69,5 @@ export class LoginPage extends CSBasePage {
         if (welcomeText !== expectedUsername) {
             throw new Error(`Expected welcome message to contain ${expectedUsername} but found ${welcomeText}`);
         }
-    }
-
-    async waitForPageLoad() {
-        await this.page.waitForLoadState('networkidle');
     }
 } 

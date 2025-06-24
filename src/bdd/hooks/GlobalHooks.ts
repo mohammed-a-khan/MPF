@@ -20,7 +20,7 @@ import { PerformanceCollector } from '../../reporting/collectors/PerformanceColl
 import { MetricsCollector } from '../../reporting/collectors/MetricsCollector';
 import { NetworkCollector } from '../../reporting/collectors/NetworkCollector';
 import { ProxyConfig } from '../../core/proxy/ProxyConfig';
-import { Feature, Scenario } from '../types/bdd.types';
+import { Feature, Scenario, HookType } from '../types/bdd.types';
 import * as path from 'path';
 
 /**
@@ -90,7 +90,7 @@ export class GlobalHooks {
 
     // Before All - Run once before all tests
     hookRegistry.registerHook(
-      'BeforeAll',
+      HookType.BeforeAll,
       async (context: ExecutionContext) => {
         ActionLogger.logInfo('Starting framework setup');
         this.startTime = Date.now();
@@ -121,7 +121,7 @@ export class GlobalHooks {
 
     // Before Each Feature - Run before each feature
     hookRegistry.registerHook(
-      'BeforeAll',
+      HookType.BeforeAll,
       async (_context: ExecutionContext) => {
         const feature = BDDContext.getInstance().getFeatureContext()?.getFeature();
         if (feature) {
@@ -139,7 +139,7 @@ export class GlobalHooks {
 
     // Before Each Scenario - Run before each scenario
     hookRegistry.registerHook(
-      'Before',
+      HookType.Before,
       async (context: ExecutionContext) => {
         const scenario = BDDContext.getInstance().getScenarioContext()?.getScenario();
         if (scenario) {
@@ -185,7 +185,7 @@ export class GlobalHooks {
 
     // After Each Scenario
     hookRegistry.registerHook(
-      'After',
+      HookType.After,
       async (context: ExecutionContext) => {
         const scenario = BDDContext.getInstance().getScenarioContext()?.getScenario();
         if (scenario) {
@@ -226,7 +226,7 @@ export class GlobalHooks {
 
     // After Each Feature
     hookRegistry.registerHook(
-      'AfterAll',
+      HookType.AfterAll,
       async (_context: ExecutionContext) => {
         const feature = BDDContext.getInstance().getFeatureContext()?.getFeature();
         if (feature) {
@@ -258,7 +258,7 @@ export class GlobalHooks {
 
     // After All - Run once after all tests
     hookRegistry.registerHook(
-      'AfterAll',
+      HookType.AfterAll,
       async (_context: ExecutionContext) => {
         ActionLogger.logInfo('Starting framework cleanup');
 
@@ -297,7 +297,7 @@ export class GlobalHooks {
 
     // Before Each Step
     hookRegistry.registerHook(
-      'BeforeStep',
+      HookType.BeforeStep,
       async (context: ExecutionContext) => {
         const currentStep = context.getMetadata('currentStep');
         if (currentStep) {
@@ -319,7 +319,7 @@ export class GlobalHooks {
 
     // After Each Step
     hookRegistry.registerHook(
-      'AfterStep',
+      HookType.AfterStep,
       async (context: ExecutionContext) => {
         const currentStep = context.getMetadata('currentStep');
         if (currentStep) {
@@ -360,7 +360,7 @@ export class GlobalHooks {
 
     // Emergency cleanup hook
     hookRegistry.registerHook(
-      'AfterAll',
+      HookType.AfterAll,
       async (_context: ExecutionContext) => {
         try {
           ActionLogger.logWarn('Running emergency cleanup');
@@ -660,7 +660,7 @@ export class GlobalHooks {
       }
 
       // Clear storage if configured
-      const browserContext = context.getBrowserContext();
+      const browserContext = context.getContext();
       if (ConfigurationManager.getBoolean('CLEAR_STORAGE_AFTER_SCENARIO', true) && browserContext) {
         const storageManager = new StorageManager();
         await storageManager.clearAllStorage(browserContext);
@@ -771,12 +771,12 @@ export class GlobalHooks {
   exportConfiguration(): any {
     return {
       initialized: this.initialized,
-      registeredHooks: HookRegistry.getInstance().getHooks('BeforeAll').length +
-                      HookRegistry.getInstance().getHooks('Before').length +
-                      HookRegistry.getInstance().getHooks('BeforeStep').length +
-                      HookRegistry.getInstance().getHooks('AfterStep').length +
-                      HookRegistry.getInstance().getHooks('After').length +
-                      HookRegistry.getInstance().getHooks('AfterAll').length
+      registeredHooks: HookRegistry.getInstance().getHooks(HookType.BeforeAll).length +
+                      HookRegistry.getInstance().getHooks(HookType.Before).length +
+                      HookRegistry.getInstance().getHooks(HookType.BeforeStep).length +
+                      HookRegistry.getInstance().getHooks(HookType.AfterStep).length +
+                      HookRegistry.getInstance().getHooks(HookType.After).length +
+                      HookRegistry.getInstance().getHooks(HookType.AfterAll).length
     };
   }
 }

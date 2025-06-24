@@ -16,9 +16,10 @@ export class BrowserManager {
   private static instance: BrowserManager;
   private browser: Browser | null = null;
   private config: BrowserConfig | null = null;
-  private isInitializing: boolean = false; // CRITICAL FIX: Prevent concurrent initialization
-  private isInitialized: boolean = false; // CRITICAL FIX: Track initialization state
-  private initializationPromise: Promise<void> | null = null; // PERFORMANCE FIX: Reuse initialization promise
+  private isInitializing: boolean = false;
+  private isInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
+  private defaultContext: BrowserContext | null = null;
   private health: BrowserHealth = {
     isResponsive: true,
     isHealthy: true,
@@ -49,50 +50,77 @@ export class BrowserManager {
   }
 
   /**
-   * PERFORMANCE OPTIMIZED: Initialize browser manager with singleton protection
+   * Initialize browser manager with singleton protection
    */
-  async initialize(config?: BrowserConfig): Promise<void> {
-    // CRITICAL FIX: Prevent multiple concurrent initializations
+  async initialize(): Promise<void> {
     if (this.isInitialized) {
-      return; // Already initialized
-    }
-    
-    if (this.isInitializing && this.initializationPromise) {
-      // Wait for ongoing initialization to complete
-      return this.initializationPromise;
+      console.log('🔍 DEBUG: BrowserManager already initialized');
+      return;
     }
 
-    // Start initialization
-    this.isInitializing = true;
-    this.initializationPromise = this.performInitialization(config);
+    console.log('🔍 DEBUG: Initializing BrowserManager');
+    await this.createBrowser();
+    this.isInitialized = true;
+  }
+
+  private async createBrowser(): Promise<void> {
+    console.log('🔍 DEBUG: Creating browser');
+    
+    const browserType = process.env.BROWSER || 'chromium';
+    const options = this.buildLaunchOptions();
+    
+    console.log(`🔍 DEBUG: Launching ${browserType} with options:`, options);
     
     try {
-      await this.initializationPromise;
-      this.isInitialized = true;
-    } finally {
-      this.isInitializing = false;
+      switch (browserType.toLowerCase()) {
+        case 'firefox':
+          this.browser = await firefox.launch(options);
+          break;
+        case 'webkit':
+          this.browser = await webkit.launch(options);
+          break;
+        default:
+          this.browser = await chromium.launch(options);
+      }
+      
+      console.log('✅ Browser launched successfully');
+      
+    } catch (error) {
+      console.error('❌ Failed to launch browser:', error);
+      throw error;
     }
   }
 
   /**
-   * PERFORMANCE OPTIMIZED: Actual initialization logic
+   * Get current browser instance with validation
    */
-  private async performInitialization(config?: BrowserConfig): Promise<void> {
-    try {
-      // Use provided config or load from ConfigurationManager
-      this.config = config || this.loadConfigFromManager();
-      
-      // Launch browser ONLY if not already launched
-      if (!this.browser || !this.browser.isConnected()) {
-        await this.launchBrowser();
-      }
-      
-      // Start health monitoring (less frequent for performance)
-      this.startHealthMonitoring();
-      
-    } catch (error) {
-      throw error;
+  async getBrowser(): Promise<Browser> {
+    if (!this.browser) {
+      await this.initialize();
     }
+    
+    if (!this.browser) {
+      throw new Error('Browser not initialized');
+    }
+    
+    return this.browser;
+  }
+
+  /**
+   * Get default browser context
+   */
+  getDefaultContext(): BrowserContext {
+    if (!this.defaultContext) {
+      throw new Error('Browser context not initialized. Call initialize() first.');
+    }
+    return this.defaultContext;
+  }
+
+  /**
+   * Check if browser is healthy
+   */
+  isHealthy(): boolean {
+    return this.isInitialized && this.browser !== null;
   }
 
   /**
@@ -131,24 +159,14 @@ export class BrowserManager {
   }
 
   /**
-   * PERFORMANCE OPTIMIZED: Get current browser instance with validation
-   */
-  getBrowser(): Browser {
-    if (!this.browser || !this.browser.isConnected()) {
-      throw new Error('Browser is not initialized or has been disconnected. Call initialize() first.');
-    }
-    return this.browser;
-  }
-
-  /**
    * PERFORMANCE OPTIMIZED: Get or create browser context
    */
   async getContext(): Promise<BrowserContext> {
-    const browser = this.getBrowser();
+    const browser = await this.getBrowser();
     
     // Check if we have existing contexts
     const contexts = browser.contexts();
-    if (contexts.length > 0) {
+    if (contexts.length > 0 && contexts[0]) {
       // Return the first available context
       return contexts[0];
     }
@@ -156,10 +174,8 @@ export class BrowserManager {
     // Create new context with optimized settings
     const context = await browser.newContext({
       viewport: this.config?.viewport || { width: 1280, height: 720 },
-      ignoreHTTPSErrors: this.config?.ignoreHTTPSErrors || false,
-      // PERFORMANCE: Disable unnecessary features for speed
-      recordVideo: undefined, // Disable video recording by default
-      recordHar: undefined,   // Disable HAR recording by default
+      ignoreHTTPSErrors: this.config?.ignoreHTTPSErrors || false
+      // PERFORMANCE: video and HAR recording disabled by default
     });
     
     return context;
@@ -168,43 +184,21 @@ export class BrowserManager {
   /**
    * PERFORMANCE OPTIMIZED: Close browser with proper cleanup
    */
-  async closeBrowser(): Promise<void> {
-    try {
-      if (this.browser && this.browser.isConnected()) {
-        // Close all contexts first
-        const contexts = this.browser.contexts();
-        await Promise.all(contexts.map(context => context.close().catch(() => {})));
-        
-        // Close browser
-        await this.browser.close();
-        this.browser = null;
-      }
-    } catch (error) {
-      // Ignore errors during cleanup
-    } finally {
-      this.stopHealthMonitoring();
-      this.isInitialized = false;
-      this.initializationPromise = null;
+  async close(): Promise<void> {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
     }
+    this.isInitialized = false;
   }
 
   /**
    * PERFORMANCE OPTIMIZED: Restart browser
    */
   async restartBrowser(): Promise<void> {
-    await this.closeBrowser();
+    await this.close();
     await this.launchBrowser();
     this.health.restarts++;
-  }
-
-  /**
-   * Check if browser is healthy
-   */
-  isHealthy(): boolean {
-    if (!this.browser || !this.browser.isConnected()) {
-      return false;
-    }
-    return this.health.isHealthy;
   }
 
   /**
@@ -227,42 +221,11 @@ export class BrowserManager {
    */
   private buildLaunchOptions(): LaunchOptions {
     const options: LaunchOptions = {
-      headless: this.config?.headless ?? true,
-      slowMo: this.config?.slowMo ?? 0,
-      timeout: this.config?.timeout ?? 30000,
-      args: [
-        // PERFORMANCE: Optimized Chrome args for speed
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-features=TranslateUI',
-        '--disable-ipc-flooding-protection',
-        // Memory optimizations
-        '--memory-pressure-off',
-        '--max_old_space_size=4096'
-      ]
+      headless: process.env.HEADLESS === 'true' || process.env.headed === 'false',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      ignoreDefaultArgs: ['--enable-automation'],
+      timeout: 30000
     };
-
-    // Add proxy configuration if available
-    const proxyManager = ProxyManager.getInstance();
-    if (proxyManager.isEnabled()) {
-      const proxyConfig = proxyManager.getProxyConfig();
-      if (proxyConfig && proxyConfig.servers && proxyConfig.servers.length > 0) {
-        const firstProxy = proxyConfig.servers[0];
-        options.proxy = {
-          server: `${firstProxy.protocol}://${firstProxy.host}:${firstProxy.port}`,
-          username: firstProxy.auth?.username,
-          password: firstProxy.auth?.password
-        };
-      }
-    }
 
     return options;
   }
@@ -271,18 +234,24 @@ export class BrowserManager {
    * Load configuration from ConfigurationManager
    */
   private loadConfigFromManager(): BrowserConfig {
-    return {
-      browser: (ConfigurationManager.get('BROWSER_TYPE', 'chromium') as any),
-      headless: ConfigurationManager.getBoolean('BROWSER_HEADLESS', true), // Default to headless for performance
-      slowMo: ConfigurationManager.getNumber('BROWSER_SLOW_MO', 0),
-      timeout: ConfigurationManager.getNumber('BROWSER_TIMEOUT', 30000),
+    // Load configuration from environment files
+    const config = {
+      browser: (ConfigurationManager.get('BROWSER', 'chromium') as any),
+      headless: ConfigurationManager.getBoolean('HEADLESS', false),
+      slowMo: ConfigurationManager.getNumber('BROWSER_SLOW_MO', 0) || 0,
+      timeout: ConfigurationManager.getNumber('TIMEOUT', 30000) || 30000,
       viewport: {
-        width: ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1280),
-        height: ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 720)
+        width: ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920) || 1920,
+        height: ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 1080) || 1080
       },
       downloadsPath: ConfigurationManager.get('DOWNLOADS_PATH', './downloads'),
       ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false)
     };
+
+    // Log loaded configuration
+    ActionLogger.logInfo('Browser configuration loaded:', config);
+
+    return config;
   }
 
   /**
@@ -371,6 +340,13 @@ export class BrowserManager {
    * PERFORMANCE OPTIMIZED: Cleanup method
    */
   async cleanup(): Promise<void> {
-    await this.closeBrowser();
+    await this.close();
+  }
+
+  /**
+   * Alias for close() method for backward compatibility
+   */
+  async closeBrowser(): Promise<void> {
+    await this.close();
   }
 }

@@ -96,7 +96,7 @@ export class DataEncryptionManager {
         const processedRecord = await this.processRecord(record);
         processedData.push(processedRecord);
       } catch (error) {
-        this.logger.error('Failed to process test data record', error);
+        this.logger.error('Failed to process test data record', error instanceof Error ? error : new Error(String(error)));
         // Keep original record if processing fails
         processedData.push(record);
       }
@@ -128,7 +128,7 @@ export class DataEncryptionManager {
             processedRecord[key] = value; // Keep encrypted value
           }
         } catch (error) {
-          this.logger.error(`Error decrypting field ${key}:`, error);
+          this.logger.error(`Error decrypting field ${key}:`, error instanceof Error ? error : new Error(String(error)));
           processedRecord[key] = value; // Keep encrypted value
         }
       } else {
@@ -163,7 +163,7 @@ export class DataEncryptionManager {
         const encryptedRecord = await this.encryptRecord(record);
         encryptedData.push(encryptedRecord);
       } catch (error) {
-        this.logger.error('Failed to encrypt test data record', error);
+        this.logger.error('Failed to encrypt test data record', error instanceof Error ? error : new Error(String(error)));
         // Keep original record if encryption fails
         encryptedData.push(record);
       }
@@ -190,7 +190,7 @@ export class DataEncryptionManager {
           encryptedRecord[key] = encrypted;
           this.logger.debug(`Encrypted field: ${key}`);
         } catch (error) {
-          this.logger.error(`Error encrypting field ${key}:`, error);
+          this.logger.error(`Error encrypting field ${key}:`, error instanceof Error ? error : new Error(String(error)));
           encryptedRecord[key] = value; // Keep original value
         }
       } else {

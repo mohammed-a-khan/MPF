@@ -1,88 +1,46 @@
-import { CSBasePage } from '../../../src/core/pages/CSBasePage';
-import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement';
-import { CSWebElement } from '../../../src/core/elements/CSWebElement';
+import { Page } from '@playwright/test';
 
-export class NavigationPage extends CSBasePage {
-    pageUrl = '';
+export class NavigationPage {
+    private page: Page;
 
-    @CSGetElement({
-        locatorType: 'xpath',
-        locatorValue: '//div[@id="abcdNavigatorBody"]',
-        description: 'Navigation menu container'
-    })
-    private navigationMenu!: CSWebElement;
-
-    @CSGetElement({
-        locatorType: 'xpath',
-        locatorValue: '//span[text()="System Admin"]',
-        description: 'System Admin menu item'
-    })
-    private systemAdminMenuItem!: CSWebElement;
-
-    @CSGetElement({
-        locatorType: 'xpath',
-        locatorValue: '//span[text()="Add files"]',
-        description: 'Add files text for File Upload page'
-    })
-    private addFilesText!: CSWebElement;
-
-    private readonly menuItems = [
-        'Home', 'ESSS/Series', 'Reference Interests', 'Interest History',
-        'External Interests', 'Version Information', 'File Upload'
-    ];
-
-    private getMenuItem(menuItem: string): CSWebElement {
-        return new CSWebElement(this.page, {
-            locatorType: 'xpath',
-            locatorValue: `//div[@id="abcdNavigatorBody"]//a[text()="${menuItem}"]`,
-            description: `Menu item: ${menuItem}`
-        });
+    constructor() {
+        this.page = null as any;
     }
 
-    private getHeader(expectedHeader: string): CSWebElement {
-        return new CSWebElement(this.page, {
-            locatorType: 'xpath',
-            locatorValue: `//h1[text()="${expectedHeader}"]`,
-            description: `Page header: ${expectedHeader}`
-        });
+    async initialize(page: Page) {
+        this.page = page;
     }
 
     async verifyMenuItem(menuItem: string) {
-        if (menuItem === 'System Admin') {
-            await this.systemAdminMenuItem.waitFor({ state: 'visible' });
-        } else {
-            const menuItemElement = this.getMenuItem(menuItem);
-            await menuItemElement.waitFor({ state: 'visible' });
-        }
+        await this.page.waitForSelector(`.oxd-main-menu-item span:text("${menuItem}")`, { state: 'visible' });
     }
 
     async clickMenuItem(menuItem: string) {
-        if (menuItem === 'System Admin') {
-            await this.systemAdminMenuItem.click();
-        } else {
-            const menuItemElement = this.getMenuItem(menuItem);
-            await menuItemElement.click();
-        }
+        await this.page.click(`.oxd-main-menu-item span:text("${menuItem}")`);
     }
 
     async verifyHeader(expectedHeader: string) {
-        if (expectedHeader === 'File Upload') {
-            await this.addFilesText.waitFor({ state: 'visible' });
-        } else {
-            const headerElement = this.getHeader(expectedHeader);
-            await headerElement.waitFor({ state: 'visible' });
-        }
+        await this.page.waitForSelector(`.oxd-topbar-header-breadcrumb h6:text("${expectedHeader}")`, { state: 'visible' });
     }
 
     async verifyAllMenuItems() {
-        // First verify the navigation menu container is present
-        await this.navigationMenu.waitFor({ state: 'visible' });
-        
-        // Then verify all menu items
-        for (const menuItem of this.menuItems) {
+        const menuItems = [
+            'Admin',
+            'PIM',
+            'Leave',
+            'Time',
+            'Recruitment',
+            'My Info',
+            'Performance',
+            'Dashboard',
+            'Directory',
+            'Maintenance',
+            'Buzz'
+        ];
+
+        for (const menuItem of menuItems) {
             await this.verifyMenuItem(menuItem);
         }
-        await this.systemAdminMenuItem.waitFor({ state: 'visible' });
     }
 
     async waitForPageLoad() {

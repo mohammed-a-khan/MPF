@@ -1,6 +1,7 @@
 import { stepRegistry } from './StepRegistry';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
+import { HookType } from '../types/bdd.types';
 
 export interface StepDefinitionOptions {
   timeout?: number;
@@ -9,56 +10,37 @@ export interface StepDefinitionOptions {
 }
 
 /**
- * Decorator for marking methods as step definitions
- * @param pattern Gherkin pattern that this step will match
- * @param options Optional configuration for the step
+ * Decorator for marking a method as a step definition
  */
 export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionOptions) {
-  return function <T extends (...args: any[]) => any>(
-    target: any, 
-    propertyKey: string | symbol, 
-    descriptor: TypedPropertyDescriptor<T>
-  ): TypedPropertyDescriptor<T> | void {
-    // Get the descriptor if it's not provided (for compatibility with different TypeScript versions)
-    const methodDescriptor = descriptor || Object.getOwnPropertyDescriptor(target, propertyKey) as TypedPropertyDescriptor<T>;
+  return function (target: any, propertyKey: string, methodDescriptor: PropertyDescriptor) {
+    console.log(`🔍 DEBUG: CSBDDStepDef decorator called for method: ${propertyKey}`);
     
-    if (!methodDescriptor) {
-      throw new Error(`Cannot find descriptor for method ${String(propertyKey)}`);
-    }
-    
+    // Get original method
     const originalMethod = methodDescriptor.value;
     
-    if (typeof originalMethod !== 'function') {
-      throw new Error(`@CSBDDStepDef can only be applied to methods`);
-    }
-    
-    // Extract parameter count from method
-    const paramCount = originalMethod.length;
+    // Get file and line information
+    const filePath = target.constructor.filePath || 'unknown';
+    const line = target.constructor.line || 0;
     
     // Create step definition metadata
     const stepDefinition = {
-      pattern: pattern,
-      method: originalMethod,
-      methodName: String(propertyKey),
-      className: target.constructor.name,
-      parameterCount: paramCount,
-      timeout: options?.timeout,
-      retry: options?.retry || 0,
-      location: `${target.constructor.name}.${String(propertyKey)}`,
-      isAsync: isAsyncFunction(originalMethod)
+      pattern,
+      implementation: originalMethod,
+      location: `${filePath}:${line}`,
+      options
     };
     
-    // Create metadata for step registration
+    // Get metadata for registration
     const metadata = {
-      filePath: `${target.constructor.name}.ts`,
-      line: 0, // Line number not available at runtime
+      file: filePath,
+      line,
       timeout: options?.timeout,
-      className: target.constructor.name,
-      methodName: String(propertyKey)
+      retry: options?.retry,
+      wrapperOptions: options?.wrapperOptions
     };
     
-    // Register the step definition
-    console.log(`🔍 DEBUG: CSBDDStepDef decorator registering step: ${pattern.toString()} -> ${stepDefinition.location}`);
+    // Register step with registry
     stepRegistry.registerStep(pattern, originalMethod, metadata);
     console.log(`🔍 DEBUG: Step registered successfully: ${pattern.toString()}`);
     
@@ -81,7 +63,7 @@ export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionO
 export function Before(options?: { tags?: string; order?: number; timeout?: number }) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const hook = {
-      type: 'before' as const,
+      type: HookType.Before,
       method: descriptor.value,
       methodName: String(propertyKey),
       className: target.constructor.name,
@@ -110,7 +92,7 @@ export function Before(options?: { tags?: string; order?: number; timeout?: numb
       registerOptions.timeout = options.timeout;
     }
     
-    stepRegistry.registerHook('Before', descriptor.value, registerOptions);
+    stepRegistry.registerHook(HookType.Before, descriptor.value, registerOptions);
     Logger.getInstance().debug(`Registered Before hook: ${hook.location}`);
   };
 }
@@ -121,7 +103,7 @@ export function Before(options?: { tags?: string; order?: number; timeout?: numb
 export function After(options?: { tags?: string; order?: number; timeout?: number }) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const hook = {
-      type: 'after' as const,
+      type: HookType.After,
       method: descriptor.value,
       methodName: String(propertyKey),
       className: target.constructor.name,
@@ -150,7 +132,7 @@ export function After(options?: { tags?: string; order?: number; timeout?: numbe
       registerOptions.timeout = options.timeout;
     }
     
-    stepRegistry.registerHook('After', descriptor.value, registerOptions);
+    stepRegistry.registerHook(HookType.After, descriptor.value, registerOptions);
     Logger.getInstance().debug(`Registered After hook: ${hook.location}`);
   };
 }
@@ -161,7 +143,7 @@ export function After(options?: { tags?: string; order?: number; timeout?: numbe
 export function BeforeStep(options?: { tags?: string; order?: number; timeout?: number }) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const hook = {
-      type: 'beforeStep' as const,
+      type: HookType.BeforeStep,
       method: descriptor.value,
       methodName: String(propertyKey),
       className: target.constructor.name,
@@ -190,7 +172,7 @@ export function BeforeStep(options?: { tags?: string; order?: number; timeout?: 
       registerOptions.timeout = options.timeout;
     }
     
-    stepRegistry.registerHook('BeforeStep', descriptor.value, registerOptions);
+    stepRegistry.registerHook(HookType.BeforeStep, descriptor.value, registerOptions);
     Logger.getInstance().debug(`Registered BeforeStep hook: ${hook.location}`);
   };
 }
@@ -201,7 +183,7 @@ export function BeforeStep(options?: { tags?: string; order?: number; timeout?: 
 export function AfterStep(options?: { tags?: string; order?: number; timeout?: number }) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const hook = {
-      type: 'afterStep' as const,
+      type: HookType.AfterStep,
       method: descriptor.value,
       methodName: String(propertyKey),
       className: target.constructor.name,
@@ -230,7 +212,7 @@ export function AfterStep(options?: { tags?: string; order?: number; timeout?: n
       registerOptions.timeout = options.timeout;
     }
     
-    stepRegistry.registerHook('AfterStep', descriptor.value, registerOptions);
+    stepRegistry.registerHook(HookType.AfterStep, descriptor.value, registerOptions);
     Logger.getInstance().debug(`Registered AfterStep hook: ${hook.location}`);
   };
 }

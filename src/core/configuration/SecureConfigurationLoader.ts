@@ -45,7 +45,7 @@ export class SecureConfigurationLoader {
         // Initialize encryption configuration
         EncryptionConfigurationManager.initializeEncryption({
           enabled: true,
-          internalKey: internalKey
+          internalKey: internalKey || ''
         });
 
         if (validateEncryption) {
@@ -72,7 +72,7 @@ export class SecureConfigurationLoader {
       this.isInitialized = true;
 
     } catch (error) {
-      this.logger.error('Failed to initialize secure configuration', error);
+      this.logger.error('Failed to initialize secure configuration', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -149,7 +149,7 @@ export class SecureConfigurationLoader {
         success: testResult.success && testResult.decrypted === value
       };
     } catch (error) {
-      this.logger.error('Encryption test failed', error);
+      this.logger.error('Encryption test failed', error instanceof Error ? error : new Error(String(error)));
       return {
         encrypted: '',
         decrypted: '',
@@ -190,7 +190,7 @@ export class SecureConfigurationLoader {
     
     const allConfig = ConfigurationManager.getAll();
     const encryptedKeys = Object.keys(allConfig).filter(key => 
-      allConfig[key].startsWith('ENCRYPTED:')
+      allConfig[key] && typeof allConfig[key] === 'string' && allConfig[key].startsWith('ENCRYPTED:')
     );
     
     const cacheStats = EncryptionConfigurationManager.getDecryptionCacheStats();
@@ -311,8 +311,8 @@ export class SecureConfig extends SecureConfigurationLoader {
  */
 export async function initializeSecureConfig(environment?: string, internalKey?: string): Promise<void> {
   await SecureConfigurationLoader.initialize({
-    environment,
-    internalKey,
+    environment: environment || 'default',
+    internalKey: internalKey || '',
     enableEncryption: true,
     validateEncryption: true
   });

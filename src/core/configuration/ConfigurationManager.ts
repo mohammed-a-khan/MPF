@@ -102,7 +102,10 @@ export class ConfigurationManager {
    */
   private static async loadLegacyConfiguration(environment: string, options?: Partial<ConfigurationOptions>): Promise<ConfigMap> {
     try {
-      return await ConfigurationManager.environmentLoader.loadEnvironmentFiles(environment);
+      // Only load global.env and other .env files except environment-specific ones
+      const config = await ConfigurationManager.environmentLoader.loadGlobalConfig();
+      console.log('✅ Loaded global configuration');
+      return config;
     } catch (error) {
       console.log(`⚠️  Legacy configuration loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return {};
@@ -113,9 +116,9 @@ export class ConfigurationManager {
    * Infer project from environment name or use default
    */
   private static inferProjectFromEnvironment(environment: string): string {
-    // You can add logic here to infer project from environment
-    // For now, default to 'saucedemo'
-    return 'saucedemo';
+    // Extract project name from environment or use default
+    const projectMatch = environment.match(/^([a-zA-Z0-9-_]+)[-_]?/);
+    return projectMatch && projectMatch[1] ? projectMatch[1] : 'akhan';
   }
 
   /**
@@ -131,7 +134,7 @@ export class ConfigurationManager {
       environment: {
         name: config['ENVIRONMENT_NAME'] || 'unknown',
         baseURL: config['BASE_URL'] || '',
-        apiBaseURL: config['API_BASE_URL']
+        apiBaseURL: config['API_BASE_URL'] || ''
       },
       
       // Browser settings
@@ -169,7 +172,7 @@ export class ConfigurationManager {
         validateSSL: ConfigurationManager.parseBoolean(config['API_VALIDATE_SSL']) !== false,
         logRequestBody: ConfigurationManager.parseBoolean(config['API_LOG_REQUEST_BODY']) || false,
         logResponseBody: ConfigurationManager.parseBoolean(config['API_LOG_RESPONSE_BODY']) || false,
-        baseURL: config['API_BASE_URL'],
+        baseURL: config['API_BASE_URL'] || '',
         headers: config['API_DEFAULT_HEADERS'] ? JSON.parse(config['API_DEFAULT_HEADERS']) : undefined
       },
       

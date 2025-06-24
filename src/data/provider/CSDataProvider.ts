@@ -34,6 +34,7 @@ export class CSDataProvider {
     private cleanupManager: DataCleanupManager;
     private loadedData: Map<string, TestData[]> = new Map();
     private config: DataProviderConfig;
+    private testData: Map<string, TestData[]>;
 
     private constructor() {
         this.cache = DataCache.getInstance();
@@ -52,6 +53,8 @@ export class CSDataProvider {
         DataEncryptionManager.initialize({
             enableAutoDecryption: true
         });
+
+        this.testData = new Map();
     }
 
     /**
@@ -696,5 +699,28 @@ export class CSDataProvider {
         }
         
         // Cache instance handles its own size limiting internally
+    }
+
+    async loadTestData(scenarioId: string): Promise<TestData[]> {
+        try {
+            // For now, just return empty array
+            // In the future, implement actual test data loading
+            return [];
+        } catch (error) {
+            ActionLogger.logError(`Failed to load test data for scenario: ${scenarioId}`, error as Error);
+            return [];
+        }
+    }
+
+    setTestData(scenarioId: string, data: TestData[]): void {
+        this.testData.set(scenarioId, data);
+    }
+
+    getTestData(scenarioId: string): TestData[] {
+        return this.testData.get(scenarioId) || [];
+    }
+
+    clearTestData(): void {
+        this.testData.clear();
     }
 }

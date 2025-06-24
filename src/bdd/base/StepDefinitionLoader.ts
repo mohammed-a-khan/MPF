@@ -3,9 +3,12 @@
 import 'reflect-metadata';
 import { Logger } from '../../core/utils/Logger';
 import { CSBDDBaseStepDefinition } from './CSBDDBaseStepDefinition';
-import { stepRegistry } from '../decorators/StepRegistry';
-import * as glob from 'glob';
+import { stepRegistry } from '../decorators/StepRegistryInstance';
+import { glob } from 'glob';
 import * as path from 'path';
+import * as fs from 'fs/promises';
+import { ActionLogger } from '../../core/logging/ActionLogger';
+import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 
 type StepDefinitionClass = new () => CSBDDBaseStepDefinition;
 
@@ -19,9 +22,12 @@ export class StepDefinitionLoader {
     private readonly stepDefinitionMethods = new Map<string, string>();
     private readonly stepDefinitionRegexps = new Map<string, RegExp>();
     private readonly stepDefinitionInstances = new Map<string, CSBDDBaseStepDefinition>();
+    private logger: Logger;
+    private loadedFiles: Set<string> = new Set();
+    private isInitialized = false;
 
     private constructor() {
-        // Private constructor to prevent instantiation
+        this.logger = Logger.getInstance('StepDefinitionLoader');
     }
 
     /**
@@ -32,6 +38,20 @@ export class StepDefinitionLoader {
             this.instance = new StepDefinitionLoader();
         }
         return this.instance;
+    }
+
+    /**
+     * Initialize the loader
+     */
+    public async initialize(): Promise<void> {
+        if (this.isInitialized) {
+            console.log('🔍 DEBUG: StepDefinitionLoader already initialized');
+            return;
+        }
+
+        console.log('🔍 DEBUG: Initializing StepDefinitionLoader');
+        await this.loadAllStepDefinitions();
+        this.isInitialized = true;
     }
 
     /**
@@ -101,110 +121,64 @@ export class StepDefinitionLoader {
             '**/test/**/steps/**/*.ts',
             '**/test/**/step/**/*.ts',
             '**/src/steps/**/*.ts',
-            '**/src/**/steps/**/*.ts'
+            '**/src/**/steps/**/*.ts',
+            '**/test/akhan/steps/*.steps.ts',
+            '**/test/akhan/steps/*.step.ts'
         ];
         
-        const files = new Set<string>();
-        
-        console.log('🔍 DEBUG: Searching for step files with patterns:', patterns);
-        
-        for (const pattern of patterns) {
-            try {
-                console.log(`🔍 DEBUG: Searching with pattern: ${pattern}`);
-                const matches = glob.sync(pattern, {
-                    ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
-                    absolute: true
-                });
-                
-                console.log(`🔍 DEBUG: Pattern ${pattern} found ${matches.length} files:`);
-                matches.forEach((file, index) => {
-                    console.log(`  ${index + 1}. ${file}`);
-                });
-                
-                matches.forEach(file => {
-                    const normalizedPath = path.normalize(file);
-                    files.add(normalizedPath);
-                    StepDefinitionLoader.logger.debug(`Found step file: ${normalizedPath}`);
-                });
-            } catch (error) {
-                StepDefinitionLoader.logger.warn(`Failed to find files for pattern ${pattern}:`, error);
-                console.error(`🔍 DEBUG: Error with pattern ${pattern}:`, error);
-            }
-        }
-        
-        const allFiles = Array.from(files);
-        console.log(`🔍 DEBUG: Total unique files found: ${allFiles.length}`);
-        allFiles.forEach((file, index) => {
-            console.log(`  ${index + 1}. ${file}`);
-        });
-        
-        return allFiles;
+        const files = await Promise.all(patterns.map(async pattern => {
+            const matches = await glob(pattern, { 
+                ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
+                cwd: process.cwd(),
+                absolute: true
+            });
+            return matches;
+        }));
+
+        return Array.from(new Set(files.flat()));
     }
 
     /**
      * Load step definition file
      */
     private async loadStepFile(filePath: string): Promise<void> {
-        console.log(`🔍 DEBUG: About to load file: ${filePath}`);
-        
-        // Check if file is already loaded to prevent duplicate registrations
-        if (stepRegistry.isFileLoaded(filePath)) {
-            console.log(`🔍 DEBUG: File already loaded, skipping: ${filePath}`);
+        if (this.loadedFiles.has(filePath)) {
             return;
         }
-        
+
         try {
-            console.log(`🔍 DEBUG: Loading step file: ${filePath}`);
+            this.logger.debug(`Loading step file: ${filePath}`);
             
-            // Convert to absolute path
-            const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
-            console.log(`🔍 DEBUG: Absolute path: ${absolutePath}`);
+            // Import the file to trigger decorators
+            const module = await import(filePath);
             
-            // Use require.resolve to get the actual file path
-            const resolvedPath = require.resolve(absolutePath);
-            console.log(`🔍 DEBUG: Resolved path: ${resolvedPath}`);
+            // Wait for next tick to ensure decorators are applied
+            await new Promise(resolve => setTimeout(resolve, 0));
             
-            // Clear require cache for this file to ensure fresh load
-            delete require.cache[resolvedPath];
-            
-            console.log(`🔍 DEBUG: Using require() for: ${resolvedPath}`);
-            
-            // Get step registry stats before loading
-            const statsBefore = stepRegistry.getStats();
-            console.log(`🔍 DEBUG: Step registry stats before loading ${filePath}:`, JSON.stringify(statsBefore, null, 2));
-            
-            // Use synchronous require
-            require(resolvedPath);
-            
-            // Mark file as loaded
-            stepRegistry.markFileLoaded(filePath);
-            
-            console.log(`🔍 DEBUG: Successfully required ${resolvedPath}`);
-            
-            // Get step registry stats after loading
-            const statsAfter = stepRegistry.getStats();
-            console.log(`🔍 DEBUG: Step registry stats after loading ${filePath}:`, JSON.stringify(statsAfter, null, 2));
-            console.log(`🔍 DEBUG: StepRegistry stats AFTER loading ${filePath}:`, JSON.stringify(statsAfter, null, 2));
-            
-            // Verify that decorators executed by checking if step count increased
-            if (statsAfter.totalSteps === statsBefore.totalSteps) {
-                console.warn(`⚠️ WARNING: No new steps registered from ${filePath}. This might indicate decorator execution issues.`);
-            } else {
-                console.log(`✅ SUCCESS: ${statsAfter.totalSteps - statsBefore.totalSteps} new steps registered from ${filePath}`);
+            // Check if the module exports any classes with step definitions
+            for (const exportKey in module) {
+                const exportedItem = module[exportKey];
+                if (typeof exportedItem === 'function' && exportedItem.prototype) {
+                    // Check if this is a class with step definitions
+                    const hasStepDefs = Reflect.getMetadata('stepDefinitions', exportedItem.prototype) || 
+                                      Reflect.getMetadata('hooks', exportedItem.prototype);
+                    
+                    if (hasStepDefs) {
+                        // Create an instance of the class to trigger decorators
+                        const instance = new exportedItem();
+                        this.logger.debug(`Created instance of class ${exportKey} from ${filePath}`);
+                    }
+                }
             }
             
+            this.loadedFiles.add(filePath);
+            stepRegistry.markFileLoaded(filePath);
+            
+            this.logger.debug(`Successfully loaded step file: ${filePath}`);
+            
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const errorStack = error instanceof Error ? error.stack : '';
-            
-            console.error(`❌ ERROR loading step file ${filePath}:`, {
-                message: errorMessage,
-                stack: errorStack,
-                filePath
-            });
-            
-            // Don't throw the error, just log it and continue with other files
-            // This prevents one bad file from stopping the entire step loading process
+            this.logger.error(`Failed to load step file ${filePath}: ${error}`);
+            throw error;
         }
     }
 
@@ -256,8 +230,72 @@ export class StepDefinitionLoader {
         this.stepDefinitionMethods.clear();
         this.stepDefinitionRegexps.clear();
         this.stepDefinitionInstances.clear();
-        // Also reset the stepRegistry
-        stepRegistry.clear();
+        this.loadedFiles.clear();
         StepDefinitionLoader.logger.info('Step definition loader reset');
+    }
+
+    async loadStepDefinitions(projectPath: string): Promise<void> {
+        this.logger.info(`Loading step definitions from: ${projectPath}`);
+        
+        try {
+            // Load step definition files
+            const stepsDir = path.join(projectPath, 'steps');
+            await this.loadStepsFromDirectory(stepsDir);
+            
+            const stats = stepRegistry.getStats();
+            this.logger.info(`Loaded ${stats.totalSteps} step definitions`);
+            
+        } catch (error) {
+            this.logger.error(`Failed to load step definitions: ${error}`);
+            throw error;
+        }
+    }
+
+    private async loadStepsFromDirectory(directory: string): Promise<void> {
+        try {
+            const files = await fs.readdir(directory);
+            for (const file of files) {
+                const filePath = path.join(directory, file);
+                const stat = await fs.stat(filePath);
+                
+                if (stat.isDirectory()) {
+                    await this.loadStepsFromDirectory(filePath);
+                } else if (file.endsWith('.ts') || file.endsWith('.js')) {
+                    await this.loadStepFile(filePath);
+                }
+            }
+        } catch (error) {
+            // Directory might not exist, which is fine
+            this.logger.debug(`Directory not found or error reading: ${directory}`);
+        }
+    }
+
+    async loadAllStepDefinitions(): Promise<void> {
+        console.log('🔍 DEBUG: Loading all step definitions');
+        
+        try {
+            const files = await this.findStepFiles();
+            console.log(`🔍 DEBUG: Found ${files.length} step definition files`);
+            
+            for (const file of files) {
+                try {
+                    console.log(`🔍 DEBUG: Loading step definitions from ${file}`);
+                    await import(file);
+                } catch (error) {
+                    console.error(`❌ Failed to load step definitions from ${file}:`, error);
+                }
+            }
+
+            const stats = stepRegistry.getStats();
+            console.log(`🔍 DEBUG: Loaded ${stats.totalSteps} step definitions`);
+            
+        } catch (error) {
+            console.error('❌ Failed to load step definitions:', error);
+            throw error;
+        }
+    }
+
+    isLoaded(): boolean {
+        return this.isInitialized;
     }
 }

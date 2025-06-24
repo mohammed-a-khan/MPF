@@ -294,7 +294,7 @@ export class PDFExporter {
       const { BrowserManager } = await import('../../core/browser/BrowserManager');
       const browserManager = BrowserManager.getInstance();
       
-      this.browser = browserManager.getBrowser();
+      this.browser = await browserManager.getBrowser();
       if (!this.browser || !this.browser.isConnected()) {
         throw new Error('No active browser available for PDF generation');
       }

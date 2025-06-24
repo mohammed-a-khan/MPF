@@ -166,6 +166,9 @@ export class CSBDDRunner {
                 throw initError;
             }
 
+            // Lock step registry before test execution
+            stepRegistry.lock();
+
             // Discover tests
             let executionPlan: ExecutionPlan;
             try {
@@ -514,7 +517,12 @@ export class CSBDDRunner {
             this.executionProfile = await this.analyzeTestExecutionProfile(options);
             logger.info('✅ Test execution profile analyzed');
 
-            // 5. Load step definitions conditionally based on test execution profile
+            // 5. Initialize and unlock step registry
+            logger.info('🔍 Initializing step registry...');
+            stepRegistry.initialize();
+            stepRegistry.unlock();
+
+            // 6. Load step definitions conditionally based on test execution profile
             console.log('🔍 DEBUG: About to create StepDefinitionLoader instance');
             const stepLoader = StepDefinitionLoader.getInstance();
             console.log('🔍 DEBUG: StepDefinitionLoader instance created, about to call loadStepDefinitionsConditionally()');
@@ -528,7 +536,7 @@ export class CSBDDRunner {
             console.log(`🔍 DEBUG: Step count from registry: ${stepCount}`);
             logger.info('Step definitions loaded conditionally - Total steps: ' + stepCount);
 
-            // 6. Initialize browser ONLY if required (CONDITIONAL INITIALIZATION)
+            // 7. Initialize browser ONLY if required (CONDITIONAL INITIALIZATION)
             if (this.executionProfile.componentInitialization.browser) {
                 logger.info('🖥️  Browser required - initializing browser...');
                 const browserConfig = {
@@ -554,7 +562,7 @@ export class CSBDDRunner {
                         logger.info('✅ Browser already initialized and healthy - reusing existing browser');
                     } else {
                         logger.info('🚀 Initializing browser...');
-                        await browserManager.initialize(browserConfig);
+                        await browserManager.initialize();
                         logger.info('✅ Browser instance ready for test execution');
                     }
                 } catch (error) {
@@ -586,7 +594,7 @@ export class CSBDDRunner {
                 logger.info(`📸 Screenshot mode set to: ${screenshotMode}`);
             }
 
-            // 6. Initialize report manager
+            // 8. Initialize report manager
             const reportConfig = new ReportConfig();
             await reportConfig.load({
                 outputDir: options['reportPath'] || ConfigurationManager.get('REPORT_PATH', './reports'),
@@ -603,7 +611,7 @@ export class CSBDDRunner {
             } as any);
             await this.reportOrchestrator.initialize(reportConfig);
 
-            // 7. Initialize ADO integration if enabled (check both config and runtime options)
+            // 9. Initialize ADO integration if enabled (check both config and runtime options)
             const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false);
             const adoRuntimeEnabled = options.adoEnabled !== false; // Default to true unless explicitly disabled
             
@@ -620,7 +628,7 @@ export class CSBDDRunner {
                 logger.info('ADO integration disabled - skipping initialization');
             }
 
-            // 8. Execute global before hooks
+            // 10. Execute global before hooks
             await this.hookExecutor.executeBeforeHooks({} as any);
 
             logger.info('Framework Initialization - Initialization completed');
@@ -893,7 +901,7 @@ export class CSBDDRunner {
             await this.hookExecutor.executeAfterHooks({} as any);
 
             // Close browsers - SINGLE BROWSER ONLY (no pool)
-            await BrowserManager.getInstance().closeBrowser();
+            await BrowserManager.getInstance().close();
 
             // Reset and reinitialize ADO service only if ADO is enabled
             const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false);
@@ -1177,7 +1185,7 @@ export class CSBDDRunner {
                 environment: result.environment || 'default'
             },
             features: result.features.map((f, index) => {
-                const feature = result.features[index];
+                const feature = result.features[index] || f;
                 const scenarios = (f.scenarios || []).map(s => ({
                     scenarioId: s.id || '',
                     name: s.scenario || '',
@@ -1584,7 +1592,7 @@ export class CSBDDRunner {
         if (!message) return null;
         
         const levelMatches = message.match(/\[(ERROR|WARN|INFO|DEBUG|TRACE)\]/i);
-        if (levelMatches) {
+        if (levelMatches && levelMatches[1]) {
             return levelMatches[1].toLowerCase();
         }
         
@@ -1604,7 +1612,7 @@ export class CSBDDRunner {
         const categoryMatches = message.match(/\[([A-Z_][A-Z0-9_]*)\]/g);
         if (categoryMatches && categoryMatches.length > 1) {
             // Return the second bracket content (first is usually log level)
-            const category = categoryMatches[1].replace(/[\[\]]/g, '').toLowerCase();
+            const category = categoryMatches[1] ? categoryMatches[1].replace(/[\[\]]/g, '').toLowerCase() : 'general';
             return category;
         }
         
@@ -1679,7 +1687,7 @@ export class CSBDDRunner {
             // Force close all browsers
             // BrowserPool permanently disabled - using single browser only
             if (BrowserManager.getInstance()) {
-                await BrowserManager.getInstance().closeBrowser();
+                await BrowserManager.getInstance().close();
             }
 
             // Save any pending logs

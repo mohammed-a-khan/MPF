@@ -522,7 +522,14 @@ export interface Attachment {
 /**
  * Hook types
  */
-export type HookType = 'Before' | 'After' | 'BeforeStep' | 'AfterStep' | 'BeforeAll' | 'AfterAll';
+export enum HookType {
+  Before = 'Before',
+  After = 'After',
+  BeforeStep = 'BeforeStep',
+  AfterStep = 'AfterStep',
+  BeforeAll = 'BeforeAll',
+  AfterAll = 'AfterAll'
+}
 
 /**
  * Hook structure
@@ -535,10 +542,10 @@ export interface Hook {
   name: string;
   
   /** Hook implementation */
-  implementation: Function;
+  implementation: HookFn;
   
   /** Hook function (alias for implementation) */
-  fn?: Function;
+  fn?: HookFn;
   
   /** Execution order */
   order?: number;

@@ -501,7 +501,7 @@ export class CSFramework {
 
             if (this.browserManager) {
                 cleanupPromises.push(this.cleanupComponent('BrowserManager', async () => {
-                    await this.browserManager?.closeBrowser();
+                    await this.browserManager?.close();
                     this.browserManager = null;
                 }));
                 componentNames.push('BrowserManager');

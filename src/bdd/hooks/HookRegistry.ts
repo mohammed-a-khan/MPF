@@ -1,6 +1,6 @@
 // src/bdd/hooks/HookRegistry.ts
 
-import { Hook, HookType } from '../types/bdd.types';
+import { Hook, HookType, HookFn } from '../types/bdd.types';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { TagParser } from '../parser/TagParser';
@@ -63,12 +63,12 @@ export class HookRegistry {
    */
   private initializeHookTypes(): void {
     const hookTypes: HookType[] = [
-      'Before',
-      'After',
-      'BeforeStep',
-      'AfterStep',
-      'BeforeAll',
-      'AfterAll'
+      HookType.Before,
+      HookType.After,
+      HookType.BeforeStep,
+      HookType.AfterStep,
+      HookType.BeforeAll,
+      HookType.AfterAll
     ];
 
     hookTypes.forEach(type => {
@@ -81,10 +81,10 @@ export class HookRegistry {
    */
   public registerHook(
     type: HookType,
-    implementation: Function,
+    implementation: HookFn,
     options?: HookOptions
   ): void {
-    if (this.isLocked && type !== 'BeforeAll' && type !== 'AfterAll') {
+    if (this.isLocked && type !== HookType.BeforeAll && type !== HookType.AfterAll) {
       throw new Error('HookRegistry is locked. Cannot register new hooks after test execution has started.');
     }
 

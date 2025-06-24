@@ -1,6 +1,6 @@
 // src/bdd/runner/StepExecutor.ts
 
-import { StepRegistry } from '../decorators/StepRegistry';
+import { stepRegistry } from '../decorators/StepRegistry';
 
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { DebugManager } from '../../core/debugging/DebugManager';
@@ -24,14 +24,12 @@ import { BDDContext } from '../context/BDDContext';
  * Executes individual test steps by matching them to step definitions
  */
 export class StepExecutor {
-    private stepRegistry: StepRegistry;
     private debugManager: DebugManager;
     private screenshotManager: ScreenshotManager;
     private currentContext!: ExecutionContext;
     private executionMonitor: ExecutionMonitor;
 
     constructor() {
-        this.stepRegistry = StepRegistry.getInstance();
         this.debugManager = DebugManager.getInstance();
         this.screenshotManager = ScreenshotManager.getInstance();
         this.executionMonitor = ExecutionMonitor.getInstance();
@@ -174,7 +172,7 @@ export class StepExecutor {
         const stepText = step.text.trim();
         
         // Try to find matching step definition
-        let definition = this.stepRegistry.findStepDefinition(stepText);
+        let definition = stepRegistry.findStepDefinition(stepText);
 
         // Log if no definition found
         if (!definition) {
@@ -193,7 +191,7 @@ export class StepExecutor {
         const stepText = step.text.trim();
         
         // Use StepRegistry to extract parameters since it has the matching logic
-        const parameters = this.stepRegistry.findStepWithParameters(stepText);
+        const parameters = stepRegistry.findStepWithParameters(stepText);
         
         if (!parameters) {
             throw new Error('Step text does not match pattern');
@@ -305,7 +303,7 @@ export class StepExecutor {
     ): Promise<void> {
         // Get the class instance for proper 'this' binding
         const className = definition.metadata['className'];
-        const classInstance = className ? this.stepRegistry.getClassInstance(className) : null;
+        const classInstance = className ? stepRegistry.getClassInstance(className) : null;
         
         if (!classInstance) {
             throw new Error(`No class instance found for step definition. ClassName: ${className}`);

@@ -16,6 +16,7 @@
  */
 
 import { ExecutionStatus } from '../../bdd/types/bdd.types';
+import { HookType } from '../../bdd/types/bdd.types';
 
 // ============================================================================
 // SUMMARY GENERATOR TYPES
@@ -426,16 +427,6 @@ export interface HookReport {
   status: TestStatus;
   duration: number;
   error?: ErrorDetails;
-}
-
-/**
- * Hook type enumeration
- */
-export enum HookType {
-  BEFORE = 'before',
-  AFTER = 'after',
-  BEFORE_STEP = 'beforeStep',
-  AFTER_STEP = 'afterStep'
 }
 
 /**

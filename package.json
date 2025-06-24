@@ -245,7 +245,7 @@
     "csv-stringify": "^6.5.2",
     "dotenv": "^16.3.1",
     "fluent-ffmpeg": "^2.1.2",
-    "glob": "^11.0.2",
+    "glob": "^10.3.10",
     "jsonpath": "^1.1.1",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.16.0",
@@ -257,8 +257,6 @@
     "reflect-metadata": "^0.2.2",
     "sharp": "^0.33.0",
     "tedious": "^18.6.1",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
     "ws": "^8.18.2",
     "xlsx": "^0.18.0",
     "xml2js": "^0.6.2",
@@ -284,7 +282,11 @@
     "lint-staged": "^15.2.0",
     "mkdirp": "^3.0.1",
     "prettier": "^3.1.1",
-    "rimraf": "^5.0.5"
+    "rimraf": "^5.0.5",
+    "ts-node": "^10.9.2",
+    "ts-node-register": "^1.0.0",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.8.3"
   },
   "keywords": [
     "test-automation",

@@ -29,6 +29,7 @@ export class ExecutionMonitor extends EventEmitter {
   private executionState: ExecutionState;
   private updateInterval?: NodeJS.Timeout;
   private metricsInterval?: NodeJS.Timeout;
+  private isInitialized = false;
 
   private constructor() {
     super();
@@ -40,8 +41,7 @@ export class ExecutionMonitor extends EventEmitter {
     this.performanceCollector = PerformanceCollector.getInstance();
     this.systemMetrics = this.initializeSystemMetrics();
     this.executionState = 'idle';
-    // Defer monitoring initialization to avoid blocking
-    // this.initializeMonitoring();
+    this.setupEventHandlers();
   }
 
   static getInstance(): ExecutionMonitor {
@@ -49,6 +49,28 @@ export class ExecutionMonitor extends EventEmitter {
       ExecutionMonitor.instance = new ExecutionMonitor();
     }
     return ExecutionMonitor.instance;
+  }
+
+  private setupEventHandlers(): void {
+    if (this.isInitialized) {
+      return;
+    }
+
+    this.on('executionStart', this.handleExecutionStart.bind(this));
+    this.on('executionEnd', this.handleExecutionEnd.bind(this));
+    this.on('featureStart', this.handleFeatureStart.bind(this));
+    this.on('featureEnd', this.handleFeatureEnd.bind(this));
+    this.on('scenarioStart', this.handleScenarioStart.bind(this));
+    this.on('scenarioEnd', this.handleScenarioEnd.bind(this));
+    this.on('stepStart', this.handleStepStart.bind(this));
+    this.on('stepEnd', this.handleStepEnd.bind(this));
+
+    this.isInitialized = true;
+  }
+
+  reset(): void {
+    this.removeAllListeners();
+    this.setupEventHandlers();
   }
 
   /**
@@ -128,21 +150,6 @@ export class ExecutionMonitor extends EventEmitter {
 
     const logger = ActionLogger.getInstance();
     logger.info(`ExecutionMonitor - Live dashboard server started on port ${port}`);
-  }
-
-  /**
-   * Setup event handlers
-   */
-  private setupEventHandlers(): void {
-    // Listen to execution events
-    this.on('executionStart', this.handleExecutionStart.bind(this));
-    this.on('executionEnd', this.handleExecutionEnd.bind(this));
-    this.on('featureStart', this.handleFeatureStart.bind(this));
-    this.on('featureEnd', this.handleFeatureEnd.bind(this));
-    this.on('scenarioStart', this.handleScenarioStart.bind(this));
-    this.on('scenarioEnd', this.handleScenarioEnd.bind(this));
-    this.on('stepStart', this.handleStepStart.bind(this));
-    this.on('stepEnd', this.handleStepEnd.bind(this));
   }
 
   /**

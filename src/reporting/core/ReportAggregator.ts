@@ -7,9 +7,9 @@ import {
     TrendData,
     ExecutionStatistics,
     TestStatus,
-    ExecutionHistory,
-    HookType
+    ExecutionHistory
 } from '../types/reporting.types';
+import { HookType } from '../../bdd/types/bdd.types';
 import { Logger } from '../../core/utils/Logger';
 
 /**
@@ -110,9 +110,9 @@ export class ReportAggregator {
             // Calculate hook durations
             if (scenario.hooks) {
                 for (const hook of scenario.hooks) {
-                    if (hook.type === HookType.BEFORE || hook.type === HookType.BEFORE_STEP) {
+                    if (hook.type === HookType.Before || hook.type === HookType.BeforeStep) {
                         setupDuration += hook.duration || 0;
-                    } else if (hook.type === HookType.AFTER || hook.type === HookType.AFTER_STEP) {
+                    } else if (hook.type === HookType.After || hook.type === HookType.AfterStep) {
                         teardownDuration += hook.duration || 0;
                     }
                 }
@@ -241,9 +241,9 @@ export class ReportAggregator {
             // Calculate hook durations
             if (scenario.hooks) {
                 for (const hook of scenario.hooks) {
-                    if (hook.type === HookType.BEFORE || hook.type === HookType.BEFORE_STEP) {
+                    if (hook.type === HookType.Before || hook.type === HookType.BeforeStep) {
                         setupDuration += hook.duration || 0;
-                    } else if (hook.type === HookType.AFTER || hook.type === HookType.AFTER_STEP) {
+                    } else if (hook.type === HookType.After || hook.type === HookType.AfterStep) {
                         teardownDuration += hook.duration || 0;
                     }
                 }

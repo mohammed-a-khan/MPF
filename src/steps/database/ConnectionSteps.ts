@@ -437,7 +437,7 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
                     config.password = testResult.decrypted;
                 }
             } catch (error) {
-                this.logger.error('Failed to decrypt database password', error);
+                this.logger.error('Failed to decrypt database password', error instanceof Error ? error : new Error(String(error)));
             }
         } else if (config.password && config.password.startsWith('encrypted:')) {
             // Handle legacy format

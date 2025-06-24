@@ -366,7 +366,7 @@ export class EncryptionConfigurationManager {
     // Check for encrypted values in configuration
     const allConfig = ConfigurationManager.getAll();
     const encryptedKeys = Object.keys(allConfig).filter(key => 
-      allConfig[key].startsWith(this.ENCRYPTED_PREFIX)
+      allConfig[key] && typeof allConfig[key] === 'string' && allConfig[key].startsWith(this.ENCRYPTED_PREFIX)
     );
 
     if (encryptedKeys.length === 0) {
@@ -377,7 +377,9 @@ export class EncryptionConfigurationManager {
 
     // Test decryption of encrypted values
     for (const key of encryptedKeys) {
-      const testResult = await this.testDecryption(allConfig[key]);
+      const value = allConfig[key];
+      if (!value || typeof value !== 'string') continue;
+      const testResult = await this.testDecryption(value);
       if (!testResult.success) {
         errors.push(`Decryption test failed for key '${key}': ${testResult.error}`);
       }

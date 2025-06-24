@@ -45,7 +45,7 @@ export class ProfessionalPDFExporter {
             
             try {
                 // BROWSER FLASHING FIX: Always try to use existing browser first
-                this.browser = browserManager.getBrowser();
+                this.browser = await browserManager.getBrowser();
                 this.logger.debug('Using existing browser for PDF generation - no new browser launch');
             } catch (error) {
                 this.logger.warn('No existing browser available for PDF generation, will skip PDF export to prevent browser flashing');
