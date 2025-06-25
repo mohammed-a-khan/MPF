@@ -44,6 +44,7 @@ export class ScenarioExecutor {
     private executionMonitor: ExecutionMonitor;
     private stepRegistry: StepRegistry;
     private stepLoader: StepDefinitionLoader;
+    private browserManagementStrategy: string;
 
     constructor() {
         this.stepExecutor = new StepExecutor();
@@ -55,6 +56,10 @@ export class ScenarioExecutor {
         this.executionMonitor = ExecutionMonitor.getInstance();
         this.stepRegistry = StepRegistry.getInstance();
         this.stepLoader = StepDefinitionLoader.getInstance();
+        
+        // Get browser management strategy from configuration
+        this.browserManagementStrategy = ConfigurationManager.get('BROWSER_MANAGEMENT_STRATEGY', 'reuse-browser');
+        ActionLogger.logInfo(`Browser management strategy: ${this.browserManagementStrategy}`);
     }
 
     async initialize(): Promise<void> {
@@ -65,14 +70,22 @@ export class ScenarioExecutor {
             await this.stepLoader.initialize();
         }
         
-        // Create execution context
-        this.currentContext = await this.createExecutionContext();
+        // Only create shared execution context if using reuse-browser strategy
+        if (this.browserManagementStrategy === 'reuse-browser') {
+            if (!this.sharedExecutionContext) {
+                this.sharedExecutionContext = await this.createExecutionContext();
+            }
+            this.currentContext = this.sharedExecutionContext;
+        }
+        // For new-per-scenario strategy, context will be created for each scenario
     }
 
     private async createExecutionContext(): Promise<ExecutionContext> {
         console.log('🔍 DEBUG: Creating execution context');
         
-        const executionId = `scenario-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // Mark execution context based on browser management strategy
+        const prefix = this.browserManagementStrategy === 'reuse-browser' ? 'shared_execution' : 'scenario';
+        const executionId = `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const executionContext = new ExecutionContext(executionId);
         await executionContext.initialize();
         
@@ -139,8 +152,26 @@ export class ScenarioExecutor {
         console.log(`[ScenarioExecutor] Raw result object:`, JSON.stringify(result, null, 2));
 
         try {
-            // Create execution context
-            this.currentContext = await this.createExecutionContext();
+            // Reset step executor state for new scenario
+            this.stepExecutor.resetInitializedClasses();
+            
+            // Handle browser management strategy
+            if (this.browserManagementStrategy === 'new-per-scenario') {
+                // Create new execution context for each scenario
+                this.currentContext = await this.createExecutionContext();
+            } else {
+                // Use shared execution context for reuse-browser strategy
+                if (!this.sharedExecutionContext) {
+                    this.sharedExecutionContext = await this.createExecutionContext();
+                }
+                this.currentContext = this.sharedExecutionContext;
+            }
+            
+            // Initialize BDDContext with the execution context
+            BDDContext.getInstance().initialize(this.currentContext);
+            
+            // Set the scenario in BDDContext
+            BDDContext.getInstance().setScenario(scenario);
 
             // Start recording if enabled
             await this.startRecording(scenarioId);
@@ -148,8 +179,16 @@ export class ScenarioExecutor {
             // Execute before scenario hooks
             await this.executeBeforeScenarioHooks(scenario, this.currentContext);
 
+            // Replace placeholders in steps if test data is provided
+            let stepsToExecute = scenario.steps;
+            if (testData) {
+                stepsToExecute = this.replacePlaceholdersInSteps(scenario.steps, testData);
+                // Store test data in context for step access
+                this.currentContext.testData = testData;
+            }
+
             // Execute steps
-            result.steps = await this.executeSteps(scenario.steps, this.currentContext);
+            result.steps = await this.executeSteps(stepsToExecute, this.currentContext);
 
             // Determine scenario status
             result.status = this.determineScenarioStatus(result.steps);
@@ -175,6 +214,9 @@ export class ScenarioExecutor {
             } as ExecutionError;
         } finally {
             try {
+                // Call after() methods for step definition classes
+                await this.stepExecutor.callAfterMethods();
+                
                 // Execute after scenario hooks
                 await this.executeAfterScenarioHooks(scenario, this.currentContext, result);
 
@@ -578,12 +620,21 @@ export class ScenarioExecutor {
             // Clear BDD context
             BDDContext.getInstance().clearScenarioState();
             
-            // CRITICAL FIX: Don't cleanup the shared execution context after each scenario
-            // This keeps the browser and browser context alive between scenarios
-            // Only reset the current context reference
-            this.currentContext = null;
-            
-            ActionLogger.logInfo('Scenario cleanup completed - browser context preserved');
+            // Handle cleanup based on browser management strategy
+            if (this.browserManagementStrategy === 'new-per-scenario') {
+                // For new-per-scenario strategy, fully cleanup the execution context
+                if (this.currentContext) {
+                    ActionLogger.logInfo('Closing browser for new-per-scenario strategy');
+                    await this.currentContext.cleanup();
+                    this.currentContext = null;
+                }
+                ActionLogger.logInfo('Scenario cleanup completed - browser closed');
+            } else {
+                // For reuse-browser strategy, preserve the browser context
+                // Only reset the current context reference
+                this.currentContext = null;
+                ActionLogger.logInfo('Scenario cleanup completed - browser context preserved');
+            }
 
         } catch (error) {
             ActionLogger.logError('Cleanup error', error as Error);
@@ -720,7 +771,26 @@ export class ScenarioExecutor {
      * Determine scenario status
      */
     private determineScenarioStatus(steps: StepResult[]): ScenarioStatus {
-        // Implementation of determineScenarioStatus method
+        if (steps.length === 0) {
+            return ScenarioStatus.PENDING;
+        }
+
+        // If any step failed, scenario failed
+        if (steps.some(step => step.status === StepStatus.FAILED)) {
+            return ScenarioStatus.FAILED;
+        }
+
+        // If any step is pending, scenario is pending
+        if (steps.some(step => step.status === StepStatus.PENDING)) {
+            return ScenarioStatus.PENDING;
+        }
+
+        // If all steps are skipped, scenario is skipped
+        if (steps.every(step => step.status === StepStatus.SKIPPED)) {
+            return ScenarioStatus.SKIPPED;
+        }
+
+        // If all steps passed or combination of passed/skipped, scenario passed
         return ScenarioStatus.PASSED;
     }
 
@@ -752,8 +822,29 @@ export class ScenarioExecutor {
      * Load test data
      */
     private async loadTestData(scenario: Scenario): Promise<TestData[]> {
-        // Implementation of loadTestData method
-        return [];
+        // Find @DataProvider tag
+        const dataProviderTag = scenario.tags.find(tag => 
+            tag.startsWith('@DataProvider') || tag.includes('DataProvider(')
+        );
+        
+        if (!dataProviderTag) {
+            return [];
+        }
+        
+        try {
+            // Import CSDataProvider dynamically to avoid circular dependencies
+            const { CSDataProvider } = await import('../../data/provider/CSDataProvider');
+            
+            // Load data using CSDataProvider
+            const dataProvider = CSDataProvider.getInstance();
+            const testData = await dataProvider.loadFromTag(dataProviderTag);
+            
+            ActionLogger.logDebug('Loaded test data', `Loaded ${testData.length} rows from ${dataProviderTag}`);
+            return testData;
+        } catch (error) {
+            ActionLogger.logError('Failed to load test data', error as Error);
+            throw error;
+        }
     }
 
     /**
@@ -783,8 +874,10 @@ export class ScenarioExecutor {
      * Check if data provider exists
      */
     private hasDataProvider(scenario: Scenario): boolean {
-        // Implementation of hasDataProvider method
-        return false;
+        // Check if scenario has @DataProvider tag
+        return scenario.tags.some(tag => 
+            tag.startsWith('@DataProvider') || tag.includes('DataProvider(')
+        );
     }
 
     /**
@@ -793,5 +886,28 @@ export class ScenarioExecutor {
     private getMaxRetries(scenario: Scenario): number {
         // Implementation of getMaxRetries method
         return 0;
+    }
+
+    /**
+     * Replace placeholders in steps with test data values
+     */
+    private replacePlaceholdersInSteps(steps: Step[], testData: TestData): Step[] {
+        return steps.map(step => {
+            let text = step.text;
+            
+            // Replace all placeholders in the step text
+            // Example: "I enter username "<username>" and password "<password>""
+            Object.keys(testData).forEach(key => {
+                const placeholder = `<${key}>`;
+                if (text.includes(placeholder)) {
+                    text = text.replace(new RegExp(placeholder, 'g'), String(testData[key]));
+                }
+            });
+            
+            return {
+                ...step,
+                text: text
+            };
+        });
     }
 }

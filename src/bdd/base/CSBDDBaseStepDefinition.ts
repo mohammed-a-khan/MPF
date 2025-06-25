@@ -1,5 +1,6 @@
 // src/bdd/base/CSBDDBaseStepDefinition.ts
 
+import 'reflect-metadata';
 import { Page } from 'playwright';
 import { BDDContext } from '../context/BDDContext';
 import { ScenarioContext } from '../context/ScenarioContext';
@@ -16,9 +17,27 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
  */
 export abstract class CSBDDBaseStepDefinition {
   protected logger: Logger;
+  private pageInstances: Map<string, CSBasePage> = new Map();
   
   constructor() {
     this.logger = Logger.getInstance(this.constructor.name);
+  }
+  
+  /**
+   * Initialize all @PageObject decorated properties
+   * Called automatically by the framework
+   */
+  public async initializePageObjects(): Promise<void> {
+    const pageProperties = Reflect.getMetadata('page:properties', this) || [];
+    
+    for (const propertyKey of pageProperties) {
+      const PageClass = Reflect.getMetadata('page:class', this, propertyKey);
+      if (PageClass) {
+        const pageInstance = await this.getPage(PageClass);
+        (this as any)[propertyKey] = pageInstance;
+        this.logger.debug(`Initialized page object: ${propertyKey} (${PageClass.name})`);
+      }
+    }
   }
 
   /**
@@ -65,14 +84,6 @@ export abstract class CSBDDBaseStepDefinition {
     return await PageFactory.createPage(PageClass, this.page);
   }
 
-  /**
-   * Get page object (cached)
-   */
-  protected async getPage<T extends CSBasePage>(
-    PageClass: new() => T
-  ): Promise<T> {
-    return await PageFactory.getPage(PageClass, this.page);
-  }
 
   /**
    * Store value in scenario context
@@ -462,5 +473,35 @@ export abstract class CSBDDBaseStepDefinition {
       this.logError(`${label} failed after ${duration}ms`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
+  }
+  
+  /**
+   * Get or create a page object with automatic initialization
+   */
+  protected async getPage<T extends CSBasePage>(PageClass: new () => T): Promise<T> {
+    const className = PageClass.name;
+    
+    // Check if already initialized
+    if (this.pageInstances.has(className)) {
+      return this.pageInstances.get(className) as T;
+    }
+    
+    // Create and initialize new instance
+    const pageInstance = new PageClass();
+    await pageInstance.initialize(this.page);
+    
+    // Cache for future use
+    this.pageInstances.set(className, pageInstance);
+    
+    this.logger.debug(`Page object initialized: ${className}`);
+    return pageInstance;
+  }
+  
+  /**
+   * Clear all cached page instances
+   * Called automatically when scenario ends
+   */
+  protected clearPageInstances(): void {
+    this.pageInstances.clear();
   }
 }

@@ -60,6 +60,13 @@ export class BrowserManager {
 
     console.log('🔍 DEBUG: Initializing BrowserManager');
     await this.createBrowser();
+    
+    // Create default context
+    if (this.browser && !this.defaultContext) {
+      console.log('🔍 DEBUG: Creating default browser context');
+      this.defaultContext = await this.browser.newContext();
+    }
+    
     this.isInitialized = true;
   }
 
@@ -220,8 +227,13 @@ export class BrowserManager {
    * PERFORMANCE OPTIMIZED: Build launch options
    */
   private buildLaunchOptions(): LaunchOptions {
+    // Load the headless configuration from ConfigurationManager
+    const headless = ConfigurationManager.getBoolean('HEADLESS', false);
+    
+    console.log(`🔍 DEBUG: Building launch options - headless: ${headless}`);
+    
     const options: LaunchOptions = {
-      headless: process.env.HEADLESS === 'true' || process.env.headed === 'false',
+      headless: headless,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       ignoreDefaultArgs: ['--enable-automation'],
       timeout: 30000

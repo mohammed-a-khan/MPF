@@ -2,7 +2,37 @@
   "permissions": {
     "allow": [
       "Bash(grep:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run test:*)",
+      "Bash(timeout 30 npm run test -- --feature=test/akhan/features/akhan-login-navigation.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(timeout 45 npm run test -- --feature=test/akhan/features/akhan-login-navigation.feature --project=akhan --env=dev --headless=false 2>&1)",
+      "Bash(find:*)",
+      "Bash(timeout 30s npm run test -- --feature=test/akhan/features/akhan-login-navigation.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(npx ts-node:*)",
+      "Bash(iconv:*)",
+      "Bash(mv:*)",
+      "Bash(ls:*)",
+      "Bash(cp:*)",
+      "Bash(timeout 30 npm run test:akhan:headed:*)",
+      "Bash(rm:*)",
+      "Bash(timeout 60 npm run test:akhan:headed:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(npm run lint)",
+      "Bash(npx eslint:*)",
+      "Bash(node:*)",
+      "Bash(npm test:*)",
+      "Bash(rg:*)",
+      "Bash(true)",
+      "Bash(timeout 5 npm run test -- --feature=test/akhan/features/akhan-login-navigation.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(timeout 5 npm run test -- test/akhan/features/akhan-login-navigation.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(mkdir:*)",
+      "Bash(timeout 120 npm run test -- test/akhan/features/akhan-login-navigation-csv.feature --project=akhan --env=dev --headless=true --grep=\"@TC501-csv\" 2 >& 1)",
+      "Bash(pkill:*)",
+      "Bash(timeout 60 npm run test -- test/akhan/features/akhan-login-navigation-csv.feature --project=akhan --env=dev --dry-run --grep=\"@TC501-csv\" 2 >& 1)",
+      "Bash(timeout 30 npm run test:*)",
+      "Bash(timeout 60 npm run test:*)",
+      "Bash(timeout 30 npx ts-node:*)",
+      "Bash(timeout 30s npm run test:*)"
     ],
     "deny": []
   }

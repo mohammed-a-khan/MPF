@@ -325,6 +325,26 @@ export abstract class CSBasePage {
     }
 
     /**
+     * Wait for selector to be visible
+     */
+    async waitForSelector(selector: string, options?: { timeout?: number; state?: 'attached' | 'detached' | 'visible' | 'hidden' }): Promise<void> {
+        try {
+            await this.page.waitForSelector(selector, {
+                timeout: options?.timeout || 30000,
+                state: options?.state || 'visible'
+            });
+            
+            ActionLogger.logPageOperation('page_wait_selector', this.constructor.name, {
+                selector,
+                state: options?.state || 'visible'
+            });
+        } catch (error) {
+            logger.error(`${this.constructor.name}: Wait for selector failed - ${selector}`, error as Error);
+            throw error;
+        }
+    }
+
+    /**
      * Scroll to element
      */
     async scrollToElement(element: CSWebElement): Promise<void> {

@@ -293,7 +293,7 @@ export class CSFramework {
             const runOptions = {
                 ...options,
                 environment: this.currentEnvironment,
-                featurePaths,
+                paths: featurePaths,  // CSBDDRunner expects 'paths' not 'featurePaths'
                 adoEnabled: options?.skipADO !== true
             };
 

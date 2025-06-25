@@ -10,6 +10,7 @@ import { ProxyConfig } from '../../core/proxy/ProxyConfig';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
+import { BDDContext } from './BDDContext';
 // import { ResourceManager } from '../../core/browser/ResourceManager';
 import { NetworkInterceptor } from '../../core/network/NetworkInterceptor';
 import { HARRecorder } from '../../core/network/HARRecorder';
@@ -23,7 +24,6 @@ import { MongoDBAdapter } from '../../database/adapters/MongoDBAdapter';
 import { SQLServerAdapter } from '../../database/adapters/SQLServerAdapter';
 import { OracleAdapter } from '../../database/adapters/OracleAdapter';
 import { DatabaseConfig } from '../../database/types/database.types';
-import { BDDContext } from './BDDContext';
 
 /**
  * Overall execution context managing all test resources
@@ -89,8 +89,12 @@ export class ExecutionContext {
       this.browser = await this.browserManager.getBrowser();
       this.context = this.browserManager.getDefaultContext();
       
-      // Create new page in the context
-      this.page = await this.context.newPage();
+      // Use existing page if valid, otherwise create new one
+      if (this.isPageValid()) {
+        this.logger.info('Reusing existing page for execution context');
+      } else {
+        this.page = await this.getOrCreatePage();
+      }
       
       this.logger.info('Execution context initialized successfully');
       
@@ -175,7 +179,26 @@ export class ExecutionContext {
   public async getOrCreatePage(): Promise<Page> {
     if (this.isPageValid()) {
       this.logger.info(`Reusing existing page: ${this.executionId}`);
+      // Ensure BDDContext has the current page
+      await BDDContext.getInstance().setCurrentPage(this.page!);
+      BDDContext.getInstance().setCurrentBrowserContext(this.context!);
       return this.page!;
+    }
+
+    // Check if context has any existing pages we can reuse
+    if (this.context && this.context.pages().length > 0) {
+      const existingPages = this.context.pages();
+      // Find a page that's not closed
+      for (const page of existingPages) {
+        if (!page.isClosed()) {
+          this.logger.info(`Reusing existing page from context: ${this.executionId}`);
+          this.page = page;
+          await this.setupPageListeners(this.page);
+          await BDDContext.getInstance().setCurrentPage(this.page);
+          BDDContext.getInstance().setCurrentBrowserContext(this.context);
+          return this.page;
+        }
+      }
     }
 
     this.logger.info(`Creating new page: ${this.executionId}`);
@@ -225,6 +248,12 @@ export class ExecutionContext {
     
     // Setup page listeners
     await this.setupPageListeners(page);
+    
+    // Set the page in BDDContext
+    await BDDContext.getInstance().setCurrentPage(page);
+    
+    // Set the browser context in BDDContext
+    BDDContext.getInstance().setCurrentBrowserContext(targetContext);
     
     ActionLogger.logPageCreation(page.url());
     return page;
@@ -400,7 +429,7 @@ export class ExecutionContext {
       ActionLogger.logDialog(dialog.type(), dialog.message());
       
       // Auto-dismiss dialogs in headless mode
-      if (ConfigurationManager.getBoolean('HEADLESS_MODE', false)) {
+      if (ConfigurationManager.getBoolean('HEADLESS', false)) {
         await dialog.dismiss();
       }
     });
@@ -470,15 +499,20 @@ export class ExecutionContext {
       // await this.resourceManager.cleanupPageResources(this.page);
     }
 
-    // BROWSER FLASHING FIX: Don't close browser context during execution
-    // Only close browser context if this is the final cleanup
-    const isFinalCleanup = this.executionId.includes('shared_execution') || 
-                          this.executionId.includes('background') ||
-                          process.env.FORCE_CONTEXT_CLEANUP === 'true';
+    // Browser context cleanup based on execution strategy
+    // Close browser context for:
+    // - Final cleanup of shared execution contexts
+    // - Background contexts
+    // - Per-scenario execution contexts (new-per-scenario strategy)
+    // - Forced cleanup
+    const shouldCloseContext = this.executionId.includes('shared_execution') || 
+                              this.executionId.includes('background') ||
+                              this.executionId.startsWith('scenario-') || // new-per-scenario strategy
+                              process.env.FORCE_CONTEXT_CLEANUP === 'true';
     
-    if (isFinalCleanup && this.context) {
+    if (shouldCloseContext && this.context) {
       try {
-        this.logger.info(`Closing browser context for final cleanup: ${this.executionId}`);
+        this.logger.info(`Closing browser context: ${this.executionId}`);
         await this.context.close();
         this.context = null;
         this.page = null;

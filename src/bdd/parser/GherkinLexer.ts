@@ -179,13 +179,20 @@ export class GherkinLexer {
       if (trimmedLine.startsWith(keyword)) {
         const value = trimmedLine.substring(keyword.length).trim();
         
-        return {
+        const token: Token = {
           type: tokenType,
           value: value,
           line: lineNumber,
           column: line.indexOf(keyword) + 1,
           indent: indent
         };
+        
+        // Store the keyword for step tokens
+        if (tokenType === TokenType.StepLine) {
+          (token as any).keyword = keyword.trim();
+        }
+        
+        return token;
       }
     }
     
@@ -211,7 +218,8 @@ export class GherkinLexer {
   
   private parseTags(line: string): string[] {
     const tags: string[] = [];
-    const tagPattern = /@(?:[a-zA-Z0-9_-]+(?:[-:][a-zA-Z0-9_-]+)*)/g;
+    // Updated pattern to capture tags with optional parentheses and their contents
+    const tagPattern = /@[a-zA-Z0-9_-]+(?:[-:][a-zA-Z0-9_-]+)*(?:\([^)]*\))?/g;
     let match;
     
     while ((match = tagPattern.exec(line)) !== null) {

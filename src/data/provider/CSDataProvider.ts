@@ -723,4 +723,29 @@ export class CSDataProvider {
     clearTestData(): void {
         this.testData.clear();
     }
+
+    /**
+     * Load data from @DataProvider tag
+     */
+    async loadFromTag(tag: string): Promise<TestData[]> {
+        try {
+            // Extract options from tag
+            // Example: @DataProvider(source="test/data.csv",type="csv",headers="true")
+            const optionsMatch = tag.match(/@DataProvider\((.*)\)/);
+            if (!optionsMatch) {
+                throw new Error(`Invalid @DataProvider tag format: ${tag}`);
+            }
+
+            const optionsString = optionsMatch[1];
+            const options: DataProviderOptions = this.parseTagValue(optionsString);
+            
+            ActionLogger.logDebug('DataProvider', `Parsed options from tag: ${JSON.stringify(options)}`);
+            
+            // Load data using the parsed options
+            return await this.loadData(options);
+        } catch (error) {
+            ActionLogger.logError('Failed to load data from tag', error as Error);
+            throw error;
+        }
+    }
 }

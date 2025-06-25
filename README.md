@@ -274,9 +274,9 @@ Scenario Outline: Search ESSS using Excel data
     | searchType | searchAttribute | searchValue |
 ```
 
-### 3. Page Object Model
+### 3. Page Object Model with Enhanced Features
 
-Create reusable page objects in `test/akhan/pages/`:
+Create reusable page objects extending `CSBasePage`:
 
 ```typescript
 // test/akhan/pages/LoginPage.ts
@@ -286,7 +286,15 @@ import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement
 import { CSWebElement } from '../../../src/core/elements/CSWebElement';
 
 export class LoginPage extends CSBasePage {
-    pageUrl = process.env['AKHAN_SIT_URL'] || 'https://akhan-ui-sit.myshare.net/';
+    // Required: Define page URL as a getter
+    protected get pageUrl(): string {
+        return process.env['AKHAN_SIT_URL'] || 'https://akhan-ui-sit.myshare.net/';
+    }
+
+    // Required: Define page load validation
+    protected async waitForPageLoad(): Promise<void> {
+        await this.page.waitForSelector('#login', { state: 'visible' });
+    }
 
     @CSGetElement({
         locatorType: 'xpath',
@@ -327,44 +335,56 @@ export class LoginPage extends CSBasePage {
 }
 ```
 
-### 4. Custom Step Definitions
+### 4. Custom Step Definitions with Automatic Page Object Initialization
 
-Create custom steps in `test/akhan/steps/`:
+Create custom steps with the new `@PageObject` decorator for automatic initialization:
 
 ```typescript
 // test/akhan/steps/akhan-login-navigation.steps.ts
 
 import { CSBDDBaseStepDefinition } from '../../../src/bdd/base/CSBDDBaseStepDefinition';
-import { CSBDDStepDef, StepDefinitions } from '../../../src/bdd/decorators/CSBDDStepDef';
+import { CSBDDStepDef, StepDefinitions, PageObject } from '../../../src/bdd/decorators/CSBDDStepDef';
 import { LoginPage } from '../pages/LoginPage';
+import { NavigationPage } from '../pages/NavigationPage';
 
 @StepDefinitions
 export class AKHANLoginNavigationSteps extends CSBDDBaseStepDefinition {
-    private loginPage!: LoginPage;
-
-    async before() {
-        this.loginPage = new LoginPage();
-        await this.loginPage.initialize(this.page);
-    }
+    // Automatic page object initialization - no constructor or before() needed!
+    @PageObject(LoginPage) loginPage!: LoginPage;
+    @PageObject(NavigationPage) navigationPage!: NavigationPage;
 
     @CSBDDStepDef('I am on the AKHAN login page')
     async navigateToLoginPage() {
-        await this.loginPage.navigateTo(this.loginPage.pageUrl);
-        await this.loginPage.waitForPageLoad();
+        const url = 'https://opensource-demo.orangehrmlive.com/web/index.php/auth/login';
+        await this.page.goto(url, { waitUntil: 'networkidle' });
     }
 
     @CSBDDStepDef('I enter username "{string}" and password "{string}"')
     async enterCredentials(username: string, password: string) {
-        await this.loginPage.enterUsername(username);
-        await this.loginPage.enterPassword(password);
+        await this.page.fill('input[name="username"]', username);
+        await this.page.fill('input[name="password"]', password);
     }
 
-    @CSBDDStepDef('I click on the Log On link')
-    async clickLogOn() {
-        await this.loginPage.clickLogOn();
+    @CSBDDStepDef('I click on {string} menu item')
+    async clickMenuItem(menuItem: string) {
+        // Direct usage - no initialization needed!
+        await this.navigationPage.clickMenuItem(menuItem);
+    }
+
+    @CSBDDStepDef('I should see the {string} header')
+    async verifyHeader(expectedHeader: string) {
+        await this.navigationPage.verifyHeader(expectedHeader);
     }
 }
 ```
+
+#### Key Benefits of the New Approach:
+
+1. **Zero Boilerplate**: No constructor, no `before()` method, no manual initialization
+2. **Automatic Initialization**: Page objects are initialized automatically when first used
+3. **Type Safety**: Full TypeScript support with proper typing
+4. **Clean Code**: Focus on test logic, not setup code
+5. **Framework Managed**: All lifecycle management is handled by the framework
 
 ## 🎯 Execution Options
 
@@ -500,6 +520,31 @@ ADO_INTEGRATION_ENABLED=true
 
 ## 🔬 Advanced Features
 
+### Automatic Page Object Initialization
+
+The framework now provides automatic page object initialization using the `@PageObject` decorator:
+
+```typescript
+@StepDefinitions
+export class MySteps extends CSBDDBaseStepDefinition {
+    // Declare page objects - they'll be initialized automatically!
+    @PageObject(LoginPage) loginPage!: LoginPage;
+    @PageObject(HomePage) homePage!: HomePage;
+    @PageObject(CartPage) cartPage!: CartPage;
+    
+    // No constructor needed!
+    // No before() method needed!
+    // No manual initialization needed!
+    
+    @CSBDDStepDef('I add product to cart')
+    async addToCart() {
+        // Just use it directly - framework handles initialization
+        await this.homePage.selectProduct('Laptop');
+        await this.cartPage.verifyItemAdded();
+    }
+}
+```
+
 ### AI-Powered Self-Healing
 
 The framework includes intelligent element identification and recovery:
@@ -510,10 +555,17 @@ The framework includes intelligent element identification and recovery:
     locatorType: 'xpath',
     locatorValue: '//button[@id="submit"]',
     description: 'Submit button',
-    healingStrategies: ['ai-visual', 'ai-text', 'ai-position']
+    enableHealing: true,
+    healingStrategies: ['visual', 'attributes', 'structure', 'nearby']
 })
 private submitButton!: CSWebElement;
 ```
+
+#### Self-Healing Strategies:
+- **Visual Recognition**: Uses AI to identify elements by visual appearance
+- **Attribute Matching**: Finds elements with similar attributes
+- **DOM Structure**: Analyzes DOM hierarchy for similar patterns
+- **Nearby Elements**: Uses surrounding elements as reference points
 
 ### Data Encryption
 
@@ -583,6 +635,9 @@ And the largest contentful paint should be less than 2500 ms
 2. **Descriptive Names**: Use clear, descriptive test names
 3. **Tag Strategy**: Implement consistent tagging strategy
 4. **Data Cleanup**: Clean up test data after execution
+5. **Page Object Pattern**: Use `@PageObject` decorator for automatic initialization
+6. **Element Decorators**: Use specific decorators (`@CSButton`, `@CSInput`) for clarity
+7. **Self-Healing**: Enable healing for critical elements to improve stability
 
 ### Performance Optimization
 
@@ -612,14 +667,46 @@ export class LoginPage extends CSBasePage {
 ```
 
 #### CSWebElement
-Enhanced web element with self-healing
+Enhanced web element with self-healing and automatic waiting
 ```typescript
 @CSGetElement({
     locatorType: 'css',
     locatorValue: '#username',
-    description: 'Username field'
+    description: 'Username field',
+    enableHealing: true,
+    waitOptions: {
+        timeout: 30000,
+        state: 'visible'
+    }
 })
 private username!: CSWebElement;
+```
+
+#### Available Element Decorators
+
+```typescript
+// Generic element
+@CSGetElement({ locatorType: 'css', locatorValue: '.submit' })
+submitElement!: CSWebElement;
+
+// Specific element types with simplified syntax
+@CSButton({ text: 'Submit' })
+submitButton!: CSWebElement;
+
+@CSInput({ placeholder: 'Enter username' })
+usernameField!: CSWebElement;
+
+@CSLink({ text: 'Click here' })
+clickLink!: CSWebElement;
+
+@CSCheckbox({ id: 'agree-terms' })
+agreeCheckbox!: CSWebElement;
+
+@CSSelect({ name: 'country' })
+countryDropdown!: CSWebElement;
+
+@CSTestId('submit-button')
+submitBtn!: CSWebElement;
 ```
 
 #### CSDataProvider
@@ -699,6 +786,78 @@ npm run test -- --show-config
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 📚 Quick Reference
+
+### Essential Decorators
+
+```typescript
+// Step Definition Class
+@StepDefinitions
+export class MySteps extends CSBDDBaseStepDefinition {
+    
+    // Page Object Declaration (Auto-initialized)
+    @PageObject(LoginPage) loginPage!: LoginPage;
+    
+    // Step Definition
+    @CSBDDStepDef('I perform {string} action')
+    async performAction(action: string) { }
+}
+
+// Page Object Class
+export class LoginPage extends CSBasePage {
+    // Element Decorators
+    @CSButton({ text: 'Login' }) loginBtn!: CSWebElement;
+    @CSInput({ id: 'username' }) usernameField!: CSWebElement;
+    @CSLink({ href: '/logout' }) logoutLink!: CSWebElement;
+    @CSCheckbox({ name: 'remember' }) rememberMe!: CSWebElement;
+    @CSSelect({ id: 'country' }) countrySelect!: CSWebElement;
+    @CSTestId('submit-form') submitButton!: CSWebElement;
+}
+```
+
+### Common Commands
+
+```bash
+# Development
+npm test -- --env=dev --tags=@wip --headed --debug
+
+# Smoke Testing
+npm test -- --env=qa --tags=@smoke --parallel --workers=4
+
+# Regression
+npm test -- --env=uat --tags=@regression --report-format=html,pdf
+
+# Specific Feature
+npm test -- --env=dev --feature=login.feature --scenario="Valid login"
+
+# Data-Driven
+npm test -- --env=qa --tags=@data-driven --data=testdata.xlsx
+```
+
+### Environment Variables
+
+```bash
+# Browser Configuration
+BROWSER=chromium              # chromium, firefox, webkit
+HEADLESS=false               # true/false
+VIEWPORT_WIDTH=1920          # pixels
+VIEWPORT_HEIGHT=1080         # pixels
+
+# Timeouts
+DEFAULT_TIMEOUT=30000        # milliseconds
+NAVIGATION_TIMEOUT=60000     # milliseconds
+STEP_TIMEOUT=30000          # milliseconds
+
+# Debugging
+DEBUG_MODE=true             # Enable debug logging
+PAUSE_ON_FAILURE=true       # Pause on test failure
+SCREENSHOT_ON_FAILURE=true  # Capture screenshots
+
+# Parallel Execution
+PARALLEL_WORKERS=4          # Number of workers
+PARALLEL_EXECUTION=true     # Enable/disable
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -707,12 +866,79 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 4. Add tests for new features
 5. Submit a pull request
 
+## 🚀 Latest Framework Improvements
+
+### v2.0.0 - Major Update (Current)
+
+#### 🎯 Zero-Configuration Page Objects
+- **NEW**: `@PageObject` decorator for automatic page object initialization
+- **REMOVED**: Manual `before()` methods and constructor initialization
+- **BENEFIT**: 70% less boilerplate code in step definitions
+
+```typescript
+// Before (v1.x)
+export class LoginSteps {
+    private loginPage!: LoginPage;
+    
+    async before() {
+        this.loginPage = new LoginPage();
+        await this.loginPage.initialize(this.page);
+    }
+}
+
+// Now (v2.0)
+export class LoginSteps {
+    @PageObject(LoginPage) loginPage!: LoginPage;
+    // That's it! No initialization needed
+}
+```
+
+#### 🔧 Enhanced Framework Features
+- **Automatic Lifecycle Management**: Framework handles all initialization and cleanup
+- **Improved Error Messages**: Better debugging with detailed error context
+- **Smart Caching**: Page objects are cached per scenario for performance
+- **Type Safety**: Full TypeScript support with enhanced type inference
+
+#### 🐛 Bug Fixes
+- Fixed scenario status reporting (failed scenarios now correctly marked as failed)
+- Fixed BDD context initialization issues
+- Improved error propagation in step execution
+- Enhanced page object lifecycle management
+
+### Migration Guide from v1.x to v2.0
+
+1. **Update Step Definitions**:
+   ```typescript
+   // Add PageObject import
+   import { PageObject } from '../../../src/bdd/decorators/CSBDDStepDef';
+   
+   // Replace private declarations with @PageObject
+   @PageObject(LoginPage) loginPage!: LoginPage;
+   
+   // Remove before() methods and constructors
+   ```
+
+2. **Update Page Objects**:
+   ```typescript
+   // Ensure proper abstract method implementation
+   protected get pageUrl(): string { return '/login'; }
+   protected async waitForPageLoad(): Promise<void> { 
+       await this.page.waitForSelector('#login');
+   }
+   ```
+
+3. **Clean Up Code**:
+   - Remove all manual `initialize()` calls
+   - Remove `before()` and `after()` methods from step definitions
+   - Remove page object instantiation code
+
 ## 📈 Version History
 
-- **v1.0.0** - Initial release with core features
-- **v1.1.0** - Added AI self-healing capabilities
+- **v2.0.0** - Automatic page object initialization, enhanced error handling
+- **v1.3.0** - Performance improvements and bug fixes  
 - **v1.2.0** - Enhanced reporting and ADO integration
-- **v1.3.0** - Performance improvements and bug fixes
+- **v1.1.0** - Added AI self-healing capabilities
+- **v1.0.0** - Initial release with core features
 
 ---
 

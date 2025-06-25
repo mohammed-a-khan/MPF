@@ -83,7 +83,7 @@ export class RunnerConfig {
       // Browser settings
       browser: {
         type: ConfigurationManager.get('DEFAULT_BROWSER', 'chromium') as any,
-        headless: ConfigurationManager.getBoolean('HEADLESS_MODE', false),
+        headless: ConfigurationManager.getBoolean('HEADLESS', false),
         slowMo: ConfigurationManager.getInt('BROWSER_SLOWMO', 0),
         timeout: ConfigurationManager.getInt('DEFAULT_TIMEOUT', 30000),
         viewport: {
@@ -390,7 +390,7 @@ export class RunnerConfig {
 
     // Browser settings
     ConfigurationManager.set('DEFAULT_BROWSER', this.config.browser.type);
-    ConfigurationManager.set('HEADLESS_MODE', String(this.config.browser.headless));
+    ConfigurationManager.set('HEADLESS', String(this.config.browser.headless));
     ConfigurationManager.set('BROWSER_SLOWMO', String(this.config.browser.slowMo));
     ConfigurationManager.set('DEFAULT_TIMEOUT', String(this.config.browser.timeout));
     ConfigurationManager.set('VIEWPORT_WIDTH', String(this.config.browser.viewport.width));

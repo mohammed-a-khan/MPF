@@ -1,0 +1,9 @@
+testId,userRole,moduleName,expectedHeader,permissionLevel,moduleDescription,testType,executeFlag,priority
+TC503-1,admin,ESSS/Series,ESSSs/Series,full,ESSS and Series Management,navigation,Y,high
+TC503-2,admin,Reference Interests,Reference Interests,full,Manage Reference Interests,navigation,Y,high
+TC503-3,admin,Interest History,Interest History,full,View Interest History,navigation,Y,high
+TC503-4,admin,External Interests,External Interests,full,External Interest Management,navigation,Y,medium
+TC503-5,admin,System Admin,System Admin,full,System Administration,navigation,Y,medium
+TC503-6,admin,Version Information,Version Information,read,Application Version Details,navigation,Y,low
+TC503-7,admin,File Upload,Add files,write,Upload Files to System,navigation,Y,medium
+TC503-8,user,ESSS/Series,ESSSs/Series,read,ESSS and Series View Only,navigation,N,low

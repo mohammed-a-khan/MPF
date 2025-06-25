@@ -274,7 +274,24 @@ export class StepDefinitionLoader {
         console.log('🔍 DEBUG: Loading all step definitions');
         
         try {
-            const files = await this.findStepFiles();
+            // TEMPORARY FIX: Load only project-specific step files to reduce loading time
+            const projectPath = ConfigurationManager.get('PROJECT_PATH', process.cwd());
+            const isAkhanProject = projectPath.includes('akhan') || process.argv.includes('akhan');
+            
+            let files: string[];
+            if (isAkhanProject) {
+                // For akhan project, load only akhan-specific steps
+                console.log('🔍 DEBUG: Loading AKHAN-specific step definitions only');
+                files = await glob('**/test/akhan/steps/*.ts', {
+                    ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
+                    cwd: process.cwd(),
+                    absolute: true
+                });
+            } else {
+                // For other projects, load all step files
+                files = await this.findStepFiles();
+            }
+            
             console.log(`🔍 DEBUG: Found ${files.length} step definition files`);
             
             for (const file of files) {

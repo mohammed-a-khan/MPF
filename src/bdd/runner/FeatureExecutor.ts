@@ -5,6 +5,7 @@ import { HookExecutor } from '../hooks/HookExecutor';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { ExecutionContext } from '../context/ExecutionContext';
 import { FeatureContext } from '../context/FeatureContext';
+import { BDDContext } from '../context/BDDContext';
 import { ExecutionMonitor } from './ExecutionMonitor';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 import { BrowserManager } from '../../core/browser/BrowserManager';
@@ -104,6 +105,9 @@ export class FeatureExecutor {
             // Initialize feature context
             this.featureContext = new FeatureContext(feature);
             await this.featureContext.initialize();
+            
+            // Set the feature in BDDContext
+            BDDContext.getInstance().setFeature(feature);
 
             // Set up feature-level browser if needed
             if (this.executionConfig.browserPerFeature) {
@@ -477,6 +481,9 @@ export class FeatureExecutor {
                 // Create execution context for hook
                 const hookContext = new ExecutionContext(`hook-${hook.name}-${Date.now()}`);
                 await hookContext.initialize();
+                
+                // Initialize BDDContext with the execution context
+                BDDContext.getInstance().initialize(hookContext);
                 
                 // Execute hook (Before hooks only take ExecutionContext)
                 const hookFn = hook.fn || hook.implementation;

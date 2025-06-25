@@ -8,6 +8,7 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import { ConsoleCapture } from '../../core/logging/ConsoleCapture';
 import { FileUtils } from '../../core/utils/FileUtils';
 import { FeatureFileParser } from '../parser/FeatureFileParser';
+import { ExamplesParser } from '../parser/ExamplesParser';
 import { TestScheduler } from './TestScheduler';
 import { ExecutionMonitor } from './ExecutionMonitor';
 import { ParallelExecutor } from './ParallelExecutor';
@@ -41,6 +42,7 @@ import {
     ExecutionPlan, 
     ExecutionResult, 
     Feature,
+    Scenario,
     ExecutionSummary,
     RunnerState,
     ExecutionStatus,
@@ -541,7 +543,7 @@ export class CSBDDRunner {
                 logger.info('🖥️  Browser required - initializing browser...');
                 const browserConfig = {
                     browser: (options.browser || ConfigurationManager.get('DEFAULT_BROWSER', 'chromium')) as 'chromium' | 'firefox' | 'webkit',
-                    headless: options.headless !== false ? ConfigurationManager.getBoolean('HEADLESS_MODE', false) : false,
+                    headless: options.headless !== false ? ConfigurationManager.getBoolean('HEADLESS', false) : false,
                     slowMo: ConfigurationManager.getInt('BROWSER_SLOWMO', 0),
                     timeout: ConfigurationManager.getInt('DEFAULT_TIMEOUT', 30000),
                     viewport: {
@@ -663,8 +665,12 @@ export class CSBDDRunner {
             const features = await Promise.race([parsePromise, parseTimeoutPromise]) as any[];
             logger.info('Features parsed - Total features: ' + features.length);
 
+            // Expand scenario outlines before filtering
+            const expandedFeatures = await this.expandScenarioOutlines(features);
+            logger.info('Scenario outlines expanded - Total features: ' + expandedFeatures.length);
+
             // Debug: Log parsed features
-            features.forEach((feature, i) => {
+            expandedFeatures.forEach((feature, i) => {
                 logger.debug(`Parsed feature ${i+1}: "${feature.name}" (URI: ${feature.uri}) with ${feature.scenarios.length} scenarios`);
                 feature.scenarios.forEach((scenario: any, j: number) => {
                     logger.debug(`  Scenario ${j+1}: "${scenario.name}" (Tags: ${scenario.tags.join(', ')})`);
@@ -678,7 +684,7 @@ export class CSBDDRunner {
                 scenarios: options['scenarios']
             }));
             
-            const filteredFeatures = this.applyFilters(features, options);
+            const filteredFeatures = this.applyFilters(expandedFeatures, options);
             
             logger.info(`Filtering result: ${features.length} -> ${filteredFeatures.length} features`);
             const totalScenariosAfterFilter = filteredFeatures.reduce((sum, f) => sum + f.scenarios.length, 0);
@@ -1697,6 +1703,47 @@ export class CSBDDRunner {
         } catch (error) {
             console.error('Emergency cleanup failed:', error);
         }
+    }
+
+    /**
+     * Expand scenario outlines into individual scenarios
+     */
+    private async expandScenarioOutlines(features: Feature[]): Promise<Feature[]> {
+        const logger = ActionLogger.getInstance();
+        const examplesParser = ExamplesParser.getInstance();
+        const expandedFeatures: Feature[] = [];
+
+        for (const feature of features) {
+            const expandedScenarios: Scenario[] = [];
+            
+            for (const scenario of feature.scenarios) {
+                if (scenario.type === 'scenario_outline' && scenario.examples && scenario.examples.length > 0) {
+                    logger.debug(`Expanding scenario outline: "${scenario.name}" with ${scenario.examples.length} examples tables`);
+                    
+                    try {
+                        // Expand the scenario outline using the examples parser
+                        const expanded = examplesParser.expandScenarioOutline(scenario as any);
+                        expandedScenarios.push(...expanded);
+                        logger.debug(`Expanded to ${expanded.length} scenarios`);
+                    } catch (error) {
+                        logger.error(`Failed to expand scenario outline "${scenario.name}": ${(error as Error).message}`);
+                        // Keep the original scenario if expansion fails
+                        expandedScenarios.push(scenario);
+                    }
+                } else {
+                    // Regular scenario, keep as is
+                    expandedScenarios.push(scenario);
+                }
+            }
+            
+            // Create a new feature with expanded scenarios
+            expandedFeatures.push({
+                ...feature,
+                scenarios: expandedScenarios
+            });
+        }
+        
+        return expandedFeatures;
     }
 
     /**

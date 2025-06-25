@@ -23,7 +23,7 @@ export class ConfigurationValidator {
       'REPORT_THEME_PRIMARY_COLOR'
     ],
     browser: [
-      'HEADLESS_MODE',
+      'HEADLESS',
       'VIEWPORT_WIDTH', 
       'VIEWPORT_HEIGHT',
       'DEFAULT_TIMEOUT'
@@ -70,7 +70,7 @@ export class ConfigurationValidator {
     { field: 'MAX_PARALLEL_WORKERS', required: false, type: 'number', min: 1, max: 10, message: 'MAX_PARALLEL_WORKERS must be between 1 and 10' },
     
     // Booleans
-    { field: 'HEADLESS_MODE', required: true, type: 'boolean', message: 'HEADLESS_MODE must be true or false' },
+    { field: 'HEADLESS', required: true, type: 'boolean', message: 'HEADLESS must be true or false' },
     { field: 'AI_ENABLED', required: true, type: 'boolean', message: 'AI_ENABLED must be true or false' },
     { field: 'PARALLEL_EXECUTION', required: false, type: 'boolean', message: 'PARALLEL_EXECUTION must be true or false' },
     

@@ -3946,7 +3946,7 @@ export class ImprovedProductionHTMLReportGenerator {
             'API Base URL': (() => { try { return ConfigurationManager.get('API_BASE_URL', 'Not configured'); } catch { return 'Not configured'; } })(),
             'Parallel Execution': (() => { try { return ConfigurationManager.getBoolean('PARALLEL_EXECUTION', false) ? 'Enabled' : 'Disabled'; } catch { return 'Disabled'; } })(),
             'Max Workers': (() => { try { return ConfigurationManager.getInt('MAX_PARALLEL_WORKERS', 1); } catch { return 1; } })(),
-            'Headless Mode': (() => { try { return ConfigurationManager.getBoolean('HEADLESS_MODE', false) ? 'Yes' : 'No'; } catch { return metadata.executionOptions?.headless ? 'Yes' : 'No'; } })(),
+            'Headless Mode': (() => { try { return ConfigurationManager.getBoolean('HEADLESS', false) ? 'Yes' : 'No'; } catch { return metadata.executionOptions?.headless ? 'Yes' : 'No'; } })(),
             'Screenshot Mode': this.screenshotMode,
             'Video Recording': (() => { try { return ConfigurationManager.getBoolean('VIDEO_RECORDING', false) ? 'Enabled' : 'Disabled'; } catch { return 'Disabled'; } })(),
             'Network Recording': (() => { try { return ConfigurationManager.getBoolean('RECORD_HAR', false) ? 'Enabled' : 'Disabled'; } catch { return 'Disabled'; } })(),

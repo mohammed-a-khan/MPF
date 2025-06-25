@@ -144,6 +144,7 @@ export class FeatureFileParser {
       // Parse tokens into feature
       const feature = this.parser.parse(tokens, filePath);
       
+      
       // Set file information
       feature.uri = filePath;
       feature.name = feature.name || path.basename(filePath, this.featureFileExtension);
@@ -161,13 +162,15 @@ export class FeatureFileParser {
         throw error; // Already a parse error
       }
       
-      throw {
-        file: filePath,
-        line: 0,
-        column: 0,
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      };
+      // Convert the error to a proper Error object instead of throwing a plain object
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const parseError = new ParseError(errorMessage, 0, 0, filePath);
+      
+      if (error instanceof Error && error.stack) {
+        parseError.stack = error.stack;
+      }
+      
+      throw parseError;
     }
   }
   
@@ -206,19 +209,27 @@ export class FeatureFileParser {
       
       // Validate scenario outline
       if (scenario.type === 'scenario_outline') {
-        if (!scenario.examples || scenario.examples.length === 0) {
-          errors.push({ type: 'validation', message: `Scenario Outline "${scenario.name}" must have examples`, stepText: scenario.name, severity: 'error' });
+        // Check if scenario has @DataProvider tag
+        const hasDataProvider = scenario.tags.some(tag => 
+          tag.startsWith('@DataProvider') || tag.includes('DataProvider(')
+        );
+        
+        // Only require examples if there's no @DataProvider
+        if ((!scenario.examples || scenario.examples.length === 0) && !hasDataProvider) {
+          errors.push({ type: 'validation', message: `Scenario Outline "${scenario.name}" must have examples or @DataProvider tag`, stepText: scenario.name, severity: 'error' });
         }
         
-        // Check if all placeholders in steps exist in examples
-        const placeholders = this.extractPlaceholders(scenario);
-        const exampleHeaders = scenario.examples?.[0]?.header || [];
-        
-        placeholders.forEach(placeholder => {
-          if (!exampleHeaders.includes(placeholder)) {
-            errors.push({ type: 'validation', message: `Placeholder <${placeholder}> in scenario "${scenario.name}" not found in examples`, stepText: scenario.name, severity: 'error' });
-          }
-        });
+        // Check if all placeholders in steps exist in examples (only if not using @DataProvider)
+        if (!hasDataProvider && scenario.examples && scenario.examples.length > 0) {
+          const placeholders = this.extractPlaceholders(scenario);
+          const exampleHeaders = scenario.examples[0]?.header || [];
+          
+          placeholders.forEach(placeholder => {
+            if (!exampleHeaders.includes(placeholder)) {
+              errors.push({ type: 'validation', message: `Placeholder <${placeholder}> in scenario "${scenario.name}" not found in examples`, stepText: scenario.name, severity: 'error' });
+            }
+          });
+        }
       }
     });
     
@@ -443,8 +454,9 @@ export class FeatureFileParser {
           errors.push({ type: 'validation', message: `Invalid tag format: "${tag}". Tags must start with @`, stepText: tag, severity: 'error' });
         }
         
-        if (!/^@[a-zA-Z0-9_:\-]+$/.test(tag)) {
-          errors.push({ type: 'validation', message: `Invalid tag format: "${tag}". Tags can only contain letters, numbers, underscores, colons, and hyphens`, stepText: tag, severity: 'error' });
+        // Allow more flexible tag format for special tags like @DataProvider
+        if (!/^@[a-zA-Z0-9_:\-]+(\([^)]*\))?$/.test(tag)) {
+          errors.push({ type: 'validation', message: `Invalid tag format: "${tag}". Tags must follow the pattern @tagname or @tagname(parameters)`, stepText: tag, severity: 'error' });
         }
       });
     }
@@ -457,7 +469,8 @@ export class FeatureFileParser {
             errors.push({ type: 'validation', message: `Invalid tag format in scenario "${scenario.name}": "${tag}"`, stepText: tag, severity: 'error' });
           }
           
-          if (!/^@[a-zA-Z0-9_:\-]+$/.test(tag)) {
+          // Allow more flexible tag format for special tags like @DataProvider
+          if (!/^@[a-zA-Z0-9_:\-]+(\([^)]*\))?$/.test(tag)) {
             errors.push({ type: 'validation', message: `Invalid tag format in scenario "${scenario.name}": "${tag}"`, stepText: tag, severity: 'error' });
           }
         });

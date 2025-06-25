@@ -47,23 +47,51 @@ export class LoginPage extends CSBasePage {
         await this.page.waitForLoadState('networkidle');
     }
 
-    async enterUsername(username: string) {
+    async navigate(): Promise<void> {
+        await this.navigateTo();
+    }
+
+    async enterCredentials(username: string, password: string): Promise<void> {
+        await this.enterUsername(username);
+        await this.enterPassword(password);
+    }
+
+    async enterUsername(username: string): Promise<void> {
         await this.usernameInput.fill(username);
     }
 
-    async enterPassword(password: string) {
+    async enterPassword(password: string): Promise<void> {
         await this.passwordInput.fill(password);
     }
 
-    async clickLogOn() {
+    async clickLogOn(): Promise<void> {
         await this.logOnLink.click();
     }
 
-    async verifyHomeHeader() {
+    async verifyLoginSuccess(): Promise<void> {
+        // Wait for URL change or dashboard elements
+        try {
+            await this.page.waitForURL(/dashboard|home|main/, { timeout: 15000 });
+        } catch (error) {
+            console.log('⚠️ URL check failed, checking for dashboard elements...');
+            // Alternative: check for dashboard elements
+            await this.page.waitForSelector('.oxd-topbar, .dashboard, [data-v-], .sidebar', { timeout: 10000 });
+        }
+    }
+
+    async verifyHomePage(): Promise<void> {
+        // Just verify we're not on the login page anymore
+        const currentUrl = this.page.url();
+        if (currentUrl.includes('login')) {
+            throw new Error('Still on login page - login may have failed');
+        }
+    }
+
+    async verifyHomeHeader(): Promise<void> {
         await this.homeHeader.waitFor({ state: 'visible' });
     }
 
-    async verifyWelcomeMessage(expectedUsername: string) {
+    async verifyWelcomeMessage(expectedUsername: string): Promise<void> {
         const welcomeLocator = await this.welcomeMessage.getLocator();
         const welcomeText = await welcomeLocator.textContent();
         if (welcomeText !== expectedUsername) {

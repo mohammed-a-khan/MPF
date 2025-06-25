@@ -28,11 +28,38 @@ export class StepExecutor {
     private screenshotManager: ScreenshotManager;
     private currentContext!: ExecutionContext;
     private executionMonitor: ExecutionMonitor;
+    private initializedClasses: Set<string> = new Set();
 
     constructor() {
         this.debugManager = DebugManager.getInstance();
         this.screenshotManager = ScreenshotManager.getInstance();
         this.executionMonitor = ExecutionMonitor.getInstance();
+    }
+    
+    /**
+     * Reset initialized classes for new scenario
+     */
+    public resetInitializedClasses(): void {
+        this.initializedClasses.clear();
+    }
+    
+    /**
+     * Call after() method for all initialized classes
+     */
+    public async callAfterMethods(): Promise<void> {
+        for (const className of this.initializedClasses) {
+            const classInstance = stepRegistry.getClassInstance(className);
+            if (classInstance) {
+                // Clear page instances
+                if (typeof (classInstance as any).clearPageInstances === 'function') {
+                    try {
+                        (classInstance as any).clearPageInstances();
+                    } catch (error) {
+                        ActionLogger.logError(`Error clearing page instances for ${className}`, error as Error);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -303,10 +330,38 @@ export class StepExecutor {
     ): Promise<void> {
         // Get the class instance for proper 'this' binding
         const className = definition.metadata['className'];
-        const classInstance = className ? stepRegistry.getClassInstance(className) : null;
+        
+        if (!className) {
+            throw new Error(
+                `Step definition metadata missing className property.\n` +
+                `Pattern: ${definition.patternString}\n` +
+                `Available metadata: ${JSON.stringify(definition.metadata)}\n` +
+                `Make sure the step is defined in a class decorated with @StepDefinitions`
+            );
+        }
+        
+        const classInstance = stepRegistry.getClassInstance(className);
         
         if (!classInstance) {
-            throw new Error(`No class instance found for step definition. ClassName: ${className}`);
+            throw new Error(
+                `No class instance found for step definition.\n` +
+                `ClassName: ${className}\n` +
+                `Pattern: ${definition.patternString}\n` +
+                `Make sure the class is decorated with @StepDefinitions`
+            );
+        }
+        
+        // Initialize page objects if this is the first step for this class
+        if (!this.initializedClasses.has(className)) {
+            if (typeof (classInstance as any).initializePageObjects === 'function') {
+                try {
+                    ActionLogger.logDebug(`Initializing page objects for ${className}`);
+                    await (classInstance as any).initializePageObjects();
+                } catch (error) {
+                    throw new Error(`Error initializing page objects for ${className}: ${(error as Error).message}`);
+                }
+            }
+            this.initializedClasses.add(className);
         }
         
         // Bind the step function to the correct context (class instance)

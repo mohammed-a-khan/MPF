@@ -3,7 +3,14 @@ import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement
 import { CSWebElement } from '../../../src/core/elements/CSWebElement';
 
 export class DealSeriesPage extends CSBasePage {
-    pageUrl = '';
+    protected get pageUrl(): string {
+        return '/web/index.php/deal-series';
+    }
+
+    protected async waitForPageLoad(): Promise<void> {
+        // Wait for the search type dropdown to be visible
+        await this.page.waitForSelector('button[name="searchType"]', { state: 'visible' });
+    }
 
     @CSGetElement({
         locatorType: 'xpath',
@@ -172,9 +179,5 @@ export class DealSeriesPage extends CSBasePage {
             const optionElement = this.getSearchAttributeOption(option);
             await optionElement.waitFor({ state: 'visible' });
         }
-    }
-
-    async waitForPageLoad() {
-        await this.page.waitForLoadState('networkidle');
     }
 } 

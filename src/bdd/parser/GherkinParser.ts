@@ -75,20 +75,15 @@ export class GherkinParser {
           
         case TokenType.ScenarioLine:
         case TokenType.ScenarioOutlineLine:
-          const scenario = this.parseScenario();
+          // Don't call parseScenario here - it expects to parse tags first
+          // Instead, we need to rewind if there are tags before this scenario
+          const scenario = this.parseScenarioWithBacktrack();
           feature.scenarios.push(scenario);
           break;
           
         case TokenType.TagLine:
-          // Tags for next scenario
-          const nextToken = this.peekToken();
-          if (nextToken && (nextToken.type === TokenType.ScenarioLine || nextToken.type === TokenType.ScenarioOutlineLine)) {
-            // Let parseScenario handle these tags
-            const scenario = this.parseScenario();
-            feature.scenarios.push(scenario);
-          } else {
-            this.advance(); // Skip orphaned tag
-          }
+          // Skip orphaned tags
+          this.advance();
           break;
           
         case TokenType.Comment:
@@ -108,6 +103,7 @@ export class GherkinParser {
         this.filePath
       );
     }
+    
     
     return feature;
   }
@@ -161,6 +157,30 @@ export class GherkinParser {
     }
     
     return background;
+  }
+  
+  private parseScenarioWithBacktrack(): Scenario {
+    // Look back to find any tags that precede this scenario
+    let tagStartIndex = this.currentIndex;
+    
+    // Backtrack to find the first tag
+    while (tagStartIndex > 0) {
+      const prevToken = this.tokens[tagStartIndex - 1];
+      if (prevToken && prevToken.type === TokenType.TagLine) {
+        tagStartIndex--;
+      } else {
+        break;
+      }
+    }
+    
+    // Save current position and reset to tag start
+    const savedIndex = this.currentIndex;
+    this.currentIndex = tagStartIndex;
+    
+    // Now parse the scenario normally (including its tags)
+    const scenario = this.parseScenario();
+    
+    return scenario;
   }
   
   private parseScenario(): Scenario {
@@ -226,9 +246,15 @@ export class GherkinParser {
         scenario.examples.push(examples);
       }
       
-      if (scenario.examples.length === 0) {
+      // Check if scenario has @DataProvider tag
+      const hasDataProvider = scenario.tags.some(tag => 
+        tag.startsWith('@DataProvider') || tag.includes('DataProvider(')
+      );
+      
+      // Only require Examples if there's no @DataProvider
+      if (scenario.examples.length === 0 && !hasDataProvider) {
         throw new ParseError(
-          'Scenario Outline must have at least one Examples section',
+          'Scenario Outline must have at least one Examples section or @DataProvider tag',
           scenarioToken.line,
           scenarioToken.column,
           this.filePath
@@ -356,8 +382,8 @@ export class GherkinParser {
     
     const examples: Examples = {
       name: examplesToken.value || 'Examples',
-      description: this.parseDescription(),
-      tags: this.parseTags(),
+      description: '', // Don't parse description here as it would consume table tokens
+      tags: [], // Tags would have been parsed before the Examples keyword
       header: [],
       rows: []
     };
@@ -366,8 +392,14 @@ export class GherkinParser {
       examples.line = examplesToken.line;
     }
     
+    // Skip empty lines before the table
+    while (!this.isAtEnd() && this.currentToken()?.type === TokenType.Empty) {
+      this.advance();
+    }
+    
     // Parse the table
     const tableToken = this.currentToken();
+    
     if (!tableToken || tableToken.type !== TokenType.TableRow) {
       throw new ParseError(
         'Examples must have a table',

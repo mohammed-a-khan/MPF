@@ -1,19 +1,10 @@
 import { CSBDDBaseStepDefinition } from '../../../src/bdd/base/CSBDDBaseStepDefinition';
-import { CSBDDStepDef, StepDefinitions } from '../../../src/bdd/decorators/CSBDDStepDef';
+import { CSBDDStepDef, StepDefinitions, PageObject } from '../../../src/bdd/decorators/CSBDDStepDef';
 import { DealSeriesPage } from '../pages/DealSeriesPage';
 
 @StepDefinitions
 export class AKHANDealSeriesSearchSteps extends CSBDDBaseStepDefinition {
-    private dealSeriesPage!: DealSeriesPage;
-
-    constructor() {
-        super();
-    }
-
-    async before() {
-        this.dealSeriesPage = new DealSeriesPage();
-        await this.dealSeriesPage.initialize(this.page);
-    }
+    @PageObject(DealSeriesPage) dealSeriesPage!: DealSeriesPage;
 
     @CSBDDStepDef('user verifies all search type options')
     async verifySearchTypeOptions() {

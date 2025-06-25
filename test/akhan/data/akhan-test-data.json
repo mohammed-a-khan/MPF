@@ -15,6 +15,36 @@
       "executeTest": true,
       "adoTestCase": "501",
       "priority": "high"
+    },
+    {
+      "testId": "TC501-2",
+      "description": "Test user 1 login",
+      "username": "testuser1",
+      "password": "testpass1",
+      "expectedBehavior": "normal_flow",
+      "executeTest": true,
+      "adoTestCase": "501",
+      "priority": "medium"
+    },
+    {
+      "testId": "TC501-3",
+      "description": "Test user 2 login",
+      "username": "testuser2",
+      "password": "testpass2",
+      "expectedBehavior": "normal_flow",
+      "executeTest": true,
+      "adoTestCase": "501",
+      "priority": "low"
+    },
+    {
+      "testId": "TC501-4",
+      "description": "Invalid user login",
+      "username": "invaliduser",
+      "password": "wrongpass",
+      "expectedBehavior": "login_failure",
+      "executeTest": false,
+      "adoTestCase": "501",
+      "priority": "low"
     }
   ],
   "esss_search_scenarios": [

@@ -140,7 +140,7 @@ export class ConfigurationManager {
       // Browser settings
       browser: {
         browser: (config['BROWSER_TYPE'] || config['DEFAULT_BROWSER'] || 'chromium') as any,
-        headless: ConfigurationManager.parseBoolean(config['BROWSER_HEADLESS'] || config['HEADLESS_MODE']) || false,
+        headless: ConfigurationManager.parseBoolean(config['BROWSER_HEADLESS'] || config['HEADLESS']) || false,
         slowMo: ConfigurationManager.parseNumber(config['BROWSER_SLOW_MO']) || 0,
         timeout: ConfigurationManager.parseNumber(config['DEFAULT_TIMEOUT']) || 30000,
         viewport: {

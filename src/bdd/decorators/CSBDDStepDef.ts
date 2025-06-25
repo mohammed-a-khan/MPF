@@ -14,7 +14,7 @@ export interface StepDefinitionOptions {
  */
 export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionOptions) {
   return function (target: any, propertyKey: string, methodDescriptor: PropertyDescriptor) {
-    console.log(`🔍 DEBUG: CSBDDStepDef decorator called for method: ${propertyKey}`);
+    console.log(`🔍 DEBUG: CSBDDStepDef decorator called for method: ${propertyKey} in class: ${target.constructor.name}`);
     
     // Get original method
     const originalMethod = methodDescriptor.value;
@@ -37,12 +37,13 @@ export function CSBDDStepDef(pattern: string | RegExp, options?: StepDefinitionO
       line,
       timeout: options?.timeout,
       retry: options?.retry,
-      wrapperOptions: options?.wrapperOptions
+      wrapperOptions: options?.wrapperOptions,
+      className: target.constructor.name
     };
     
     // Register step with registry
     stepRegistry.registerStep(pattern, originalMethod, metadata);
-    console.log(`🔍 DEBUG: Step registered successfully: ${pattern.toString()}`);
+    console.log(`🔍 DEBUG: Step registered successfully: ${pattern.toString()} for class: ${target.constructor.name}`);
     
     // Log registration
     Logger.getInstance().debug(`Registered step definition: ${pattern.toString()} -> ${stepDefinition.location}`);
@@ -253,3 +254,4 @@ function isAsyncFunction(fn: Function): boolean {
 // Re-export commonly used together
 export { stepRegistry } from './StepRegistry';
 export { ParameterTypeRegistry } from './ParameterTypeRegistry';
+export { PageObject, Page } from '../decorators/Page';

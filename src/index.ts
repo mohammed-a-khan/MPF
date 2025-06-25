@@ -138,8 +138,14 @@ async function runTests(options: ExecutionOptions): Promise<any> {
         // 🔥 FIX: Use TypeScript imports for critical modules
         const { CSFramework } = await import('./core/CSFramework');
         const { logger } = await import('./core/utils/Logger');
+        const { StepDefinitionLoader } = await import('./bdd/base/StepDefinitionLoader');
         
         console.log('✅ Critical modules loaded successfully');
+        
+        // Initialize step definition loader
+        const stepLoader = StepDefinitionLoader.getInstance();
+        await stepLoader.initialize();
+        console.log('✅ Step definition loader initialized');
         
         // Get framework instance
         const framework = CSFramework.getInstance();
