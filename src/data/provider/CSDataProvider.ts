@@ -126,12 +126,15 @@ export class CSDataProvider {
             
             // Load data from source
             let data = await this.loadFromSource(parsedOptions);
+            logger.debug(`Loaded ${data.length} rows from source`);
             
             // Apply transformations
             data = await this.applyTransformations(data, parsedOptions);
+            logger.debug(`After transformations: ${data.length} rows`);
             
             // Filter by execution flag
             data = await this.filterByExecutionFlag(data, parsedOptions);
+            logger.debug(`After execution flag filter: ${data.length} rows`);
             
             // Validate data
             await this.validateData(data, parsedOptions);
@@ -154,10 +157,14 @@ export class CSDataProvider {
                 duration
             });
             
+            logger.info(`Final data loaded: ${data.length} rows for ${options.source}`);
+            
             return data;
             
         } catch (error) {
-            ActionLogger.logError('Data provider error: load_failed', error as Error);
+            const errorObj = error instanceof Error ? error : new Error(String(error));
+            logger.error(`CSDataProvider.load failed:`, errorObj);
+            ActionLogger.logError('Data provider error: load_failed', errorObj);
             throw this.enhanceError(error, options);
         }
     }
@@ -227,9 +234,26 @@ export class CSDataProvider {
                 case 'skipFlag':
                     options.skipExecutionFlag = value === 'true';
                     break;
+                case 'delimiter':
+                    // Store delimiter for CSV handler
+                    (options as any).delimiter = value;
+                    break;
+                case 'headers':
+                    options.headers = value === 'true';
+                    break;
+                case 'parseBooleans':
+                    (options as any).parseBooleans = value === 'true';
+                    break;
+                case 'parseNumbers':
+                    (options as any).parseNumbers = value === 'true';
+                    break;
+                case 'parseDates':
+                    (options as any).parseDates = value === 'true';
+                    break;
             }
         }
         
+        logger.debug(`Parsed tag options: ${JSON.stringify(options)}`);
         return options;
     }
 
@@ -239,6 +263,8 @@ export class CSDataProvider {
     private parseFilter(filterStr: string): Record<string, any> {
         const filter: Record<string, any> = {};
         
+        logger.debug(`Parsing filter string: "${filterStr}"`);
+        
         // Parse simple key=value filters
         const parts = filterStr.split(',');
         for (const part of parts) {
@@ -247,11 +273,14 @@ export class CSDataProvider {
                 const key = splitParts[0];
                 const value = splitParts[1];
                 if (key) {
-                    filter[key] = this.parseFilterValue(value || '');
+                    const parsedValue = this.parseFilterValue(value || '');
+                    filter[key] = parsedValue;
+                    logger.debug(`Filter parsed: ${key} = ${parsedValue} (type: ${typeof parsedValue})`);
                 }
             }
         }
         
+        logger.debug(`Final parsed filter: ${JSON.stringify(filter)}`);
         return filter;
     }
 
@@ -282,6 +311,7 @@ export class CSDataProvider {
      * Load data from source
      */
     private async loadFromSource(options: DataProviderOptions): Promise<TestData[]> {
+        logger.debug(`loadFromSource called with options: ${JSON.stringify(options)}`);
         const handler = this.factory.createHandler(options.type!);
         
         let attempt = 0;
@@ -289,10 +319,13 @@ export class CSDataProvider {
         
         while (attempt < this.config.maxRetries) {
             try {
+                logger.debug(`Loading data from source: ${options.source}, type: ${options.type}`);
                 const result = await handler.load(options);
+                logger.debug(`Handler returned ${result.data.length} rows`);
                 return result.data;
             } catch (error) {
-                lastError = error as Error;
+                lastError = error instanceof Error ? error : new Error(String(error));
+                logger.error(`Data loading failed:`, lastError);
                 attempt++;
                 
                 if (attempt < this.config.maxRetries) {
@@ -346,14 +379,20 @@ export class CSDataProvider {
      * Apply filter to data
      */
     private applyFilter(data: TestData[], filter: Record<string, any>): TestData[] {
-        return data.filter(row => {
+        logger.debug(`Applying filter: ${JSON.stringify(filter)} to ${data.length} rows`);
+        
+        const filtered = data.filter(row => {
             for (const [key, value] of Object.entries(filter)) {
                 if (row[key] !== value) {
+                    logger.debug(`Row filtered out: ${key}=${row[key]} does not match ${value}`);
                     return false;
                 }
             }
             return true;
         });
+        
+        logger.debug(`Filter result: ${filtered.length} rows matched out of ${data.length} total`);
+        return filtered;
     }
 
     /**
@@ -369,11 +408,40 @@ export class CSDataProvider {
         
         const columnName = options.executionFlagColumn || this.config.executionFlagColumn;
         
-        return this.flagValidator.filterByExecutionFlag(data, 'execute', {
-            flagColumn: columnName,
+        // Look for common execution flag column names
+        const possibleColumns = ['executeTest', 'ExecuteTest', 'ExecutionFlag', 'executionFlag', 'Execute', 'execute'];
+        let actualColumn = columnName;
+        
+        // Find the actual column name in the data
+        if (data.length > 0) {
+            const firstRow = data[0];
+            if (firstRow) {
+                for (const col of possibleColumns) {
+                    if (col in firstRow) {
+                        actualColumn = col;
+                        logger.debug(`Found execution flag column: ${actualColumn}`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        const filtered = this.flagValidator.filterByExecutionFlag(data, 'execute', {
+            flagColumn: actualColumn,
             environment: ConfigurationManager.getEnvironmentName(),
-            defaultFlag: this.config.defaultExecutionFlag
+            defaultFlag: this.config.defaultExecutionFlag,
+            executeValues: ['Y', 'Yes', 'TRUE', 'true', '1', 'Execute', 'Run', 'T'],
+            skipValues: ['N', 'No', 'FALSE', 'false', '0', 'Skip', 'Ignore', 'F']
         });
+        
+        // Also set _execute property for backward compatibility
+        for (const row of filtered) {
+            row._execute = true;
+        }
+        
+        logger.debug(`Filtered data: ${filtered.length} rows out of ${data.length} total rows`);
+        
+        return filtered;
     }
 
     /**
@@ -732,7 +800,7 @@ export class CSDataProvider {
             // Extract options from tag
             // Example: @DataProvider(source="test/data.csv",type="csv",headers="true")
             const optionsMatch = tag.match(/@DataProvider\((.*)\)/);
-            if (!optionsMatch) {
+            if (!optionsMatch || !optionsMatch[1]) {
                 throw new Error(`Invalid @DataProvider tag format: ${tag}`);
             }
 

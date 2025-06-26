@@ -1,0 +1,160 @@
+{
+  "testData": [
+    {
+      "testCase": "TC501-1",
+      "testType": "login",
+      "username": "Admin",
+      "password": "admin123",
+      "expectedResult": "Login successful",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "high"
+    },
+    {
+      "testCase": "TC501-2", 
+      "testType": "login",
+      "username": "testuser",
+      "password": "test123",
+      "expectedResult": "Login successful",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "high"
+    },
+    {
+      "testCase": "TC501-3",
+      "testType": "login",
+      "username": "manager",
+      "password": "manager123",
+      "expectedResult": "Login successful",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "medium"
+    },
+    {
+      "testCase": "TC503-1",
+      "testType": "navigation",
+      "module": "Admin",
+      "expectedResult": "Admin page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "high"
+    },
+    {
+      "testCase": "TC503-2",
+      "testType": "navigation",
+      "module": "PIM",
+      "expectedResult": "PIM page",
+      "executeFlag": true,
+      "environment": "QA", 
+      "priority": "high"
+    },
+    {
+      "testCase": "TC503-3",
+      "testType": "navigation",
+      "module": "Leave",
+      "expectedResult": "Leave page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "medium"
+    },
+    {
+      "testCase": "TC503-4",
+      "testType": "navigation",
+      "module": "Time",
+      "expectedResult": "Time page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "medium"
+    },
+    {
+      "testCase": "TC503-5",
+      "testType": "navigation",
+      "module": "Recruitment",
+      "expectedResult": "Recruitment page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "medium"
+    },
+    {
+      "testCase": "TC503-6",
+      "testType": "navigation",
+      "module": "My Info",
+      "expectedResult": "My Info page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "low"
+    },
+    {
+      "testCase": "TC503-7",
+      "testType": "navigation",
+      "module": "Performance",
+      "expectedResult": "Performance page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "low"
+    },
+    {
+      "testCase": "TC503-8",
+      "testType": "navigation",
+      "module": "Dashboard",
+      "expectedResult": "Dashboard page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "high"
+    },
+    {
+      "testCase": "TC503-9",
+      "testType": "navigation",
+      "module": "Directory",
+      "expectedResult": "Directory page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "low"
+    },
+    {
+      "testCase": "TC503-10",
+      "testType": "navigation",
+      "module": "Maintenance",
+      "expectedResult": "Maintenance page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "low"
+    },
+    {
+      "testCase": "TC503-11",
+      "testType": "navigation",
+      "module": "Buzz",
+      "expectedResult": "Buzz page",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "low"
+    },
+    {
+      "testCase": "TC502-1",
+      "testType": "menu-verify",
+      "menuItem": "Admin",
+      "expectedResult": "Admin menu visible",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "medium"
+    },
+    {
+      "testCase": "TC502-2",
+      "testType": "menu-verify",
+      "menuItem": "PIM",
+      "expectedResult": "PIM menu visible",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "medium"
+    },
+    {
+      "testCase": "TC502-3",
+      "testType": "menu-verify",
+      "menuItem": "Leave",
+      "expectedResult": "Leave menu visible",
+      "executeFlag": true,
+      "environment": "QA",
+      "priority": "medium"
+    }
+  ]
+}

@@ -100,6 +100,14 @@ export abstract class CSBasePage {
                 throw new Error('No URL specified for navigation');
             }
             
+            // Check if we're already on the target URL to avoid unnecessary navigation
+            const currentUrl = this.page.url();
+            if (currentUrl === targetUrl) {
+                logger.debug(`Already on target URL: ${targetUrl}`);
+                await this.waitForPageLoad();
+                return;
+            }
+            
             const startTime = Date.now();
             
             await this.page.goto(targetUrl, {

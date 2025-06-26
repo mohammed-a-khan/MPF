@@ -115,22 +115,18 @@ export class StepDefinitionLoader {
      * Find step definition files
      */
     private async findStepFiles(): Promise<string[]> {
+        // Simplified patterns to reduce search time
         const patterns = [
-            '**/test/**/*.steps.ts',
-            '**/test/**/*.step.ts',
-            '**/test/**/steps/**/*.ts',
-            '**/test/**/step/**/*.ts',
-            '**/src/steps/**/*.ts',
-            '**/src/**/steps/**/*.ts',
-            '**/test/akhan/steps/*.steps.ts',
-            '**/test/akhan/steps/*.step.ts'
+            'test/**/steps/**/*.{ts,js}',
+            'src/steps/**/*.{ts,js}'
         ];
         
         const files = await Promise.all(patterns.map(async pattern => {
             const matches = await glob(pattern, { 
-                ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
+                ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/*.d.ts'],
                 cwd: process.cwd(),
-                absolute: true
+                absolute: true,
+                maxDepth: 8 // Limit search depth
             });
             return matches;
         }));
@@ -282,11 +278,19 @@ export class StepDefinitionLoader {
             if (isAkhanProject) {
                 // For akhan project, load only akhan-specific steps
                 console.log('🔍 DEBUG: Loading AKHAN-specific step definitions only');
-                files = await glob('**/test/akhan/steps/*.ts', {
-                    ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
+                files = await glob('test/akhan/steps/*.{ts,js}', {
+                    ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/*.d.ts'],
                     cwd: process.cwd(),
                     absolute: true
                 });
+                
+                // Load ALL UI steps to ensure nothing is missing
+                const uiSteps = await glob('src/steps/ui/*.{ts,js}', {
+                    ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/*.d.ts'],
+                    cwd: process.cwd(),
+                    absolute: true
+                });
+                files = [...files, ...uiSteps];
             } else {
                 // For other projects, load all step files
                 files = await this.findStepFiles();

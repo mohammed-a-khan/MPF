@@ -929,7 +929,7 @@ export class StepExecutor {
     /**
      * Get current step execution context information
      */
-    private getCurrentStepInfo(step: Step): { featureName: string; scenarioName: string; stepLabel: string } {
+    private getCurrentStepInfo(step: Step): { featureName: string; scenarioName: string; scenarioId: string; stepLabel: string } {
         try {
             const bddContext = BDDContext.getInstance();
             const featureContext = bddContext.getFeatureContext();
@@ -938,6 +938,7 @@ export class StepExecutor {
             return {
                 featureName: featureContext.getFeature().name,
                 scenarioName: scenarioContext.getScenario().name,
+                scenarioId: scenarioContext.getScenarioId(),
                 stepLabel: `${step.keyword} ${step.text}`
             };
         } catch (error) {
@@ -945,6 +946,7 @@ export class StepExecutor {
             return {
                 featureName: 'Unknown Feature',
                 scenarioName: 'Unknown Scenario',
+                scenarioId: 'unknown',
                 stepLabel: `${step.keyword} ${step.text}`
             };
         }
@@ -972,9 +974,11 @@ export class StepExecutor {
                 }
             );
 
-            // Generate filename with timestamp
+            // Generate filename with scenario ID and timestamp
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const fileName = `${status}-screenshot-${timestamp}.png`;
+            const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            // Format: scenarioId_stepId_type_timestamp.png (expected by ReportCollector)
+            const fileName = `${stepInfo.scenarioId}_${stepId}_${status}_${timestamp}.png`;
             
             // Save screenshot to screenshots subdirectory
             const screenshotPath = await this.screenshotManager.saveScreenshot(
@@ -999,6 +1003,7 @@ export class StepExecutor {
                 metadata: {
                     featureName: stepInfo.featureName,
                     scenarioName: stepInfo.scenarioName,
+                    scenarioId: stepInfo.scenarioId,
                     stepLabel: stepInfo.stepLabel,
                     status: status
                 }

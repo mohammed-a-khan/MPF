@@ -204,8 +204,17 @@ export class ExecutionContext {
     this.logger.info(`Creating new page: ${this.executionId}`);
     
     // Ensure we have a valid browser context
-    if (!this.context || this.context.pages().length === 0) {
+    if (!this.context) {
       this.context = await this.createBrowserContext();
+    }
+
+    // Close any existing about:blank pages before creating a new one
+    const existingPages = this.context.pages();
+    for (const page of existingPages) {
+      if (!page.isClosed() && page.url() === 'about:blank') {
+        this.logger.info(`Closing unused about:blank page`);
+        await page.close();
+      }
     }
 
     this.page = await this.createPage(this.context);

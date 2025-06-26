@@ -124,6 +124,8 @@ export class ExecutionFlagValidator {
         // Check multiple possible flag locations
         const flagLocations = [
             options.flagColumn,
+            'executeTest',
+            'ExecuteTest',
             'executionFlag',
             'ExecutionFlag',
             'execution_flag',

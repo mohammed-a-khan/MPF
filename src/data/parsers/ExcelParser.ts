@@ -16,9 +16,8 @@ export class ExcelParser {
     constructor() {
         this.typeConverter = new TypeConverter();
         
-        // Configure XLSX settings
-        XLSX.set_fs(require('fs'));
-        XLSX.stream.set_readable(require('stream').Readable);
+        // Configure XLSX settings - removed deprecated methods
+        // Modern versions of xlsx don't need set_fs or set_readable
     }
 
     /**

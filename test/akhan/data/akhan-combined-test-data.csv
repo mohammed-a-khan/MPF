@@ -1,0 +1,18 @@
+testCase,testType,username,password,module,expectedResult,executeFlag,environment,priority
+TC501-1,login,Admin,admin123,,Login successful,Y,QA,high
+TC501-2,login,testuser,test123,,Login successful,Y,QA,high
+TC501-3,login,manager,manager123,,Login successful,Y,QA,medium
+TC503-1,navigation,,,Admin,Admin page,Y,QA,high
+TC503-2,navigation,,,PIM,PIM page,Y,QA,high
+TC503-3,navigation,,,Leave,Leave page,Y,QA,medium
+TC503-4,navigation,,,Time,Time page,Y,QA,medium
+TC503-5,navigation,,,Recruitment,Recruitment page,Y,QA,medium
+TC503-6,navigation,,,My Info,My Info page,Y,QA,low
+TC503-7,navigation,,,Performance,Performance page,Y,QA,low
+TC503-8,navigation,,,Dashboard,Dashboard page,Y,QA,high
+TC503-9,navigation,,,Directory,Directory page,Y,QA,low
+TC503-10,navigation,,,Maintenance,Maintenance page,Y,QA,low
+TC503-11,navigation,,,Buzz,Buzz page,Y,QA,low
+TC502-1,menu-verify,,,Admin,Admin menu visible,Y,QA,medium
+TC502-2,menu-verify,,,PIM,PIM menu visible,Y,QA,medium
+TC502-3,menu-verify,,,Leave,Leave menu visible,Y,QA,medium

@@ -32,7 +32,19 @@
       "Bash(timeout 30 npm run test:*)",
       "Bash(timeout 60 npm run test:*)",
       "Bash(timeout 30 npx ts-node:*)",
-      "Bash(timeout 30s npm run test:*)"
+      "Bash(timeout 30s npm run test:*)",
+      "Bash(timeout 180 npm test -- test/akhan/features/akhan-login-navigation-csv.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(timeout 60 npm test:*)",
+      "Bash(timeout 240 npm test -- test/akhan/features/akhan-login-navigation-csv.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(timeout 120 npm test -- test/akhan/features/test-simple.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(SKIP_STEP_LOADING=true timeout 120 npm test -- test/akhan/features/akhan-login-navigation-csv.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(timeout 300 npm test -- test/akhan/features/akhan-login-navigation-csv.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(timeout 240 npm test -- test/akhan/features/akhan-login-navigation.feature --project=akhan --env=dev --headless=false 2 >& 1)",
+      "Bash(npm run bdd:*)",
+      "Bash(cross-env:*)",
+      "Bash(npx cross-env:*)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }

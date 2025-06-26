@@ -142,8 +142,16 @@ async function runTests(options: ExecutionOptions): Promise<any> {
         
         console.log('✅ Critical modules loaded successfully');
         
-        // Initialize step definition loader
+        // Initialize step definition loader with performance optimization
         const stepLoader = StepDefinitionLoader.getInstance();
+        
+        // For AKHAN project, only load AKHAN-specific steps
+        const projectName = options.project || 'saucedemo';
+        if (projectName === 'akhan') {
+            console.log('🚀 Loading AKHAN-specific step definitions only...');
+            // The StepDefinitionLoader already has optimization for AKHAN project
+        }
+        
         await stepLoader.initialize();
         console.log('✅ Step definition loader initialized');
         

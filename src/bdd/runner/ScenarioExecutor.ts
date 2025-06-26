@@ -183,8 +183,9 @@ export class ScenarioExecutor {
             let stepsToExecute = scenario.steps;
             if (testData) {
                 stepsToExecute = this.replacePlaceholdersInSteps(scenario.steps, testData);
-                // Store test data in context for step access
-                this.currentContext.testData = testData;
+                // Store test data in BDD context for step access
+                const bddContext = BDDContext.getInstance();
+                bddContext.setTestData(testData);
             }
 
             // Execute steps
@@ -308,18 +309,30 @@ export class ScenarioExecutor {
         featureContext?: any
     ): Promise<ScenarioResult> {
         ActionLogger.logInfo('Data-Driven Scenario', `Executing: ${scenario.name}`);
+        console.log(`🔍 DEBUG: executeDataDrivenScenario called for: ${scenario.name}`);
 
         // Load test data
         const testDataSet = await this.loadTestData(scenario);
+        console.log(`🔍 DEBUG: Loaded ${testDataSet.length} test data rows`);
+        
         const results: ScenarioResult[] = [];
 
+        if (testDataSet.length === 0) {
+            console.log(`⚠️ WARNING: No test data found for scenario: ${scenario.name}`);
+            ActionLogger.logWarn('No test data found', scenario.name);
+        }
+
         for (const testData of testDataSet) {
+            console.log(`🔍 DEBUG: Processing test data row:`, JSON.stringify(testData));
+            
             // Skip if execution flag is false
             if (testData._execute === false) {
                 ActionLogger.logDebug('Skipping test data', JSON.stringify(testData));
+                console.log(`🔍 DEBUG: Skipping row due to _execute=false`);
                 continue;
             }
 
+            console.log(`🔍 DEBUG: Executing scenario with test data`);
             // Execute scenario with test data
             const result = await this.executeSingleScenario(
                 scenario,
@@ -335,6 +348,7 @@ export class ScenarioExecutor {
             }
         }
 
+        console.log(`🔍 DEBUG: Executed ${results.length} scenario iterations`);
         // Merge results
         return this.mergeDataDrivenResults(scenario, results);
     }
@@ -827,9 +841,14 @@ export class ScenarioExecutor {
             tag.startsWith('@DataProvider') || tag.includes('DataProvider(')
         );
         
+        console.log(`🔍 DEBUG: Looking for @DataProvider tag in: ${scenario.tags}`);
+        
         if (!dataProviderTag) {
+            console.log(`🔍 DEBUG: No @DataProvider tag found`);
             return [];
         }
+        
+        console.log(`🔍 DEBUG: Found @DataProvider tag: ${dataProviderTag}`);
         
         try {
             // Import CSDataProvider dynamically to avoid circular dependencies
@@ -837,11 +856,14 @@ export class ScenarioExecutor {
             
             // Load data using CSDataProvider
             const dataProvider = CSDataProvider.getInstance();
+            console.log(`🔍 DEBUG: Loading data from tag: ${dataProviderTag}`);
             const testData = await dataProvider.loadFromTag(dataProviderTag);
             
+            console.log(`🔍 DEBUG: Loaded ${testData.length} rows from ${dataProviderTag}`);
             ActionLogger.logDebug('Loaded test data', `Loaded ${testData.length} rows from ${dataProviderTag}`);
             return testData;
         } catch (error) {
+            console.log(`❌ ERROR: Failed to load test data:`, error);
             ActionLogger.logError('Failed to load test data', error as Error);
             throw error;
         }
@@ -859,8 +881,87 @@ export class ScenarioExecutor {
      * Merge data-driven results
      */
     private mergeDataDrivenResults(scenario: Scenario, results: ScenarioResult[]): ScenarioResult {
-        // Implementation of mergeDataDrivenResults method
-        return {} as ScenarioResult;
+        if (results.length === 0) {
+            // No results, return a pending/skipped result
+            return {
+                id: `scenario_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                scenario: scenario.name,  // Changed from 'name' to 'scenario'
+                scenarioRef: scenario,    // Add the scenario reference
+                tags: scenario.tags,
+                status: ScenarioStatus.PENDING,
+                steps: [],
+                duration: 0,
+                startTime: new Date(),
+                endTime: new Date(),
+                error: null,
+                attachments: [],
+                metadata: {
+                    dataProvider: true,
+                    totalIterations: 0,
+                    passedIterations: 0,
+                    failedIterations: 0
+                }
+            };
+        }
+
+        // Determine overall status
+        const hasFailure = results.some(r => r.status === ScenarioStatus.FAILED);
+        const allPassed = results.every(r => r.status === ScenarioStatus.PASSED);
+        const overallStatus = hasFailure ? ScenarioStatus.FAILED : 
+                            allPassed ? ScenarioStatus.PASSED : 
+                            ScenarioStatus.PENDING;
+
+        // Collect all steps from all iterations
+        const allSteps: StepResult[] = [];
+        const allAttachments: any[] = [];
+        let totalDuration = 0;
+
+        results.forEach((result, index) => {
+            // Add iteration info to steps
+            const iterationSteps = result.steps.map(step => ({
+                ...step,
+                text: `[Iteration ${index + 1}] ${step.text}`
+            }));
+            allSteps.push(...iterationSteps);
+            
+            if (result.attachments) {
+                allAttachments.push(...result.attachments);
+            }
+            totalDuration += result.duration;
+        });
+
+        // Get the first error if any
+        const firstError = results.find(r => r.error)?.error;
+
+        const result: ScenarioResult = {
+            id: `scenario_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            scenario: scenario.name,  // Changed from 'name' to 'scenario'
+            scenarioRef: scenario,    // Add the scenario reference
+            status: overallStatus,
+            steps: allSteps,
+            duration: totalDuration,
+            startTime: results[0]?.startTime || new Date(),
+            endTime: results[results.length - 1]?.endTime || new Date(),
+            metadata: {
+                dataProvider: true,
+                totalIterations: results.length,
+                passedIterations: results.filter(r => r.status === ScenarioStatus.PASSED).length,
+                failedIterations: results.filter(r => r.status === ScenarioStatus.FAILED).length
+            }
+        };
+        
+        // Add optional properties only if they have values
+        if (scenario.tags && scenario.tags.length > 0) {
+            result.tags = scenario.tags;
+        }
+        if (firstError) {
+            result.error = firstError;
+        }
+        if (allAttachments.length > 0) {
+            result.attachments = allAttachments;
+        }
+        
+        return result;
     }
 
     /**

@@ -1,11 +1,6 @@
-menuGroup,menuItem,position,subItemsCount,isVisible,icon,executeTest
-main,Home,1,0,true,home-icon,true
-main,ESSS/Series,2,3,true,folder-icon,true
-main,Reference Interests,3,0,true,reference-icon,true
-main,Interest History,4,0,true,history-icon,true
-main,External Interests,5,0,true,external-icon,true
-main,System Admin,6,5,true,admin-icon,true
-main,Version Information,7,0,true,info-icon,true
-main,File Upload,8,0,true,upload-icon,true
-admin,User Management,1,0,true,user-icon,false
-admin,Role Management,2,0,true,role-icon,false
+testId,menuItem,menuGroup,executeTest,priority,environment
+TC502-1,ESSS,main,TRUE,high,SIT
+TC502-2,Deal Series,main,TRUE,high,SIT
+TC502-3,Reports,main,TRUE,medium,SIT
+TC502-4,Admin,admin,FALSE,low,SIT
+TC502-5,Help,support,FALSE,low,SIT

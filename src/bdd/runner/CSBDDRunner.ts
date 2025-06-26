@@ -955,6 +955,23 @@ export class CSBDDRunner {
                     name: (firstFeature.feature && firstFeature.feature.name) || firstFeature.name || 'no-name',
                     scenarios: (firstFeature.scenarios && firstFeature.scenarios.length) || 0
                 });
+                
+                // Debug scenario details
+                if (firstFeature.scenarios && firstFeature.scenarios.length > 0) {
+                    const firstScenario = firstFeature.scenarios[0];
+                    if (firstScenario) {
+                        logger.info(`🔥 DEBUG: First scenario in first feature:`, {
+                            id: firstScenario.id || 'no-id',
+                            scenario: firstScenario.scenario || 'no-scenario-field',
+                            name: firstScenario.scenario || 'no-name-field',
+                            scenarioRef: firstScenario.scenarioRef ? {
+                                name: firstScenario.scenarioRef.name || 'no-ref-name'
+                            } : 'no-scenarioRef',
+                            status: firstScenario.status || 'no-status',
+                            steps: firstScenario.steps ? firstScenario.steps.length : 0
+                        });
+                    }
+                }
             }
         }
 
@@ -1104,10 +1121,10 @@ export class CSBDDRunner {
                 scenarios: result.features.flatMap(f => 
                     (f.scenarios || []).map(s => ({
                         scenarioId: s.id || '',
-                        name: s.scenario || '',
+                        name: s.scenarioRef?.name || s.scenario || 'Unknown Scenario',
                         status: this.mapScenarioStatusToTestStatus(s.status || 'failed'),
                         duration: s.duration || 0,
-                        retryCount: 0,
+                        retryCount: s.retries || 0,
                         description: s.scenarioRef?.description || '',
                         tags: s.tags || [],
                         line: s.scenarioRef?.line || 0,
@@ -1142,10 +1159,10 @@ export class CSBDDRunner {
                     tags: f.feature?.tags || f.tags || [],
                     scenarios: (f.scenarios || []).map(s => ({
                         scenarioId: s.id || '',
-                        name: s.scenario || '',
+                        name: s.scenarioRef?.name || s.scenario || 'Unknown Scenario',
                         status: this.mapScenarioStatusToTestStatus(s.status || 'failed'),
                         duration: s.duration || 0,
-                        retryCount: 0,
+                        retryCount: s.retries || 0,
                         description: s.scenarioRef?.description || '',
                         tags: s.tags || [],
                         line: s.scenarioRef?.line || 0,
@@ -1194,10 +1211,10 @@ export class CSBDDRunner {
                 const feature = result.features[index] || f;
                 const scenarios = (f.scenarios || []).map(s => ({
                     scenarioId: s.id || '',
-                    name: s.scenario || '',
+                    name: s.scenarioRef?.name || s.scenario || 'Unknown Scenario',
                     status: this.mapScenarioStatusToTestStatus(s.status || 'failed'),
                     duration: s.duration || 0,
-                    retryCount: 0,
+                    retryCount: s.retries || 0,
                     // CRITICAL: Include steps with actionDetails for proper reporting
                     steps: (s.steps || []).map(st => ({
                         stepId: st.id || '',
@@ -1976,9 +1993,10 @@ export class CSBDDRunner {
      */
     private logExecutionSummary(summary: ExecutionSummary): void {
         console.log('\n=== Execution Summary ===');
-        console.log(`Total Scenarios: ${summary.total}`);
-        console.log(`Passed: ${summary.passed} (${(summary.passed / summary.total * 100).toFixed(1)}%)`);
-        console.log(`Failed: ${summary.failed} (${(summary.failed / summary.total * 100).toFixed(1)}%)`);
+        console.log(`Total Scenarios: ${summary.totalScenarios || summary.total}`);
+        const total = summary.totalScenarios || summary.total || 1; // Prevent division by zero
+        console.log(`Passed: ${summary.passed} (${total > 0 ? (summary.passed / total * 100).toFixed(1) : '0.0'}%)`);
+        console.log(`Failed: ${summary.failed} (${total > 0 ? (summary.failed / total * 100).toFixed(1) : '0.0'}%)`);
         console.log(`Skipped: ${summary.skipped}`);
         console.log(`Pending: ${summary.pending}`);
         console.log('\n');

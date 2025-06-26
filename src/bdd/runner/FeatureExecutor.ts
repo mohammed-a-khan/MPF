@@ -856,10 +856,12 @@ export class FeatureExecutor {
 
         // Count steps
         for (const scenario of result.scenarios) {
-            metrics.totalSteps += scenario.steps.length;
-            metrics.passedSteps += scenario.steps.filter(s => s.status === StepStatus.PASSED).length;
-            metrics.failedSteps += scenario.steps.filter(s => s.status === StepStatus.FAILED).length;
-            metrics.skippedSteps += scenario.steps.filter(s => s.status === StepStatus.SKIPPED).length;
+            if (scenario.steps && Array.isArray(scenario.steps)) {
+                metrics.totalSteps += scenario.steps.length;
+                metrics.passedSteps += scenario.steps.filter(s => s.status === StepStatus.PASSED).length;
+                metrics.failedSteps += scenario.steps.filter(s => s.status === StepStatus.FAILED).length;
+                metrics.skippedSteps += scenario.steps.filter(s => s.status === StepStatus.SKIPPED).length;
+            }
         }
 
         // Calculate durations
