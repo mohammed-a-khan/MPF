@@ -2898,7 +2898,12 @@ export class ImprovedProductionHTMLReportGenerator {
                                 let imagePath = screenshot.path || '';
                                 
                                 // FIXED: Handle new zip structure where HTML is in html/ subdirectory and screenshots are in evidence/screenshots/
-                                if (imagePath.includes('/screenshots/')) {
+                                // First check if path contains evidence/screenshots (most common case after path updates)
+                                if (imagePath.includes('/evidence/screenshots/') || imagePath.includes('\\evidence\\screenshots\\')) {
+                                    // Extract just the filename from the evidence path
+                                    const filename = path.basename(imagePath);
+                                    imagePath = `../evidence/screenshots/${filename}`;
+                                } else if (imagePath.includes('/screenshots/')) {
                                     // Extract just the filename from the path
                                     const filename = imagePath.split('/screenshots/').pop();
                                     imagePath = `../evidence/screenshots/${filename}`;
@@ -2942,6 +2947,11 @@ export class ImprovedProductionHTMLReportGenerator {
                                             imagePath = `../${afterReports}`;
                                         }
                                     }
+                                } else {
+                                    // Fallback: If no pattern matches, assume it's an absolute path
+                                    // and extract just the filename to use with evidence directory
+                                    const filename = path.basename(imagePath);
+                                    imagePath = `../evidence/screenshots/${filename}`;
                                 }
                                 
                                 // Ensure proper path format for display
@@ -4949,7 +4959,10 @@ export class ImprovedProductionHTMLReportGenerator {
         const scenarios = reportData.scenarios || [];
         scenarios.forEach(scenario => {
             (scenario.tags || []).forEach(tag => {
-                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                // Exclude @DataProvider tags from tag distribution
+                if (!tag.startsWith('@DataProvider')) {
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                }
             });
         });
         

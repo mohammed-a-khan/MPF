@@ -4,7 +4,7 @@ import { ParserOptions, DataSchema } from '../types/data.types';
 import { logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { TypeConverter } from '../transformers/TypeConverter';
-import * as jsonpath from 'jsonpath';
+const jsonpath = require('jsonpath');
 
 /**
  * Parser for JSON files

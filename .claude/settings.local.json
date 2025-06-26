@@ -44,7 +44,10 @@
       "Bash(cross-env:*)",
       "Bash(npx cross-env:*)",
       "Bash(python3:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(timeout 30 npm test:*)",
+      "Bash(npm run verify-excel-data:*)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }

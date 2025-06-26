@@ -14,6 +14,7 @@ import { DataMerger } from '../transformers/DataMerger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { logger } from '../../core/utils/Logger';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
+import { ColumnNormalizer } from '../utils/ColumnNormalizer';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
@@ -195,13 +196,27 @@ export class CSDataProvider {
     private parseTagValue(tagValue: string): Partial<DataProviderOptions> {
         const options: Partial<DataProviderOptions> = {};
         
-        // Parse key=value pairs
-        const regex = /(\w+)=["']([^"']+)["']/g;
+        logger.debug(`Parsing @DataProvider tag value: ${tagValue}`);
+        console.log(`🔍 DEBUG parseTagValue: Input tagValue = "${tagValue}"`);
+        
+        // Parse key=value pairs - handle both quoted and unquoted values
+        // Updated regex to handle nested quotes in values (like JSONPath expressions)
+        const regex = /(\w+)="((?:[^"\\]|\\.)*)"/g;
         let match;
+        let matchCount = 0;
+        
+        // Also check what kind of quotes we have
+        console.log(`🔍 DEBUG parseTagValue: Checking for quote types...`);
+        console.log(`  Contains ": ${tagValue.includes('"')}`);
+        console.log(`  Contains ': ${tagValue.includes("'")}`);
+        console.log(`  First 50 chars: ${tagValue.substring(0, 50)}`);
         
         while ((match = regex.exec(tagValue)) !== null) {
+            matchCount++;
             const key = match[1];
             const value = match[2];
+            logger.debug(`Extracted key="${key}", value="${value}"`);
+            console.log(`🔍 DEBUG parseTagValue: Match ${matchCount} - key="${key}", value="${value}"`);
             
             switch (key) {
                 case 'source':
@@ -213,6 +228,9 @@ export class CSDataProvider {
                 case 'sheet':
                     options.sheet = value || '';
                     break;
+                case 'sheetName':
+                    options.sheet = value || '';
+                    break;
                 case 'table':
                     options.table = value || '';
                     break;
@@ -220,6 +238,8 @@ export class CSDataProvider {
                     options.query = value || '';
                     break;
                 case 'filter':
+                    // Filter values are already captured correctly by the regex
+                    // The value contains the full filter string
                     options.filter = this.parseFilter(value || '');
                     break;
                 case 'schema':
@@ -250,10 +270,16 @@ export class CSDataProvider {
                 case 'parseDates':
                     (options as any).parseDates = value === 'true';
                     break;
+                case 'jsonPath':
+                    // Store JSONPath for JSON handler
+                    (options as any).jsonPath = value;
+                    break;
             }
         }
         
+        console.log(`🔍 DEBUG parseTagValue: Total matches found = ${matchCount}`);
         logger.debug(`Parsed tag options: ${JSON.stringify(options)}`);
+        console.log(`🔍 DEBUG parseTagValue: Final parsed options = ${JSON.stringify(options)}`);
         return options;
     }
 
@@ -276,6 +302,7 @@ export class CSDataProvider {
                     const parsedValue = this.parseFilterValue(value || '');
                     filter[key] = parsedValue;
                     logger.debug(`Filter parsed: ${key} = ${parsedValue} (type: ${typeof parsedValue})`);
+                    console.log(`🔍 DEBUG parseFilter: ${key} = "${value}" -> ${parsedValue} (type: ${typeof parsedValue})`);
                 }
             }
         }
@@ -293,9 +320,19 @@ export class CSDataProvider {
             return parseFloat(value);
         }
         
-        // Boolean
-        if (value.toLowerCase() === 'true' || value.toLowerCase() === 'false') {
-            return value.toLowerCase() === 'true';
+        // Boolean - handle Y/N and other common boolean values
+        const lowerValue = value.toLowerCase();
+        if (lowerValue === 'true' || lowerValue === 'false') {
+            return lowerValue === 'true';
+        }
+        // Handle Y/N values that TypeConverter converts to boolean
+        if (lowerValue === 'y' || lowerValue === 'yes' || lowerValue === '1' || 
+            lowerValue === 'on' || lowerValue === 'enabled' || lowerValue === 'active') {
+            return true;
+        }
+        if (lowerValue === 'n' || lowerValue === 'no' || lowerValue === '0' || 
+            lowerValue === 'off' || lowerValue === 'disabled' || lowerValue === 'inactive') {
+            return false;
         }
         
         // Date
@@ -312,6 +349,7 @@ export class CSDataProvider {
      */
     private async loadFromSource(options: DataProviderOptions): Promise<TestData[]> {
         logger.debug(`loadFromSource called with options: ${JSON.stringify(options)}`);
+        console.log(`🔍 DEBUG loadFromSource: options = ${JSON.stringify(options, null, 2)}`);
         const handler = this.factory.createHandler(options.type!);
         
         let attempt = 0;
@@ -320,9 +358,21 @@ export class CSDataProvider {
         while (attempt < this.config.maxRetries) {
             try {
                 logger.debug(`Loading data from source: ${options.source}, type: ${options.type}`);
+                console.log(`🔍 DEBUG loadFromSource: Calling handler.load with source=${options.source}`);
                 const result = await handler.load(options);
+                console.log(`🔍 DEBUG loadFromSource: Handler returned ${result.data.length} rows`);
                 logger.debug(`Handler returned ${result.data.length} rows`);
-                return result.data;
+                
+                // Normalize column names to handle variations
+                const normalizedData = ColumnNormalizer.normalizeData(result.data);
+                
+                // Log first few rows for debugging
+                if (normalizedData.length > 0) {
+                    console.log(`🔍 DEBUG loadFromSource: First row (before normalization) = ${JSON.stringify(result.data[0])}`);
+                    console.log(`🔍 DEBUG loadFromSource: First row (after normalization) = ${JSON.stringify(normalizedData[0])}`);
+                }
+                
+                return normalizedData;
             } catch (error) {
                 lastError = error instanceof Error ? error : new Error(String(error));
                 logger.error(`Data loading failed:`, lastError);
@@ -380,18 +430,74 @@ export class CSDataProvider {
      */
     private applyFilter(data: TestData[], filter: Record<string, any>): TestData[] {
         logger.debug(`Applying filter: ${JSON.stringify(filter)} to ${data.length} rows`);
+        console.log(`🔍 DEBUG applyFilter: filter = ${JSON.stringify(filter)}, data.length = ${data.length}`);
         
-        const filtered = data.filter(row => {
+        // Log first row to see column names
+        if (data.length > 0 && data[0]) {
+            console.log(`🔍 DEBUG applyFilter: First row keys = ${Object.keys(data[0]).join(', ')}`);
+            console.log(`🔍 DEBUG applyFilter: First row = ${JSON.stringify(data[0])}`);
+            
+            // Check if filter columns exist in the data
+            const availableColumns = Object.keys(data[0]);
+            const filterColumns = Object.keys(filter);
+            const missingColumns = filterColumns.filter(col => !availableColumns.includes(col));
+            
+            if (missingColumns.length > 0) {
+                console.warn(`⚠️ WARNING: Filter columns not found in data: ${missingColumns.join(', ')}`);
+                console.warn(`⚠️ Available columns: ${availableColumns.join(', ')}`);
+                console.warn(`⚠️ This will result in no matches. Please check your filter configuration.`);
+            }
+        }
+        
+        const filtered = data.filter((row, index) => {
+            let rowMatches = true;
             for (const [key, value] of Object.entries(filter)) {
-                if (row[key] !== value) {
-                    logger.debug(`Row filtered out: ${key}=${row[key]} does not match ${value}`);
-                    return false;
+                // Check if the key exists in the row
+                if (!(key in row)) {
+                    if (index < 3) {
+                        console.log(`🔍 DEBUG applyFilter: Row ${index} - key "${key}" not found in row`);
+                    }
+                    rowMatches = false;
+                    break;
+                }
+                
+                // Handle undefined values
+                if (row[key] === undefined || row[key] === null) {
+                    const matches = value === undefined || value === null || value === 'undefined' || value === 'null';
+                    if (!matches) {
+                        if (index < 3) {
+                            console.log(`🔍 DEBUG applyFilter: Row ${index} filtered out - ${key}=undefined/null !== "${value}"`);
+                        }
+                        rowMatches = false;
+                        break;
+                    }
+                    continue;
+                }
+                
+                // Convert both values to strings for comparison to handle type mismatches
+                const rowValue = String(row[key]);
+                const filterValue = String(value);
+                
+                if (rowValue !== filterValue) {
+                    if (index < 3) { // Only log first few rows to avoid spam
+                        logger.debug(`Row ${index} filtered out: ${key}=${rowValue} (type: ${typeof row[key]}) does not match ${filterValue} (type: ${typeof value})`);
+                        console.log(`🔍 DEBUG applyFilter: Row ${index} filtered out - ${key}="${rowValue}" !== "${filterValue}"`);
+                    }
+                    rowMatches = false;
+                    break;
                 }
             }
-            return true;
+            
+            if (rowMatches && index < 3) {
+                console.log(`🔍 DEBUG applyFilter: Row ${index} MATCHED filter`);
+            }
+            
+            return rowMatches;
         });
         
         logger.debug(`Filter result: ${filtered.length} rows matched out of ${data.length} total`);
+        console.log(`🔍 DEBUG applyFilter: Final result = ${filtered.length} rows matched out of ${data.length} total`);
+        logger.info(`Final data loaded: ${filtered.length} rows for ${data.length > 0 ? 'data source' : 'empty data'}`);
         return filtered;
     }
 
