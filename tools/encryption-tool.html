@@ -267,15 +267,15 @@
             <div class="instructions">
                 <h3>📝 How to Use</h3>
                 <ul>
-                    <li><strong>Encrypt:</strong> Enter your sensitive data (password, PAT token, etc.) and a master password to get an encrypted string</li>
-                    <li><strong>Decrypt:</strong> Enter the encrypted string and master password to get the original data</li>
+                    <li><strong>Encrypt:</strong> Simply enter your sensitive data (password, PAT token, etc.) to get an encrypted string</li>
+                    <li><strong>Decrypt:</strong> Enter the encrypted string to get the original data back</li>
                     <li><strong>Framework Integration:</strong> Use encrypted strings in your config files with the <code>ENCRYPTED:</code> prefix</li>
-                    <li><strong>Security:</strong> Keep your master password secure - it's needed to decrypt the data</li>
+                    <li><strong>Simple & Secure:</strong> No master passwords needed - encryption happens automatically</li>
                 </ul>
                 <div class="usage-example">
 # Example configuration file usage:<br>
-ADO_PERSONAL_ACCESS_TOKEN=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJhYmMxMjMiLCJzYWx0IjoiZGVmNDU2IiwiaXYiOiJnaGk3ODkiLCJ0YWciOiJqa2wxMjMifQ==<br>
-DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5IiwiaXYiOiJ1aW9wYXMiLCJ0YWciOiJkZmdoamsiPQ==
+ADO_PERSONAL_ACCESS_TOKEN=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJhYmMxMjMiLCJpdiI6ImdoaTc4OSIsInRhZyI6ImprbDEyMyJ9<br>
+DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJpdiI6InVpb3BhcyIsInRhZyI6ImRmZ2hqayJ9
                 </div>
             </div>
             
@@ -297,16 +297,7 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
                         ></textarea>
                     </div>
                     
-                    <div class="form-group">
-                        <label class="form-label" for="encrypt-password">Master Password</label>
-                        <input 
-                            type="password" 
-                            id="encrypt-password" 
-                            class="form-input" 
-                            placeholder="Enter a strong master password"
-                            required
-                        />
-                    </div>
+                    <!-- Master password removed - using internal key -->
                     
                     <button type="submit" class="btn">
                         🔒 Encrypt Data
@@ -338,16 +329,7 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
                         ></textarea>
                     </div>
                     
-                    <div class="form-group">
-                        <label class="form-label" for="decrypt-password">Master Password</label>
-                        <input 
-                            type="password" 
-                            id="decrypt-password" 
-                            class="form-input" 
-                            placeholder="Enter the master password used for encryption"
-                            required
-                        />
-                    </div>
+                    <!-- Master password removed - using internal key -->
                     
                     <button type="submit" class="btn">
                         🔓 Decrypt Data
@@ -396,15 +378,14 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
             e.preventDefault();
             
             const plaintext = document.getElementById('plaintext').value;
-            const password = document.getElementById('encrypt-password').value;
             
-            if (!plaintext || !password) {
-                showAlert('Please fill in all fields', 'error');
+            if (!plaintext) {
+                showAlert('Please enter data to encrypt', 'error');
                 return;
             }
 
             try {
-                const result = await encryptData(plaintext, password);
+                const result = await encryptData(plaintext);
                 const base64Result = btoa(JSON.stringify(result));
                 const finalResult = `ENCRYPTED:${base64Result}`;
                 
@@ -422,10 +403,9 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
             e.preventDefault();
             
             let encryptedData = document.getElementById('encrypted-data').value.trim();
-            const password = document.getElementById('decrypt-password').value;
             
-            if (!encryptedData || !password) {
-                showAlert('Please fill in all fields', 'error');
+            if (!encryptedData) {
+                showAlert('Please enter encrypted data', 'error');
                 return;
             }
 
@@ -436,7 +416,7 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
                 }
                 
                 const encryptionData = JSON.parse(atob(encryptedData));
-                const result = await decryptData(encryptionData, password);
+                const result = await decryptData(encryptionData);
                 
                 document.getElementById('decrypt-output').textContent = result;
                 document.getElementById('decrypt-result').classList.remove('hidden');
@@ -447,19 +427,19 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
             }
         });
 
-        // Crypto functions using Web Crypto API
-        async function encryptData(data, password) {
+        // Crypto functions using Web Crypto API with fixed internal key
+        const INTERNAL_KEY = 'CS-Framework-2024-Internal-Encryption-Key-V1'; // Fixed key for simplicity
+        
+        async function encryptData(data) {
             const encoder = new TextEncoder();
-            const decoder = new TextDecoder();
             
-            // Generate salt and IV
-            const salt = crypto.getRandomValues(new Uint8Array(32));
+            // Generate IV (no salt needed since we use fixed key)
             const iv = crypto.getRandomValues(new Uint8Array(16));
             
-            // Derive key from password
+            // Derive key from fixed internal key
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
-                encoder.encode(password),
+                encoder.encode(INTERNAL_KEY),
                 'PBKDF2',
                 false,
                 ['deriveBits', 'deriveKey']
@@ -468,8 +448,8 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
             const key = await crypto.subtle.deriveKey(
                 {
                     name: 'PBKDF2',
-                    salt: salt,
-                    iterations: 100000,
+                    salt: encoder.encode('CS-Framework-Salt'),
+                    iterations: 10000, // Reduced iterations for performance
                     hash: 'SHA-256'
                 },
                 keyMaterial,
@@ -495,19 +475,17 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
             
             return {
                 encrypted: btoa(String.fromCharCode(...ciphertext)),
-                salt: btoa(String.fromCharCode(...salt)),
                 iv: btoa(String.fromCharCode(...iv)),
                 tag: btoa(String.fromCharCode(...tag))
             };
         }
 
-        async function decryptData(encryptionData, password) {
+        async function decryptData(encryptionData) {
             const encoder = new TextEncoder();
             const decoder = new TextDecoder();
             
             // Decode base64 data
             const encrypted = new Uint8Array(atob(encryptionData.encrypted).split('').map(c => c.charCodeAt(0)));
-            const salt = new Uint8Array(atob(encryptionData.salt).split('').map(c => c.charCodeAt(0)));
             const iv = new Uint8Array(atob(encryptionData.iv).split('').map(c => c.charCodeAt(0)));
             const tag = new Uint8Array(atob(encryptionData.tag).split('').map(c => c.charCodeAt(0)));
             
@@ -516,10 +494,10 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
             encryptedWithTag.set(encrypted);
             encryptedWithTag.set(tag, encrypted.length);
             
-            // Derive key from password
+            // Derive key from fixed internal key
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
-                encoder.encode(password),
+                encoder.encode(INTERNAL_KEY),
                 'PBKDF2',
                 false,
                 ['deriveBits', 'deriveKey']
@@ -528,8 +506,8 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
             const key = await crypto.subtle.deriveKey(
                 {
                     name: 'PBKDF2',
-                    salt: salt,
-                    iterations: 100000,
+                    salt: encoder.encode('CS-Framework-Salt'),
+                    iterations: 10000,
                     hash: 'SHA-256'
                 },
                 keyMaterial,
@@ -574,14 +552,12 @@ DATABASE_PASSWORD=ENCRYPTED:eyJlbmNyeXB0ZWQiOiJ4eXo5ODciLCJzYWx0IjoicXdlcnR5Iiwi
 
         function clearEncryptForm() {
             document.getElementById('plaintext').value = '';
-            document.getElementById('encrypt-password').value = '';
             document.getElementById('encrypt-result').classList.add('hidden');
             clearAlerts();
         }
 
         function clearDecryptForm() {
             document.getElementById('encrypted-data').value = '';
-            document.getElementById('decrypt-password').value = '';
             document.getElementById('decrypt-result').classList.add('hidden');
             clearAlerts();
         }

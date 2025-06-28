@@ -75,8 +75,15 @@ export class ConfigurationManager {
       // Merge with any legacy configuration if needed
       const legacyConfig = await ConfigurationManager.loadLegacyConfiguration(environment, actualOptions);
       
-      // Merge configurations (hierarchical takes precedence)
+      // Merge configurations (hierarchical takes precedence, then process.env overrides)
       ConfigurationManager.config = { ...legacyConfig, ...hierarchicalConfig };
+      
+      // Merge process.env variables (they take highest precedence)
+      for (const [key, value] of Object.entries(process.env)) {
+        if (value !== undefined) {
+          ConfigurationManager.config[key] = value;
+        }
+      }
       
       // Create loaded configuration metadata
       ConfigurationManager.loadedConfiguration = {
@@ -409,7 +416,7 @@ export class ConfigurationManager {
       // Use Node.js crypto directly for synchronous decryption
       const crypto = require('crypto');
       const internalKey = 'CS-Framework-2024-Internal-Encryption-Key-V1';
-      const fixedSalt = Buffer.from('CS-Framework-Salt-2024');
+      const fixedSalt = Buffer.from('CS-Framework-Salt');
       
       // Derive key using PBKDF2 (synchronous)
       const derivedKey = crypto.pbkdf2Sync(internalKey, fixedSalt, 10000, 32, 'sha256');

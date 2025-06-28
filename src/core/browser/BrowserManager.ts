@@ -64,7 +64,26 @@ export class BrowserManager {
     // Create default context
     if (this.browser && !this.defaultContext) {
       console.log('🔍 DEBUG: Creating default browser context');
-      this.defaultContext = await this.browser.newContext();
+      
+      // Build context options
+      const contextOptions: any = {
+        ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false)
+      };
+      
+      // Handle maximized mode
+      const isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
+      if (isMaximized) {
+        contextOptions.viewport = null;
+        console.log('🔍 DEBUG: Default context created with viewport=null for maximized mode');
+      } else {
+        // Use configured viewport if not maximized
+        const width = ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920);
+        const height = ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 1080);
+        contextOptions.viewport = { width, height };
+        console.log(`🔍 DEBUG: Default context created with viewport ${width}x${height}`);
+      }
+      
+      this.defaultContext = await this.browser.newContext(contextOptions);
     }
     
     this.isInitialized = true;
@@ -179,11 +198,28 @@ export class BrowserManager {
     }
     
     // Create new context with optimized settings
-    const context = await browser.newContext({
-      viewport: this.config?.viewport || { width: 1280, height: 720 },
+    const contextOptions: any = {
       ignoreHTTPSErrors: this.config?.ignoreHTTPSErrors || false
       // PERFORMANCE: video and HAR recording disabled by default
-    });
+    };
+    
+    // Only set viewport if not in maximized mode
+    const isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
+    console.log(`🔍 DEBUG: Creating context - maximized mode: ${isMaximized}`);
+    
+    if (!isMaximized && this.config?.viewport) {
+      contextOptions.viewport = this.config.viewport;
+      console.log('🔍 DEBUG: Setting viewport:', this.config.viewport);
+    } else if (isMaximized) {
+      // Explicitly set viewport to null for maximized mode
+      contextOptions.viewport = null;
+      console.log('🔍 DEBUG: Setting viewport to null for maximized mode');
+    } else {
+      console.log('🔍 DEBUG: No viewport configuration - using browser default');
+    }
+    
+    console.log('🔍 DEBUG: Context options:', JSON.stringify(contextOptions, null, 2));
+    const context = await browser.newContext(contextOptions);
     
     return context;
   }
@@ -232,12 +268,30 @@ export class BrowserManager {
     
     console.log(`🔍 DEBUG: Building launch options - headless: ${headless}`);
     
+    const browserArgs = ['--no-sandbox', '--disable-setuid-sandbox'];
+    
+    // Add maximization args based on configuration
+    if (ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false) && !headless) {
+      console.log('🔍 DEBUG: Browser maximized mode enabled');
+      // For Chromium-based browsers, use start-maximized
+      browserArgs.push('--start-maximized');
+      // Also disable default viewport to use full window
+      browserArgs.push('--disable-blink-features=AutomationControlled');
+    } else {
+      // If not maximized, use configured viewport size
+      const width = ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920);
+      const height = ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 1080);
+      browserArgs.push(`--window-size=${width},${height}`);
+    }
+    
     const options: LaunchOptions = {
       headless: headless,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: browserArgs,
       ignoreDefaultArgs: ['--enable-automation'],
       timeout: 30000
     };
+    
+    console.log('🔍 DEBUG: Browser launch options:', JSON.stringify(options, null, 2));
 
     return options;
   }
@@ -247,18 +301,22 @@ export class BrowserManager {
    */
   private loadConfigFromManager(): BrowserConfig {
     // Load configuration from environment files
-    const config = {
+    const config: any = {
       browser: (ConfigurationManager.get('BROWSER', 'chromium') as any),
       headless: ConfigurationManager.getBoolean('HEADLESS', false),
       slowMo: ConfigurationManager.getNumber('BROWSER_SLOW_MO', 0) || 0,
       timeout: ConfigurationManager.getNumber('TIMEOUT', 30000) || 30000,
-      viewport: {
-        width: ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920) || 1920,
-        height: ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 1080) || 1080
-      },
       downloadsPath: ConfigurationManager.get('DOWNLOADS_PATH', './downloads'),
       ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false)
     };
+    
+    // Only set viewport if not in maximized mode
+    if (!ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false)) {
+      config.viewport = {
+        width: ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920) || 1920,
+        height: ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 1080) || 1080
+      };
+    }
 
     // Log loaded configuration
     ActionLogger.logInfo('Browser configuration loaded:', config);

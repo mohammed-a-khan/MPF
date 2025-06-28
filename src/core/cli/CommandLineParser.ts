@@ -554,8 +554,12 @@ export class CommandLineParser {
    */
   public static parse(argv: string[]): ExecutionOptions {
     try {
+      // Debug logging for PowerShell issues
+      console.log('🔍 DEBUG CommandLineParser: Raw argv:', JSON.stringify(argv));
+      
       // Remove node and script path
       const args = argv.slice(2);
+      console.log('🔍 DEBUG CommandLineParser: Args after slice:', JSON.stringify(args));
       
       // Check for help or version flags first
       if (this.checkHelpOrVersion(args)) {

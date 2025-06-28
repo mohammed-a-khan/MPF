@@ -44,7 +44,7 @@ export class ScenarioExecutor {
     private executionMonitor: ExecutionMonitor;
     private stepRegistry: StepRegistry;
     private stepLoader: StepDefinitionLoader;
-    private browserManagementStrategy: string;
+    private _browserManagementStrategy?: string;
 
     constructor() {
         this.stepExecutor = new StepExecutor();
@@ -57,9 +57,18 @@ export class ScenarioExecutor {
         this.stepRegistry = StepRegistry.getInstance();
         this.stepLoader = StepDefinitionLoader.getInstance();
         
-        // Get browser management strategy from configuration
-        this.browserManagementStrategy = ConfigurationManager.get('BROWSER_MANAGEMENT_STRATEGY', 'reuse-browser');
-        ActionLogger.logInfo(`Browser management strategy: ${this.browserManagementStrategy}`);
+        // Don't read browser management strategy in constructor - will be read lazily
+    }
+
+    /**
+     * Get browser management strategy - lazy loaded to ensure configuration is ready
+     */
+    private get browserManagementStrategy(): string {
+        if (!this._browserManagementStrategy) {
+            this._browserManagementStrategy = ConfigurationManager.get('BROWSER_MANAGEMENT_STRATEGY', 'reuse-browser');
+            ActionLogger.logInfo(`Browser management strategy: ${this._browserManagementStrategy}`);
+        }
+        return this._browserManagementStrategy;
     }
 
     async initialize(): Promise<void> {
@@ -156,10 +165,15 @@ export class ScenarioExecutor {
             this.stepExecutor.resetInitializedClasses();
             
             // Handle browser management strategy
+            console.log(`🔍 DEBUG ScenarioExecutor: Browser strategy = "${this.browserManagementStrategy}"`);
+            console.log(`🔍 DEBUG ScenarioExecutor: Comparing with 'new-per-scenario': ${this.browserManagementStrategy === 'new-per-scenario'}`);
+            
             if (this.browserManagementStrategy === 'new-per-scenario') {
+                console.log('🔍 DEBUG ScenarioExecutor: Creating NEW execution context for scenario');
                 // Create new execution context for each scenario
                 this.currentContext = await this.createExecutionContext();
             } else {
+                console.log('🔍 DEBUG ScenarioExecutor: Using SHARED execution context (reuse-browser)');
                 // Use shared execution context for reuse-browser strategy
                 if (!this.sharedExecutionContext) {
                     this.sharedExecutionContext = await this.createExecutionContext();
@@ -633,6 +647,14 @@ export class ScenarioExecutor {
 
             // Clear BDD context
             BDDContext.getInstance().clearScenarioState();
+            
+            // Clear element caches for new-per-scenario strategy
+            if (this.browserManagementStrategy === 'new-per-scenario') {
+                // Clear the global element cache to prevent stale references
+                const ElementCache = require('../../core/elements/ElementCache').ElementCache;
+                ElementCache.getInstance().invalidateAll();
+                ActionLogger.logInfo('Cleared element cache for new-per-scenario strategy');
+            }
             
             // Handle cleanup based on browser management strategy
             if (this.browserManagementStrategy === 'new-per-scenario') {

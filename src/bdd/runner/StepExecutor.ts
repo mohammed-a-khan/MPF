@@ -37,9 +37,30 @@ export class StepExecutor {
     }
     
     /**
+     * Get browser management strategy - read fresh each time to ensure latest config
+     */
+    private getBrowserManagementStrategy(): string {
+        return ConfigurationManager.get('BROWSER_MANAGEMENT_STRATEGY', 'reuse-browser');
+    }
+
+    /**
      * Reset initialized classes for new scenario
      */
     public resetInitializedClasses(): void {
+        // For new-per-scenario, also clear page instances from all initialized classes
+        const browserStrategy = this.getBrowserManagementStrategy();
+        if (browserStrategy === 'new-per-scenario') {
+            for (const className of this.initializedClasses) {
+                const classInstance = stepRegistry.getClassInstance(className);
+                if (classInstance && typeof (classInstance as any).clearPageInstances === 'function') {
+                    try {
+                        (classInstance as any).clearPageInstances();
+                    } catch (error) {
+                        ActionLogger.logError(`Error clearing page instances for ${className}`, error as Error);
+                    }
+                }
+            }
+        }
         this.initializedClasses.clear();
     }
     
@@ -47,6 +68,8 @@ export class StepExecutor {
      * Call after() method for all initialized classes
      */
     public async callAfterMethods(): Promise<void> {
+        const browserStrategy = this.getBrowserManagementStrategy();
+        
         for (const className of this.initializedClasses) {
             const classInstance = stepRegistry.getClassInstance(className);
             if (classInstance) {
@@ -56,6 +79,33 @@ export class StepExecutor {
                         (classInstance as any).clearPageInstances();
                     } catch (error) {
                         ActionLogger.logError(`Error clearing page instances for ${className}`, error as Error);
+                    }
+                }
+                
+                // For new-per-scenario, also clear all element caches on page objects
+                if (browserStrategy === 'new-per-scenario') {
+                    const pageProperties = Reflect.getMetadata('page:properties', classInstance) || 
+                                          Reflect.getMetadata('page:properties', Object.getPrototypeOf(classInstance)) || [];
+                    for (const propertyKey of pageProperties) {
+                        const pageObject = (classInstance as any)[propertyKey];
+                        if (pageObject) {
+                            // Clear element caches
+                            if (typeof pageObject.clearAllElementCaches === 'function') {
+                                try {
+                                    pageObject.clearAllElementCaches();
+                                } catch (error) {
+                                    ActionLogger.logWarn(`Error clearing element caches for ${propertyKey}`, error as Error);
+                                }
+                            }
+                            // Also call cleanup if available
+                            if (typeof pageObject.cleanup === 'function') {
+                                try {
+                                    await pageObject.cleanup();
+                                } catch (error) {
+                                    ActionLogger.logWarn(`Error cleaning up page object ${propertyKey}`, error as Error);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -351,18 +401,46 @@ export class StepExecutor {
             );
         }
         
-        // Initialize page objects if this is the first step for this class
-        if (!this.initializedClasses.has(className)) {
-            if (typeof (classInstance as any).initializePageObjects === 'function') {
+        // For new-per-scenario, force clear cached page instances before initialization
+        const browserStrategy = this.getBrowserManagementStrategy();
+        if (browserStrategy === 'new-per-scenario') {
+            // Clear page instances
+            if (typeof (classInstance as any).clearPageInstances === 'function') {
                 try {
-                    ActionLogger.logDebug(`Initializing page objects for ${className}`);
-                    await (classInstance as any).initializePageObjects();
+                    (classInstance as any).clearPageInstances();
                 } catch (error) {
-                    throw new Error(`Error initializing page objects for ${className}: ${(error as Error).message}`);
+                    ActionLogger.logWarn(`Error clearing page instances for ${className}`, error as Error);
                 }
             }
-            this.initializedClasses.add(className);
+            
+            // Also clear element caches on all page objects
+            const pageProperties = Reflect.getMetadata('page:properties', classInstance) || 
+                                  Reflect.getMetadata('page:properties', Object.getPrototypeOf(classInstance)) || [];
+            for (const propertyKey of pageProperties) {
+                const pageObject = (classInstance as any)[propertyKey];
+                if (pageObject && typeof pageObject.clearAllElementCaches === 'function') {
+                    try {
+                        pageObject.clearAllElementCaches();
+                    } catch (error) {
+                        ActionLogger.logWarn(`Error clearing element caches for ${propertyKey}`, error as Error);
+                    }
+                }
+            }
         }
+        
+        // Always call initializePageObjects to ensure page objects are reinitialized if needed
+        // The method itself will check if reinitialization is necessary
+        if (typeof (classInstance as any).initializePageObjects === 'function') {
+            try {
+                ActionLogger.logDebug(`Initializing/checking page objects for ${className}`);
+                await (classInstance as any).initializePageObjects();
+            } catch (error) {
+                throw new Error(`Error initializing page objects for ${className}: ${(error as Error).message}`);
+            }
+        }
+        
+        // Track that we've seen this class in this scenario
+        this.initializedClasses.add(className);
         
         // Bind the step function to the correct context (class instance)
         const boundFunction = definition.implementation.bind(classInstance);

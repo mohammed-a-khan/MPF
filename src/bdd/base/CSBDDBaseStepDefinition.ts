@@ -10,6 +10,7 @@ import { PageFactory } from '../../core/pages/PageFactory';
 import { CSBasePage } from '../../core/pages/CSBasePage';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
+import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 
 /**
  * Base class for all step definition classes
@@ -22,20 +23,102 @@ export abstract class CSBDDBaseStepDefinition {
   constructor() {
     this.logger = Logger.getInstance(this.constructor.name);
   }
+
+  /**
+   * Get browser management strategy - read fresh to ensure latest config
+   */
+  private getBrowserManagementStrategy(): string {
+    return ConfigurationManager.get('BROWSER_MANAGEMENT_STRATEGY', 'reuse-browser');
+  }
   
   /**
    * Initialize all @PageObject decorated properties
    * Called automatically by the framework
    */
   public async initializePageObjects(): Promise<void> {
-    const pageProperties = Reflect.getMetadata('page:properties', this) || [];
+    // Try to get metadata from both the instance and its prototype
+    let pageProperties = Reflect.getMetadata('page:properties', this) || [];
+    if (pageProperties.length === 0) {
+      // Try the prototype
+      pageProperties = Reflect.getMetadata('page:properties', Object.getPrototypeOf(this)) || [];
+    }
     
+    // Get current page from BDDContext
+    const currentPage = BDDContext.getCurrentPage();
+    
+    // Check if the current page is closed
+    if (!currentPage || currentPage.isClosed()) {
+      throw new Error(`Cannot initialize page objects - no valid page available in BDDContext`);
+    }
+    
+    // For new-per-scenario, always clear cached instances to force reinitialization
+    const browserStrategy = this.getBrowserManagementStrategy();
+    
+    this.logger.debug(`initializePageObjects called for ${this.constructor.name} with strategy: ${browserStrategy}`);
+    this.logger.debug(`Current page URL: ${currentPage?.url() || 'N/A'}, isClosed: ${currentPage?.isClosed() || false}`);
+    this.logger.debug(`Page properties count: ${pageProperties.length}, properties: ${JSON.stringify(pageProperties)}`);
+    
+    // Always check if existing page objects need reinitialization
     for (const propertyKey of pageProperties) {
-      const PageClass = Reflect.getMetadata('page:class', this, propertyKey);
+      const existingPageObject = (this as any)[propertyKey];
+      if (existingPageObject && existingPageObject.currentPage) {
+        try {
+          // If the existing page object's page is closed or different, we need to reinitialize
+          if (existingPageObject.currentPage.isClosed() || existingPageObject.currentPage !== currentPage) {
+            this.logger.debug(`Page object ${propertyKey} has a closed or different page, will reinitialize`);
+            // Clear the page object
+            if (typeof existingPageObject.cleanup === 'function') {
+              await existingPageObject.cleanup();
+            }
+            (this as any)[propertyKey] = undefined;
+          }
+        } catch (error) {
+          // If we can't check, clear it to be safe
+          this.logger.debug(`Error checking page object ${propertyKey}, will reinitialize`);
+          (this as any)[propertyKey] = undefined;
+        }
+      }
+    }
+    
+    if (browserStrategy === 'new-per-scenario') {
+      this.logger.debug(`Clearing page instances for new-per-scenario strategy`);
+      this.clearPageInstances();
+      // Also clear the property references
+      for (const propertyKey of pageProperties) {
+        this.logger.debug(`Clearing property ${propertyKey}`);
+        (this as any)[propertyKey] = undefined;
+      }
+    }
+    
+    // Initialize page objects
+    for (const propertyKey of pageProperties) {
+      let PageClass = Reflect.getMetadata('page:class', this, propertyKey);
+      if (!PageClass) {
+        // Try the prototype
+        PageClass = Reflect.getMetadata('page:class', Object.getPrototypeOf(this), propertyKey);
+      }
+      
       if (PageClass) {
-        const pageInstance = await this.getPage(PageClass);
-        (this as any)[propertyKey] = pageInstance;
-        this.logger.debug(`Initialized page object: ${propertyKey} (${PageClass.name})`);
+        // Always create new instance for new-per-scenario or if not exists
+        if (browserStrategy === 'new-per-scenario' || !(this as any)[propertyKey]) {
+          this.logger.debug(`Creating new instance of ${PageClass.name} for property ${propertyKey}`);
+          const pageInstance = new PageClass();
+          await pageInstance.initialize(currentPage);
+          (this as any)[propertyKey] = pageInstance;
+          this.pageInstances.set(PageClass.name, pageInstance);
+          this.logger.debug(`Initialized page object: ${propertyKey} (${PageClass.name})`);
+        } else {
+          // For reuse-browser, check if the page object needs reinitialization
+          const existingInstance = (this as any)[propertyKey];
+          if (existingInstance && existingInstance.currentPage !== currentPage) {
+            this.logger.debug(`Reinitializing ${PageClass.name} for property ${propertyKey} with new page`);
+            await existingInstance.initialize(currentPage);
+          } else {
+            this.logger.debug(`Reusing existing instance of ${PageClass.name} for property ${propertyKey}`);
+          }
+        }
+      } else {
+        this.logger.warn(`No PageClass metadata found for property ${propertyKey}`);
       }
     }
   }
@@ -44,7 +127,36 @@ export abstract class CSBDDBaseStepDefinition {
    * Get current page
    */
   protected get page(): Page {
-    return BDDContext.getCurrentPage();
+    const currentPage = BDDContext.getCurrentPage();
+    // Ensure all page objects are using the current page
+    const pageProperties = Reflect.getMetadata('page:properties', this) || 
+                           Reflect.getMetadata('page:properties', Object.getPrototypeOf(this)) || [];
+    for (const propertyKey of pageProperties) {
+      const pageObject = (this as any)[propertyKey];
+      if (pageObject && pageObject.currentPage !== currentPage) {
+        // Update the page reference if it has changed
+        pageObject.page = currentPage;
+      }
+    }
+    return currentPage;
+  }
+
+  /**
+   * Wait for a specific URL pattern
+   * @param urlPattern - URL string or regex pattern to wait for
+   * @param options - Wait options
+   */
+  protected async waitForURL(urlPattern: string | RegExp, options?: { timeout?: number }): Promise<void> {
+    await this.page.waitForURL(urlPattern, options);
+  }
+
+  /**
+   * Wait for the page to reach a specific load state
+   * @param state - The load state to wait for
+   * @param options - Wait options
+   */
+  protected async waitForLoadState(state?: 'load' | 'domcontentloaded' | 'networkidle', options?: { timeout?: number }): Promise<void> {
+    await this.page.waitForLoadState(state, options);
   }
 
   /**
@@ -480,15 +592,17 @@ export abstract class CSBDDBaseStepDefinition {
    */
   protected async getPage<T extends CSBasePage>(PageClass: new () => T): Promise<T> {
     const className = PageClass.name;
+    const currentPage = BDDContext.getCurrentPage();
     
-    // Check if already initialized
-    if (this.pageInstances.has(className)) {
+    // For reuse-browser strategy, return cached instance if available
+    const browserStrategy = this.getBrowserManagementStrategy();
+    if (browserStrategy === 'reuse-browser' && this.pageInstances.has(className)) {
       return this.pageInstances.get(className) as T;
     }
     
     // Create and initialize new instance
     const pageInstance = new PageClass();
-    await pageInstance.initialize(this.page);
+    await pageInstance.initialize(currentPage);
     
     // Cache for future use
     this.pageInstances.set(className, pageInstance);
@@ -502,6 +616,20 @@ export abstract class CSBDDBaseStepDefinition {
    * Called automatically when scenario ends
    */
   protected clearPageInstances(): void {
+    // Clear all property references first
+    const pageProperties = Reflect.getMetadata('page:properties', this) || [];
+    for (const propertyKey of pageProperties) {
+      const pageObject = (this as any)[propertyKey];
+      if (pageObject && typeof pageObject.cleanup === 'function') {
+        try {
+          pageObject.cleanup();
+        } catch (error) {
+          this.logger.warn(`Error cleaning up page object ${propertyKey}: ${(error as Error).message}`);
+        }
+      }
+      (this as any)[propertyKey] = undefined;
+    }
+    // Then clear the map
     this.pageInstances.clear();
   }
 }

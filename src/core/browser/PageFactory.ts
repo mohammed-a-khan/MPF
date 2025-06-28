@@ -39,6 +39,55 @@ export class PageFactory {
       // Store page
       this.pages.set(pageId, page);
       
+      // Maximize browser if configured
+      // Check both ConfigurationManager and process.env as fallback
+      let isMaximized = false;
+      let isHeadless = false;
+      
+      try {
+        const ConfigurationManager = require('../configuration/ConfigurationManager').ConfigurationManager;
+        isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
+        isHeadless = ConfigurationManager.getBoolean('HEADLESS', false);
+      } catch (error) {
+        // Fallback to process.env if ConfigurationManager is not available
+        isMaximized = process.env['BROWSER_MAXIMIZED'] === 'true';
+        isHeadless = process.env['HEADLESS'] === 'true';
+      }
+      
+      console.log(`🔍 DEBUG PageFactory: BROWSER_MAXIMIZED=${isMaximized}, HEADLESS=${isHeadless}`);
+      ActionLogger.logInfo(`PageFactory: BROWSER_MAXIMIZED=${isMaximized}, HEADLESS=${isHeadless}`);
+      
+      if (isMaximized && !isHeadless) {
+        console.log('🔍 DEBUG PageFactory: Attempting to maximize browser...');
+        try {
+          // Cross-browser solution: Set viewport to screen size
+          const screenSize = await page.evaluate(() => {
+            return {
+              width: window.screen.width,
+              height: window.screen.height,
+              availWidth: window.screen.availWidth,
+              availHeight: window.screen.availHeight
+            };
+          });
+          
+          console.log(`🔍 DEBUG PageFactory: Screen size detected - ${screenSize.availWidth}x${screenSize.availHeight}`);
+          
+          // Use available dimensions to account for taskbar/dock
+          await page.setViewportSize({
+            width: screenSize.availWidth,
+            height: screenSize.availHeight
+          });
+          
+          console.log(`🔍 DEBUG PageFactory: Browser maximized to ${screenSize.availWidth}x${screenSize.availHeight}`);
+          ActionLogger.logInfo(`Page maximized to ${screenSize.availWidth}x${screenSize.availHeight}`);
+        } catch (error) {
+          console.log('🔍 DEBUG PageFactory: Browser maximization failed', error);
+          ActionLogger.logWarn('Browser maximization failed', error as Error);
+        }
+      } else {
+        console.log(`🔍 DEBUG PageFactory: Skipping maximization - maximized=${isMaximized}, headless=${isHeadless}`);
+      }
+      
       // Register default event handlers
       this.registerPageEvents(page, pageId);
       

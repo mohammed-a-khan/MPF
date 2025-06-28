@@ -85,9 +85,18 @@ export class ExecutionContext {
         await this.browserManager.initialize();
       }
       
-      // Get browser and context from manager
+      // Get browser from manager
       this.browser = await this.browserManager.getBrowser();
-      this.context = this.browserManager.getDefaultContext();
+      
+      // For scenario-based execution contexts (new-per-scenario strategy),
+      // create a new browser context instead of using the default one
+      if (this.executionId.startsWith('scenario-')) {
+        this.logger.info('Creating new browser context for scenario execution');
+        this.context = await this.createBrowserContext();
+      } else {
+        // For shared execution contexts, use the default context
+        this.context = this.browserManager.getDefaultContext();
+      }
       
       // Use existing page if valid, otherwise create new one
       if (this.isPageValid()) {
@@ -179,6 +188,10 @@ export class ExecutionContext {
   public async getOrCreatePage(): Promise<Page> {
     if (this.isPageValid()) {
       this.logger.info(`Reusing existing page: ${this.executionId}`);
+      
+      // Ensure page is maximized when reusing
+      await this.ensurePageMaximized(this.page!);
+      
       // Ensure BDDContext has the current page
       await BDDContext.getInstance().setCurrentPage(this.page!);
       BDDContext.getInstance().setCurrentBrowserContext(this.context!);
@@ -193,6 +206,10 @@ export class ExecutionContext {
         if (!page.isClosed()) {
           this.logger.info(`Reusing existing page from context: ${this.executionId}`);
           this.page = page;
+          
+          // Ensure page is maximized when reusing
+          await this.ensurePageMaximized(this.page);
+          
           await this.setupPageListeners(this.page);
           await BDDContext.getInstance().setCurrentPage(this.page);
           BDDContext.getInstance().setCurrentBrowserContext(this.context);
@@ -231,11 +248,30 @@ export class ExecutionContext {
       throw new Error('Browser not initialized');
     }
     
-    console.log('🔍 DEBUG: Creating browser context');
-    const context = await this.browser.newContext({
-      viewport: { width: 1920, height: 1080 },
+    console.log('🔍 DEBUG: Creating browser context in ExecutionContext');
+    console.log('🔍 DEBUG: BROWSER_MAXIMIZED =', process.env.BROWSER_MAXIMIZED);
+    
+    const contextOptions: any = {
       ignoreHTTPSErrors: true
-    });
+    };
+    
+    // Check if we should set viewport - use ConfigurationManager
+    const ConfigurationManager = require('../../core/configuration/ConfigurationManager').ConfigurationManager;
+    const isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
+    console.log('🔍 DEBUG: Browser maximized mode (from ConfigurationManager):', isMaximized);
+    
+    if (!isMaximized) {
+      // Only set viewport if not maximized
+      contextOptions.viewport = { width: 1920, height: 1080 };
+      console.log('🔍 DEBUG: Setting viewport to 1920x1080');
+    } else {
+      // For maximized mode, we'll set viewport to null to start with system default
+      contextOptions.viewport = null;
+      console.log('🔍 DEBUG: Setting viewport to null for maximized mode');
+    }
+    
+    console.log('🔍 DEBUG: Context options:', JSON.stringify(contextOptions, null, 2));
+    const context = await this.browser.newContext(contextOptions);
     
     // Register cleanup
     this.registerCleanupHandler(async () => {
@@ -447,6 +483,50 @@ export class ExecutionContext {
     page.on('requestfailed', request => {
       ActionLogger.logRequestFailure(request.url(), request.failure()?.errorText || 'Unknown error');
     });
+  }
+
+  /**
+   * Ensure page is maximized (for browser reuse strategy)
+   */
+  private async ensurePageMaximized(page: Page): Promise<void> {
+    const ConfigurationManager = require('../../core/configuration/ConfigurationManager').ConfigurationManager;
+    const isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
+    const isHeadless = ConfigurationManager.getBoolean('HEADLESS', false);
+    
+    if (isMaximized && !isHeadless) {
+      try {
+        // Get current viewport size
+        const currentViewport = page.viewportSize();
+        
+        // Get screen dimensions
+        const screenSize = await page.evaluate(() => {
+          return {
+            width: window.screen.width,
+            height: window.screen.height,
+            availWidth: window.screen.availWidth,
+            availHeight: window.screen.availHeight
+          };
+        });
+        
+        // Check if already maximized (with 10px tolerance for browser chrome)
+        if (currentViewport && 
+            Math.abs(currentViewport.width - screenSize.availWidth) < 10 && 
+            Math.abs(currentViewport.height - screenSize.availHeight) < 10) {
+          this.logger.debug(`Page already maximized: ${currentViewport.width}x${currentViewport.height}`);
+          return;
+        }
+        
+        // Maximize the page
+        await page.setViewportSize({
+          width: screenSize.availWidth,
+          height: screenSize.availHeight
+        });
+        
+        this.logger.info(`Page maximized to ${screenSize.availWidth}x${screenSize.availHeight}`);
+      } catch (error) {
+        this.logger.warn('Failed to maximize page', error as Error);
+      }
+    }
   }
 
   /**

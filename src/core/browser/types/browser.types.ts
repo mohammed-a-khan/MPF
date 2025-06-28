@@ -19,7 +19,7 @@ export interface BrowserConfig {
 }
 
 export interface ContextOptions {
-  viewport?: ViewportSize;
+  viewport?: ViewportSize | null;
   userAgent?: string;
   locale?: string;
   timezone?: string;

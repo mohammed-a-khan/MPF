@@ -5,9 +5,9 @@
 [![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![BDD](https://img.shields.io/badge/BDD-Cucumber-00A818?style=for-the-badge&logo=cucumber&logoColor=white)](https://cucumber.io/)
 
-> **Enterprise-grade Zero-Code BDD Test Automation Framework with AI-Powered Self-Healing**
+> **Enterprise-grade Zero-Code BDD Test Automation Framework**
 
-A comprehensive, TypeScript-based test automation framework that enables **zero-code testing** through BDD (Behavior-Driven Development) with built-in support for **UI**, **API**, and **Database** testing. Features AI-powered self-healing, advanced reporting, Azure DevOps integration, and enterprise-level configurability.
+A comprehensive, TypeScript-based test automation framework that enables **zero-code testing** through BDD (Behavior-Driven Development) with built-in support for **UI**, **API**, and **Database** testing. Features advanced reporting, Azure DevOps integration, and enterprise-level configurability.
 
 ## 🚀 Key Features
 
@@ -17,11 +17,12 @@ A comprehensive, TypeScript-based test automation framework that enables **zero-
 - **Data-Driven Testing**: Advanced support for JSON, Excel, CSV, and XML with intelligent column normalization
 - **Dynamic Configuration**: Environment-based configuration management
 
-### 🧠 **AI-Powered Capabilities**
+### 🧠 **AI-Powered Capabilities** *(In Progress)*
 - **Self-Healing**: Automatic element identification and recovery from locator failures
 - **Smart Element Detection**: AI-driven element identification using multiple strategies
 - **Visual Recognition**: Computer vision-based element detection
 - **Natural Language Processing**: Convert natural language to executable test steps
+> *Note: AI features are currently under development and testing*
 
 ### 🔧 **Multi-Domain Testing**
 - **UI Testing**: Web automation with Playwright across all major browsers
@@ -32,26 +33,15 @@ A comprehensive, TypeScript-based test automation framework that enables **zero-
 ### 📊 **Advanced Reporting & Analytics**
 - **Multi-Format Reports**: HTML, PDF, Excel, and JSON export
 - **Interactive Dashboards**: Real-time execution monitoring with charts
-- **Screenshot & Video Capture**: Visual evidence collection
-- **Performance Metrics**: Detailed execution analytics
+- **Comprehensive Action Logging**: Every UI action is logged with verbose descriptions
+- **Console Log Capture**: All terminal output captured and categorized
+- **Evidence Collection**: Screenshots, videos, network logs, and traces
 
 ### 🔗 **Enterprise Integration**
-- **Azure DevOps Integration**: Test case management and result publishing
+- **Azure DevOps**: Comprehensive test management with automatic result publishing
 - **CI/CD Pipeline Support**: Jenkins, GitHub Actions, Azure Pipelines
 - **Version Control**: Git integration with branch-based testing
 - **Security**: Built-in encryption for sensitive data
-
-## 🆕 Recent Updates (December 2024)
-
-### Enhanced Data Provider Features
-- **Column Normalization**: Automatically handles column name variations in data files
-  - `testId`, `testCaseId`, `tcId` → `testCase`
-  - `user`, `userName`, `login` → `username`
-  - `executeTest`, `run`, `active` → `executeFlag`
-- **JSONPath Support**: Complex queries with filters for JSON data sources
-- **Improved Error Handling**: Clear warnings when filter columns don't exist
-- **Type Conversion**: Automatic conversion (e.g., "Y"/"N" to boolean)
-- **Special Character Handling**: Removes line breaks and special characters from column names
 
 ## 📋 Prerequisites
 
@@ -64,6 +54,7 @@ A comprehensive, TypeScript-based test automation framework that enables **zero-
 
 1. **Clone the repository**:
 ```bash
+git clone <repository-url>
 cd Playwright_typescript_for_cursor_trail3
 ```
 
@@ -87,7 +78,7 @@ npx playwright install
 │   │   ├── browser/           # Browser management
 │   │   ├── elements/          # Element handling & locators
 │   │   ├── pages/             # Base page objects
-│   │   └── ai/                # AI-powered features
+│   │   └── ai/                # AI-powered features (in progress)
 │   ├── api/                    # API testing utilities
 │   │   ├── client/            # HTTP client implementation
 │   │   ├── auth/              # Authentication handlers
@@ -125,6 +116,17 @@ npx playwright install
 
 ## ⚙️ Configuration
 
+### Hierarchical Configuration System
+
+The framework uses a powerful hierarchical configuration system:
+
+```
+1. Global (config/global.env) → Base defaults
+2. Project Common (config/{project}/common/) → Project overrides  
+3. Environment (config/{project}/environments/*.env) → Environment-specific
+4. Runtime (CLI/tags) → Highest priority
+```
+
 ### Global Configuration (`config/global.env`)
 ```properties
 # Browser Configuration
@@ -145,6 +147,24 @@ VIDEO_MODE=on-failure
 # Data Providers
 EXECUTION_FLAG_COLUMN=ExecutionFlag
 SKIP_EXECUTION_FLAG=false
+
+# Performance Monitoring
+COLLECT_WEB_VITALS=true
+COLLECT_SYSTEM_METRICS=true
+PERFORMANCE_BUDGET_LCP=2500
+PERFORMANCE_BUDGET_FID=100
+PERFORMANCE_BUDGET_CLS=0.1
+
+# Network & Proxy
+PROXY_TYPE=http
+PROXY_HOST=proxy.company.com
+PROXY_PORT=8080
+NETWORK_THROTTLING_ENABLED=false
+
+# Security
+CERTIFICATE_STRICT_VALIDATION=true
+OAUTH_TOKEN_CACHE_ENABLED=true
+SECURE_CONFIG_ENCRYPTION_ALGORITHM=aes-256-gcm
 ```
 
 ### Project Configuration (`config/<project>/project.env`)
@@ -153,13 +173,6 @@ PROJECT_NAME=AKHAN
 BASE_URL=https://opensource-demo.orangehrmlive.com
 DEFAULT_TIMEOUT=10000
 ```
-
-### Environment Configuration (`config/<project>/environments/`)
-Create environment-specific files:
-- `dev.env` - Development settings
-- `qa.env` - QA environment
-- `uat.env` - UAT environment
-- `prod.env` - Production (read-only tests)
 
 ## 📝 Writing Tests
 
@@ -191,74 +204,27 @@ Feature: User Authentication
 
 ### Data-Driven Testing
 
+The framework supports multiple data providers with advanced features:
+
 #### Excel Data Provider
 ```gherkin
-# With filter - loads only matching rows
 @DataProvider(source="data/test-data.xlsx",type="excel",sheetName="LoginData",filter="priority=high,executeFlag=Y")
-Scenario: Data-driven test with Excel filter
-  When I perform action with "<testData>"
-  Then I verify "<expectedResult>"
-
-# Without filter - loads ALL rows from Excel
-@DataProvider(source="data/test-data.xlsx",type="excel",sheetName="LoginData")
-Scenario: Data-driven test loading all Excel data
+Scenario: Data-driven test with Excel
   When I perform action with "<testData>"
   Then I verify "<expectedResult>"
 ```
 
 #### JSON Data Provider with JSONPath
 ```gherkin
-# With JSONPath filter
 @DataProvider(source="data/test-data.json",type="json",jsonPath="$.users[?(@.role=='admin' && @.active==true)]")
 Scenario: Data-driven test with JSON filter
   When I login as "<username>" with password "<password>"
   Then I should have "<accessLevel>" access
-
-# Without filter - loads entire JSON structure
-@DataProvider(source="data/test-data.json",type="json")
-Scenario: Data-driven test loading all JSON data
-  When I login as "<username>" with password "<password>"
-  Then I should have "<accessLevel>" access
 ```
 
-#### CSV Data Provider
-```gherkin
-# With filter
-@DataProvider(source="data/test-data.csv",type="csv",delimiter=",",headers="true",filter="status=active")
-Scenario: Data-driven test with CSV filter
-  When I search for "<productName>"
-  Then I should see price "<expectedPrice>"
+#### Column Normalization
 
-# Without filter - loads all CSV rows
-@DataProvider(source="data/test-data.csv",type="csv",delimiter=",",headers="true")
-Scenario: Data-driven test loading all CSV data
-  When I search for "<productName>"
-  Then I should see price "<expectedPrice>"
-```
-
-#### Filter Behavior
-
-**Filters are OPTIONAL in all data providers**. Here's what happens:
-
-| Scenario | Result |
-|----------|--------|
-| No filter specified | ALL rows are loaded |
-| Empty filter `{}` | ALL rows are loaded |
-| Filter with criteria | Only matching rows are loaded |
-
-**Execution Flag Behavior:**
-- By default, `skipExecutionFlag=false` 
-- Rows with `executeFlag=false` or `ExecutionFlag=N` are automatically filtered out
-- To include ALL rows regardless: set `skipExecutionFlag=true`
-
-```gherkin
-# Include all rows, even with executeFlag=false
-@DataProvider(source="data.xlsx",type="excel",skipExecutionFlag="true")
-```
-
-### Column Normalization Examples
-
-The framework automatically normalizes column names to handle variations:
+The framework automatically normalizes column names:
 
 | Original Column | Normalized Column |
 |----------------|-------------------|
@@ -266,7 +232,6 @@ The framework automatically normalizes column names to handle variations:
 | user, userName, login | username |
 | pass, passwd, pwd | password |
 | executeTest, run, active | executeFlag |
-| menu, menuItem, section | module |
 
 ## 🚀 Running Tests
 
@@ -287,95 +252,164 @@ npm run test:akhan -- --feature=test/akhan/features/login.feature
 # Run with tags
 npm run test:akhan -- --tags="@smoke and not @skip"
 
-# Run in headed mode
-npm run test:akhan:headed
-
-# Run in debug mode
-npm run test:akhan:debug
-
 # Run tests in parallel
 npm run test:akhan:parallel
 ```
 
 ### Advanced Options
 ```bash
-# Custom configuration
 npm run test:akhan -- \
   --env=uat \
   --browser=firefox \
   --headless=true \
   --workers=4 \
   --retry=2 \
-  --grep="Login" \
   --screenshot=always \
   --video=on-failure
 ```
 
-## 📊 Reporting
+## 📊 Reporting Features
 
-### Report Types
+### HTML Reports
+- **Interactive Dashboard**: Real-time test execution summary
+- **Action Timeline**: Every UI interaction with verbose descriptions
+- **Console Log Integration**: All terminal output captured and categorized
+- **Evidence Gallery**: Screenshots and videos linked to test steps
+- **Performance Metrics**: Detailed timing for each operation
+- **Search & Filter**: Find specific actions, errors, or test steps
 
-#### HTML Report
-- Interactive dashboard with execution summary
-- Detailed test results with screenshots
-- Performance metrics and trends
-- Filterable test execution timeline
+### Report Enhancements
+- **Verbose Action Logging**: Shows actual values (e.g., "Element filled: 'Admin' filled in Username input field")
+- **Automatic Secret Masking**: Sensitive fields masked with asterisks
+- **Exception Details**: Failed actions include error messages
+- **Console Log Categorization**: Errors, Warnings, Debug, Info properly sorted
+- **Working Filters**: Click category tabs to filter logs
+- **Scrollable Containers**: Proper scrolling for long log lists
 
-#### PDF Report
-- Executive summary
-- Test execution details
-- Charts and visualizations
-- Professional formatting
+### Report Formats
+- **HTML**: Interactive web-based reports
+- **PDF**: Professional document format
+- **Excel**: Detailed spreadsheets with pivot tables
+- **JSON**: Machine-readable format for integrations
 
-#### Excel Report
-- Detailed test results in spreadsheet format
-- Multiple worksheets for different views
-- Pivot table ready data
-- Automated charts
+## 💾 Runtime Property Storage
 
-### Report Location
-Reports are generated in: `reports/report-{timestamp}-{random}/`
+The framework provides multiple mechanisms for storing and retrieving runtime data:
 
-### Custom Report Configuration
-```javascript
-// playwright.config.ts
-reporter: [
-  ['html', { outputFolder: 'reports/html' }],
-  ['json', { outputFile: 'reports/results.json' }],
-  ['junit', { outputFile: 'reports/junit.xml' }],
-  ['./src/reporting/core/CSReporter.ts']
-]
+### ConfigurationManager (Global Storage)
+```typescript
+// Store a value globally
+ConfigurationManager.set('SESSION_TOKEN', 'abc123');
+
+// Retrieve it anywhere
+const token = ConfigurationManager.get('SESSION_TOKEN');
 ```
 
-## 🤖 AI Features
-
-### Self-Healing Locators
+### BDDContext (Scoped Storage)
 ```typescript
-// Automatically heals broken locators
-@CSGetElement({ 
-  locator: '#submit-btn',
-  healingStrategy: 'auto',
-  fallbackLocators: [
-    'button[type="submit"]',
-    'text=Submit'
-  ]
-})
-submitButton: CSWebElement;
+// Store with different scopes
+this.bddContext.store('userId', '12345'); // scenario scope
+this.bddContext.store('apiToken', 'abc123', 'feature'); // feature scope
+this.bddContext.store('baseUrl', 'https://api.example.com', 'world'); // global scope
+
+// Retrieve values
+const userId = this.bddContext.retrieve<string>('userId');
 ```
 
-### Visual Recognition
+### ExecutionContext (Metadata Storage)
 ```typescript
-// Find elements using visual recognition
-await page.findByVisual('login-button.png', {
-  threshold: 0.8,
-  timeout: 5000
+// Store test execution metadata
+this.executionContext.setMetadata('testRunId', 'TR-12345');
+
+// Retrieve metadata
+const testRunId = this.executionContext.getMetadata('testRunId');
+```
+
+## 🔗 Azure DevOps Integration
+
+### Overview
+The framework provides comprehensive integration with Azure DevOps Test Plans for automatic test result publishing and evidence attachment.
+
+### Tag-Based Test Mapping
+```gherkin
+@TestPlanId-100 @TestSuiteId-200
+Feature: User Authentication
+
+  @TestCaseId-12345 @priority:critical @smoke
+  Scenario: Successful login
+    Given I am on login page
+    When I enter valid credentials
+    Then I should see dashboard
+```
+
+### Supported Tags
+- `@TestCaseId-XXX` - Maps to ADO test case
+- `@TestPlanId-XXX` - Specifies test plan
+- `@TestSuiteId-XXX` - Specifies test suite
+- `@priority:critical|high|medium|low` - Sets priority
+
+### Authentication
+```env
+# Personal Access Token (Recommended)
+ADO_PAT_TOKEN=your-pat-token
+# Or encrypted:
+ADO_PAT_TOKEN=ENCRYPTED:U2FsdGVkX1+...
+
+# Basic Authentication
+ADO_USERNAME=user@company.com
+ADO_PASSWORD=ENCRYPTED:U2FsdGVkX1+...
+```
+
+### Evidence Attachment
+- Screenshots with automatic compression
+- Videos with chunked upload
+- Console logs and execution traces
+- HAR files for network analysis
+- HTML reports as ZIP archives
+
+### Advanced Features
+- Automatic bug creation on failures
+- Build/release integration
+- Custom field mapping
+- Batch processing for performance
+- Smart retry logic
+
+## 🚀 Advanced Features
+
+### Parallel Execution
+```bash
+# Configure workers
+MAX_PARALLEL_WORKERS=4
+PARALLEL_SCENARIO_EXECUTION=true
+
+# Run with parallel execution
+npm run test -- --parallel --workers=4
+```
+
+### Network Interception
+```typescript
+// Mock API responses
+await page.route('**/api/users', route => {
+  route.fulfill({
+    status: 200,
+    body: JSON.stringify({ users: [] })
+  });
 });
 ```
 
-### Natural Language Processing
-```gherkin
-# Natural language steps are automatically converted
-Given I want to "search for products under $50 and add the first one to cart"
+### Performance Monitoring
+- Automatic Core Web Vitals collection
+- Custom performance metrics
+- Resource timing analysis
+- Performance budgets enforcement
+
+### Proxy Configuration
+```env
+PROXY_TYPE=http
+PROXY_HOST=proxy.company.com
+PROXY_PORT=8080
+PROXY_USERNAME=user
+PROXY_PASSWORD=pass
 ```
 
 ## 🔍 Debugging
@@ -401,60 +435,51 @@ npm run test:akhan -- --trace=on
 npx playwright show-trace trace.zip
 ```
 
-### VS Code Debugging
-1. Set breakpoints in your code
-2. Run "Debug: AKHAN Tests" from VS Code
-3. Use the debug console for inspection
+## 🔒 Security
+
+### Data Encryption
+- Automatic encryption/decryption of sensitive values
+- Support for encrypted configuration files
+- Secure credential storage
+
+### Best Practices
+- Store sensitive data in `test-secure.config.env`
+- Use environment variables for secrets
+- Never commit credentials to version control
+- Implement role-based access control
 
 ## 🧪 Best Practices
 
-### 1. **Page Object Model**
-```typescript
-export class LoginPage extends CSBasePage {
-  @CSGetElement({ locator: '#username' })
-  private usernameInput: CSWebElement;
-  
-  async login(username: string, password: string) {
-    await this.usernameInput.type(username);
-    // ...
-  }
-}
-```
+### Page Object Model
+- Encapsulate page logic in dedicated classes
+- Use descriptive element locators
+- Implement reusable methods
 
-### 2. **Data Management**
+### Data Management
 - Keep test data in external files
 - Use meaningful column names
-- Enable execution flags for selective running
+- Enable execution flags
 - Encrypt sensitive data
 
-### 3. **Test Organization**
-- Use descriptive feature and scenario names
-- Apply meaningful tags for categorization
-- Group related tests in feature files
-- Maintain a clear folder structure
+### Test Organization
+- Use descriptive feature names
+- Apply meaningful tags
+- Group related tests
+- Maintain clear folder structure
 
-### 4. **Step Definitions**
+### Step Definitions
 - Keep steps atomic and reusable
 - Use parameters for flexibility
 - Avoid hardcoded values
 - Implement proper error handling
 
-## 🔒 Security
+## 📈 Performance Tips
 
-### Data Encryption
-```javascript
-// Encrypt sensitive data in config files
-ENCRYPTED_PASSWORD={encrypted}U2FsdGVkX1+...
-
-// Auto-decryption in tests
-const password = await decrypt(config.ENCRYPTED_PASSWORD);
-```
-
-### Secure Configuration
-- Store sensitive data in `test-secure.config.env`
-- Use environment variables for secrets
-- Never commit credentials to version control
-- Implement role-based access control
+- Use parallel execution for faster runs
+- Implement smart waits instead of hard sleeps
+- Optimize locator strategies
+- Cache reusable data
+- Use headless mode in CI/CD
 
 ## 🤝 Contributing
 
@@ -463,12 +488,6 @@ const password = await decrypt(config.ENCRYPTED_PASSWORD);
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
-
-### Coding Standards
-- Follow TypeScript best practices
-- Write comprehensive unit tests
-- Document new features
-- Update README for significant changes
 
 ## 📚 Documentation
 
@@ -495,32 +514,9 @@ const password = await decrypt(config.ENCRYPTED_PASSWORD);
    chmod +x node_modules/.bin/*
    ```
 
-## 📈 Performance Tips
-
-- Use parallel execution for faster runs
-- Implement smart waits instead of hard sleeps
-- Optimize locator strategies
-- Cache reusable data
-- Use headless mode in CI/CD
-
-## 🚧 Roadmap
-
-- [ ] Mobile app testing support
-- [ ] Enhanced GraphQL testing
-- [ ] AI-powered test generation
-- [ ] Cloud device farm integration
-- [ ] Advanced performance testing
-- [ ] Kubernetes native execution
-
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Playwright team for the amazing automation library
-- Cucumber team for BDD implementation
-- All contributors and users of this framework
 
 ## 📞 Support
 
@@ -528,6 +524,4 @@ For questions and support, please refer to the documentation or create an issue 
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: December 2024  
 **Maintained by**: CS Test Automation Team

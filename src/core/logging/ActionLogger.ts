@@ -158,6 +158,9 @@ export class ActionLogger extends EventEmitter {
       return;
     }
 
+    // Create more verbose description based on action type
+    const verboseDetails = this.createVerboseDescription(action, details);
+
     const entry: ActionLogEntry = {
       id: this.generateLogId(),
       timestamp: new Date(),
@@ -167,7 +170,7 @@ export class ActionLogger extends EventEmitter {
       sessionId: this.sessionId,
       context: { ...this.currentContext },
       action,
-      details: this.sanitizeData(details),
+      details: this.sanitizeData(verboseDetails),
       metadata: this.enrichMetadata(metadata),
       threadId: this.getThreadId(),
       processId: process.pid,
@@ -1084,6 +1087,86 @@ export class ActionLogger extends EventEmitter {
     }
   }
 
+  private createVerboseDescription(action: string, details: any): any {
+    const enhancedDetails = { ...details };
+    
+    // Add verbose descriptions based on action type
+    switch (action.toLowerCase()) {
+      case 'click':
+      case 'element_action':
+        if (details.element || details.description) {
+          enhancedDetails.verboseDescription = `User clicked on "${details.element || details.description}"`;
+          if (details.options?.position) {
+            enhancedDetails.verboseDescription += ` at position (${details.options.position.x}, ${details.options.position.y})`;
+          }
+        }
+        break;
+      
+      case 'fill':
+      case 'type':
+        if (details.element || details.description) {
+          enhancedDetails.verboseDescription = `User entered text into "${details.element || details.description}" field`;
+          if (details.value && typeof details.value === 'string') {
+            // Mask sensitive values
+            const maskedValue = this.maskSensitiveValue(details.value, details.element || details.description || '');
+            enhancedDetails.verboseDescription += ` with value "${maskedValue}"`;
+          }
+        }
+        break;
+      
+      case 'navigation':
+      case 'navigate':
+        enhancedDetails.verboseDescription = `Navigating to ${details.url || details.description || 'page'}`;
+        break;
+      
+      case 'wait':
+        enhancedDetails.verboseDescription = `Waiting for ${details.description || 'element'} to be ${details.state || 'ready'}`;
+        break;
+      
+      case 'validation':
+      case 'assert':
+        enhancedDetails.verboseDescription = `Validating that ${details.description || 'condition'} ${details.passed ? 'passed' : 'failed'}`;
+        break;
+      
+      default:
+        if (details.description) {
+          enhancedDetails.verboseDescription = details.description;
+        }
+    }
+    
+    return enhancedDetails;
+  }
+
+  private maskSensitiveValue(value: string, fieldName: string): string {
+    // List of field names that might contain sensitive data
+    const sensitiveFields = [
+      /password/i,
+      /pwd/i,
+      /pass/i,
+      /secret/i,
+      /token/i,
+      /api[_-]?key/i,
+      /auth/i,
+      /pin/i,
+      /ssn/i,
+      /social/i,
+      /credit[_-]?card/i,
+      /cvv/i,
+      /account/i
+    ];
+    
+    // Check if field name matches sensitive patterns
+    const isSensitive = sensitiveFields.some(pattern => pattern.test(fieldName));
+    
+    if (isSensitive) {
+      // Return masked value with asterisks
+      return '*'.repeat(value.length || 8);
+    }
+    
+    // For non-sensitive fields, return the actual value
+    return value;
+  }
+
   private sanitizeData(data: any): any {
     if (data === null || data === undefined) {
       return data;
@@ -1094,14 +1177,19 @@ export class ActionLogger extends EventEmitter {
 
     const sensitivePatterns = [
       /password/i,
+      /pwd/i,
+      /pass/i,
       /token/i,
       /secret/i,
-      /key/i,
+      /api[_-]?key/i,
       /auth/i,
       /credential/i,
       /pin/i,
       /ssn/i,
-      /social/i
+      /social/i,
+      /credit[_-]?card/i,
+      /cvv/i,
+      /account[_-]?number/i
     ];
 
     const sanitize = (obj: any, path: string = ''): any => {
@@ -1131,7 +1219,14 @@ export class ActionLogger extends EventEmitter {
         const isSensitive = sensitivePatterns.some(pattern => pattern.test(key));
         
         if (isSensitive) {
-          sanitized[key] = '[REDACTED]';
+          // Mask with asterisks instead of [REDACTED]
+          if (typeof value === 'string') {
+            sanitized[key] = '*'.repeat(value.length || 8);
+          } else if (typeof value === 'number') {
+            sanitized[key] = '*'.repeat(value.toString().length);
+          } else {
+            sanitized[key] = '********';
+          }
         } else if (this.shouldApplyCustomSanitization(currentPath)) {
           sanitized[key] = this.applyCustomSanitization(currentPath, value);
         } else if (typeof value === 'object') {
@@ -2023,6 +2118,91 @@ export class ActionLogger extends EventEmitter {
     } else {
       console.info(`[PAGE OPERATION] ${operation} - ${pageName}`, context);
     }
+  }
+
+  /**
+   * Log element actions specifically with 'action' type for HTML report processing
+   */
+  static async logElementAction(description: string, context?: any): Promise<void> {
+    const instance = ActionLogger.getInstance();
+    instance.ensureComponentsInitialized();
+    
+    // Extract action details from context
+    const { action, element, duration, error, ...otherContext } = context || {};
+    
+    // Create a more verbose description based on the action
+    let verboseDescription = description;
+    
+    // Handle error cases
+    if (error) {
+      verboseDescription = `${description} - Failed with error: ${error.message || error}`;
+      await instance.logError(`Action failed: ${action}`, error, {
+        element,
+        action,
+        ...otherContext
+      });
+      return;
+    }
+    
+    // Create verbose descriptions for successful actions
+    if (action && element) {
+      switch (action.toLowerCase()) {
+        case 'click':
+          verboseDescription = `Element clicked: ${element}`;
+          break;
+        case 'fill':
+        case 'type':
+          if (otherContext.value !== undefined) {
+            const maskedValue = instance.maskSensitiveValue(String(otherContext.value), element);
+            verboseDescription = `Element filled: '${maskedValue}' filled in ${element}`;
+            // Store both original and masked value for proper logging
+            otherContext.displayValue = maskedValue;
+          } else if (otherContext.characters !== undefined) {
+            verboseDescription = `Element filled: ${element} (${otherContext.characters} characters)`;
+          }
+          break;
+        case 'select':
+        case 'selectoption':
+          if (otherContext.value !== undefined) {
+            const valueStr = Array.isArray(otherContext.value) ? otherContext.value.join(', ') : otherContext.value;
+            verboseDescription = `Element selected: '${valueStr}' selected in ${element}`;
+          }
+          break;
+        case 'check':
+          verboseDescription = `Element checked: ${element} checkbox checked`;
+          break;
+        case 'uncheck':
+          verboseDescription = `Element unchecked: ${element} checkbox unchecked`;
+          break;
+        case 'hover':
+          verboseDescription = `Element hovered: Mouse hovered over ${element}`;
+          break;
+        case 'focus':
+          verboseDescription = `Element focused: ${element} received focus`;
+          break;
+        case 'scroll':
+          verboseDescription = `Element scrolled: Scrolled to ${element}`;
+          break;
+        case 'wait':
+          verboseDescription = `Waiting for element: ${element} to be ${otherContext.state || 'ready'}`;
+          break;
+        case 'press':
+          if (otherContext.key) {
+            verboseDescription = `Key pressed: '${otherContext.key}' pressed on ${element}`;
+          }
+          break;
+        default:
+          verboseDescription = description;
+      }
+    }
+    
+    // Use logAction method which creates entries with type: 'action'
+    await instance.logAction(action || 'element_action', {
+      description: verboseDescription,
+      element,
+      duration,
+      ...otherContext
+    });
   }
 
   // Step-specific logging methods for BDD framework compatibility

@@ -21,6 +21,8 @@
     "test:akhan:rerun": "npm run test:akhan -- --rerun=true",
     "test:akhan:smoke": "npm run test:akhan -- --tags=@smoke",
     "test:akhan:regression": "npm run test:akhan -- --tags=@regression",
+    "test:crru": "cross-env TS_NODE_PROJECT=./tsconfig.json ts-node src/index.ts --project=crru",
+    "test:crru:headed": "cross-env TS_NODE_PROJECT=./tsconfig.json ts-node src/index.ts --project=crru --headless=false",
     "test:feature": "cross-env TS_NODE_PROJECT=./tsconfig.json ts-node src/index.ts",
     "clean": "rimraf dist reports logs screenshots downloads videos traces",
     "clean:reports": "rimraf reports",

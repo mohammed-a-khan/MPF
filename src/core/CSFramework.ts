@@ -63,6 +63,7 @@ export class CSFramework {
     private isRunning = false;
     private startTime?: Date;
     private currentEnvironment?: string;
+    private currentProject?: string;
     // private globalTimeout = 30000;
     private components = new Map<string, any>();
     private componentStatus: ComponentStatus[] = [];
@@ -127,6 +128,7 @@ export class CSFramework {
         try {
             logger.info(`🚀 Starting CS Framework v${CSFramework.version} parallel initialization for project: ${project}, environment: ${environment}`);
             this.startTime = new Date();
+            this.currentProject = project;
             this.currentEnvironment = environment;
 
             await this.initializeCoreModulesParallel(project, environment, actualConfig);
@@ -169,6 +171,11 @@ export class CSFramework {
         this.updateComponentStatus('ConfigurationManager', true, true);
         logger.info('✅ Configuration loaded - proceeding with parallel initialization');
         
+        // Apply command-line configuration overrides
+        if (config) {
+            this.applyConfigurationOverrides(config);
+        }
+        
         const coreModules = await Promise.allSettled([
             this.initializeBrowserManagementWithFallback(),
             this.initializeUtilitiesWithFallback()
@@ -179,6 +186,30 @@ export class CSFramework {
         if (config?.debug) {
             logger.debug('Core modules initialized in debug mode');
         }
+    }
+
+    /**
+     * Apply configuration overrides from command line
+     */
+    private applyConfigurationOverrides(config: Partial<FrameworkConfig>): void {
+        // Apply browser settings
+        if (config.headless !== undefined) {
+            ConfigurationManager.set('HEADLESS', String(config.headless));
+            logger.debug(`Applied headless override: ${config.headless}`);
+        }
+        if (config.parallel !== undefined) {
+            ConfigurationManager.set('PARALLEL_EXECUTION', String(config.parallel));
+        }
+        if (config.workers !== undefined) {
+            ConfigurationManager.set('MAX_PARALLEL_WORKERS', String(config.workers));
+        }
+        if (config.timeout !== undefined) {
+            ConfigurationManager.set('DEFAULT_TIMEOUT', String(config.timeout));
+        }
+        if (config.debug !== undefined) {
+            ConfigurationManager.set('DEBUG_MODE', String(config.debug));
+        }
+        // Add more configuration overrides as needed
     }
 
     /**
@@ -292,6 +323,7 @@ export class CSFramework {
 
             const runOptions = {
                 ...options,
+                project: this.currentProject,
                 environment: this.currentEnvironment,
                 paths: featurePaths,  // CSBDDRunner expects 'paths' not 'featurePaths'
                 adoEnabled: options?.skipADO !== true

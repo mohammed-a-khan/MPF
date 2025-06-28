@@ -178,7 +178,7 @@ async function runTests(options: ExecutionOptions): Promise<any> {
                 workers: options.workers,
                 timeout: options.timeout,
                 debug: options.debug,
-                headless: !options.headed,
+                headless: options.headless,
                 proxy: !!options.proxy,
                 reporting: !options.skipReport,
                 adoIntegration: !options.skipADO

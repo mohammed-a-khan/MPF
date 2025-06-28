@@ -1794,7 +1794,28 @@ export class ImprovedProductionHTMLReportGenerator {
         .enhanced-log-container {
             max-height: 600px;
             overflow-y: auto;
+            overflow-x: hidden;
             background: #fafafa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 0;
+        }
+        
+        .enhanced-log-container::-webkit-scrollbar {
+            width: 12px;
+        }
+        
+        .enhanced-log-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .enhanced-log-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 6px;
+        }
+        
+        .enhanced-log-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
         
         .enhanced-log-entry {
@@ -1950,6 +1971,7 @@ export class ImprovedProductionHTMLReportGenerator {
         
         /* 🔥 MODERN LOG STYLES - Better format and readability */
         .modern-log-entry {
+            display: block;
             margin-bottom: 8px;
             border-radius: 6px;
             border: 1px solid #e1e5e9;
@@ -2894,12 +2916,21 @@ export class ImprovedProductionHTMLReportGenerator {
                                 </h5>
                                 <div class="screenshot-gallery">
                                     ${stepShots.map(screenshot => {
-                                // Convert absolute path to relative path for web display
+                                // Convert path to relative path for web display
                                 let imagePath = screenshot.path || '';
+                                console.log(`[DEBUG] Original screenshot path: ${imagePath}`);
                                 
-                                // FIXED: Handle new zip structure where HTML is in html/ subdirectory and screenshots are in evidence/screenshots/
-                                // First check if path contains evidence/screenshots (most common case after path updates)
-                                if (imagePath.includes('/evidence/screenshots/') || imagePath.includes('\\evidence\\screenshots\\')) {
+                                // If the path is just a filename (no directory separators)
+                                if (!imagePath.includes('/') && !imagePath.includes('\\')) {
+                                    // It's just a filename, prepend the relative path
+                                    imagePath = `../evidence/screenshots/${imagePath}`;
+                                    console.log(`[DEBUG] Converted filename to relative path: ${imagePath}`);
+                                } else if (/^[A-Za-z]:[\\/]/.test(imagePath) || /^\/[A-Za-z]:[\\/]/.test(imagePath)) {
+                                    // This is an absolute Windows path, extract just the filename
+                                    const filename = path.basename(imagePath);
+                                    imagePath = `../evidence/screenshots/${filename}`;
+                                    console.log(`[DEBUG] Converted absolute Windows path to: ${imagePath}`);
+                                } else if (imagePath.includes('/evidence/screenshots/') || imagePath.includes('\\evidence\\screenshots\\')) {
                                     // Extract just the filename from the evidence path
                                     const filename = path.basename(imagePath);
                                     imagePath = `../evidence/screenshots/${filename}`;
@@ -3213,14 +3244,33 @@ export class ImprovedProductionHTMLReportGenerator {
             }
             
             // Categorize and beautify logs
-            let category = log.category || 'general';
+            let category = log.category || (log.type === 'console' ? 'console' : 'general');
             let icon = '📝';
             let beautifiedMessage = message;
             let priority = 3; // 1=high, 2=medium, 3=low
             let logLevel = (log.level || 'info').toLowerCase();
             
+            // If it's already categorized as console, keep it
+            if (category === 'console') {
+                icon = '💻';
+                priority = 2;
+                // Adjust category based on console log level
+                if (logLevel === 'error') {
+                    category = 'errors';
+                    icon = '❌';
+                    priority = 1;
+                } else if (logLevel === 'warn') {
+                    category = 'warnings';
+                    icon = '⚠️';
+                    priority = 1;
+                } else if (logLevel === 'debug') {
+                    category = 'debug';
+                    icon = '🐛';
+                    priority = 3;
+                }
+            }
             // Enhanced categorization and beautification
-            if (message.includes('Screenshot') || message.includes('screenshot')) {
+            else if (message.includes('Screenshot') || message.includes('screenshot')) {
                 category = 'screenshots';
                 icon = '📸';
                 priority = 2;
@@ -3277,11 +3327,12 @@ export class ImprovedProductionHTMLReportGenerator {
                 logLevel = 'debug';
                 beautifiedMessage = message.replace(/Debug/gi, '🐛 Debug');
             }
-            else if (message.includes('[Console]') || message.includes('console')) {
+            else if (message.includes('[Console]') || message.includes('console') || log.type === 'console') {
                 category = 'console';
                 icon = '💻';
                 priority = 2;
-                beautifiedMessage = message.replace(/\[Console\]/gi, '💻 Console').replace(/console/gi, '💻 Console');
+                // Don't over-beautify console messages, keep them as-is mostly
+                beautifiedMessage = message.replace(/\[Console\]/gi, '💻 [Console]');
             }
             else if (message.includes('Test') || message.includes('test') || message.includes('Step') || message.includes('step')) {
                 category = 'test';
@@ -3335,7 +3386,7 @@ export class ImprovedProductionHTMLReportGenerator {
         <div class="log-filters-enhanced mb-4">
             <div class="log-filter-tabs">
                 ${categories.map((cat, index) => `
-                <button class="log-filter-tab ${index === 0 ? 'active' : ''}" onclick="filterLogsByCategory('${cat.key}')">
+                <button class="log-filter-tab ${index === 0 ? 'active' : ''}" onclick="filterLogsByCategory('${cat.key}', this)">
                     <span class="filter-icon">${cat.icon}</span>
                     <span class="filter-label">${cat.label}</span>
                     <span class="filter-count">${cat.count}</span>
@@ -3493,7 +3544,7 @@ export class ImprovedProductionHTMLReportGenerator {
         return `
     <script>
         // Tab navigation
-        function showTab(tabName) {
+        function showTab(tabName, clickedTab) {
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
@@ -3508,7 +3559,17 @@ export class ImprovedProductionHTMLReportGenerator {
             document.getElementById(tabName).classList.add('active');
             
             // Add active class to clicked nav tab
-            event.target.closest('.nav-tab').classList.add('active');
+            if (clickedTab) {
+                const navTab = clickedTab.closest('.nav-tab');
+                if (navTab) {
+                    navTab.classList.add('active');
+                }
+            } else if (event && event.target) {
+                const navTab = event.target.closest('.nav-tab');
+                if (navTab) {
+                    navTab.classList.add('active');
+                }
+            }
         }
         
         // Collapsible scenarios
@@ -3533,41 +3594,12 @@ export class ImprovedProductionHTMLReportGenerator {
             // Get the image path from data attribute
             const imagePath = element.getAttribute('data-image-path');
             
-            // For relative paths, try to resolve them properly
-            let resolvedPath = imagePath;
-            
-            // If it's a relative path, try to make it absolute based on the current location
-            if (imagePath.startsWith('../')) {
-                // Get the current location path
-                const currentPath = window.location.pathname;
-                const currentDir = currentPath.substring(0, currentPath.lastIndexOf('/'));
-                
-                // Resolve the relative path
-                let relativeParts = imagePath.split('/');
-                let pathParts = currentDir.split('/');
-                
-                for (let part of relativeParts) {
-                    if (part === '..') {
-                        pathParts.pop();
-                    } else if (part !== '.') {
-                        pathParts.push(part);
-                    }
-                }
-                
-                resolvedPath = pathParts.join('/');
-            }
-            
-            img.src = resolvedPath;
+            // Just use the relative path directly - modern browsers handle this correctly
+            // Don't try to resolve to absolute path as it causes issues with file:// URLs
+            img.src = imagePath;
             img.onerror = function() {
-                // Try the original path if resolved path fails
-                if (resolvedPath !== imagePath) {
-                    this.src = imagePath;
-                    this.onerror = function() {
-                        this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"%3E%3Crect width="400" height="300" fill="%23f0f0f0"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="20"%3EImage not found%3C/text%3E%3C/svg%3E';
-                    };
-                } else {
-                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"%3E%3Crect width="400" height="300" fill="%23f0f0f0"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="20"%3EImage not found%3C/text%3E%3C/svg%3E';
-                }
+                // If image fails to load, show placeholder
+                this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"%3E%3Crect width="400" height="300" fill="%23f0f0f0"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="20"%3EImage not found%3C/text%3E%3C/svg%3E';
             };
             lightbox.classList.add('active');
         }
@@ -3576,9 +3608,9 @@ export class ImprovedProductionHTMLReportGenerator {
             document.getElementById('lightbox').classList.remove('active');
         }
         
-        // Log filtering
-        function filterLogs(level) {
-            const logEntries = document.querySelectorAll('.log-entry');
+        // Log filtering by level
+        function filterLogs(level, clickedButton) {
+            const logEntries = document.querySelectorAll('.modern-log-entry');
             logEntries.forEach(entry => {
                 if (level === 'all' || entry.dataset.level === level) {
                     entry.style.display = 'block';
@@ -3591,8 +3623,97 @@ export class ImprovedProductionHTMLReportGenerator {
             document.querySelectorAll('.log-filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            }
         }
+        
+        // Log filtering by category
+        function filterLogsByCategory(category, clickedButton) {
+            const logEntries = document.querySelectorAll('.modern-log-entry');
+            let visibleCount = 0;
+            
+            logEntries.forEach(entry => {
+                if (category === 'all' || entry.dataset.category === category) {
+                    entry.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    entry.style.display = 'none';
+                }
+            });
+            
+            // Update tab states
+            document.querySelectorAll('.log-filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // If we have a clicked button reference, use it directly
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            } else {
+                // Otherwise, find and activate the correct tab
+                document.querySelectorAll('.log-filter-tab').forEach(tab => {
+                    const tabText = tab.textContent.toLowerCase();
+                    if ((category === 'all' && tabText.includes('all logs')) ||
+                        (category === 'errors' && tabText.includes('errors')) ||
+                        (category === 'warnings' && tabText.includes('warnings')) ||
+                        (category === 'test' && tabText.includes('test')) ||
+                        (category === 'auth' && tabText.includes('auth')) ||
+                        (category === 'navigation' && tabText.includes('navigation')) ||
+                        (category === 'screenshots' && tabText.includes('screenshots')) ||
+                        (category === 'performance' && tabText.includes('performance')) ||
+                        (category === 'console' && tabText.includes('console')) ||
+                        (category === 'browser' && tabText.includes('browser')) ||
+                        (category === 'cleanup' && tabText.includes('cleanup')) ||
+                        (category === 'debug' && tabText.includes('debug')) ||
+                        (category === 'general' && tabText.includes('general'))) {
+                        tab.classList.add('active');
+                    }
+                });
+            }
+            
+            // Clear search when filtering
+            const searchInput = document.getElementById('logSearchInput');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+        }
+        
+        // Log search functionality
+        function searchLogs() {
+            const searchTerm = document.getElementById('logSearchInput').value.toLowerCase();
+            const logEntries = document.querySelectorAll('.modern-log-entry');
+            
+            logEntries.forEach(entry => {
+                const logMessage = entry.querySelector('.log-message');
+                if (!logMessage) return;
+                
+                const messageText = logMessage.textContent.toLowerCase();
+                const logLevel = (entry.dataset.level || '').toLowerCase();
+                const logCategory = (entry.dataset.category || '').toLowerCase();
+                
+                if (messageText.includes(searchTerm) || 
+                    logLevel.includes(searchTerm) || 
+                    logCategory.includes(searchTerm)) {
+                    entry.style.display = 'block';
+                } else {
+                    entry.style.display = 'none';
+                }
+            });
+        }
+        
+        // Clear log search
+        function clearLogSearch() {
+            document.getElementById('logSearchInput').value = '';
+            searchLogs(); // Re-run search to show all logs
+        }
+        
+        // Make functions globally accessible
+        window.filterLogsByCategory = filterLogsByCategory;
+        window.searchLogs = searchLogs;
+        window.clearLogSearch = clearLogSearch;
+        window.filterLogs = filterLogs;
+        window.showTab = showTab;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -3611,6 +3732,19 @@ export class ImprovedProductionHTMLReportGenerator {
                     header.addEventListener('click', () => sortTable(table, index));
                 });
             });
+            
+            // Initialize log filters to show all logs
+            const allLogsTab = document.querySelector('.log-filter-tab.active');
+            if (allLogsTab) {
+                filterLogsByCategory('all', allLogsTab);
+            }
+            
+            // Make sure log container has proper height
+            const logContainer = document.getElementById('enhanced-log-container');
+            if (logContainer && logContainer.children.length > 0) {
+                logContainer.style.minHeight = '200px';
+                logContainer.style.maxHeight = '600px';
+            }
         });
         
         // Table sorting
@@ -3700,7 +3834,10 @@ export class ImprovedProductionHTMLReportGenerator {
         }
 
         // Enhanced Log Functions
-        function filterLogsByCategory(category) {
+        // (filterLogsByCategory is already defined above with proper event handling)
+        
+        // Additional helper for old-style log entries if needed
+        function filterEnhancedLogEntries(category) {
             const logEntries = document.querySelectorAll('.enhanced-log-entry');
             logEntries.forEach(entry => {
                 if (category === 'all' || entry.dataset.category === category) {
@@ -3709,37 +3846,9 @@ export class ImprovedProductionHTMLReportGenerator {
                     entry.style.display = 'none';
                 }
             });
-            
-            // Update button states
-            document.querySelectorAll('.log-filter-tab').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.closest('.log-filter-tab').classList.add('active');
         }
         
-        function searchLogs() {
-            const searchTerm = document.getElementById('logSearchInput').value.toLowerCase();
-            const logEntries = document.querySelectorAll('.enhanced-log-entry');
-            
-            logEntries.forEach(entry => {
-                const message = entry.querySelector('.log-entry-message').textContent.toLowerCase();
-                const context = entry.querySelector('.log-entry-context');
-                const contextText = context ? context.textContent.toLowerCase() : '';
-                
-                if (message.includes(searchTerm) || contextText.includes(searchTerm)) {
-                    entry.style.display = 'block';
-                } else {
-                    entry.style.display = 'none';
-                }
-            });
-        }
-        
-        function clearLogSearch() {
-            document.getElementById('logSearchInput').value = '';
-            document.querySelectorAll('.enhanced-log-entry').forEach(entry => {
-                entry.style.display = 'block';
-            });
-        }
+        // (clearLogSearch is already defined above)
     </script>`;
     }
 
@@ -3750,10 +3859,31 @@ export class ImprovedProductionHTMLReportGenerator {
         const processedTimestamps = new Set<string>();
         
         try {
-            // Get ALL logs from ActionLogger
+            // FIRST: Get ALL terminal console logs from ConsoleCapture
+            const { consoleCapture } = await import('../../core/logging/ConsoleCapture');
+            const consoleMessages = consoleCapture.getMessages();
+            
+            // Add all console messages to logs
+            consoleMessages.forEach(consoleMsg => {
+                const logEntry = {
+                    timestamp: consoleMsg.timestamp,
+                    level: consoleMsg.level,
+                    message: consoleMsg.message,
+                    type: 'console',
+                    category: 'console',
+                    context: {
+                        source: 'terminal',
+                        args: consoleMsg.args,
+                        stack: consoleMsg.stack
+                    }
+                };
+                logs.push(logEntry);
+            });
+            
+            // THEN: Get ALL logs from ActionLogger
             const allLogs = actionLogger.getAllLogs();
             
-            // Process all logs
+            // Process action logger logs
             allLogs.forEach(log => {
                 // Skip logs without valid timestamps
                 if (!log.timestamp || (typeof log.timestamp === 'string' && isNaN(Date.parse(log.timestamp)))) {
@@ -4044,8 +4174,9 @@ export class ImprovedProductionHTMLReportGenerator {
                 
                 // Check if file exists in evidence directory
                 if (await FileUtils.pathExists(evidenceFilePath)) {
-                    // Update path to evidence directory location
-                    screenshot.path = evidenceFilePath;
+                    // Store just the filename, not the full path
+                    // The path will be converted to relative path when generating HTML
+                    screenshot.path = filename;
                     this.logger.debug(`Found screenshot in evidence: ${filename}`);
                 }
             }
@@ -4111,7 +4242,7 @@ export class ImprovedProductionHTMLReportGenerator {
                                      file.toLowerCase().includes(scenario.scenario?.toLowerCase().replace(/\s+/g, '-')))) {
                                     pathSet.add(filePath);
                                     screenshots.push({
-                                        path: filePath,
+                                        path: file,  // Store just the filename, not the full path
                                         label: file,
                                         scenarioId: scenario.scenarioId,
                                         scenarioName: scenario.scenario,
@@ -4150,7 +4281,7 @@ export class ImprovedProductionHTMLReportGenerator {
                                     
                                     pathSet.add(filePath);
                                     screenshots.push({
-                                        path: filePath,
+                                        path: file,  // Store just the filename, not the full path
                                         label: label,
                                         scenarioId: 'failure-evidence',
                                         scenarioName: scenarioName,
@@ -4169,7 +4300,7 @@ export class ImprovedProductionHTMLReportGenerator {
                                 file.toLowerCase().includes(scenario.scenario?.toLowerCase().replace(/\s+/g, '-'))) {
                                 pathSet.add(filePath);
                                 screenshots.push({
-                                    path: filePath,
+                                    path: file,  // Store just the filename, not the full path
                                     label: file,
                                     scenarioId: scenario.scenarioId,
                                     scenarioName: scenario.scenario,
@@ -4186,7 +4317,7 @@ export class ImprovedProductionHTMLReportGenerator {
                         if (!matched) {
                             pathSet.add(filePath);
                             screenshots.push({
-                                path: filePath,
+                                path: file,  // Store just the filename, not the full path
                                 label: file,
                                 scenarioId: 'evidence',
                                 scenarioName: 'Evidence',

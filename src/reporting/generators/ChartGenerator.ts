@@ -255,9 +255,9 @@ export class ChartGenerator {
             data-label="${segment.label}"
             data-percentage="${percentage}"
             style="cursor: pointer; transition: all 0.3s ease; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2));"
-            onmouseover="chartHover_${id}(event, ${index})"
-            onmouseout="chartUnhover_${id}(event, ${index})"
-            onclick="chartClick_${id}(event, ${index})"
+            onmouseover="chartHover_${id.replace(/-/g, '_')}(event, ${index})"
+            onmouseout="chartUnhover_${id.replace(/-/g, '_')}(event, ${index})"
+            onclick="chartClick_${id.replace(/-/g, '_')}(event, ${index})"
           />
           
           <!-- Percentage Label on Segment -->
@@ -413,8 +413,8 @@ ${this.generateDoughnutScript(id, segments, total)}`;
               data-label="${data.labels[index]}"
               data-dataset="${dataset.label}"
               style="cursor: pointer; transition: all 0.3s ease;"
-              onmouseover="barHover_${id}(event, ${datasetIndex}, ${index})"
-              onmouseout="barUnhover_${id}(event, ${datasetIndex}, ${index})"
+              onmouseover="barHover_${id.replace(/-/g, '_')}(event, ${datasetIndex}, ${index})"
+              onmouseout="barUnhover_${id.replace(/-/g, '_')}(event, ${datasetIndex}, ${index})"
             >
               <animate
                 attributeName="height"
@@ -3375,7 +3375,7 @@ ${this.generateFunnelChartScript(id, segments)}`;
   const segments = ${JSON.stringify(segments)};
   const total = ${total};
   
-  window.chartHover_${id} = function(event, index) {
+  window.chartHover_${id.replace(/-/g, '_')} = function(event, index) {
     const segment = segments[index];
     const tooltip = document.getElementById(chartId + '-tooltip');
     const content = tooltip.querySelector('.tooltip-content');
@@ -3395,7 +3395,7 @@ ${this.generateFunnelChartScript(id, segments)}`;
     event.target.style.filter = 'brightness(1.1)';
   };
   
-  window.chartUnhover_${id} = function(event, index) {
+  window.chartUnhover_${id.replace(/-/g, '_')} = function(event, index) {
     const tooltip = document.getElementById(chartId + '-tooltip');
     tooltip.style.display = 'none';
     
@@ -3403,7 +3403,7 @@ ${this.generateFunnelChartScript(id, segments)}`;
     event.target.style.filter = '';
   };
   
-  window.chartClick_${id} = function(event, index) {
+  window.chartClick_${id.replace(/-/g, '_')} = function(event, index) {
     const segment = segments[index];
     console.log('Clicked:', segment);
     // Add custom click handler here
@@ -3416,13 +3416,15 @@ ${this.generateFunnelChartScript(id, segments)}`;
    * Generate bar chart script
    */
   private generateBarChartScript(id: string, data: BarChart): string {
+    // Ensure valid function names by replacing hyphens with underscores
+    const funcId = id.replace(/-/g, '_');
     return `
 <script>
 (function() {
   const chartId = '${id}';
   const data = ${JSON.stringify(data)};
   
-  window.barHover_${id} = function(event, datasetIndex, index) {
+  window.barHover_${funcId} = function(event, datasetIndex, index) {
     const dataset = data.datasets[datasetIndex];
     const value = dataset.data[index];
     const label = data.labels[index];
@@ -3442,7 +3444,7 @@ ${this.generateFunnelChartScript(id, segments)}`;
     event.target.style.filter = 'brightness(1.2)';
   };
   
-  window.barUnhover_${id} = function(event, datasetIndex, index) {
+  window.barUnhover_${funcId} = function(event, datasetIndex, index) {
     const tooltip = document.getElementById(chartId + '-tooltip');
     tooltip.style.display = 'none';
     

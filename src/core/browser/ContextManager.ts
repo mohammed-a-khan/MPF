@@ -332,16 +332,28 @@ export class ContextManager {
    */
   private mergeWithDefaults(options?: ContextOptions): ContextOptions {
     const defaults: ContextOptions = {
-      viewport: {
-        width: ConfigurationManager.getInt('VIEWPORT_WIDTH', this.DEFAULT_VIEWPORT.width),
-        height: ConfigurationManager.getInt('VIEWPORT_HEIGHT', this.DEFAULT_VIEWPORT.height)
-      },
       ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false),
       acceptDownloads: true,
       colorScheme: 'light',
       locale: ConfigurationManager.get('LOCALE', 'en-US'),
       timezone: ConfigurationManager.get('TIMEZONE', 'UTC')
     };
+    
+    // Only set viewport if not in maximized mode
+    const isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
+    console.log(`🔍 DEBUG: ContextManager.mergeWithDefaults - maximized mode: ${isMaximized}`);
+    
+    if (!isMaximized) {
+      defaults.viewport = {
+        width: ConfigurationManager.getInt('VIEWPORT_WIDTH', this.DEFAULT_VIEWPORT.width),
+        height: ConfigurationManager.getInt('VIEWPORT_HEIGHT', this.DEFAULT_VIEWPORT.height)
+      };
+      console.log('🔍 DEBUG: ContextManager setting viewport:', defaults.viewport);
+    } else {
+      // Explicitly set viewport to null for maximized mode
+      defaults.viewport = null;
+      console.log('🔍 DEBUG: ContextManager - Setting viewport to null for maximized mode');
+    }
     
     // Apply proxy if enabled
     if (ConfigurationManager.getBoolean('PROXY_ENABLED')) {

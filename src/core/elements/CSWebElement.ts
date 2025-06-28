@@ -17,6 +17,13 @@ import { SelfHealingEngine } from '../ai/healing/SelfHealingEngine';
 import { ActionLogger } from '../logging/ActionLogger';
 import { ConfigurationManager } from '../configuration/ConfigurationManager';
 import { expect } from '@playwright/test';
+// Import dynamically to avoid circular dependency
+let BDDContext: any = null;
+try {
+    BDDContext = require('../bdd/context/BDDContext').BDDContext;
+} catch (error) {
+    // BDDContext might not be available in non-BDD scenarios
+}
 
 export interface ElementConfig {
     locatorType: 'css' | 'xpath' | 'id' | 'text' | 'role' | 'testid' | 'label' | 'placeholder' | 'alt' | 'title';
@@ -34,7 +41,7 @@ export interface ElementConfig {
 
 export class CSWebElement {
     // Public properties for backward compatibility
-    public page: Page;
+    private _page: Page | null;
     public options: CSGetElementOptions;
     public description: string;
     
@@ -45,11 +52,43 @@ export class CSWebElement {
     private lastResolvedAt: Date | null;
     private cacheValidityMs = 5000; // Cache valid for 5 seconds
     private readonly elementId: string;
+    
+    // Dynamic page getter - always returns current page
+    public get page(): Page {
+        // Try to get current page from BDDContext first
+        if (BDDContext) {
+            try {
+                const currentPage = BDDContext.getCurrentPage();
+                if (currentPage && !currentPage.isClosed()) {
+                    // Update our internal reference if it has changed
+                    if (this._page !== currentPage) {
+                        this._page = currentPage;
+                        // Clear cached locator as page has changed
+                        this.clearCache();
+                    }
+                    return currentPage;
+                }
+            } catch (error) {
+                // BDDContext might not be available in some scenarios
+            }
+        }
+        
+        // Fallback to stored page reference
+        if (!this._page || this._page.isClosed()) {
+            throw new Error('Page not initialized or has been closed for element: ' + this.description);
+        }
+        return this._page;
+    }
+    
+    // Setter for backward compatibility
+    public set page(page: Page) {
+        this._page = page;
+    }
 
     // Support both new constructor with parameters and legacy no-parameter constructor
     constructor(page?: Page, partialConfig?: Partial<ElementConfig> & Pick<ElementConfig, 'locatorType' | 'locatorValue' | 'description'>) {
         // Initialize with defaults for backward compatibility
-        this.page = page || (null as any);
+        this._page = page || null;
         this.elementId = `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         if (partialConfig) {
@@ -199,12 +238,61 @@ export class CSWebElement {
         this.syncConfigFromOptions();
         
         try {
-            // Check cache first
-            if (this.locator && this.isCacheValid()) {
-                return this.locator;
+            // Always get the current page to ensure we're using the right one
+            let currentPage: Page;
+            try {
+                currentPage = this.page;
+            } catch (pageError) {
+                // If getting page fails, try to get from BDDContext directly
+                if (BDDContext) {
+                    currentPage = BDDContext.getCurrentPage();
+                    // Update our internal reference
+                    this._page = currentPage;
+                } else {
+                    throw new Error(`Cannot resolve element "${this.description}" - page is not available`);
+                }
             }
             
-            // Try resolution
+            // Check cache first - but invalidate if page has changed
+            if (this.locator && this.isCacheValid()) {
+                // Verify the locator's page is still valid
+                try {
+                    // Check if the locator's page is closed
+                    const locatorPage = (this.locator as any).page?.() || (this.locator as any)._page;
+                    if (!locatorPage || locatorPage.isClosed() || locatorPage !== currentPage) {
+                        // Page is closed or changed, invalidate cache
+                        this.locator = null;
+                        this.lastResolvedAt = null;
+                    } else {
+                        return this.locator;
+                    }
+                } catch (error) {
+                    // If we can't check, invalidate to be safe
+                    this.locator = null;
+                    this.lastResolvedAt = null;
+                }
+            }
+            
+            // Ensure we have a valid page before trying to resolve
+            if (!currentPage || currentPage.isClosed()) {
+                // Try one more time to get a valid page from BDDContext
+                if (BDDContext) {
+                    try {
+                        currentPage = BDDContext.getCurrentPage();
+                        if (!currentPage || currentPage.isClosed()) {
+                            throw new Error(`Cannot resolve element "${this.description}" - page is closed or not available`);
+                        }
+                        // Update our internal reference
+                        this._page = currentPage;
+                    } catch (error) {
+                        throw new Error(`Cannot resolve element "${this.description}" - page is closed or not available`);
+                    }
+                } else {
+                    throw new Error(`Cannot resolve element "${this.description}" - page is closed or not available`);
+                }
+            }
+            
+            // Try resolution with the current page
             const resolvedLocator = await ElementResolver.getInstance().resolve(this);
             this.locator = resolvedLocator;
             this.lastResolvedAt = new Date();
@@ -238,7 +326,29 @@ export class CSWebElement {
 
     private isCacheValid(): boolean {
         if (!this.lastResolvedAt) return false;
+        
+        // Invalidate cache if page context has changed
+        if (BDDContext) {
+            try {
+                const currentPage = BDDContext.getCurrentPage();
+                if (currentPage && this._page && currentPage !== this._page) {
+                    // Page has changed, invalidate cache
+                    return false;
+                }
+            } catch (error) {
+                // BDDContext might not be available
+            }
+        }
+        
         return Date.now() - this.lastResolvedAt.getTime() < this.cacheValidityMs;
+    }
+    
+    /**
+     * Clear the cached locator - useful when page context changes
+     */
+    public clearCache(): void {
+        this.locator = null;
+        this.lastResolvedAt = null;
     }
 
     async getLocator(): Promise<Locator> {
@@ -365,13 +475,20 @@ export class CSWebElement {
             await locator.click(options);
             
             await this.logAction('click', [options], 'success');
-            ActionLogger.logInfo(`Element clicked: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element clicked: ${this.description}`, { 
                 action: 'click',
+                element: this.description,
                 duration: Date.now() - startTime,
                 options 
             });
         } catch (error) {
             await this.logAction('click', [options], 'failure', error as Error);
+            await ActionLogger.logElementAction(`Click failed: ${this.description}`, { 
+                action: 'click',
+                element: this.description,
+                duration: Date.now() - startTime,
+                error: error
+            });
             throw error;
         }
     }
@@ -383,8 +500,9 @@ export class CSWebElement {
             await locator.dblclick(options);
             
             await this.logAction('doubleClick', [options], 'success');
-            ActionLogger.logInfo(`Element double-clicked: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element double-clicked: ${this.description}`, { 
                 action: 'doubleClick',
+                element: this.description,
                 duration: Date.now() - startTime,
                 options 
             });
@@ -401,8 +519,9 @@ export class CSWebElement {
             await locator.click({ ...options, button: 'right' });
             
             await this.logAction('rightClick', [options], 'success');
-            ActionLogger.logInfo(`Element right-clicked: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element right-clicked: ${this.description}`, { 
                 action: 'rightClick',
+                element: this.description,
                 duration: Date.now() - startTime,
                 options 
             });
@@ -419,8 +538,9 @@ export class CSWebElement {
             await locator.click({ clickCount: 3 });
             
             await this.logAction('tripleClick', [], 'success');
-            ActionLogger.logInfo(`Element triple-clicked: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element triple-clicked: ${this.description}`, { 
                 action: 'tripleClick',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -436,14 +556,22 @@ export class CSWebElement {
             await locator.type(text, options);
             
             await this.logAction('type', [text.length > 20 ? text.substring(0, 20) + '...' : text, options], 'success');
-            ActionLogger.logInfo(`Text typed into element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Text typed into element: ${this.description}`, { 
                 action: 'type',
+                element: this.description,
                 duration: Date.now() - startTime,
-                characters: text.length,
+                value: text,
                 options 
             });
         } catch (error) {
             await this.logAction('type', [text, options], 'failure', error as Error);
+            await ActionLogger.logElementAction(`Type action failed: ${this.description}`, { 
+                action: 'type',
+                element: this.description,
+                duration: Date.now() - startTime,
+                value: text,
+                error: error
+            });
             throw error;
         }
     }
@@ -455,13 +583,21 @@ export class CSWebElement {
             await locator.fill(text);
             
             await this.logAction('fill', [text.length > 20 ? text.substring(0, 20) + '...' : text], 'success');
-            ActionLogger.logInfo(`Element filled: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element filled: ${this.description}`, { 
                 action: 'fill',
+                element: this.description,
                 duration: Date.now() - startTime,
-                characters: text.length 
+                value: text
             });
         } catch (error) {
             await this.logAction('fill', [text], 'failure', error as Error);
+            await ActionLogger.logElementAction(`Element fill failed: ${this.description}`, { 
+                action: 'fill',
+                element: this.description,
+                duration: Date.now() - startTime,
+                value: text,
+                error: error
+            });
             throw error;
         }
     }
@@ -473,8 +609,9 @@ export class CSWebElement {
             await locator.clear();
             
             await this.logAction('clear', [], 'success');
-            ActionLogger.logInfo(`Element cleared: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element cleared: ${this.description}`, { 
                 action: 'clear',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -490,8 +627,9 @@ export class CSWebElement {
             await locator.press(key);
             
             await this.logAction('press', [key], 'success');
-            ActionLogger.logInfo(`Key pressed on element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Key pressed on element: ${this.description}`, { 
                 action: 'press',
+                element: this.description,
                 duration: Date.now() - startTime,
                 key 
             });
@@ -508,8 +646,9 @@ export class CSWebElement {
             await locator.selectOption(value);
             
             await this.logAction('selectOption', [value], 'success');
-            ActionLogger.logInfo(`Option selected in element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Option selected in element: ${this.description}`, { 
                 action: 'selectOption',
+                element: this.description,
                 duration: Date.now() - startTime,
                 value 
             });
@@ -526,8 +665,9 @@ export class CSWebElement {
             await locator.selectText();
             
             await this.logAction('selectText', [], 'success');
-            ActionLogger.logInfo(`Text selected in element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Text selected in element: ${this.description}`, { 
                 action: 'selectText',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -543,8 +683,9 @@ export class CSWebElement {
             await locator.check();
             
             await this.logAction('check', [], 'success');
-            ActionLogger.logInfo(`Element checked: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element checked: ${this.description}`, { 
                 action: 'check',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -560,8 +701,9 @@ export class CSWebElement {
             await locator.uncheck();
             
             await this.logAction('uncheck', [], 'success');
-            ActionLogger.logInfo(`Element unchecked: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element unchecked: ${this.description}`, { 
                 action: 'uncheck',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -577,8 +719,9 @@ export class CSWebElement {
             await locator.hover();
             
             await this.logAction('hover', [], 'success');
-            ActionLogger.logInfo(`Element hovered: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element hovered: ${this.description}`, { 
                 action: 'hover',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -594,8 +737,9 @@ export class CSWebElement {
             await locator.focus();
             
             await this.logAction('focus', [], 'success');
-            ActionLogger.logInfo(`Element focused: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element focused: ${this.description}`, { 
                 action: 'focus',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -611,8 +755,9 @@ export class CSWebElement {
             await locator.blur();
             
             await this.logAction('blur', [], 'success');
-            ActionLogger.logInfo(`Element blurred: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element blurred: ${this.description}`, { 
                 action: 'blur',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -628,8 +773,9 @@ export class CSWebElement {
             await locator.scrollIntoViewIfNeeded();
             
             await this.logAction('scrollIntoView', [], 'success');
-            ActionLogger.logInfo(`Element scrolled into view: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element scrolled into view: ${this.description}`, { 
                 action: 'scrollIntoView',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
@@ -656,8 +802,9 @@ export class CSWebElement {
             await locator.waitFor(waitOptions);
             
             await this.logAction('waitFor', [options], 'success');
-            ActionLogger.logInfo(`Waited for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Waited for element: ${this.description}`, { 
                 action: 'waitFor',
+                element: this.description,
                 duration: Date.now() - startTime,
                 state: options?.state 
             });
@@ -678,8 +825,9 @@ export class CSWebElement {
             await sourceLocator.dragTo(targetLocator);
             
             await this.logAction('dragTo', [target.description], 'success');
-            ActionLogger.logInfo(`Element dragged to target: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element dragged to target: ${this.description}`, { 
                 action: 'dragTo',
+                element: this.description,
                 duration: Date.now() - startTime,
                 target: target.description 
             });
@@ -705,8 +853,9 @@ export class CSWebElement {
             await this.page.mouse.up();
             
             await this.logAction('dragToPosition', [x, y], 'success');
-            ActionLogger.logInfo(`Element dragged to position: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element dragged to position: ${this.description}`, { 
                 action: 'dragToPosition',
+                element: this.description,
                 duration: Date.now() - startTime,
                 position: { x, y } 
             });
@@ -735,8 +884,9 @@ export class CSWebElement {
             await this.page.mouse.up();
             
             await this.logAction('dragByOffset', [offsetX, offsetY], 'success');
-            ActionLogger.logInfo(`Element dragged by offset: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element dragged by offset: ${this.description}`, { 
                 action: 'dragByOffset',
+                element: this.description,
                 duration: Date.now() - startTime,
                 offset: { x: offsetX, y: offsetY } 
             });
@@ -754,8 +904,9 @@ export class CSWebElement {
             
             const fileList = Array.isArray(files) ? files : [files];
             await this.logAction('upload', [fileList], 'success');
-            ActionLogger.logInfo(`Files uploaded to element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Files uploaded to element: ${this.description}`, { 
                 action: 'upload',
+                element: this.description,
                 duration: Date.now() - startTime,
                 files: fileList.length 
             });
@@ -773,8 +924,9 @@ export class CSWebElement {
             const download = await downloadPromise;
             
             await this.logAction('download', [], 'success');
-            ActionLogger.logInfo(`Download initiated from element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Download initiated from element: ${this.description}`, { 
                 action: 'download',
+                element: this.description,
                 duration: Date.now() - startTime,
                 url: download.url() 
             });
@@ -793,8 +945,9 @@ export class CSWebElement {
             const screenshot = await locator.screenshot(options);
             
             await this.logAction('screenshot', [options?.path], 'success');
-            ActionLogger.logInfo(`Screenshot taken of element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Screenshot taken of element: ${this.description}`, { 
                 action: 'screenshot',
+                element: this.description,
                 duration: Date.now() - startTime,
                 path: options?.path 
             });
@@ -824,8 +977,9 @@ export class CSWebElement {
             await this.page.mouse.wheel(deltaX, deltaY);
             
             await this.logAction('mouseWheel', [deltaX, deltaY], 'success');
-            ActionLogger.logInfo(`Mouse wheel scrolled on element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Mouse wheel scrolled on element: ${this.description}`, { 
                 action: 'mouseWheel',
+                element: this.description,
                 duration: Date.now() - startTime,
                 delta: { x: deltaX, y: deltaY } 
             });
@@ -865,8 +1019,9 @@ export class CSWebElement {
             }, { cx: centerX, cy: centerY, d2: newDistance });
             
             await this.logAction('pinch', [scale], 'success');
-            ActionLogger.logInfo(`Pinch gesture performed on element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Pinch gesture performed on element: ${this.description}`, { 
                 action: 'pinch',
+                element: this.description,
                 duration: Date.now() - startTime,
                 scale 
             });
@@ -883,12 +1038,178 @@ export class CSWebElement {
             await locator.tap();
             
             await this.logAction('tap', [], 'success');
-            ActionLogger.logInfo(`Element tapped: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Element tapped: ${this.description}`, { 
                 action: 'tap',
+                element: this.description,
                 duration: Date.now() - startTime 
             });
         } catch (error) {
             await this.logAction('tap', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async setChecked(checked: boolean): Promise<void> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            await locator.setChecked(checked);
+            
+            await this.logAction('setChecked', [checked], 'success');
+            await ActionLogger.logElementAction(`Element checked state set: ${this.description}`, { 
+                action: 'setChecked',
+                element: this.description,
+                duration: Date.now() - startTime,
+                checked 
+            });
+        } catch (error) {
+            await this.logAction('setChecked', [checked], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async dispatchEvent(type: string, eventInit?: any): Promise<void> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            await locator.dispatchEvent(type, eventInit);
+            
+            await this.logAction('dispatchEvent', [type, eventInit], 'success');
+            await ActionLogger.logElementAction(`Event dispatched on element: ${this.description}`, { 
+                action: 'dispatchEvent',
+                element: this.description,
+                duration: Date.now() - startTime,
+                eventType: type 
+            });
+        } catch (error) {
+            await this.logAction('dispatchEvent', [type, eventInit], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async highlight(): Promise<void> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            await locator.highlight();
+            
+            await this.logAction('highlight', [], 'success');
+            await ActionLogger.logElementAction(`Element highlighted: ${this.description}`, { 
+                action: 'highlight',
+                element: this.description,
+                duration: Date.now() - startTime 
+            });
+        } catch (error) {
+            await this.logAction('highlight', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async innerHTML(): Promise<string> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            const html = await locator.innerHTML();
+            
+            await this.logAction('innerHTML', [], 'success');
+            await ActionLogger.logElementAction(`Got innerHTML from element: ${this.description}`, { 
+                action: 'innerHTML',
+                element: this.description,
+                duration: Date.now() - startTime,
+                htmlLength: html.length 
+            });
+            
+            return html;
+        } catch (error) {
+            await this.logAction('innerHTML', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async pressSequentially(text: string, options?: { delay?: number }): Promise<void> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            await locator.pressSequentially(text, options);
+            
+            await this.logAction('pressSequentially', [text.length > 20 ? text.substring(0, 20) + '...' : text, options], 'success');
+            await ActionLogger.logElementAction(`Text typed sequentially into element: ${this.description}`, { 
+                action: 'pressSequentially',
+                element: this.description,
+                duration: Date.now() - startTime,
+                characters: text.length,
+                delay: options?.delay 
+            });
+        } catch (error) {
+            await this.logAction('pressSequentially', [text, options], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async getPage(): Promise<Page> {
+        try {
+            const locator = await this.resolve();
+            const page = locator.page();
+            
+            await ActionLogger.logElementAction(`Got page from element: ${this.description}`, { 
+                action: 'getPage',
+                element: this.description 
+            });
+            
+            return page;
+        } catch (error) {
+            await this.logAction('getPage', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async or(other: CSWebElement): Promise<CSWebElement> {
+        const startTime = Date.now();
+        try {
+            const locator1 = await this.resolve();
+            const locator2 = await other.resolve();
+            const orLocator = locator1.or(locator2);
+            
+            // Create a new CSWebElement with the combined locator
+            const elementConfig = {
+                ...this._config,
+                description: `${this._config.description} OR ${other.description}`,
+                locatorValue: 'or-combined'
+            };
+            const element = CSWebElement.createDynamic(this.page, elementConfig);
+            (element as any).locator = orLocator;
+            
+            await this.logAction('or', [other.description], 'success');
+            await ActionLogger.logElementAction(`Created OR locator: ${element.description}`, { 
+                action: 'or',
+                element: this.description,
+                duration: Date.now() - startTime 
+            });
+            
+            return element;
+        } catch (error) {
+            await this.logAction('or', [other.description], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    async frameLocator(selector: string): Promise<any> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            const frameLocator = locator.frameLocator(selector);
+            
+            await this.logAction('frameLocator', [selector], 'success');
+            await ActionLogger.logElementAction(`Got frame locator from element: ${this.description}`, { 
+                action: 'frameLocator',
+                element: this.description,
+                duration: Date.now() - startTime,
+                frameSelector: selector 
+            });
+            
+            return frameLocator;
+        } catch (error) {
+            await this.logAction('frameLocator', [selector], 'failure', error as Error);
             throw error;
         }
     }
@@ -946,8 +1267,9 @@ export class CSWebElement {
             });
             
             await this.logAction('swipe', [direction, distance], 'success');
-            ActionLogger.logInfo(`Swipe performed on element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Swipe performed on element: ${this.description}`, { 
                 action: 'swipe',
+                element: this.description,
                 duration: Date.now() - startTime,
                 direction,
                 distance 
@@ -1135,8 +1457,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertText', [expected, options], 'success');
-            ActionLogger.logInfo(`Text assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Text assertion passed for element: ${this.description}`, { 
                 action: 'assertText',
+                element: this.description,
                 duration: Date.now() - startTime,
                 expected,
                 actual,
@@ -1169,8 +1492,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertTextContains', [expected, options], 'success');
-            ActionLogger.logInfo(`Text contains assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Text contains assertion passed for element: ${this.description}`, { 
                 action: 'assertTextContains',
+                element: this.description,
                 duration: Date.now() - startTime,
                 expected,
                 actual,
@@ -1203,8 +1527,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertValue', [expected, options], 'success');
-            ActionLogger.logInfo(`Value assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Value assertion passed for element: ${this.description}`, { 
                 action: 'assertValue',
+                element: this.description,
                 duration: Date.now() - startTime,
                 expected,
                 actual,
@@ -1237,8 +1562,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertAttribute', [name, expected, options], 'success');
-            ActionLogger.logInfo(`Attribute assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Attribute assertion passed for element: ${this.description}`, { 
                 action: 'assertAttribute',
+                element: this.description,
                 duration: Date.now() - startTime,
                 attribute: name,
                 expected,
@@ -1272,8 +1598,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertCSSProperty', [property, expected, options], 'success');
-            ActionLogger.logInfo(`CSS property assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`CSS property assertion passed for element: ${this.description}`, { 
                 action: 'assertCSSProperty',
+                element: this.description,
                 duration: Date.now() - startTime,
                 property,
                 expected,
@@ -1307,8 +1634,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertVisible', [options], 'success');
-            ActionLogger.logInfo(`Visibility assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Visibility assertion passed for element: ${this.description}`, { 
                 action: 'assertVisible',
+                element: this.description,
                 duration: Date.now() - startTime,
                 success: true 
             });
@@ -1339,8 +1667,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertHidden', [options], 'success');
-            ActionLogger.logInfo(`Hidden assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Hidden assertion passed for element: ${this.description}`, { 
                 action: 'assertHidden',
+                element: this.description,
                 duration: Date.now() - startTime,
                 success: true 
             });
@@ -1371,8 +1700,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertEnabled', [options], 'success');
-            ActionLogger.logInfo(`Enabled assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Enabled assertion passed for element: ${this.description}`, { 
                 action: 'assertEnabled',
+                element: this.description,
                 duration: Date.now() - startTime,
                 success: true 
             });
@@ -1403,8 +1733,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertDisabled', [options], 'success');
-            ActionLogger.logInfo(`Disabled assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Disabled assertion passed for element: ${this.description}`, { 
                 action: 'assertDisabled',
+                element: this.description,
                 duration: Date.now() - startTime,
                 success: true 
             });
@@ -1435,8 +1766,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertChecked', [options], 'success');
-            ActionLogger.logInfo(`Checked assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Checked assertion passed for element: ${this.description}`, { 
                 action: 'assertChecked',
+                element: this.description,
                 duration: Date.now() - startTime,
                 success: true 
             });
@@ -1467,8 +1799,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertUnchecked', [options], 'success');
-            ActionLogger.logInfo(`Unchecked assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Unchecked assertion passed for element: ${this.description}`, { 
                 action: 'assertUnchecked',
+                element: this.description,
                 duration: Date.now() - startTime,
                 success: true 
             });
@@ -1499,8 +1832,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertCount', [expected, options], 'success');
-            ActionLogger.logInfo(`Count assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`Count assertion passed for element: ${this.description}`, { 
                 action: 'assertCount',
+                element: this.description,
                 duration: Date.now() - startTime,
                 expected,
                 actual,
@@ -1533,8 +1867,9 @@ export class CSWebElement {
             }
             
             await this.logAction('assertInViewport', [options], 'success');
-            ActionLogger.logInfo(`In viewport assertion passed for element: ${this.description}`, { 
+            await ActionLogger.logElementAction(`In viewport assertion passed for element: ${this.description}`, { 
                 action: 'assertInViewport',
+                element: this.description,
                 duration: Date.now() - startTime,
                 success: true 
             });
@@ -2080,6 +2415,130 @@ export class CSWebElement {
             return classNames as string[];
         } catch (error) {
             await this.logAction('get_class_names', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get all text content including from child elements
+     */
+    async allTextContents(): Promise<string[]> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            const texts = await locator.allTextContents();
+            
+            await this.logAction('allTextContents', [], 'success');
+            await ActionLogger.logElementAction(`Got all text contents from element: ${this.description}`, { 
+                action: 'allTextContents',
+                element: this.description,
+                duration: Date.now() - startTime,
+                count: texts.length 
+            });
+            
+            return texts;
+        } catch (error) {
+            await this.logAction('allTextContents', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get all inner texts including from child elements
+     */
+    async allInnerTexts(): Promise<string[]> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            const texts = await locator.allInnerTexts();
+            
+            await this.logAction('allInnerTexts', [], 'success');
+            await ActionLogger.logElementAction(`Got all inner texts from element: ${this.description}`, { 
+                action: 'allInnerTexts',
+                element: this.description,
+                duration: Date.now() - startTime,
+                count: texts.length 
+            });
+            
+            return texts;
+        } catch (error) {
+            await this.logAction('allInnerTexts', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Evaluate JavaScript and return a handle to the result
+     */
+    async evaluateHandle<T>(script: string | ((element: Element, ...args: any[]) => T), ...args: any[]): Promise<any> {
+        const startTime = Date.now();
+        try {
+            const locator = await this.resolve();
+            // Pass arguments as a single array to match Playwright's API
+            const handle = await locator.evaluateHandle(script as any, args);
+            
+            await this.logAction('evaluateHandle', [script, ...args], 'success');
+            await ActionLogger.logElementAction(`Evaluated script with handle on element: ${this.description}`, { 
+                action: 'evaluateHandle',
+                element: this.description,
+                duration: Date.now() - startTime 
+            });
+            
+            return handle;
+        } catch (error) {
+            await this.logAction('evaluateHandle', [script, ...args], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get the owner frame if available
+     */
+    async ownerFrame(): Promise<any> {
+        const startTime = Date.now();
+        try {
+            const element = await this.elementHandle();
+            if (!element) {
+                throw new Error('Element handle not available');
+            }
+            const frame = await element.ownerFrame();
+            
+            await this.logAction('ownerFrame', [], 'success');
+            await ActionLogger.logElementAction(`Got owner frame from element: ${this.description}`, { 
+                action: 'ownerFrame',
+                element: this.description,
+                duration: Date.now() - startTime 
+            });
+            
+            return frame;
+        } catch (error) {
+            await this.logAction('ownerFrame', [], 'failure', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get content frame for iframe elements
+     */
+    async contentFrame(): Promise<any> {
+        const startTime = Date.now();
+        try {
+            const element = await this.elementHandle();
+            if (!element) {
+                throw new Error('Element handle not available');
+            }
+            const frame = await element.contentFrame();
+            
+            await this.logAction('contentFrame', [], 'success');
+            await ActionLogger.logElementAction(`Got content frame from element: ${this.description}`, { 
+                action: 'contentFrame',
+                element: this.description,
+                duration: Date.now() - startTime 
+            });
+            
+            return frame;
+        } catch (error) {
+            await this.logAction('contentFrame', [], 'failure', error as Error);
             throw error;
         }
     }

@@ -156,7 +156,7 @@
             ],
             "args": [
                 "${workspaceFolder}/src/index.ts",
-                "--env=dev",
+                "--env=sit",
                 "--project=akhan",
                 "--feature=test/akhan/features/akhan-login-navigation.feature"
             ],

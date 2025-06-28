@@ -498,8 +498,13 @@ export class CSBDDRunner {
 
         try {
             // 1. Load configuration
-            await ConfigurationManager.loadConfiguration(options.environment || 'default');
-            logger.info('Configuration loaded - Environment: ' + (options.environment || 'default'));
+            if (options.project) {
+                await ConfigurationManager.loadConfiguration(options.project, options.environment || 'default');
+                logger.info(`Configuration loaded - Project: ${options.project}, Environment: ${options.environment || 'default'}`);
+            } else {
+                await ConfigurationManager.loadConfiguration(options.environment || 'default');
+                logger.info('Configuration loaded - Environment: ' + (options.environment || 'default'));
+            }
 
             // 2. Configure proxy if needed
             if (ConfigurationManager.getBoolean('PROXY_ENABLED', false)) {

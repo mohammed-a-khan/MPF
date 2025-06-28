@@ -49,4 +49,17 @@ downloads/
 
 # Coverage reports
 coverage/
-.nyc_output/ 
+.nyc_output/
+
+# Claude AI folder
+.claude/
+
+# Test folder
+test/
+
+# Config folder exclusions
+# Ignore all config folders except api, common, and global.env
+config/*
+!config/api/
+!config/common/
+!config/global.env 

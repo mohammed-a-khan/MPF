@@ -395,6 +395,9 @@ export class CSDataProvider {
         data: TestData[], 
         options: DataProviderOptions
     ): Promise<TestData[]> {
+        // Apply automatic decryption for encrypted values
+        data = await DataEncryptionManager.processTestData(data);
+        
         // Apply filter if specified
         if (options.filter) {
             data = this.applyFilter(data, options.filter);

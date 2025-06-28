@@ -1,6 +1,6 @@
 # CS Test Automation Framework - User Guide
 
-This comprehensive guide provides detailed instructions for implementing and using the CS Test Automation Framework with real-world examples from the Akhan application.
+This comprehensive guide provides detailed instructions for implementing and using the CS Test Automation Framework with real-world examples.
 
 ## 📋 Table of Contents
 
@@ -10,8 +10,9 @@ This comprehensive guide provides detailed instructions for implementing and usi
 4. [Test Implementation](#test-implementation)
 5. [Data-Driven Testing](#data-driven-testing)
 6. [Advanced Features](#advanced-features)
-7. [Best Practices](#best-practices)
-8. [Examples](#examples)
+7. [Azure DevOps Integration](#azure-devops-integration)
+8. [Best Practices](#best-practices)
+9. [Troubleshooting](#troubleshooting)
 
 ## Framework Architecture
 
@@ -57,12 +58,12 @@ graph TD
 
 ### 1. Environment Configuration
 
-Create a hierarchical configuration structure for the Akhan project:
+Create a hierarchical configuration structure for your project:
 
 ```bash
 config/
 ├── global.env                    # Global framework settings
-├── akhan/                       # Akhan project configuration
+├── akhan/                       # Project configuration
 │   ├── project.env              # Project-specific settings
 │   ├── common/                  # Shared configurations
 │   │   ├── api.endpoints.env    # API endpoint definitions
@@ -75,7 +76,7 @@ config/
 │       └── uat.env              # User Acceptance Testing
 ```
 
-### 2. Akhan Project Configuration
+### 2. Project Configuration Example
 
 #### config/akhan/project.env
 ```bash
@@ -107,7 +108,7 @@ REPORT_COMPANY=MyCompany Ltd.
 # AKHAN Development Environment Configuration
 
 # Application URLs
-AKHAN_SIT_URL=https://akhan-ui-sit.myshare.net/
+AKHAN_URL=https://akhan-ui-dev.mycompany.com/
 AKHAN_API_URL=https://api-dev.akhan.com
 AKHAN_ADMIN_URL=https://admin-dev.akhan.com
 
@@ -138,357 +139,214 @@ ENABLE_TRACING=true
 ENABLE_PERFORMANCE_MONITORING=true
 
 # ADO Integration
-ADO_ORGANIZATION=mdakhan
+ADO_ORGANIZATION=mycompany
 ADO_PROJECT=akhan-project
 ADO_TEST_PLAN_ID=500
 ADO_TEST_SUITE_ID=501
 ADO_INTEGRATION_ENABLED=true
 ```
 
-## Test Implementation
+## Configuration Management
 
-### 1. Feature Files with Real Examples
+### Hierarchical Configuration System
 
-#### test/akhan/features/akhan-esss-search.feature
-```gherkin
-@TestCase:504 @ADO_TestSuite:500
-@DataProvider(source="test/akhan/data/akhan-test-data.json",type="json",filter="executeTest=true,priority=high")
-Feature: AKHAN ESSS/Series Search
-  As a financial analyst using AKHAN
-  I want to search for ESSS/Series information
-  So that I can analyze specific financial instruments
+The framework uses a powerful 4-tier configuration hierarchy:
 
-  Background:
-    Given I navigate to the AKHAN application
-    When I enter username "login" and password "passwd"
-    And I click on Log On link
-    Then I should be logged in successfully
-    And I navigate to "ESSS/Series" module
-
-  @regression @TestCase:504 @TC504 @smoke @high
-  @DataProvider(source="test/akhan/data/akhan-test-data.json",type="json",jsonPath="$.esss_search_scenarios[?(@.testId=='TC504')]",filter="executeTest=true")
-  Scenario Outline: Search ESSS by Key using JSON data
-    Given I am logged in to AKHAN application
-    And I am on the ESSS/Series page
-    When I select search type "<searchType>"
-    And I select search attribute "<searchAttribute>" 
-    And I enter search value "<searchValue>"
-    And I click on the Search button
-    Then I should see the search results
-    And the search results should contain "<searchValue>"
-    And I verify the result count is greater than 0
-    And I capture screenshot with name "esss_search_results"
-
-    Examples:
-      | searchType | searchAttribute | searchValue |
-
-  @regression @performance
-  Scenario: Verify ESSS search performance
-    Given I am on the ESSS/Series page
-    When I perform search for "MESA 2001-5"
-    Then the search should complete within 3000 milliseconds
-    And the page should be responsive
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Configuration Flow                     │
+├─────────────────────────────────────────────────────────┤
+│  1. Global (config/global.env)                          │
+│     ↓ (Base defaults)                                   │
+│  2. Project Common (config/{project}/common/)           │
+│     ↓ (Project-specific overrides)                      │
+│  3. Environment (config/{project}/environments/*.env)   │
+│     ↓ (Environment-specific overrides)                  │
+│  4. Runtime (CLI arguments / tags)                      │
+│     (Highest priority)                                  │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 2. Advanced Page Object Implementation
+### Configuration Best Practices
 
-#### test/akhan/pages/ESSSDashboardPage.ts
+1. **Global Settings**: Framework-wide defaults that rarely change
+2. **Project Common**: Shared settings across all environments for a project
+3. **Environment Specific**: Environment-specific URLs, credentials, and settings
+4. **Runtime**: Command-line overrides for special test runs
+
+### Accessing Configuration Values
+
+```typescript
+import { ConfigurationManager } from '../core/configuration/ConfigurationManager';
+
+// Get a configuration value
+const baseUrl = ConfigurationManager.get('BASE_URL');
+const timeout = ConfigurationManager.getInt('DEFAULT_TIMEOUT', 30000);
+const isEnabled = ConfigurationManager.getBoolean('ENABLE_SCREENSHOTS', true);
+
+// Set runtime values
+ConfigurationManager.set('SESSION_TOKEN', 'abc123');
+```
+
+## Test Implementation
+
+### 1. Feature Files
+
+#### Basic Structure
+```gherkin
+@project:akhan @module:authentication
+Feature: User Authentication
+  As a user of the AKHAN system
+  I want to authenticate securely
+  So that I can access my authorized resources
+
+  Background:
+    Given I am on the AKHAN login page
+
+  @smoke @priority:critical @TestCaseId-101
+  Scenario: Successful login with valid credentials
+    When I enter username "admin@akhan.com"
+    And I enter password "ValidPass123"
+    And I click on the "Login" button
+    Then I should be redirected to the dashboard
+    And I should see welcome message "Welcome, Admin"
+```
+
+#### Data-Driven Scenarios
+```gherkin
+@regression @TestPlanId-500 @TestSuiteId-501
+@DataProvider(source="test/akhan/data/users.json",type="json",jsonPath="$.validUsers[?(@.active==true)]")
+Feature: Multi-User Authentication Tests
+
+  Scenario Outline: Login with different user roles
+    Given I am on the login page
+    When I login with username "<username>" and password "<password>"
+    Then I should see the dashboard for role "<role>"
+    And I should have access to "<modules>"
+
+    Examples:
+      | username | password | role | modules |
+```
+
+### 2. Page Object Implementation
+
+#### Base Page Setup
 ```typescript
 import { CSBasePage } from '../../../src/core/pages/CSBasePage';
 import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement';
 import { CSWebElement } from '../../../src/core/elements/CSWebElement';
-import { Locator } from 'playwright';
 
-export class ESSSDashboardPage extends CSBasePage {
-    pageUrl = `${process.env['AKHAN_SIT_URL']}/esss-series`;
+export class LoginPage extends CSBasePage {
+    pageUrl = '/login';
+    pageName = 'AKHAN Login Page';
 
-    // Search Controls
+    // Element Definitions with AI Healing
     @CSGetElement({
         locatorType: 'css',
-        locatorValue: 'select[name="searchType"]',
-        description: 'Search type dropdown',
+        locatorValue: '#username',
+        description: 'Username input field',
         waitConditions: { state: 'visible', timeout: 10000 },
         healingStrategies: ['ai-text', 'ai-position']
     })
-    private searchTypeDropdown!: CSWebElement;
+    private usernameInput!: CSWebElement;
 
     @CSGetElement({
         locatorType: 'css',
-        locatorValue: 'select[name="searchAttribute"]',
-        description: 'Search attribute dropdown'
+        locatorValue: '#password',
+        description: 'Password input field',
+        isSensitive: true // Automatically masks in logs
     })
-    private searchAttributeDropdown!: CSWebElement;
-
-    @CSGetElement({
-        locatorType: 'css',
-        locatorValue: 'input[name="searchValue"]',
-        description: 'Search value input field'
-    })
-    private searchValueInput!: CSWebElement;
+    private passwordInput!: CSWebElement;
 
     @CSGetElement({
         locatorType: 'css',
         locatorValue: 'button[type="submit"]',
-        description: 'Search button'
+        description: 'Login submit button',
+        fallbackLocators: [
+            'text=Login',
+            'button:has-text("Sign In")',
+            '//button[contains(@class, "login-btn")]'
+        ]
     })
-    private searchButton!: CSWebElement;
-
-    // Results
-    @CSGetElement({
-        locatorType: 'css',
-        locatorValue: 'table.results-table',
-        description: 'Search results table'
-    })
-    private resultsTable!: CSWebElement;
-
-    @CSGetElement({
-        locatorType: 'css',
-        locatorValue: '.result-count',
-        description: 'Result count display'
-    })
-    private resultCount!: CSWebElement;
+    private loginButton!: CSWebElement;
 
     // Page Methods
-    async selectSearchType(searchType: string) {
-        await this.searchTypeDropdown.selectOption(searchType);
-        await this.page.waitForTimeout(500); // Wait for dependent dropdown to load
+    async login(username: string, password: string): Promise<void> {
+        await this.usernameInput.fill(username);
+        await this.passwordInput.fill(password);
+        await this.loginButton.click();
+        
+        // Wait for navigation
+        await this.page.waitForLoadState('networkidle');
     }
 
-    async selectSearchAttribute(attribute: string) {
-        await this.searchAttributeDropdown.selectOption(attribute);
-    }
-
-    async enterSearchValue(value: string) {
-        await this.searchValueInput.fill(value);
-    }
-
-    async clickSearchButton() {
-        const startTime = Date.now();
-        await this.searchButton.click();
-        
-        // Wait for results to load
-        await this.resultsTable.waitFor({ state: 'visible', timeout: 10000 });
-        
-        const endTime = Date.now();
-        const searchDuration = endTime - startTime;
-        
-        // Log performance metric
-        await this.logPerformanceMetric('search_duration', searchDuration);
-        
-        return searchDuration;
-    }
-
-    async getSearchResults(): Promise<Array<Record<string, string>>> {
-        await this.resultsTable.waitFor({ state: 'visible' });
-        
-        const rows = await this.page.locator('table.results-table tbody tr').all();
-        const results: Array<Record<string, string>> = [];
-        
-        for (const row of rows) {
-            const cells = await row.locator('td').all();
-            const rowData: Record<string, string> = {};
-            
-            for (let i = 0; i < cells.length; i++) {
-                const headerCell = await this.page.locator('table.results-table thead th').nth(i);
-                const headerText = await headerCell.textContent() || `column_${i}`;
-                const cellText = await cells[i].textContent() || '';
-                rowData[headerText.trim()] = cellText.trim();
-            }
-            
-            results.push(rowData);
-        }
-        
-        return results;
-    }
-
-    async verifySearchResultContains(expectedValue: string): Promise<boolean> {
-        const results = await this.getSearchResults();
-        
-        return results.some(row => 
-            Object.values(row).some(value => 
-                value.toLowerCase().includes(expectedValue.toLowerCase())
-            )
-        );
-    }
-
-    async getResultCount(): Promise<number> {
-        const countText = await this.resultCount.textContent();
-        const match = countText?.match(/(\d+)/);
-        return match ? parseInt(match[1]) : 0;
-    }
-
-    private async logPerformanceMetric(metric: string, value: number) {
-        // Integration with performance monitoring
-        console.log(`Performance Metric - ${metric}: ${value}ms`);
+    async verifyLoginError(expectedError: string): Promise<void> {
+        const errorElement = await this.page.locator('.error-message');
+        await expect(errorElement).toContainText(expectedError);
     }
 }
 ```
 
-### 3. Advanced Step Definitions
+### 3. Step Definition Implementation
 
-#### test/akhan/steps/akhan-esss-search.steps.ts
 ```typescript
 import { CSBDDBaseStepDefinition } from '../../../src/bdd/base/CSBDDBaseStepDefinition';
 import { CSBDDStepDef, StepDefinitions } from '../../../src/bdd/decorators/CSBDDStepDef';
-import { ESSSDashboardPage } from '../pages/ESSSDashboardPage';
 import { LoginPage } from '../pages/LoginPage';
-import { NavigationPage } from '../pages/NavigationPage';
-import { ActionLogger } from '../../../src/core/logging/ActionLogger';
+import { DashboardPage } from '../pages/DashboardPage';
 
 @StepDefinitions
-export class AKHANESSSSearchSteps extends CSBDDBaseStepDefinition {
+export class AuthenticationSteps extends CSBDDBaseStepDefinition {
     private loginPage!: LoginPage;
-    private navigationPage!: NavigationPage;
-    private esssPage!: ESSSDashboardPage;
-    private searchResults: any[] = [];
-    private searchDuration: number = 0;
+    private dashboardPage!: DashboardPage;
 
     async before() {
+        // Initialize page objects
         this.loginPage = new LoginPage();
-        this.navigationPage = new NavigationPage();
-        this.esssPage = new ESSSDashboardPage();
+        this.dashboardPage = new DashboardPage();
         
         await this.loginPage.initialize(this.page);
-        await this.navigationPage.initialize(this.page);
-        await this.esssPage.initialize(this.page);
+        await this.dashboardPage.initialize(this.page);
     }
 
-    @CSBDDStepDef('I am on the ESSS/Series page')
-    async navigateToESSSPage() {
-        await ActionLogger.logAction('Navigation', {
-            description: 'Navigating to ESSS/Series page',
-            page: 'ESSS Dashboard',
-            action: 'navigate'
-        });
-        
-        await this.esssPage.navigateTo(this.esssPage.pageUrl);
-        await this.esssPage.waitForPageLoad();
+    @CSBDDStepDef('I am on the AKHAN login page')
+    async navigateToLoginPage() {
+        await this.loginPage.navigateTo();
+        await this.loginPage.waitForPageLoad();
     }
 
-    @CSBDDStepDef('I select search type "{string}"')
-    async selectSearchType(searchType: string) {
-        await ActionLogger.logAction('UI Interaction', {
-            description: `Selecting search type: ${searchType}`,
-            element: 'Search Type Dropdown',
-            value: searchType
-        });
-        
-        await this.esssPage.selectSearchType(searchType);
+    @CSBDDStepDef('I enter username {string}')
+    async enterUsername(username: string) {
+        // Runtime property storage example
+        this.bddContext.store('currentUsername', username);
+        await this.loginPage.enterUsername(username);
     }
 
-    @CSBDDStepDef('I select search attribute "{string}"')
-    async selectSearchAttribute(attribute: string) {
-        await ActionLogger.logAction('UI Interaction', {
-            description: `Selecting search attribute: ${attribute}`,
-            element: 'Search Attribute Dropdown',
-            value: attribute
-        });
-        
-        await this.esssPage.selectSearchAttribute(attribute);
+    @CSBDDStepDef('I enter password {string}')
+    async enterPassword(password: string) {
+        await this.loginPage.enterPassword(password);
     }
 
-    @CSBDDStepDef('I enter search value "{string}"')
-    async enterSearchValue(value: string) {
-        await ActionLogger.logAction('UI Interaction', {
-            description: `Entering search value: ${value}`,
-            element: 'Search Value Input',
-            value: value
-        });
-        
-        await this.esssPage.enterSearchValue(value);
+    @CSBDDStepDef('I click on the {string} button')
+    async clickButton(buttonText: string) {
+        await this.page.click(`button:has-text("${buttonText}")`);
     }
 
-    @CSBDDStepDef('I click on the Search button')
-    async clickSearchButton() {
-        await ActionLogger.logAction('UI Interaction', {
-            description: 'Clicking Search button to execute search',
-            element: 'Search Button',
-            action: 'click'
-        });
-        
-        this.searchDuration = await this.esssPage.clickSearchButton();
-        this.searchResults = await this.esssPage.getSearchResults();
+    @CSBDDStepDef('I should be redirected to the dashboard')
+    async verifyDashboardRedirect() {
+        await this.dashboardPage.waitForPageLoad();
+        const url = this.page.url();
+        expect(url).toContain('/dashboard');
     }
 
-    @CSBDDStepDef('I should see the search results')
-    async verifySearchResults() {
-        await ActionLogger.logAction('Verification', {
-            description: 'Verifying search results are displayed',
-            expected: 'Search results table visible',
-            actual: `${this.searchResults.length} results found`
-        });
+    @CSBDDStepDef('I should see welcome message {string}')
+    async verifyWelcomeMessage(expectedMessage: string) {
+        const actualMessage = await this.dashboardPage.getWelcomeMessage();
+        expect(actualMessage).toBe(expectedMessage);
         
-        if (this.searchResults.length === 0) {
-            throw new Error('No search results found');
-        }
-    }
-
-    @CSBDDStepDef('the search results should contain "{string}"')
-    async verifyResultsContain(expectedValue: string) {
-        const found = await this.esssPage.verifySearchResultContains(expectedValue);
-        
-        await ActionLogger.logAction('Verification', {
-            description: `Verifying search results contain: ${expectedValue}`,
-            expected: `Results containing "${expectedValue}"`,
-            actual: found ? 'Value found in results' : 'Value not found',
-            status: found ? 'passed' : 'failed'
-        });
-        
-        if (!found) {
-            throw new Error(`Search results do not contain expected value: ${expectedValue}`);
-        }
-    }
-
-    @CSBDDStepDef('I verify the result count is greater than {int}')
-    async verifyResultCount(expectedMinCount: number) {
-        const actualCount = await this.esssPage.getResultCount();
-        
-        await ActionLogger.logAction('Verification', {
-            description: `Verifying result count is greater than ${expectedMinCount}`,
-            expected: `> ${expectedMinCount} results`,
-            actual: `${actualCount} results`,
-            status: actualCount > expectedMinCount ? 'passed' : 'failed'
-        });
-        
-        if (actualCount <= expectedMinCount) {
-            throw new Error(`Expected more than ${expectedMinCount} results, but got ${actualCount}`);
-        }
-    }
-
-    @CSBDDStepDef('I perform search for "{string}"')
-    async performCompleteSearch(searchValue: string) {
-        await this.selectSearchType('ESSS');
-        await this.selectSearchAttribute('Key');
-        await this.enterSearchValue(searchValue);
-        await this.clickSearchButton();
-    }
-
-    @CSBDDStepDef('the search should complete within {int} milliseconds')
-    async verifySearchPerformance(maxDuration: number) {
-        await ActionLogger.logAction('Performance Verification', {
-            description: `Verifying search completes within ${maxDuration}ms`,
-            expected: `<= ${maxDuration}ms`,
-            actual: `${this.searchDuration}ms`,
-            status: this.searchDuration <= maxDuration ? 'passed' : 'failed'
-        });
-        
-        if (this.searchDuration > maxDuration) {
-            throw new Error(`Search took ${this.searchDuration}ms, expected <= ${maxDuration}ms`);
-        }
-    }
-
-    @CSBDDStepDef('I capture screenshot with name "{string}"')
-    async captureScreenshot(screenshotName: string) {
-        await ActionLogger.logAction('Evidence Capture', {
-            description: `Capturing screenshot: ${screenshotName}`,
-            type: 'screenshot',
-            name: screenshotName
-        });
-        
-        await this.page.screenshot({
-            path: `screenshots/${screenshotName}-${Date.now()}.png`,
-            fullPage: true
-        });
+        // Retrieve stored username
+        const username = this.bddContext.retrieve<string>('currentUsername');
+        console.log(`User ${username} successfully logged in`);
     }
 }
 ```
@@ -497,120 +355,282 @@ export class AKHANESSSSearchSteps extends CSBDDBaseStepDefinition {
 
 ### 1. JSON Data Provider
 
-#### test/akhan/data/akhan-test-data.json
+#### Test Data Structure (test/akhan/data/test-data.json)
 ```json
 {
-  "environment": {
-    "name": "AKHAN SIT",
-    "baseUrl": "https://akhan-ui-sit.myshare.net",
-    "timeout": 30000,
-    "retryAttempts": 3
-  },
-  "esss_search_scenarios": [
+  "validUsers": [
     {
-      "testId": "TC504",
-      "description": "Search ESSS by Key - MESA Series",
-      "searchType": "ESSS",
-      "searchAttribute": "Key",
-      "searchValue": "MESA 2001-5",
-      "expectedBehavior": "normal_flow",
-      "executeTest": true,
-      "adoTestCase": "504",
-      "priority": "high",
-      "expectedResultCount": 1,
-      "validationRules": {
-        "mustContain": ["MESA", "2001-5"],
-        "mustNotContain": ["ERROR", "NOT FOUND"]
-      }
+      "testId": "TC001",
+      "username": "admin@akhan.com",
+      "password": "Admin123",
+      "role": "admin",
+      "modules": ["dashboard", "users", "settings", "reports"],
+      "active": true,
+      "executeFlag": true
     },
     {
-      "testId": "TC505",
-      "description": "Search ESSS by Name - Treasury Series",
-      "searchType": "ESSS",
-      "searchAttribute": "Name",
-      "searchValue": "Treasury Bond",
-      "expectedBehavior": "normal_flow",
-      "executeTest": true,
-      "adoTestCase": "505",
-      "priority": "medium",
-      "expectedResultCount": 5,
-      "validationRules": {
-        "mustContain": ["Treasury", "Bond"],
-        "mustNotContain": ["ERROR"]
-      }
+      "testId": "TC002",
+      "username": "user@akhan.com",
+      "password": "User123",
+      "role": "standard",
+      "modules": ["dashboard", "reports"],
+      "active": true,
+      "executeFlag": true
     }
   ],
-  "user_scenarios": [
+  "invalidUsers": [
     {
-      "testId": "TC501",
-      "username": "login",
-      "password": "passwd",
-      "expectedRole": "standard_user",
-      "executeTest": true,
-      "priority": "high"
+      "testId": "TC003",
+      "username": "invalid@akhan.com",
+      "password": "wrong",
+      "expectedError": "Invalid credentials",
+      "executeFlag": true
     }
-  ],
-  "ado_configuration": {
-    "organization": "mdakhan",
-    "project": "akhan-project",
-    "testPlan": {
-      "id": 500,
-      "name": "AKHAN Test Plan"
-    },
-    "testSuite": {
-      "id": 500,
-      "name": "AKHAN ESSS Search Suite"
-    }
-  }
+  ]
 }
 ```
 
 ### 2. Excel Data Provider
 
-#### test/akhan/data/esss-search-data.xlsx
-Excel structure with sheets:
-- **SearchTests**: Main test data
-- **ValidationRules**: Validation criteria
-- **PerformanceTargets**: Performance benchmarks
+#### Excel Structure
+- **Sheet: TestData**
+  - Columns: TestCase, Username, Password, ExpectedResult, ExecuteFlag
+- **Sheet: ValidationRules**
+  - Columns: RuleName, Condition, ExpectedBehavior
 
-### 3. Data Provider Usage in Steps
+#### Usage in Feature Files
+```gherkin
+@DataProvider(source="test/akhan/data/users.xlsx",type="excel",sheetName="TestData",filter="ExecuteFlag=Y")
+Scenario Outline: Excel data-driven login test
+  Given I am on the login page
+  When I login with username "<Username>" and password "<Password>"
+  Then I should see result "<ExpectedResult>"
+```
 
-```typescript
-// Enhanced step with data provider integration
-@CSBDDStepDef('I execute search scenarios from data provider')
-async executeDataDrivenSearch() {
-    const dataProvider = CSDataProvider.getInstance();
-    
-    const testData = await dataProvider.loadData({
-        source: 'test/akhan/data/akhan-test-data.json',
-        type: 'json',
-        jsonPath: '$.esss_search_scenarios[?(@.executeTest == true)]',
-        filter: 'priority=high'
-    });
+### 3. CSV Data Provider
 
-    for (const scenario of testData) {
-        await this.selectSearchType(scenario.searchType);
-        await this.selectSearchAttribute(scenario.searchAttribute);
-        await this.enterSearchValue(scenario.searchValue);
-        await this.clickSearchButton();
-        
-        // Validate results based on scenario rules
-        const results = await this.esssPage.getSearchResults();
-        await this.validateResultsAgainstRules(results, scenario.validationRules);
-    }
-}
+```gherkin
+@DataProvider(source="test/akhan/data/users.csv",type="csv",delimiter=",",headers="true")
+Scenario Outline: CSV data-driven test
+  Given I navigate to "<Module>"
+  When I perform action "<Action>"
+  Then I verify outcome "<Expected>"
+```
+
+### 4. Column Normalization
+
+The framework automatically handles column name variations:
+
+| Original Column Names | Normalized To |
+|----------------------|---------------|
+| testId, testCaseId, tcId, tc_id | testCase |
+| user, userName, login, user_name | username |
+| pass, passwd, pwd, password | password |
+| executeTest, run, active, execute_flag | executeFlag |
+| menu, menuItem, section, module_name | module |
+
+### 5. Advanced Data Provider Features
+
+#### JSONPath Filtering
+```gherkin
+@DataProvider(source="data.json",type="json",jsonPath="$.users[?(@.role=='admin' && @.active==true)]")
+```
+
+#### Multiple Filters
+```gherkin
+@DataProvider(source="data.xlsx",type="excel",filter="priority=high,status=active,executeFlag=Y")
+```
+
+#### Skip Execution Flag
+```gherkin
+# Include all rows regardless of executeFlag
+@DataProvider(source="data.xlsx",type="excel",skipExecutionFlag="true")
 ```
 
 ## Advanced Features
 
-### 1. AI-Powered Self-Healing
+### 1. Enhanced Action Logging
+
+The framework provides comprehensive action logging with automatic value capture and secret masking:
+
+#### Features
+- **Verbose Descriptions**: Every action shows what happened with actual values
+- **Automatic Secret Masking**: Sensitive fields are automatically masked
+- **Exception Details**: Failed actions include error messages
+- **Performance Metrics**: Duration tracking for each action
+
+#### Example Log Output
+```
+Step: Login to application
+  ├─ [00:01.234] ✓ Element filled: 'admin@akhan.com' filled in Username input field (145ms)
+  ├─ [00:01.380] ✓ Element filled: '********' filled in Password input field (89ms)
+  ├─ [00:01.469] ✓ Element clicked: Login submit button (234ms)
+  └─ [00:02.726] ✓ Page navigated: Dashboard loaded successfully (1257ms)
+```
+
+#### Custom Action Logging
+```typescript
+import { ActionLogger } from '../../../src/core/logging/ActionLogger';
+
+// Log custom business actions
+await ActionLogger.logAction('Business Process', {
+    description: 'Processing order checkout',
+    orderId: 'ORD-12345',
+    amount: 99.99,
+    status: 'completed'
+});
+```
+
+### 2. Console Log Capture
+
+All terminal console output is automatically captured and integrated into reports:
+
+#### What's Captured
+- `console.log()` - General logs
+- `console.error()` - Error messages
+- `console.warn()` - Warnings
+- `console.debug()` - Debug information
+- `console.info()` - Information messages
+
+#### Report Integration
+- Logs are categorized by type
+- Filterable in HTML reports
+- Searchable across all entries
+- Timestamps for each log entry
+
+### 3. Runtime Property Storage
+
+#### ConfigurationManager (Global Storage)
+```typescript
+// Store runtime values
+ConfigurationManager.set('API_TOKEN', response.token);
+ConfigurationManager.set('USER_ID', userId);
+
+// Retrieve anywhere in the test
+const token = ConfigurationManager.get('API_TOKEN');
+const userId = ConfigurationManager.get('USER_ID');
+```
+
+#### BDDContext (Scoped Storage)
+```typescript
+// Store with different scopes
+this.bddContext.store('tempValue', data, 'step');      // Step only
+this.bddContext.store('scenarioData', data, 'scenario'); // Entire scenario
+this.bddContext.store('featureData', data, 'feature');   // Entire feature
+this.bddContext.store('globalData', data, 'world');      // All tests
+
+// Retrieve with type safety
+const data = this.bddContext.retrieve<MyType>('scenarioData');
+```
+
+#### ExecutionContext (Session Storage)
+```typescript
+// Store session metadata
+this.executionContext.setMetadata('testRunId', 'TR-12345');
+this.executionContext.setMetadata('environment', 'qa');
+
+// Retrieve metadata
+const runId = this.executionContext.getMetadata('testRunId');
+```
+
+### 4. Parallel Execution
+
+Configure parallel test execution for better performance:
 
 ```typescript
-// Enhanced element with self-healing capabilities
+// playwright.config.ts
+export default defineConfig({
+    workers: process.env.CI ? 2 : undefined,
+    fullyParallel: true,
+    use: {
+        trace: 'on-first-retry',
+        screenshot: 'only-on-failure'
+    }
+});
+```
+
+Environment variables:
+```env
+MAX_PARALLEL_WORKERS=4
+PARALLEL_SCENARIO_EXECUTION=true
+WORKER_POOL_SIZE=auto
+```
+
+### 5. Network Interception
+
+#### Mock API Responses
+```typescript
+await this.page.route('**/api/users', route => {
+    route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+            users: [
+                { id: 1, name: 'Test User', role: 'admin' }
+            ]
+        })
+    });
+});
+```
+
+#### Simulate Network Conditions
+```typescript
+// Simulate slow 3G
+await this.page.route('**/*', route => {
+    route.continue({ delay: 500 });
+});
+
+// Block specific resources
+await this.page.route('**/*.png', route => route.abort());
+```
+
+### 6. Performance Monitoring
+
+#### Collect Web Vitals
+```typescript
+const metrics = await this.page.evaluate(() => ({
+    lcp: performance.getEntriesByName('largest-contentful-paint')[0]?.startTime,
+    fid: performance.getEntriesByName('first-input')[0]?.processingStart,
+    cls: performance.getEntriesByType('layout-shift')
+        .filter((e: any) => !e.hadRecentInput)
+        .reduce((sum, e: any) => sum + e.value, 0)
+}));
+
+// Verify against budgets
+expect(metrics.lcp).toBeLessThan(2500); // 2.5s
+expect(metrics.cls).toBeLessThan(0.1);  // 0.1
+```
+
+### 7. Database Integration
+
+```typescript
+@CSBDDStepDef('I verify data in database')
+async verifyDatabaseData() {
+    const dbClient = await this.getDatabaseClient('AKHAN_DB');
+    
+    const query = `
+        SELECT id, username, status
+        FROM users 
+        WHERE email = @email
+        AND status = 'ACTIVE'
+    `;
+    
+    const results = await dbClient.executeQuery(query, {
+        email: 'admin@akhan.com'
+    });
+    
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].status).toBe('ACTIVE');
+}
+```
+
+### 8. AI-Powered Features (In Progress)
+
+#### Self-Healing Locators
+```typescript
 @CSGetElement({
     locatorType: 'css',
-    locatorValue: '#dynamic-search-button',
-    description: 'Dynamic search button',
+    locatorValue: '#dynamic-button',
     healingStrategies: [
         'ai-visual',      // Visual pattern recognition
         'ai-text',        // Text-based identification
@@ -619,78 +639,135 @@ async executeDataDrivenSearch() {
     ],
     healingConfig: {
         maxAttempts: 3,
-        confidenceThreshold: 0.8,
-        fallbackLocators: [
-            'button[type="submit"]',
-            'input[value="Search"]',
-            '//button[contains(text(), "Search")]'
-        ]
+        confidenceThreshold: 0.8
     }
 })
-private dynamicSearchButton!: CSWebElement;
+private dynamicButton!: CSWebElement;
 ```
 
-### 2. Performance Monitoring
+> Note: AI features are currently under development and testing
 
-```typescript
-@CSBDDStepDef('the page should be responsive')
-async verifyPageResponsiveness() {
-    const performanceMetrics = await this.page.evaluate(() => {
-        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-        return {
-            domContentLoaded: navigation.domContentLoadedEventEnd - navigation.navigationStart,
-            loadComplete: navigation.loadEventEnd - navigation.navigationStart,
-            firstPaint: performance.getEntriesByName('first-paint')[0]?.startTime || 0,
-            firstContentfulPaint: performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0
-        };
-    });
+## Azure DevOps Integration
 
-    await ActionLogger.logAction('Performance Verification', {
-        description: 'Verifying page responsiveness metrics',
-        metrics: performanceMetrics,
-        thresholds: {
-            domContentLoaded: 3000,
-            loadComplete: 5000,
-            firstContentfulPaint: 2500
-        }
-    });
+### Overview
 
-    // Assert performance thresholds
-    if (performanceMetrics.domContentLoaded > 3000) {
-        throw new Error(`DOM Content Loaded took ${performanceMetrics.domContentLoaded}ms, expected < 3000ms`);
-    }
-}
+The framework provides enterprise-grade integration with Azure DevOps Test Plans, enabling automatic test result publishing, evidence attachment, and test case management.
+
+### Architecture
+
+```
+ADOIntegrationService (Main orchestrator)
+    ├── ADOClient (HTTP communication)
+    ├── ADOConfig (Configuration management)
+    ├── TestRunManager (Test run lifecycle)
+    ├── TestResultUploader (Result uploads)
+    ├── EvidenceUploader (Attachment handling)
+    └── ADOTagExtractor (Tag parsing)
 ```
 
-### 3. Database Integration
+### Tag-Based Test Mapping
 
-```typescript
-@CSBDDStepDef('I verify ESSS data in database')
-async verifyDatabaseData() {
-    const dbClient = await this.getDatabaseClient('AKHAN_DB');
-    
-    const query = `
-        SELECT esss_key, esss_name, status, created_date
-        FROM esss_master 
-        WHERE esss_key = @searchValue
-        AND status = 'ACTIVE'
-    `;
-    
-    const results = await dbClient.executeQuery(query, {
-        searchValue: this.lastSearchValue
-    });
-    
-    await ActionLogger.logAction('Database Verification', {
-        description: `Verifying ESSS data exists in database`,
-        query: query,
-        parameters: { searchValue: this.lastSearchValue },
-        resultCount: results.length
-    });
-    
-    if (results.length === 0) {
-        throw new Error(`No database records found for ESSS key: ${this.lastSearchValue}`);
-    }
-}
+Map scenarios to Azure DevOps test artifacts using tags:
+
+```gherkin
+@TestPlanId-100 @TestSuiteId-200
+Feature: User Management
+
+  @TestCaseId-12345 @priority:critical
+  Scenario: Create new user
+    Given I am logged in as admin
+    When I create a user with email "test@example.com"
+    Then the user should be created successfully
+```
+
+### Supported Tags
+
+| Tag Format | Description | Example |
+|------------|-------------|---------|
+| `@TestCaseId-XXX` | Maps to ADO test case | `@TestCaseId-12345` |
+| `@TestPlanId-XXX` | Specifies test plan | `@TestPlanId-100` |
+| `@TestSuiteId-XXX` | Specifies test suite | `@TestSuiteId-200` |
+| `@priority:level` | Sets test priority | `@priority:critical` |
+
+### Priority Mapping
+
+- `@priority:critical` → ADO Priority 1
+- `@priority:high` → ADO Priority 2
+- `@priority:medium` → ADO Priority 3 (default)
+- `@priority:low` → ADO Priority 4
+
+### Configuration
+
+```env
+# Core Settings
+ADO_INTEGRATION_ENABLED=true
+ADO_ORGANIZATION_URL=https://dev.azure.com/yourorg
+ADO_PROJECT_NAME=YourProject
+ADO_API_VERSION=7.0
+
+# Authentication
+ADO_PAT_TOKEN=ENCRYPTED:U2FsdGVkX1+...
+
+# Test Configuration
+ADO_TEST_PLAN_ID=100
+ADO_TEST_SUITE_ID=200
+
+# Upload Settings
+ADO_UPLOAD_BATCH_SIZE=50
+ADO_UPLOAD_TIMEOUT=300000
+ADO_RETRY_COUNT=3
+
+# Evidence Settings
+ADO_UPLOAD_SCREENSHOTS=true
+ADO_UPLOAD_VIDEOS=true
+ADO_UPLOAD_LOGS=true
+ADO_ATTACHMENT_MAX_SIZE=10485760
+ADO_COMPRESS_ATTACHMENTS=true
+
+# Bug Creation
+ADO_AUTO_CREATE_BUG=true
+ADO_BUG_ASSIGN_TO=user@company.com
+ADO_BUG_AREA_PATH=YourProject\\QA
+
+# Build Integration
+ADO_BUILD_ID=${BUILD_BUILDID}
+ADO_BUILD_NUMBER=${BUILD_BUILDNUMBER}
+```
+
+### Evidence Attachment
+
+| Type | Extensions | Compression | Chunked Upload |
+|------|------------|-------------|----------------|
+| Screenshots | .png, .jpg | Auto (>1MB) | No |
+| Videos | .mp4, .webm | No | Yes |
+| Logs | .log, .txt | Auto (>5MB) | No |
+| Reports | .html → .zip | Always | Yes |
+
+### Advanced Usage
+
+#### Multi-Environment Testing
+```gherkin
+@TestPlanId-100
+Feature: Cross-Browser Testing
+
+  @TestCaseId-5001 @browser:chrome @env:qa
+  Scenario: Chrome - User login
+    Given I am testing on Chrome
+    When I perform login
+    Then I verify success
+
+  @TestCaseId-5001 @browser:firefox @env:qa
+  Scenario: Firefox - User login
+    Given I am testing on Firefox
+    When I perform login
+    Then I verify success
+```
+
+#### Conditional Bug Creation
+```env
+ADO_AUTO_CREATE_BUG=true
+ADO_BUG_CREATION_FILTER=@priority:critical,@priority:high
+ADO_BUG_SEVERITY=2 - High
 ```
 
 ## Best Practices
@@ -699,145 +776,138 @@ async verifyDatabaseData() {
 
 ```
 test/akhan/
-├── features/                     # Feature files grouped by functionality
-│   ├── authentication/          # Login, logout, session management
-│   ├── esss-search/             # ESSS search functionality
-│   ├── navigation/              # Menu and navigation tests
-│   └── administration/          # Admin panel tests
-├── pages/                       # Page objects with clear responsibilities
-│   ├── common/                  # Shared page components
-│   ├── authentication/          # Authentication-related pages
-│   └── esss/                    # ESSS module pages
-├── steps/                       # Step definitions organized by domain
-│   ├── common/                  # Shared step definitions
-│   └── esss/                    # ESSS-specific steps
-└── data/                        # Test data organized by feature
-    ├── authentication/          # User credentials and roles
-    ├── esss/                    # ESSS test data
-    └── common/                  # Shared test data
+├── features/              # Feature files by module
+│   ├── authentication/   
+│   ├── user-management/  
+│   └── reporting/        
+├── pages/                # Page objects
+│   ├── common/          
+│   └── modules/         
+├── steps/               # Step definitions
+│   ├── common/          
+│   └── domain-specific/ 
+└── data/                # Test data
+    ├── users/           
+    └── test-cases/      
 ```
 
-### 2. Configuration Strategy
+### 2. Page Object Pattern
 
-```bash
-# Environment hierarchy
-config/
-├── global.env                   # Framework-level settings
-├── akhan/
-│   ├── project.env             # Project-wide settings
-│   ├── common/
-│   │   ├── api.endpoints.env   # API endpoint definitions
-│   │   ├── database.queries.env # SQL query templates
-│   │   └── security.env        # Security configurations
-│   └── environments/
-│       ├── dev.env             # Development environment
-│       ├── sit.env             # System integration
-│       ├── qa.env              # Quality assurance
-│       └── uat.env             # User acceptance testing
-```
+- One page object per logical page/component
+- Encapsulate element locators
+- Provide meaningful method names
+- Handle waits and validations internally
 
-### 3. Error Handling
+### 3. Step Definition Guidelines
+
+- Keep steps atomic and focused
+- Use parameters for reusability
+- Avoid implementation details in step text
+- Group related steps in single class
+
+### 4. Data Management
+
+- Externalize test data
+- Use meaningful data file names
+- Version control test data
+- Encrypt sensitive information
+
+### 5. Configuration Management
+
+- Use environment variables for secrets
+- Maintain separate configs per environment
+- Document all configuration options
+- Use hierarchical overrides wisely
+
+### 6. Error Handling
 
 ```typescript
-// Robust error handling in step definitions
-@CSBDDStepDef('I perform critical operation "{string}"')
-async performCriticalOperation(operation: string) {
-    const maxRetries = 3;
-    let attempt = 0;
-    
-    while (attempt < maxRetries) {
-        try {
-            await this.executeCriticalOperation(operation);
-            
-            await ActionLogger.logAction('Critical Operation', {
-                description: `Successfully executed: ${operation}`,
-                attempt: attempt + 1,
-                status: 'success'
-            });
-            
-            return; // Success - exit retry loop
-            
-        } catch (error) {
-            attempt++;
-            
-            await ActionLogger.logAction('Critical Operation', {
-                description: `Failed to execute: ${operation}`,
-                attempt: attempt,
-                error: error.message,
-                status: 'retry'
-            });
-            
-            if (attempt >= maxRetries) {
-                await this.captureFailureEvidence(operation, error);
-                throw new Error(`Critical operation "${operation}" failed after ${maxRetries} attempts: ${error.message}`);
-            }
-            
-            // Wait before retry with exponential backoff
-            await this.page.waitForTimeout(1000 * Math.pow(2, attempt));
-        }
-    }
-}
-
-private async captureFailureEvidence(operation: string, error: Error) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    
-    // Capture screenshot
-    await this.page.screenshot({
-        path: `evidence/failures/${operation}-${timestamp}.png`,
-        fullPage: true
+try {
+    await this.performAction();
+} catch (error) {
+    // Capture evidence
+    await this.page.screenshot({ 
+        path: `errors/error-${Date.now()}.png` 
     });
     
-    // Capture page source
-    const pageContent = await this.page.content();
-    await fs.writeFile(`evidence/failures/${operation}-${timestamp}.html`, pageContent);
-    
-    // Log browser console errors
-    const logs = await this.page.evaluate(() => {
-        return window.console.errors || [];
-    });
-    
-    await ActionLogger.logAction('Failure Evidence', {
-        description: `Captured evidence for failed operation: ${operation}`,
-        timestamp: timestamp,
+    // Log error details
+    await ActionLogger.logAction('Error', {
+        action: 'performAction',
         error: error.message,
-        consoleLogs: logs,
-        screenshotPath: `evidence/failures/${operation}-${timestamp}.png`
+        stack: error.stack
     });
+    
+    throw error; // Re-throw for test failure
 }
 ```
 
-## Examples
+## Troubleshooting
 
-### Complete Test Execution Example
+### Common Issues and Solutions
 
+#### 1. Element Not Found
+**Issue**: Element locator fails to find element
+**Solutions**:
+- Check if element is in iframe
+- Verify element is visible/enabled
+- Add appropriate wait conditions
+- Use more specific locators
+- Enable AI healing strategies
+
+#### 2. Timeout Errors
+**Issue**: Tests timeout waiting for elements/navigation
+**Solutions**:
+- Increase timeout values
+- Use proper wait conditions
+- Check network throttling
+- Verify page load state
+
+#### 3. Data Provider Issues
+**Issue**: Data not loading from external files
+**Solutions**:
+- Verify file path is correct
+- Check data format matches provider type
+- Ensure column names are normalized
+- Validate filter expressions
+
+#### 4. Configuration Not Loading
+**Issue**: Environment variables not being picked up
+**Solutions**:
+- Check configuration hierarchy
+- Verify file naming conventions
+- Ensure proper .env file format
+- Check for typos in variable names
+
+#### 5. ADO Integration Failures
+**Issue**: Test results not uploading to Azure DevOps
+**Solutions**:
+- Verify PAT token permissions
+- Check test case IDs exist
+- Ensure proper tag format
+- Validate network connectivity
+
+### Debug Mode
+
+Enable debug mode for detailed logging:
 ```bash
-# Run Akhan ESSS search tests in development environment
-npm run test -- \
-  --env=dev \
-  --feature=test/akhan/features/akhan-esss-search.feature \
-  --tags="@smoke and @high" \
-  --browser=chromium \
-  --headed \
-  --report-format=html,pdf,excel \
-  --ado-upload \
-  --parallel \
-  --workers=2 \
-  --retry=2 \
-  --timeout=60000
+# Via command line
+npm run test -- --debug=true
 
-# Expected output:
-# ✅ Framework initialized successfully
-# 🚀 Executing feature: akhan-esss-search.feature
-# 📊 Test Results:
-#    - Total: 5 scenarios
-#    - Passed: 5 (100%)
-#    - Failed: 0 (0%)
-#    - Duration: 2m 30s
-# 📄 Reports generated:
-#    - HTML: reports/akhan-esss-20241222/html/index.html
-#    - PDF: reports/akhan-esss-20241222/pdf/report.pdf
-#    - Excel: reports/akhan-esss-20241222/excel/results.xlsx
-# 🔗 ADO integration: Test results published successfully
+# Via environment variable
+DEBUG_MODE=true npm run test
+
+# In code
+process.env.DEBUG_MODE = 'true';
 ```
 
-This comprehensive user guide provides practical implementation guidance using real Akhan examples, demonstrating the framework's enterprise-grade capabilities for zero-code test automation. 
+### Performance Optimization
+
+1. **Use Parallel Execution**: Run tests in parallel when possible
+2. **Optimize Locators**: Use efficient CSS selectors
+3. **Minimize Waits**: Use smart waits instead of fixed delays
+4. **Cache Data**: Reuse test data across scenarios
+5. **Clean Up Resources**: Properly close browsers and connections
+
+---
+
+This comprehensive user guide provides practical implementation guidance for the CS Test Automation Framework, demonstrating its enterprise-grade capabilities for zero-code test automation.

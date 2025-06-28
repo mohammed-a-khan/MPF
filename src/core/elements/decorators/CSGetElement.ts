@@ -21,15 +21,31 @@ export function CSGetElement(options: CSGetElementOptions): PropertyDecorator {
         
         Object.defineProperty(target, propertyKey, {
             get: function () {
-                // Check if element already exists
-                if (this[privateKey]) {
-                    return this[privateKey];
-                }
-                
-                // Ensure page is available
+                // Get current page
                 const page = this.page as Page;
                 if (!page) {
                     throw new Error(`Page is not initialized for ${className}.${propertyName}. Make sure the page object is properly initialized with a page instance.`);
+                }
+                
+                // Check if element already exists and page hasn't changed
+                if (this[privateKey]) {
+                    const element = this[privateKey] as CSWebElement;
+                    // If the page has changed or is closed, we need to recreate the element
+                    try {
+                        // Always check if the page is closed first
+                        if (page.isClosed()) {
+                            delete this[privateKey];
+                        } else if (element.page !== page || element.page.isClosed()) {
+                            delete this[privateKey];
+                        } else {
+                            // Update the element's page reference to ensure it's current
+                            element.page = page;
+                            return element;
+                        }
+                    } catch (error) {
+                        // If we can't check, recreate the element
+                        delete this[privateKey];
+                    }
                 }
 
                 // Create element configuration

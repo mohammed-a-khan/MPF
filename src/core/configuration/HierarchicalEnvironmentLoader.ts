@@ -62,6 +62,10 @@ export class HierarchicalEnvironmentLoader {
       if (Object.keys(environmentConfig).length > 0) {
         loadedSources.push(`${project}/environments/${environment}.env`);
         console.log(`✅ Loaded ${Object.keys(environmentConfig).length} keys from ${project}/${environment}.env`);
+        // Debug BROWSER_MANAGEMENT_STRATEGY
+        if (environmentConfig['BROWSER_MANAGEMENT_STRATEGY']) {
+          console.log(`🔍 DEBUG: BROWSER_MANAGEMENT_STRATEGY from ${project}/${environment}.env = "${environmentConfig['BROWSER_MANAGEMENT_STRATEGY']}"`);
+        }
       }
 
       // Step 5: Resolve variable interpolation
@@ -69,6 +73,7 @@ export class HierarchicalEnvironmentLoader {
 
       console.log(`🎯 Total configuration loaded: ${Object.keys(mergedConfig).length} keys from ${loadedSources.length} sources`);
       console.log(`📁 Sources: ${loadedSources.join(', ')}`);
+      console.log(`🔍 DEBUG: Final BROWSER_MANAGEMENT_STRATEGY = "${mergedConfig['BROWSER_MANAGEMENT_STRATEGY']}"`);
 
       return mergedConfig;
 

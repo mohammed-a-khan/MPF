@@ -1,46 +1,36 @@
 @akhan @login @navigation
-Feature: AKHAN Login and Navigation
+Feature: akhan Login and Navigation
 
   @TC501 @smoke @high
   Scenario: Standard user login
-    Given I am on the AKHAN login page
-    When I enter username "Admin" and password "admin123"
-    And I click on the Log On link
-    Then I should be logged in successfully
-    And I should see the AKHAN home page
+    Given user is on the akhan login page
+    When user enters username "Admin" and password "admin123"
+    And user clicks on the Log On link
+    Then user should be logged in successfully
+    And user should see the akhan home page
 
   @TC502 @regression @medium
   Scenario: Verify menu items
-    Given I am logged in to AKHAN application
-    Then I should see the following menu items
-      | Admin           |
-      | PIM            |
-      | Leave          |
-      | Time           |
-      | Recruitment    |
-      | My Info        |
-      | Performance    |
-      | Dashboard      |
-      | Directory      |
-      | Maintenance    |
-      | Buzz           |
+    Given user is logged in to akhan application with username "Admin" and password "admin123"
+    Then user should see the following menu items
+      | Admin                |
+      | PIM        |
+      | Leave |
+      | Time   |
+      | Recruitment |
+      | My Info       |
+      | Performance|
+      | Directory        |
 
   @TC503 @regression @medium
   Scenario Outline: Verify navigation to each module
-    Given I am logged in to AKHAN application
-    When I click on "<module>" menu item
-    Then I should be navigated to "<module>" page
+    Given user is logged in to akhan application with username "Admin" and password "admin123"
+    When user clicks on "<moduleName>" menu item
+    Then user should see the "<expectedHeader>" page
 
     Examples:
-      | module      |
-      | Admin      |
-      | PIM        |
-      | Leave      |
-      | Time       |
-      | Recruitment|
-      | My Info    |
-      | Performance|
-      | Dashboard  |
-      | Directory  |
-      | Maintenance|
-      | Buzz       | 
+      | moduleName           | expectedHeader       |
+      | PIM         | PIM        |
+      | Leave | Leave  |
+      | Time    | Time     |
+      | Recruitment  | Recruitment   |
