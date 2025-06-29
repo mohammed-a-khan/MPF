@@ -91,12 +91,32 @@ export class ElementResolver {
 
       // Ensure element exists
       if (options.strict !== false) {
-        const count = await locator.count();
-        if (count === 0) {
-          throw new Error(`Element not found: ${element.description}`);
-        }
-        if (count > 1 && options.strict) {
-          throw new Error(`Multiple elements found (${count}): ${element.description}`);
+        try {
+          const count = await locator.count();
+          if (count === 0) {
+            throw new Error(`Element not found: ${element.description}`);
+          }
+          if (count > 1 && options.strict) {
+            throw new Error(`Multiple elements found (${count}): ${element.description}`);
+          }
+        } catch (error: any) {
+          // Handle context destruction during navigation
+          if (error.message?.includes('Execution context was destroyed')) {
+            // Re-create locator with fresh page context
+            const freshPage = element.page;
+            locator = await element.getLocator();
+            
+            // Retry the count operation
+            const count = await locator.count();
+            if (count === 0) {
+              throw new Error(`Element not found: ${element.description}`);
+            }
+            if (count > 1 && options.strict) {
+              throw new Error(`Multiple elements found (${count}): ${element.description}`);
+            }
+          } else {
+            throw error;
+          }
         }
       }
 

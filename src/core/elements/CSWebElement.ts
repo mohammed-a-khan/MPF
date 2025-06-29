@@ -786,31 +786,44 @@ export class CSWebElement {
 
     async waitFor(options?: WaitOptions): Promise<void> {
         const startTime = Date.now();
-        try {
-            const locator = await this.resolve();
-            
-            // Create waitFor options with proper state
-            const waitOptions: { state?: 'attached' | 'detached' | 'visible' | 'hidden'; timeout?: number } = {};
-            
-            if (options?.state) {
-                waitOptions.state = options.state;
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        while (retryCount <= maxRetries) {
+            try {
+                const locator = await this.resolve();
+                
+                // Create waitFor options with proper state
+                const waitOptions: { state?: 'attached' | 'detached' | 'visible' | 'hidden'; timeout?: number } = {};
+                
+                if (options?.state) {
+                    waitOptions.state = options.state;
+                }
+                if (options?.timeout !== undefined) {
+                    waitOptions.timeout = options.timeout;
+                }
+                
+                await locator.waitFor(waitOptions);
+                
+                await this.logAction('waitFor', [options], 'success');
+                await ActionLogger.logElementAction(`Waited for element: ${this.description}`, { 
+                    action: 'waitFor',
+                    element: this.description,
+                    duration: Date.now() - startTime,
+                    state: options?.state 
+                });
+                return; // Success, exit the method
+            } catch (error: any) {
+                if (error.message?.includes('Execution context was destroyed') && retryCount < maxRetries) {
+                    retryCount++;
+                    ActionLogger.logDebug(`Context destroyed during waitFor, retrying (${retryCount}/${maxRetries})...`);
+                    // Small delay before retry
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    continue;
+                }
+                await this.logAction('waitFor', [options], 'failure', error as Error);
+                throw error;
             }
-            if (options?.timeout !== undefined) {
-                waitOptions.timeout = options.timeout;
-            }
-            
-            await locator.waitFor(waitOptions);
-            
-            await this.logAction('waitFor', [options], 'success');
-            await ActionLogger.logElementAction(`Waited for element: ${this.description}`, { 
-                action: 'waitFor',
-                element: this.description,
-                duration: Date.now() - startTime,
-                state: options?.state 
-            });
-        } catch (error) {
-            await this.logAction('waitFor', [options], 'failure', error as Error);
-            throw error;
         }
     }
 
