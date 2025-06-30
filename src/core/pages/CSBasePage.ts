@@ -10,6 +10,7 @@ import { ConfigurationManager } from '../configuration/ConfigurationManager';
 import { BDDContext } from '../../bdd/context/BDDContext';
 import { NavigationObserver } from './NavigationObserver';
 import { NavigationRegistry } from './NavigationRegistry';
+import { CrossDomainNavigationHandler } from '../navigation/CrossDomainNavigationHandler';
 
 interface NavigationOptions {
     waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -27,6 +28,7 @@ export abstract class CSBasePage {
     private _pageLoadTime: number = 0;
     private _validationErrors: ValidationError[] = [];
     private navigationObserver?: NavigationObserver;
+    private crossDomainHandler?: CrossDomainNavigationHandler;
 
     /**
      * Wait for a specific URL pattern
@@ -94,6 +96,9 @@ export abstract class CSBasePage {
             
             // Set up navigation observer
             this.navigationObserver = new NavigationObserver(page);
+            
+            // Set up cross-domain navigation handler
+            this.crossDomainHandler = new CrossDomainNavigationHandler(page);
             
             // Register with NavigationRegistry for global access
             NavigationRegistry.getInstance().register(page, this.navigationObserver);
@@ -163,10 +168,21 @@ export abstract class CSBasePage {
             
             const startTime = Date.now();
             
+            // For authentication scenarios, handle potential redirect
+            if (this.crossDomainHandler) {
+                await this.crossDomainHandler.handleInitialAuthRedirect(targetUrl);
+            }
+            
             await page.goto(targetUrl, {
-                waitUntil: 'networkidle',
+                waitUntil: 'domcontentloaded',  // Don't wait for networkidle as we might redirect
                 timeout: 60000
             });
+
+            // Handle cross-domain authentication if it occurs
+            if (this.crossDomainHandler?.isInCrossDomainNavigation()) {
+                ActionLogger.logDebug('Detected authentication redirect, waiting for completion...');
+                await this.crossDomainHandler.forceWaitForNavigation();
+            }
 
             // Wait for navigation to stabilize using NavigationObserver
             if (this.navigationObserver) {
@@ -561,6 +577,12 @@ export abstract class CSBasePage {
      * This method is called automatically before any element interaction
      */
     protected async ensurePageReady(): Promise<void> {
+        // Handle cross-domain navigation first
+        if (this.crossDomainHandler?.isInCrossDomainNavigation()) {
+            await this.crossDomainHandler.handleCrossDomainNavigation();
+        }
+        
+        // Then ensure page is ready
         if (this.navigationObserver) {
             await this.navigationObserver.ensurePageReady();
         }

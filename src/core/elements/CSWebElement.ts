@@ -18,6 +18,7 @@ import { ActionLogger } from '../logging/ActionLogger';
 import { ConfigurationManager } from '../configuration/ConfigurationManager';
 import { expect } from '@playwright/test';
 import { NavigationRegistry } from '../pages/NavigationRegistry';
+import { SmartElementResolver } from './SmartElementResolver';
 // Import dynamically to avoid circular dependency
 let BDDContext: any = null;
 try {
@@ -249,6 +250,47 @@ export class CSWebElement {
     }
 
     private async resolve(): Promise<Locator> {
+        const startTime = Date.now();
+        
+        // Ensure config is synced with options (for backward compatibility)
+        this.syncConfigFromOptions();
+        
+        // Use SmartElementResolver for robust resolution
+        try {
+            const locator = await SmartElementResolver.resolveWithRetry(this);
+            
+            // Cache the resolved locator
+            this.locator = locator;
+            this.lastResolvedAt = new Date();
+            
+            // Log success
+            ActionLogger.logInfo(`Element resolved successfully: ${this.description}`, {
+                duration: Date.now() - startTime,
+                locator: `${this._config.locatorType}=${this._config.locatorValue}`
+            });
+            
+            return locator;
+        } catch (error) {
+            // Try AI healing if enabled and regular resolution failed
+            if (this._config.aiEnabled) {
+                try {
+                    ActionLogger.logInfo(`Attempting AI healing for element: ${this.description}`);
+                    const healedLocator = await SelfHealingEngine.getInstance().heal(this);
+                    this.locator = healedLocator;
+                    this.lastResolvedAt = new Date();
+                    return healedLocator;
+                } catch (healingError) {
+                    ActionLogger.logError('AI healing failed', healingError as Error);
+                }
+            }
+            
+            // Log failure
+            ActionLogger.logError(`Element resolution failed: ${this.description}`, error as Error);
+            throw error;
+        }
+    }
+    
+    private async resolveOld(): Promise<Locator> {
         const startTime = Date.now();
         
         // Ensure config is synced with options (for backward compatibility)
