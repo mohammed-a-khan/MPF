@@ -1,6 +1,7 @@
 import { CSBasePage } from '../../../src/core/pages/CSBasePage';
 import { CSGetElement } from '../../../src/core/elements/decorators/CSGetElement';
 import { CSWebElement } from '../../../src/core/elements/CSWebElement';
+import { ActionLogger } from '../../../src/core/logging/ActionLogger';
 
 export class LoginPage extends CSBasePage {
     protected get pageUrl(): string {
@@ -97,7 +98,18 @@ export class LoginPage extends CSBasePage {
     async verifyWelcomeMessage(expectedUsername: string): Promise<void> {
         const welcomeLocator = await this.welcomeMessage.getLocator();
         const welcomeText = await welcomeLocator.textContent();
-        if (welcomeText !== 'Admin') {
+        
+        const passed = welcomeText === 'Admin';
+        
+        // Log the verification
+        await ActionLogger.logVerification(
+            'Welcome message verification',
+            expectedUsername,
+            welcomeText,
+            passed
+        );
+        
+        if (!passed) {
             throw new Error(`Expected welcome message to contain ${expectedUsername} but found ${welcomeText}`);
         }
     }

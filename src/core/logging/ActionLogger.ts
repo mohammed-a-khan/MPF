@@ -317,6 +317,39 @@ export class ActionLogger extends EventEmitter {
     }
   }
 
+  async logVerification(
+    description: string,
+    expected: any,
+    actual: any,
+    passed: boolean,
+    metadata?: LogMetadata
+  ): Promise<void> {
+    const entry: ActionLogEntry = {
+      id: this.generateLogId(),
+      timestamp: new Date(),
+      level: passed ? LogLevel.INFO : LogLevel.WARN,
+      type: 'action',
+      correlationId: this.getCurrentCorrelationId(),
+      sessionId: this.sessionId,
+      context: { ...this.currentContext },
+      action: passed ? 'Verification Passed' : 'Verification Failed',
+      details: {
+        description,
+        expected,
+        actual,
+        passed,
+        comparison: `Expected: ${expected}, Actual: ${actual}`
+      },
+      metadata: this.enrichMetadata(metadata),
+      threadId: this.getThreadId(),
+      processId: process.pid,
+      hostname: os.hostname()
+    };
+
+    await this.writeLog(entry);
+    this.updateStats('verification');
+  }
+
   async logAPIRequest(
     requestId: string,
     requestOptions: any,
@@ -2415,6 +2448,18 @@ export class ActionLogger extends EventEmitter {
       ...details,
       type: 'emulation'
     });
+  }
+
+  /**
+   * Log verification/assertion results
+   * @param description What is being verified
+   * @param expected Expected value
+   * @param actual Actual value
+   * @param passed Whether verification passed
+   */
+  static async logVerification(description: string, expected: any, actual: any, passed: boolean): Promise<void> {
+    const instance = ActionLogger.getInstance();
+    await instance.logVerification(description, expected, actual, passed);
   }
 
   /**
