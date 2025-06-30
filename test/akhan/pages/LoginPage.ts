@@ -48,9 +48,14 @@ export class LoginPage extends CSBasePage {
         // For NetScaler scenarios, we might be on either the auth page or the app page
         const currentUrl = this.page.url();
         
-        if (currentUrl.toLowerCase().includes('auth') || currentUrl.toLowerCase().includes('login')) {
-            // We're on the authentication page, just wait for it to be ready
+        if (currentUrl.toLowerCase().includes('auth') || 
+            currentUrl.toLowerCase().includes('login') ||
+            currentUrl.toLowerCase().includes('netscaler') ||
+            currentUrl.toLowerCase().includes('citrix')) {
+            // We're on the authentication page, just wait for DOM
             await this.waitForLoadState('domcontentloaded');
+            // Small wait to ensure form elements are interactive
+            await this.page.waitForTimeout(1000);
         } else {
             // We're on the application page, wait for full load
             await this.waitForLoadState('networkidle');
@@ -78,11 +83,21 @@ export class LoginPage extends CSBasePage {
     async clickLogOn(): Promise<void> {
         await this.logOnLink.click();
         
-        // Framework handles the NetScaler authentication flow automatically
-        // CrossDomainNavigationHandler will:
-        // 1. Detect the redirect back to your application
-        // 2. Wait for the application to fully load
-        // 3. Ensure page stability before continuing
+        // Wait for URL to change away from the authentication page
+        // This is the modern replacement for waitForNavigation
+        await this.page.waitForURL((url) => {
+            const urlStr = url.toString().toLowerCase();
+            // Return true when we're NOT on an auth page anymore
+            return !urlStr.includes('netscaler') && 
+                   !urlStr.includes('citrix') && 
+                   !urlStr.includes('auth') &&
+                   !urlStr.includes('login') &&
+                   !urlStr.includes('/vpn/') &&
+                   !urlStr.includes('/logon/');
+        }, { 
+            timeout: 30000,
+            waitUntil: 'domcontentloaded' 
+        });
     }
 
     async verifyHomeHeader(): Promise<void> {

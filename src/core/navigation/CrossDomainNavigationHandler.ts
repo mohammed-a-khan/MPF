@@ -29,15 +29,18 @@ export class CrossDomainNavigationHandler {
                 const currentUrl = frame.url();
                 const currentDomain = this.extractDomain(currentUrl);
                 
-                // If original domain is not set and we're on a login page, this might be NetScaler
-                if (!this.originalDomain && this.isAuthenticationPage(currentUrl)) {
-                    ActionLogger.logDebug(`Initial navigation to authentication page: ${currentDomain}`);
-                    this.isNavigating = true;
-                    return;
+                // If original domain is set and we're navigating back to it from auth
+                if (this.originalDomain && 
+                    currentDomain === this.originalDomain && 
+                    this.isNavigating) {
+                    ActionLogger.logDebug(`Returned to original domain: ${this.originalDomain}`);
+                    this.isNavigating = false;
                 }
                 
-                // If we have an original domain and navigated away
-                if (this.originalDomain && currentDomain !== this.originalDomain) {
+                // If we have an original domain and navigated away (e.g., after login click)
+                if (this.originalDomain && 
+                    currentDomain !== this.originalDomain && 
+                    !this.isAuthenticationPage(currentUrl)) {
                     ActionLogger.logDebug(`Cross-domain navigation detected: ${this.originalDomain} -> ${currentDomain}`);
                     this.isNavigating = true;
                     
@@ -222,10 +225,18 @@ export class CrossDomainNavigationHandler {
         
         ActionLogger.logDebug(`Current URL after navigation: ${this.page.url()}`);
         
+        // Quick check - if we're already on an auth page, no need to wait
+        const currentPageUrl = this.page.url();
+        if (currentPageUrl !== 'about:blank' && this.isAuthenticationPage(currentPageUrl)) {
+            ActionLogger.logDebug(`Already on authentication page: ${currentPageUrl}`);
+            this.isNavigating = false;
+            return;
+        }
+        
         // Wait for either:
         // 1. We reach the target domain (no auth needed)
         // 2. We get redirected to auth page
-        const maxWaitTime = 30000; // 30 seconds for auth scenarios
+        const maxWaitTime = 10000; // 10 seconds should be enough
         const startTime = Date.now();
         
         while (Date.now() - startTime < maxWaitTime) {
@@ -249,17 +260,17 @@ export class CrossDomainNavigationHandler {
             if (this.isAuthenticationPage(currentUrl)) {
                 // We were redirected to auth page
                 ActionLogger.logDebug(`Redirected to authentication page: ${currentUrl}`);
-                this.isNavigating = true;
+                this.isNavigating = false; // We're not navigating anymore, we're on the auth page
                 
-                // Wait for auth page to fully load
+                // Wait for auth page to be ready for interaction
                 try {
-                    await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+                    await this.page.waitForLoadState('domcontentloaded', { timeout: 5000 });
                 } catch {
-                    // Continue even if network isn't idle
+                    // Continue even if not fully loaded
                 }
                 
-                // Now wait for authentication to complete and return to target
-                this.navigationPromise = this.waitForReturnToOriginalDomain();
+                ActionLogger.logDebug('Authentication page is ready for user interaction');
+                // Don't set up navigation promise here - we'll handle it when user clicks login
                 return;
             }
             
