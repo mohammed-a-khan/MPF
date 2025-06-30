@@ -1,5 +1,9 @@
-testId,moduleName,expectedHeader,testType,executeFlag,priority,environment
-TC503-1,ESSS,Employee Self Service System,navigation,Y,high,SIT
-TC503-2,Deal Series,Deal Series Management,navigation,Y,high,SIT
-TC503-3,Reports,Reports Dashboard,navigation,Y,medium,SIT
-TC503-4,Settings,System Settings,navigation,N,low,SIT
+testId,moduleName,expectedHeader,testType,executeFlag,priority,environment,description
+TC503-1,ESSS/Series,ESSSs/Series,navigation,Y,high,SIT,Main ESSS module with # support
+TC503-2,Reference Interests,Reference Interests,navigation,Yes,high,SIT,Reference module #1
+TC503-3,Interest History,Interest History,navigation,true,medium,SIT,History with # chars
+TC503-4,External Interests,External Interests,navigation,N,low,SIT,Should be skipped
+TC503-5,System Admin,System Admin,navigation,No,low,SIT,Admin #skip test
+TC503-6,Version Information,Version Information,navigation,false,medium,SIT,Version #info - skip
+TC503-7,File Upload,Add files,navigation,1,high,SIT,Upload #files module
+TC503-8,Home,Home,navigation,n,low,SIT,Home #page - skip

@@ -1,7 +1,9 @@
 testId,username,password,userRole,accessLevel,environment,status,executeTest,priority
-TC501-1,Admin,admin123,admin,full,SIT,Active,TRUE,high
-TC501-2,Aishaaaa,testpass1,ESS,read,SIT,Active,TRUE,medium
-TC501-3,john.doe135,testpass2,ESS,write,SIT,Active,TRUE,low
-TC501-4,invaliduser,wrongpass,none,none,SIT,Inactive,FALSE,low
-TC501-5,test.user,test123,user,read,UAT,Active,TRUE,medium
-TC501-6,qa.tester,qa123,tester,full,QA,Active,TRUE,high
+TC501-1,Admin,admin#123,admin,full,SIT,Active,Y,high
+TC501-2,Aishaaaa,test#pass#1,ESS,read,SIT,Active,Yes,medium
+TC501-3,john.doe135,pwd#2023,ESS,write,SIT,Active,TRUE,low
+TC501-4,invaliduser,wrong#pass,none,none,SIT,Inactive,N,low
+TC501-5,test.user,#test123,user,read,UAT,Active,No,medium
+TC501-6,qa.tester,qa@#123,tester,full,QA,Active,1,high
+TC501-7,demo.user,demo#pwd#123,demo,read,SIT,Active,n,low
+TC501-8,prod.user,prod##secure,admin,full,SIT,Active,FALSE,high

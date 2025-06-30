@@ -206,64 +206,55 @@ export class FeatureExecutor {
         
         try {
             const logger = ActionLogger.getInstance();
-            logger.info(`Background started: ${background.name || 'Background'}`);
+            logger.info(`Processing background: ${background.name || 'Background'}`);
 
-            // Create background context
-            this.backgroundContext = await this.createBackgroundContext();
-
-            // Create pseudo-scenario for background execution
-            const backgroundScenario: Scenario = {
-                id: `background-${Date.now()}`,
-                name: background.name || 'Background',
-                description: background.description || '',
-                type: 'background' as 'scenario' | 'scenario_outline' | 'background',
-                tags: [],
-                steps: background.steps,
-                examples: [],
-                line: background.line || 0
-            };
-
-            // Execute background steps
-            const backgroundStepResults = await this.scenarioExecutor.executeSteps(
-                backgroundScenario.steps,
-                this.backgroundContext
-            );
-
-            // Store results
-            this.backgroundSteps = backgroundStepResults;
-            this.isBackgroundFailed = backgroundStepResults.some(s => s.status === StepStatus.FAILED);
-
-            // Calculate background status
-            const backgroundStatus = this.isBackgroundFailed ? ScenarioStatus.FAILED : 
-                                   backgroundStepResults.every(s => s.status === StepStatus.PASSED) ? ScenarioStatus.PASSED : ScenarioStatus.SKIPPED;
+            // CRITICAL FIX: Do NOT execute background steps independently
+            // Only store them to be prepended to each scenario
             
-            // Calculate duration
-            const backgroundDuration = backgroundStepResults.reduce((sum, s) => sum + (s.duration || 0), 0);
+            // Convert background steps to StepResult format for compatibility
+            // but mark them as NOT executed yet
+            this.backgroundSteps = background.steps.map(step => {
+                const stepResult: StepResult = {
+                    id: `bg-step-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                    keyword: step.keyword,
+                    text: step.text,
+                    line: step.line,
+                    status: StepStatus.PENDING,
+                    duration: 0,
+                    startTime: backgroundStartTime,
+                    endTime: backgroundStartTime
+                };
+                
+                // Only add optional properties if they exist
+                if (step.dataTable) {
+                    stepResult.dataTable = step.dataTable;
+                }
+                if (step.docString) {
+                    stepResult.docString = step.docString;
+                }
+                
+                return stepResult;
+            });
+            
+            this.isBackgroundFailed = false;
 
-            // Update feature result
+            // Update feature result to indicate background is ready (not executed)
             featureResult.background = {
                 name: background.name || 'Background',
                 description: background.description || '',
                 steps: this.backgroundSteps,
-                status: backgroundStatus,
-                duration: backgroundDuration,
+                status: ScenarioStatus.PENDING,
+                duration: 0,
                 startTime: backgroundStartTime,
                 endTime: new Date()
             };
 
-            if (this.isBackgroundFailed) {
-                const error = this.findFirstStepError(this.backgroundSteps);
-                if (error) {
-                    throw new Error(`Background failed: ${error.message}`);
-                }
-            }
-
             const actionLogger = ActionLogger.getInstance();
-            actionLogger.info(`Background completed: ${background.name || 'Background'} - ${backgroundStatus}`);
+            actionLogger.info(`Background processed: ${background.name || 'Background'} - Ready for scenario execution`);
 
         } catch (error) {
             const logger = Logger.getInstance('FeatureExecutor');
-            logger.error('Background execution failed', error as Error);
+            logger.error('Background processing failed', error as Error);
             this.isBackgroundFailed = true;
             
             featureResult.background = {
@@ -604,10 +595,14 @@ export class FeatureExecutor {
             return scenario;
         }
 
+        // CRITICAL FIX: Use the original background steps from the feature
+        // not the already-executed step results
+        const backgroundSteps = this.currentFeature?.background?.steps || [];
+        
         // Clone scenario to avoid modifying original
         const scenarioWithBackground: Scenario = {
             ...scenario,
-            steps: [...this.convertStepResultsToSteps(this.backgroundSteps), ...scenario.steps]
+            steps: [...backgroundSteps, ...scenario.steps]
         };
 
         return scenarioWithBackground;
@@ -1020,11 +1015,8 @@ export class FeatureExecutor {
                 this.featureContext = null;
             }
 
-            // Cleanup background context
-            if (this.backgroundContext) {
-                await this.backgroundContext.cleanup();
-                this.backgroundContext = null;
-            }
+            // Cleanup background context - removed since we no longer create a separate context
+            // Background steps are now only executed as part of each scenario
 
             // Reset state
             this.backgroundSteps = [];

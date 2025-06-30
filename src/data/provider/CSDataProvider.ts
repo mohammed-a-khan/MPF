@@ -200,23 +200,64 @@ export class CSDataProvider {
         console.log(`🔍 DEBUG parseTagValue: Input tagValue = "${tagValue}"`);
         
         // Parse key=value pairs - handle both quoted and unquoted values
-        // Updated regex to handle nested quotes in values (like JSONPath expressions)
-        const regex = /(\w+)="((?:[^"\\]|\\.)*)"/g;
-        let match;
-        let matchCount = 0;
+        // Use a more robust parsing approach for complex values like JSONPath
+        const attributes: Array<{key: string, value: string}> = [];
+        let currentPos = 0;
         
-        // Also check what kind of quotes we have
-        console.log(`🔍 DEBUG parseTagValue: Checking for quote types...`);
-        console.log(`  Contains ": ${tagValue.includes('"')}`);
-        console.log(`  Contains ': ${tagValue.includes("'")}`);
-        console.log(`  First 50 chars: ${tagValue.substring(0, 50)}`);
+        while (currentPos < tagValue.length) {
+            // Find the next key
+            const keyMatch = tagValue.substring(currentPos).match(/^(\w+)="/);
+            if (!keyMatch) break;
+            
+            const key = keyMatch[1];
+            if (!key) continue; // Skip if key is somehow undefined
+            currentPos += keyMatch[0].length;
+            
+            // Extract the value, handling nested quotes
+            let value = '';
+            let inEscape = false;
+            let depth = 0;
+            
+            for (let i = currentPos; i < tagValue.length; i++) {
+                const char = tagValue[i];
+                
+                if (inEscape) {
+                    value += char;
+                    inEscape = false;
+                    continue;
+                }
+                
+                if (char === '\\') {
+                    inEscape = true;
+                    value += char;
+                    continue;
+                }
+                
+                if (char === '"' && depth === 0) {
+                    // End of value
+                    currentPos = i + 1;
+                    break;
+                }
+                
+                if (char === '[' || char === '{' || char === '(') depth++;
+                if (char === ']' || char === '}' || char === ')') depth--;
+                
+                value += char;
+            }
+            
+            attributes.push({ key, value });
+            console.log(`🔍 DEBUG parseTagValue: Extracted ${key}="${value}"`);
+            
+            // Skip comma and whitespace
+            while (currentPos < tagValue.length && (tagValue[currentPos] === ',' || tagValue[currentPos] === ' ')) {
+                currentPos++;
+            }
+        }
         
-        while ((match = regex.exec(tagValue)) !== null) {
-            matchCount++;
-            const key = match[1];
-            const value = match[2];
+        // Process the extracted attributes
+        for (const { key, value } of attributes) {
             logger.debug(`Extracted key="${key}", value="${value}"`);
-            console.log(`🔍 DEBUG parseTagValue: Match ${matchCount} - key="${key}", value="${value}"`);
+            console.log(`🔍 DEBUG parseTagValue: Processing ${key}="${value}"`);
             
             switch (key) {
                 case 'source':
@@ -273,11 +314,12 @@ export class CSDataProvider {
                 case 'jsonPath':
                     // Store JSONPath for JSON handler
                     (options as any).jsonPath = value;
+                    console.log(`🔍 DEBUG parseTagValue: jsonPath = "${value}"`);
                     break;
             }
         }
         
-        console.log(`🔍 DEBUG parseTagValue: Total matches found = ${matchCount}`);
+        console.log(`🔍 DEBUG parseTagValue: Total attributes found = ${attributes.length}`);
         logger.debug(`Parsed tag options: ${JSON.stringify(options)}`);
         console.log(`🔍 DEBUG parseTagValue: Final parsed options = ${JSON.stringify(options)}`);
         return options;
@@ -540,7 +582,9 @@ export class CSDataProvider {
             environment: ConfigurationManager.getEnvironmentName(),
             defaultFlag: this.config.defaultExecutionFlag,
             executeValues: ['Y', 'Yes', 'TRUE', 'true', '1', 'Execute', 'Run', 'T'],
-            skipValues: ['N', 'No', 'FALSE', 'false', '0', 'Skip', 'Ignore', 'F']
+            skipValues: ['N', 'No', 'FALSE', 'false', '0', 'Skip', 'Ignore', 'F'],
+            caseInsensitive: true,
+            trimValues: true
         });
         
         // Also set _execute property for backward compatibility

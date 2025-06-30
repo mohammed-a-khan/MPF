@@ -38,6 +38,11 @@ export class CSVParser {
             let rowCount = 0;
             let skippedRows = 0;
             
+            // Debug logging
+            if (options.delimiter) {
+                ActionLogger.logDebug(`Using specified delimiter: "${delimiter}"`);
+            }
+            
             // Setup parser event handlers
             parser.on('readable', async () => {
                 let record;
@@ -432,7 +437,7 @@ export class CSVParser {
             trim: csvOptions.trimValues !== false,
             columns: false, // We handle headers manually
             cast: false, // We handle type conversion manually
-            comment: '#',
+            comment: '', // Disable comment character to allow # in data
             bom: true,
             encoding: csvOptions.encoding || 'utf8'
         });

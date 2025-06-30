@@ -39,7 +39,15 @@ export class JSONParser {
             let data = parsed;
             if (options.jsonPath) {
                 try {
+                    console.log(`🔍 DEBUG JSONParser: Applying JSONPath = "${options.jsonPath}"`);
+                    console.log(`🔍 DEBUG JSONParser: Input data structure:`, JSON.stringify(Object.keys(parsed), null, 2));
+                    
                     data = jsonpath.query(parsed, options.jsonPath);
+                    
+                    console.log(`🔍 DEBUG JSONParser: JSONPath query returned ${Array.isArray(data) ? data.length : 'non-array'} results`);
+                    if (Array.isArray(data) && data.length > 0) {
+                        console.log(`🔍 DEBUG JSONParser: First result:`, JSON.stringify(data[0], null, 2));
+                    }
                     
                     // JSONPath returns array, unwrap if single result expected
                     if (options.jsonPath.startsWith('$..')) {

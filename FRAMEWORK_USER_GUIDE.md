@@ -428,6 +428,20 @@ Scenario Outline: CSV data-driven test
   Then I verify outcome "<Expected>"
 ```
 
+#### CSV Special Characters Support
+The framework fully supports special characters in CSV data:
+- **Hash (#) Character**: Can be used anywhere in data values without being treated as comments
+- **Quotes**: Properly handled within quoted fields
+- **Commas**: Can be included in data when fields are quoted
+
+Example CSV:
+```csv
+testCase,username,password,description
+TC001,user1,pass#123,Password with # character
+TC002,user2,"pwd,with,commas",Password with commas
+TC003,user3,normal@123,Regular password
+```
+
 ### 4. Column Normalization
 
 The framework automatically handles column name variations:
@@ -450,6 +464,26 @@ The framework automatically handles column name variations:
 #### Multiple Filters
 ```gherkin
 @DataProvider(source="data.xlsx",type="excel",filter="priority=high,status=active,executeFlag=Y")
+```
+
+#### Execution Flag Filtering
+The framework automatically filters test data based on execution flags:
+
+**Supported Values for Execute:**
+- Y, Yes, TRUE, true, 1, Execute, Run, T
+
+**Supported Values for Skip:**
+- N, No, FALSE, false, 0, Skip, Ignore, F
+
+**Case Insensitive:** All execution flag values are case-insensitive (e.g., 'n', 'N', 'no', 'NO' all work)
+
+Example:
+```csv
+testCase,username,executeFlag
+TC001,user1,Y      # Will execute
+TC002,user2,N      # Will be skipped
+TC003,user3,yes    # Will execute
+TC004,user4,false  # Will be skipped
 ```
 
 #### Skip Execution Flag

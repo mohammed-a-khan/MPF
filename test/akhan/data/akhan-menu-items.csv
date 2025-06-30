@@ -1,6 +1,9 @@
-testId,menuItem,menuGroup,executeTest,priority,environment
-TC502-1,ESSS,main,TRUE,high,SIT
-TC502-2,Deal Series,main,TRUE,high,SIT
-TC502-3,Reports,main,TRUE,medium,SIT
-TC502-4,Admin,admin,FALSE,low,SIT
-TC502-5,Help,support,FALSE,low,SIT
+testId,menuItem,menuGroup,executeTest,priority,environment,description
+TC502-1,Home,main,Y,high,SIT,Home menu with # test
+TC502-2,ESSS/Series,main,Yes,high,SIT,ESSS #series menu
+TC502-3,Reference Interests,main,1,medium,SIT,Reference #interests
+TC502-4,Interest History,main,TRUE,medium,SIT,History menu #test
+TC502-5,External Interests,main,N,low,SIT,External #skip
+TC502-6,System Admin,main,No,low,SIT,Admin menu #disabled
+TC502-7,Version Information,main,false,low,SIT,Version #info skip
+TC502-8,File Upload,main,0,low,SIT,Upload #files skip

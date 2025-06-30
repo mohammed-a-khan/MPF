@@ -73,6 +73,16 @@ export class JSONHandler implements DataHandler {
                         ...jsonOptions
                     } as any);
                     
+                    // Debug logging for JSONPath results
+                    if (jsonOptions.jsonPath) {
+                        console.log(`🔍 DEBUG JSONHandler: JSONPath = "${jsonOptions.jsonPath}"`);
+                        console.log(`🔍 DEBUG JSONHandler: parseResult.data type = ${Array.isArray(parseResult.data) ? 'array' : typeof parseResult.data}`);
+                        console.log(`🔍 DEBUG JSONHandler: parseResult.data length = ${Array.isArray(parseResult.data) ? parseResult.data.length : 'N/A'}`);
+                        if (Array.isArray(parseResult.data) && parseResult.data.length > 0) {
+                            console.log(`🔍 DEBUG JSONHandler: First item = ${JSON.stringify(parseResult.data[0])}`);
+                        }
+                    }
+                    
                     data = this.normalizeData(parseResult.data);
                     metadata = parseResult.metadata || {};
                 }
