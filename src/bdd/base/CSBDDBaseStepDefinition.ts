@@ -147,7 +147,34 @@ export abstract class CSBDDBaseStepDefinition {
    * @param options - Wait options
    */
   protected async waitForURL(urlPattern: string | RegExp, options?: { timeout?: number }): Promise<void> {
-    await this.page.waitForURL(urlPattern, options);
+    const patternStr = urlPattern instanceof RegExp ? urlPattern.toString() : urlPattern;
+    const timeout = options?.timeout || 30000;
+    
+    ActionLogger.logInfo(`Waiting for URL pattern: ${patternStr} (timeout: ${timeout}ms)`);
+    const startTime = Date.now();
+    
+    try {
+      await this.page.waitForURL(urlPattern, options);
+      const duration = Date.now() - startTime;
+      const currentUrl = this.page.url();
+      
+      ActionLogger.logInfo(
+        `Successfully navigated to URL matching pattern: ${patternStr}`,
+        {
+          pattern: patternStr,
+          currentUrl,
+          duration,
+          timeout
+        }
+      );
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      ActionLogger.logError(
+        `Failed to navigate to URL matching pattern: ${patternStr} after ${duration}ms`,
+        error
+      );
+      throw error;
+    }
   }
 
   /**
@@ -156,7 +183,34 @@ export abstract class CSBDDBaseStepDefinition {
    * @param options - Wait options
    */
   protected async waitForLoadState(state?: 'load' | 'domcontentloaded' | 'networkidle', options?: { timeout?: number }): Promise<void> {
-    await this.page.waitForLoadState(state, options);
+    const loadState = state || 'load';
+    const timeout = options?.timeout || 30000;
+    
+    ActionLogger.logInfo(`Waiting for page load state: ${loadState} (timeout: ${timeout}ms)`);
+    const startTime = Date.now();
+    
+    try {
+      await this.page.waitForLoadState(state, options);
+      const duration = Date.now() - startTime;
+      const currentUrl = this.page.url();
+      
+      ActionLogger.logInfo(
+        `Page reached '${loadState}' state`,
+        {
+          state: loadState,
+          currentUrl,
+          duration,
+          timeout
+        }
+      );
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      ActionLogger.logError(
+        `Failed to reach load state '${loadState}' after ${duration}ms`,
+        error
+      );
+      throw error;
+    }
   }
 
   /**
@@ -242,14 +296,32 @@ export abstract class CSBDDBaseStepDefinition {
     const message = options?.message || 'Condition not met';
     const startTime = Date.now();
 
+    ActionLogger.logInfo(`Waiting for condition: ${message} (timeout: ${timeout}ms)`);
+
     while (Date.now() - startTime < timeout) {
       if (await condition()) {
+        const duration = Date.now() - startTime;
+        ActionLogger.logInfo(
+          `Condition met: ${message}`,
+          {
+            message,
+            duration,
+            timeout,
+            interval
+          }
+        );
         return;
       }
       await this.page.waitForTimeout(interval);
     }
 
-    throw new Error(`Timeout waiting for condition: ${message}`);
+    const duration = Date.now() - startTime;
+    const error = new Error(`Timeout waiting for condition: ${message}`);
+    ActionLogger.logError(
+      `Timeout waiting for condition after ${duration}ms: ${message}`,
+      error
+    );
+    throw error;
   }
 
   /**
@@ -292,6 +364,12 @@ export abstract class CSBDDBaseStepDefinition {
     condition: boolean,
     message: string
   ): void {
+    ActionLogger.logVerification(
+      `Assert: ${message}`,
+      'true',
+      condition.toString(),
+      condition
+    );
     if (!condition) {
       throw new Error(`Assertion failed: ${message}`);
     }
@@ -304,6 +382,12 @@ export abstract class CSBDDBaseStepDefinition {
     condition: boolean,
     message: string
   ): void {
+    ActionLogger.logVerification(
+      `Soft Assert: ${message}`,
+      'true',
+      condition.toString(),
+      condition
+    );
     if (!condition) {
       this.context.addSoftAssertionFailure(message);
       this.logWarning(`Soft assertion failed: ${message}`);
@@ -318,7 +402,14 @@ export abstract class CSBDDBaseStepDefinition {
     expected: T,
     message?: string
   ): void {
-    if (actual !== expected) {
+    const passed = actual === expected;
+    ActionLogger.logVerification(
+      message || 'Assert Equals',
+      expected,
+      actual,
+      passed
+    );
+    if (!passed) {
       throw new Error(
         message || `Expected ${expected} but got ${actual}`
       );
@@ -333,7 +424,14 @@ export abstract class CSBDDBaseStepDefinition {
     substring: string,
     message?: string
   ): void {
-    if (!text.includes(substring)) {
+    const passed = text.includes(substring);
+    ActionLogger.logVerification(
+      message || 'Assert Contains',
+      `Text contains "${substring}"`,
+      `Text: "${text}"`,
+      passed
+    );
+    if (!passed) {
       throw new Error(
         message || `Expected "${text}" to contain "${substring}"`
       );
@@ -348,7 +446,14 @@ export abstract class CSBDDBaseStepDefinition {
     pattern: RegExp,
     message?: string
   ): void {
-    if (!pattern.test(text)) {
+    const passed = pattern.test(text);
+    ActionLogger.logVerification(
+      message || 'Assert Matches Pattern',
+      `Text matches ${pattern}`,
+      `Text: "${text}"`,
+      passed
+    );
+    if (!passed) {
       throw new Error(
         message || `Expected "${text}" to match pattern ${pattern}`
       );
@@ -362,6 +467,12 @@ export abstract class CSBDDBaseStepDefinition {
     condition: boolean,
     message?: string
   ): void {
+    ActionLogger.logVerification(
+      message || 'Assert True',
+      'true',
+      condition.toString(),
+      condition
+    );
     if (!condition) {
       throw new Error(message || 'Expected condition to be true');
     }
@@ -374,6 +485,13 @@ export abstract class CSBDDBaseStepDefinition {
     condition: boolean,
     message?: string
   ): void {
+    const passed = !condition;
+    ActionLogger.logVerification(
+      message || 'Assert False',
+      'false',
+      condition.toString(),
+      passed
+    );
     if (condition) {
       throw new Error(message || 'Expected condition to be false');
     }
@@ -386,7 +504,14 @@ export abstract class CSBDDBaseStepDefinition {
     value: T | null | undefined,
     message?: string
   ): asserts value is T {
-    if (value === null || value === undefined) {
+    const passed = value !== null && value !== undefined;
+    ActionLogger.logVerification(
+      message || 'Assert Not Null',
+      'not null or undefined',
+      value === null ? 'null' : value === undefined ? 'undefined' : 'defined',
+      passed
+    );
+    if (!passed) {
       throw new Error(message || 'Expected value to not be null or undefined');
     }
   }
@@ -399,7 +524,14 @@ export abstract class CSBDDBaseStepDefinition {
     item: T,
     message?: string
   ): void {
-    if (!array.includes(item)) {
+    const passed = array.includes(item);
+    ActionLogger.logVerification(
+      message || 'Assert Array Contains',
+      `Array contains ${JSON.stringify(item)}`,
+      `Array: ${JSON.stringify(array)}`,
+      passed
+    );
+    if (!passed) {
       throw new Error(
         message || `Expected array to contain ${item}`
       );
@@ -415,7 +547,14 @@ export abstract class CSBDDBaseStepDefinition {
     max: number,
     message?: string
   ): void {
-    if (value < min || value > max) {
+    const passed = value >= min && value <= max;
+    ActionLogger.logVerification(
+      message || 'Assert In Range',
+      `Value between ${min} and ${max}`,
+      value.toString(),
+      passed
+    );
+    if (!passed) {
       throw new Error(
         message || `Expected ${value} to be between ${min} and ${max}`
       );

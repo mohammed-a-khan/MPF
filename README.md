@@ -29,11 +29,14 @@ A comprehensive, TypeScript-based test automation framework that enables **zero-
 - **API Testing**: REST/GraphQL API testing with comprehensive validation
 - **Database Testing**: Support for SQL Server, MySQL, PostgreSQL, MongoDB, Oracle, Redis
 - **Cross-Platform**: Windows, macOS, and Linux support
+- **Cross-Domain Navigation**: Automatic handling of SSO, NetScaler, and multi-domain authentication flows
 
 ### 📊 **Advanced Reporting & Analytics**
 - **Multi-Format Reports**: HTML, PDF, Excel, and JSON export
 - **Interactive Dashboards**: Real-time execution monitoring with charts
 - **Comprehensive Action Logging**: Every UI action is logged with verbose descriptions
+- **Verification Logging**: All assertions and validations logged with expected vs actual values
+- **Navigation Tracking**: Detailed logging of page navigations, waits, and load states
 - **Console Log Capture**: All terminal output captured and categorized
 - **Evidence Collection**: Screenshots, videos, network logs, and traces
 
@@ -78,6 +81,7 @@ npx playwright install
 │   │   ├── browser/           # Browser management
 │   │   ├── elements/          # Element handling & locators
 │   │   ├── pages/             # Base page objects
+│   │   ├── navigation/        # Cross-domain navigation handling
 │   │   └── ai/                # AI-powered features (in progress)
 │   ├── api/                    # API testing utilities
 │   │   ├── client/            # HTTP client implementation
@@ -280,6 +284,8 @@ npm run test:akhan -- \
 
 ### Report Enhancements
 - **Verbose Action Logging**: Shows actual values (e.g., "Element filled: 'Admin' filled in Username input field")
+- **Verification Results**: All assertions logged with pass/fail status and comparison details
+- **Navigation Timeline**: Complete tracking of page navigations and load states
 - **Automatic Secret Masking**: Sensitive fields masked with asterisks
 - **Exception Details**: Failed actions include error messages
 - **Console Log Categorization**: Errors, Warnings, Debug, Info properly sorted
@@ -402,6 +408,7 @@ await page.route('**/api/users', route => {
 - Custom performance metrics
 - Resource timing analysis
 - Performance budgets enforcement
+- Navigation performance tracking with detailed timing
 
 ### Proxy Configuration
 ```env
@@ -424,6 +431,9 @@ npm run test:akhan -- --pause-on-failure
 
 # Slow motion execution
 npm run test:akhan -- --slow-mo=1000
+
+# Enable CSP-safe mode for restricted environments
+CSP_SAFE_MODE=true npm run test:akhan
 ```
 
 ### Trace Viewer

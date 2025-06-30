@@ -31,6 +31,7 @@ This comprehensive guide provides detailed instructions for implementing and usi
 │  • Page Objects   │  • HTTP Client    │  • SQL Queries   │
 │  • Element Cache  │  • Response Val.  │  • Multi-DB      │
 │  • Browser Pool   │  • Auth Support   │  • Data Val.     │
+│  • Cross-Domain   │  • OAuth/JWT      │  • Transactions  │
 ├─────────────────────────────────────────────────────────┤
 │  📦 Data Layer   │  ⚙️ Config Mgmt   │  🔧 Utilities    │
 │  • Multi-format  │  • Hierarchical   │  • Logging       │
@@ -276,7 +277,7 @@ export class LoginPage extends CSBasePage {
         await this.passwordInput.fill(password);
         await this.loginButton.click();
         
-        // Wait for navigation
+        // Wait for navigation - framework handles cross-domain redirects automatically
         await this.page.waitForLoadState('networkidle');
     }
 
@@ -342,7 +343,17 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef('I should see welcome message {string}')
     async verifyWelcomeMessage(expectedMessage: string) {
         const actualMessage = await this.dashboardPage.getWelcomeMessage();
-        expect(actualMessage).toBe(expectedMessage);
+        
+        // Use built-in assertion with automatic logging
+        this.assertEquals(actualMessage, expectedMessage, 'Welcome message verification');
+        
+        // Or use ActionLogger for custom verification logging
+        await ActionLogger.logVerification(
+            'Welcome message displayed correctly',
+            expectedMessage,
+            actualMessage,
+            actualMessage === expectedMessage
+        );
         
         // Retrieve stored username
         const username = this.bddContext.retrieve<string>('currentUsername');
@@ -458,6 +469,8 @@ The framework provides comprehensive action logging with automatic value capture
 - **Automatic Secret Masking**: Sensitive fields are automatically masked
 - **Exception Details**: Failed actions include error messages
 - **Performance Metrics**: Duration tracking for each action
+- **Verification Logging**: All assertions automatically logged with expected vs actual values
+- **Navigation Tracking**: Complete visibility into page navigations and wait conditions
 
 #### Example Log Output
 ```
@@ -473,12 +486,19 @@ Step: Login to application
 import { ActionLogger } from '../../../src/core/logging/ActionLogger';
 
 // Log custom business actions
-await ActionLogger.logAction('Business Process', {
-    description: 'Processing order checkout',
+await ActionLogger.logInfo('Processing order checkout', {
     orderId: 'ORD-12345',
     amount: 99.99,
     status: 'completed'
 });
+
+// Log verification results
+await ActionLogger.logVerification(
+    'Order total validation',
+    99.99,  // expected
+    99.99,  // actual
+    true    // passed
+);
 ```
 
 ### 2. Console Log Capture
@@ -556,7 +576,39 @@ PARALLEL_SCENARIO_EXECUTION=true
 WORKER_POOL_SIZE=auto
 ```
 
-### 5. Network Interception
+### 5. Cross-Domain Navigation
+
+The framework automatically handles complex authentication flows:
+
+#### Supported Scenarios
+- Single Sign-On (SSO) redirects
+- NetScaler authentication
+- OAuth/SAML flows
+- Multi-domain applications
+
+#### Configuration
+```env
+# Enable cross-domain navigation handling
+CROSS_DOMAIN_NAVIGATION_ENABLED=true
+AUTH_DOMAIN_PATTERNS=login.company.com,auth.company.com
+APP_DOMAIN=app.company.com
+
+# CSP-safe mode for restricted environments
+CSP_SAFE_MODE=true
+```
+
+#### Usage
+```typescript
+// Framework automatically handles redirects
+await this.loginPage.navigateTo();
+// Even if URL redirects to NetScaler -> App, it's handled seamlessly
+
+// Built-in wait methods with logging
+await this.waitForURL(/dashboard/, { timeout: 30000 });
+await this.waitForLoadState('networkidle');
+```
+
+### 6. Network Interception
 
 #### Mock API Responses
 ```typescript
@@ -584,7 +636,7 @@ await this.page.route('**/*', route => {
 await this.page.route('**/*.png', route => route.abort());
 ```
 
-### 6. Performance Monitoring
+### 7. Performance Monitoring
 
 #### Collect Web Vitals
 ```typescript
@@ -601,7 +653,7 @@ expect(metrics.lcp).toBeLessThan(2500); // 2.5s
 expect(metrics.cls).toBeLessThan(0.1);  // 0.1
 ```
 
-### 7. Database Integration
+### 8. Database Integration
 
 ```typescript
 @CSBDDStepDef('I verify data in database')
@@ -624,7 +676,50 @@ async verifyDatabaseData() {
 }
 ```
 
-### 8. AI-Powered Features (In Progress)
+### 9. Assertion and Verification Logging
+
+All assertions in the framework automatically log their results:
+
+#### Built-in Assertion Methods
+```typescript
+// All these methods automatically log to reports
+this.assert(condition, 'Validation message');
+this.assertEquals(actual, expected, 'Values should match');
+this.assertContains(text, substring, 'Text validation');
+this.assertMatches(text, /pattern/, 'Pattern validation');
+this.assertTrue(condition, 'Should be true');
+this.assertFalse(condition, 'Should be false');
+this.assertNotNull(value, 'Should not be null');
+this.assertArrayContains(array, item, 'Array validation');
+this.assertInRange(value, min, max, 'Range validation');
+this.softAssert(condition, 'Non-failing assertion');
+```
+
+#### Custom Verification Logging
+```typescript
+// Log any custom verification
+await ActionLogger.logVerification(
+    'Custom business rule validation',
+    expectedValue,
+    actualValue,
+    passed
+);
+```
+
+#### Report Output
+```
+Verification Passed: Order total validation
+  Expected: 99.99
+  Actual: 99.99
+  Status: ✓ Passed
+  
+Verification Failed: User role check  
+  Expected: "admin"
+  Actual: "user"
+  Status: ✗ Failed
+```
+
+### 10. AI-Powered Features (In Progress)
 
 #### Self-Healing Locators
 ```typescript
@@ -831,11 +926,7 @@ try {
     });
     
     // Log error details
-    await ActionLogger.logAction('Error', {
-        action: 'performAction',
-        error: error.message,
-        stack: error.stack
-    });
+    await ActionLogger.logError('Failed to perform action', error);
     
     throw error; // Re-throw for test failure
 }
@@ -861,6 +952,7 @@ try {
 - Use proper wait conditions
 - Check network throttling
 - Verify page load state
+- For CSP errors, enable CSP_SAFE_MODE=true
 
 #### 3. Data Provider Issues
 **Issue**: Data not loading from external files
@@ -870,7 +962,15 @@ try {
 - Ensure column names are normalized
 - Validate filter expressions
 
-#### 4. Configuration Not Loading
+#### 4. Cross-Domain Navigation Issues
+**Issue**: Tests fail during SSO/NetScaler authentication
+**Solutions**:
+- Enable CROSS_DOMAIN_NAVIGATION_ENABLED=true
+- Configure AUTH_DOMAIN_PATTERNS with auth domains
+- Use CSP_SAFE_MODE=true for restricted environments
+- Let framework handle redirects automatically
+
+#### 5. Configuration Not Loading
 **Issue**: Environment variables not being picked up
 **Solutions**:
 - Check configuration hierarchy
@@ -878,7 +978,7 @@ try {
 - Ensure proper .env file format
 - Check for typos in variable names
 
-#### 5. ADO Integration Failures
+#### 6. ADO Integration Failures
 **Issue**: Test results not uploading to Azure DevOps
 **Solutions**:
 - Verify PAT token permissions
