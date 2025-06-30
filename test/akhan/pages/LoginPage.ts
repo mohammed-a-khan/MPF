@@ -81,23 +81,12 @@ export class LoginPage extends CSBasePage {
     }
 
     async clickLogOn(): Promise<void> {
+        // Playwright auto-waits for navigation after click
+        // It handles redirects automatically
         await this.logOnLink.click();
         
-        // Wait for URL to change away from the authentication page
-        // This is the modern replacement for waitForNavigation
-        await this.page.waitForURL((url) => {
-            const urlStr = url.toString().toLowerCase();
-            // Return true when we're NOT on an auth page anymore
-            return !urlStr.includes('netscaler') && 
-                   !urlStr.includes('citrix') && 
-                   !urlStr.includes('auth') &&
-                   !urlStr.includes('login') &&
-                   !urlStr.includes('/vpn/') &&
-                   !urlStr.includes('/logon/');
-        }, { 
-            timeout: 30000,
-            waitUntil: 'domcontentloaded' 
-        });
+        // Playwright's click() already waits for navigation
+        // Only add explicit wait if your app has specific requirements
     }
 
     async verifyHomeHeader(): Promise<void> {

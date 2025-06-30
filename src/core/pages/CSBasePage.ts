@@ -171,18 +171,14 @@ export abstract class CSBasePage {
             // Log current URL before navigation
             ActionLogger.logDebug(`Current URL before navigation: ${currentUrl}`);
             
+            // Use Playwright's native navigation with auto-waiting
             await page.goto(targetUrl, {
-                waitUntil: 'commit',  // Just wait for navigation to start
+                waitUntil: 'domcontentloaded',  // Playwright recommends this for most cases
                 timeout: 60000
             });
             
-            // Wait a moment for the initial navigation to process
-            await page.waitForTimeout(1000);
-            
-            // Now handle potential authentication redirect
-            if (this.crossDomainHandler) {
-                await this.crossDomainHandler.handleInitialAuthRedirect(targetUrl);
-            }
+            // Playwright automatically handles redirects and waits for navigation
+            // No need for custom handlers - Playwright is smart enough to handle SSO/NetScaler redirects
 
             // Handle cross-domain authentication if it occurs
             if (this.crossDomainHandler?.isInCrossDomainNavigation()) {

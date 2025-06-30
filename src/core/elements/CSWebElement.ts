@@ -519,19 +519,9 @@ export class CSWebElement {
                 }
                 await locator.waitFor(waitOptions);
                 
-                const functionOptions: { timeout?: number } = {};
-                if (this._config.waitTimeout !== undefined) {
-                    functionOptions.timeout = this._config.waitTimeout;
-                }
-                
-                await this.page.waitForFunction(
-                    (selector) => {
-                        const element = document.querySelector(selector);
-                        return element && !(element as any).disabled;
-                    },
-                    this.getSelectorString(),
-                    functionOptions
-                );
+                // Skip the JavaScript evaluation that causes CSP errors
+                // Playwright's click() will automatically fail if element is disabled
+                // No need for manual disabled check
             }
 
             await locator.click(options);
