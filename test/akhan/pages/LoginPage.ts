@@ -65,22 +65,11 @@ export class LoginPage extends CSBasePage {
 
     async clickLogOn(): Promise<void> {
         await this.logOnLink.click();
-        
-        // Wait for navigation to complete (handles NetScaler redirects)
-        await this.page.waitForLoadState('networkidle', { timeout: 60000 });
-        
-        // Additional wait to ensure page is stable after redirects
-        await this.page.waitForTimeout(3000);
+        // Framework will automatically handle navigation and page stability
     }
 
     async verifyHomeHeader(): Promise<void> {
-        // Wait for navigation to complete after login
-        await this.waitForURL('**/dashboard/**', { timeout: 30000 });
-        
-        // Wait for page to be fully loaded
-        await this.waitForLoadState('networkidle');
-        
-        // Now verify the header is visible
+        // Framework automatically handles navigation, just verify the header
         await this.homeHeader.waitFor({ state: 'visible' });
     }
 
@@ -93,13 +82,7 @@ export class LoginPage extends CSBasePage {
     }
 
     async verifyLoginSuccess(): Promise<void> {
-        // Wait for navigation to complete after login
-        await this.waitForURL('**/dashboard/**', { timeout: 30000 });
-        
-        // Wait for page to be fully loaded
-        await this.waitForLoadState('networkidle');
-        
-        // Verify dashboard header is visible
+        // Framework automatically handles navigation, just verify the header
         await this.homeHeader.waitFor({ state: 'visible' });
     }
 

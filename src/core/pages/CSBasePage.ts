@@ -8,6 +8,8 @@ import { WaitOptions, ValidationError } from './types/page.types';
 import { expect } from '@playwright/test';
 import { ConfigurationManager } from '../configuration/ConfigurationManager';
 import { BDDContext } from '../../bdd/context/BDDContext';
+import { NavigationObserver } from './NavigationObserver';
+import { NavigationRegistry } from './NavigationRegistry';
 
 interface NavigationOptions {
     waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -24,6 +26,7 @@ export abstract class CSBasePage {
     private _initialized: boolean = false;
     private _pageLoadTime: number = 0;
     private _validationErrors: ValidationError[] = [];
+    private navigationObserver?: NavigationObserver;
 
     /**
      * Wait for a specific URL pattern
@@ -88,6 +91,12 @@ export abstract class CSBasePage {
             
             this.page = page;
             this.context = new PageContext(page);
+            
+            // Set up navigation observer
+            this.navigationObserver = new NavigationObserver(page);
+            
+            // Register with NavigationRegistry for global access
+            NavigationRegistry.getInstance().register(page, this.navigationObserver);
             
             // Initialize all decorated elements
             this.initializeElements();
@@ -158,6 +167,11 @@ export abstract class CSBasePage {
                 waitUntil: 'networkidle',
                 timeout: 60000
             });
+
+            // Wait for navigation to stabilize using NavigationObserver
+            if (this.navigationObserver) {
+                await this.navigationObserver.waitForNavigation();
+            }
 
             // Wait for page load without re-initializing
             await this.waitForPageLoad();
@@ -540,6 +554,23 @@ export abstract class CSBasePage {
         } finally {
             this.currentPage.off('request', requestHandler);
         }
+    }
+
+    /**
+     * Ensure page is ready for interaction
+     * This method is called automatically before any element interaction
+     */
+    protected async ensurePageReady(): Promise<void> {
+        if (this.navigationObserver) {
+            await this.navigationObserver.ensurePageReady();
+        }
+    }
+
+    /**
+     * Check if navigation is in progress
+     */
+    protected isNavigationInProgress(): boolean {
+        return this.navigationObserver?.isNavigationInProgress() || false;
     }
 
     // Private methods

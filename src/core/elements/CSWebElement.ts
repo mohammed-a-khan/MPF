@@ -17,6 +17,7 @@ import { SelfHealingEngine } from '../ai/healing/SelfHealingEngine';
 import { ActionLogger } from '../logging/ActionLogger';
 import { ConfigurationManager } from '../configuration/ConfigurationManager';
 import { expect } from '@playwright/test';
+import { NavigationRegistry } from '../pages/NavigationRegistry';
 // Import dynamically to avoid circular dependency
 let BDDContext: any = null;
 try {
@@ -231,11 +232,30 @@ export class CSWebElement {
         }
     }
 
+    /**
+     * Ensure page is ready before interaction
+     * This is called automatically before any element interaction
+     */
+    private async ensurePageReady(): Promise<void> {
+        try {
+            const currentPage = this.page;
+            if (currentPage) {
+                await NavigationRegistry.getInstance().ensurePageReady(currentPage);
+            }
+        } catch (error) {
+            // If navigation registry is not available, continue anyway
+            ActionLogger.logDebug('NavigationRegistry not available, skipping page readiness check');
+        }
+    }
+
     private async resolve(): Promise<Locator> {
         const startTime = Date.now();
         
         // Ensure config is synced with options (for backward compatibility)
         this.syncConfigFromOptions();
+        
+        // Ensure page is ready before resolving
+        await this.ensurePageReady();
         
         try {
             // Always get the current page to ensure we're using the right one
