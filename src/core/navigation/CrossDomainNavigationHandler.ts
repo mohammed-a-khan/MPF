@@ -134,19 +134,29 @@ export class CrossDomainNavigationHandler {
                 return this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
             });
             
-            // Additional stability checks
-            await this.page.evaluate(() => {
-                return new Promise((resolve) => {
-                    if (document.readyState === 'complete') {
-                        // Wait a bit more for any dynamic content
-                        setTimeout(resolve, 1000);
-                    } else {
-                        window.addEventListener('load', () => {
+            // Additional stability checks - avoid evaluate on CSP-restricted pages
+            try {
+                await this.page.evaluate(() => {
+                    return new Promise((resolve) => {
+                        if (document.readyState === 'complete') {
+                            // Wait a bit more for any dynamic content
                             setTimeout(resolve, 1000);
-                        });
-                    }
+                        } else {
+                            window.addEventListener('load', () => {
+                                setTimeout(resolve, 1000);
+                            });
+                        }
+                    });
                 });
-            });
+            } catch (error: any) {
+                if (error.message?.includes('unsafe-eval') || error.message?.includes('CSP')) {
+                    // CSP restriction - just wait without evaluate
+                    ActionLogger.logDebug('CSP restriction detected, using alternative wait method');
+                    await this.page.waitForTimeout(2000);
+                } else {
+                    throw error;
+                }
+            }
             
             ActionLogger.logDebug('Page is stable after cross-domain navigation');
         } catch (error) {

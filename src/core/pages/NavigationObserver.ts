@@ -134,8 +134,15 @@ export class NavigationObserver {
                 },
                 { timeout: 10000 }
             );
-        } catch {
-            // If this fails, it's okay - we tried our best
+        } catch (error: any) {
+            // If this fails due to CSP, just wait
+            if (error.message?.includes('unsafe-eval') || 
+                error.message?.includes('CSP') ||
+                error.message?.includes('EvalError')) {
+                ActionLogger.logDebug('CSP restriction during DOM stability check, using timeout');
+                await this.page.waitForTimeout(2000);
+            }
+            // Otherwise ignore - we tried our best
         }
     }
     

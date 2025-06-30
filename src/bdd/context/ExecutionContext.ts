@@ -465,8 +465,17 @@ export class ExecutionContext {
 
     // Error handling
     page.on('pageerror', error => {
-      ActionLogger.logPageError(error.toString());
-      this.logger.error('Page error:', error);
+      const errorMessage = error.toString();
+      // Ignore CSP-related errors as they're expected on some auth pages
+      if (errorMessage.includes('unsafe-eval') || 
+          errorMessage.includes('Content Security Policy') ||
+          errorMessage.includes('CSP') ||
+          errorMessage.includes('EvalError')) {
+        this.logger.debug('CSP restriction detected (expected on auth pages):', { error: errorMessage });
+      } else {
+        ActionLogger.logPageError(errorMessage);
+        this.logger.error('Page error:', error);
+      }
     });
 
     // Dialog handling
