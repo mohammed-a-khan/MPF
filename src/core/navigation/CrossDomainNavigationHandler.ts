@@ -120,8 +120,19 @@ export class CrossDomainNavigationHandler {
      */
     private async waitForPageStability(): Promise<void> {
         try {
+            // First ensure we're not on about:blank
+            if (this.page.url() === 'about:blank') {
+                await this.page.waitForNavigation({ 
+                    waitUntil: 'domcontentloaded', 
+                    timeout: 10000 
+                }).catch(() => {});
+            }
+            
             // Wait for network to be idle
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+                // If networkidle times out, at least wait for domcontentloaded
+                return this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+            });
             
             // Additional stability checks
             await this.page.evaluate(() => {
@@ -192,14 +203,30 @@ export class CrossDomainNavigationHandler {
         this.originalDomain = targetDomain;
         ActionLogger.logDebug(`Target domain set to: ${this.originalDomain}`);
         
+        // Wait for page to navigate away from about:blank
+        let attempts = 0;
+        while (this.page.url() === 'about:blank' && attempts < 20) {
+            await this.page.waitForTimeout(100);
+            attempts++;
+        }
+        
+        ActionLogger.logDebug(`Current URL after navigation: ${this.page.url()}`);
+        
         // Wait for either:
         // 1. We reach the target domain (no auth needed)
         // 2. We get redirected to auth page
-        const maxWaitTime = 10000; // 10 seconds
+        const maxWaitTime = 30000; // 30 seconds for auth scenarios
         const startTime = Date.now();
         
         while (Date.now() - startTime < maxWaitTime) {
             const currentUrl = this.page.url();
+            
+            // Skip if still on about:blank
+            if (currentUrl === 'about:blank') {
+                await this.page.waitForTimeout(500);
+                continue;
+            }
+            
             const currentDomain = this.extractDomain(currentUrl);
             
             if (currentDomain === this.originalDomain) {
@@ -211,8 +238,15 @@ export class CrossDomainNavigationHandler {
             
             if (this.isAuthenticationPage(currentUrl)) {
                 // We were redirected to auth page
-                ActionLogger.logDebug('Redirected to authentication page');
+                ActionLogger.logDebug(`Redirected to authentication page: ${currentUrl}`);
                 this.isNavigating = true;
+                
+                // Wait for auth page to fully load
+                try {
+                    await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+                } catch {
+                    // Continue even if network isn't idle
+                }
                 
                 // Now wait for authentication to complete and return to target
                 this.navigationPromise = this.waitForReturnToOriginalDomain();
@@ -221,5 +255,8 @@ export class CrossDomainNavigationHandler {
             
             await this.page.waitForTimeout(500);
         }
+        
+        // If we get here, log the current state
+        ActionLogger.logDebug(`Timeout waiting for navigation. Current URL: ${this.page.url()}`);
     }
 }

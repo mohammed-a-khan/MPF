@@ -19,7 +19,9 @@ export class akhanLoginNavigationSteps extends CSBDDBaseStepDefinition {
 
     @CSBDDStepDef('user is on the akhan login page')
     async navigateToLoginPage() {
+        console.log('Step: Navigating to login page...');
         await this.loginPage.navigateTo();
+        console.log('Step: Navigation complete, should be on NetScaler or app login page');
     }
 
     @CSBDDStepDef('user enters username {string} and password {string}')

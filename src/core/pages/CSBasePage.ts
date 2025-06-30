@@ -168,15 +168,21 @@ export abstract class CSBasePage {
             
             const startTime = Date.now();
             
-            // For authentication scenarios, handle potential redirect
+            // Log current URL before navigation
+            ActionLogger.logDebug(`Current URL before navigation: ${currentUrl}`);
+            
+            await page.goto(targetUrl, {
+                waitUntil: 'commit',  // Just wait for navigation to start
+                timeout: 60000
+            });
+            
+            // Wait a moment for the initial navigation to process
+            await page.waitForTimeout(1000);
+            
+            // Now handle potential authentication redirect
             if (this.crossDomainHandler) {
                 await this.crossDomainHandler.handleInitialAuthRedirect(targetUrl);
             }
-            
-            await page.goto(targetUrl, {
-                waitUntil: 'domcontentloaded',  // Don't wait for networkidle as we might redirect
-                timeout: 60000
-            });
 
             // Handle cross-domain authentication if it occurs
             if (this.crossDomainHandler?.isInCrossDomainNavigation()) {
