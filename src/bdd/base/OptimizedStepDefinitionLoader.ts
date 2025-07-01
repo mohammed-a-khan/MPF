@@ -7,21 +7,32 @@ import { stepRegistry } from '../decorators/StepRegistryInstance';
 import { glob } from 'glob';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { ActionLogger } from '../../core/logging/ActionLogger';
+import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 import { Feature, Scenario, Step } from '../types/bdd.types';
+import { FeatureFileParser } from '../parser/FeatureFileParser';
 
 type StepDefinitionClass = new () => CSBDDBaseStepDefinition;
+
+interface StepFileMapping {
+    pattern: string;
+    files: Set<string>;
+}
 
 export class OptimizedStepDefinitionLoader {
     private static readonly logger = Logger.getInstance('OptimizedStepDefinitionLoader');
     private static instance: OptimizedStepDefinitionLoader;
     
+    private readonly stepDefinitions = new Map<string, CSBDDBaseStepDefinition>();
+    private readonly stepFileCache = new Map<string, StepFileMapping>();
     private readonly loadedFiles = new Set<string>();
-    private readonly stepToFileMap = new Map<string, string[]>();
-    private readonly projectStepPaths = new Map<string, string[]>();
+    private readonly featureParser: FeatureFileParser;
     private isInitialized = false;
-    private stepFileIndex: Map<string, string[]> | null = null;
+    private stepPatternToFileMap = new Map<string, string[]>();
 
-    private constructor() {}
+    private constructor() {
+        this.featureParser = FeatureFileParser.getInstance();
+    }
 
     public static getInstance(): OptimizedStepDefinitionLoader {
         if (!this.instance) {
@@ -30,277 +41,224 @@ export class OptimizedStepDefinitionLoader {
         return this.instance;
     }
 
-    /**
-     * Initialize the loader with smart loading strategy
-     */
-    public async initialize(options?: { preloadCommon?: boolean }): Promise<void> {
+    public async initialize(featureFiles: string[]): Promise<void> {
         if (this.isInitialized) {
+            OptimizedStepDefinitionLoader.logger.debug('OptimizedStepDefinitionLoader already initialized');
             return;
         }
 
-        console.log('🚀 Initializing OptimizedStepDefinitionLoader...');
+        const startTime = Date.now();
         
-        // Build step file index for quick lookup
-        await this.buildStepFileIndex();
-        
-        // Optionally preload common step definitions
-        if (options?.preloadCommon) {
-            await this.preloadCommonSteps();
+        try {
+            const requiredSteps = await this.extractRequiredSteps(featureFiles);
+            
+            await this.buildStepFileIndex();
+
+            const filesToLoad = await this.findRequiredStepFiles(requiredSteps);
+            
+            await this.loadStepFiles(Array.from(filesToLoad));
+
+            const duration = Date.now() - startTime;
+            const stats = stepRegistry.getStats();
+            OptimizedStepDefinitionLoader.logger.info(`✅ Optimized loading complete in ${duration}ms - Loaded ${stats.totalSteps} step definitions from ${filesToLoad.size} files`);
+
+            this.isInitialized = true;
+        } catch (error) {
+            OptimizedStepDefinitionLoader.logger.error('Failed to initialize optimized loader', error as Error);
+            throw error;
         }
-        
-        this.isInitialized = true;
     }
 
-    /**
-     * Load only the step definitions needed for specific features
-     */
-    public async loadStepsForFeatures(features: Feature[]): Promise<void> {
-        console.log(`📦 Loading step definitions for ${features.length} features...`);
-        
-        const requiredSteps = this.extractRequiredSteps(features);
-        console.log(`🔍 Found ${requiredSteps.size} unique step patterns`);
-        
-        const filesToLoad = await this.findFilesForSteps(requiredSteps);
-        console.log(`📁 Need to load ${filesToLoad.size} step definition files`);
-        
-        // Load files in parallel for better performance
-        const loadPromises = Array.from(filesToLoad).map(file => this.loadStepFile(file));
-        await Promise.all(loadPromises);
-        
-        const stats = stepRegistry.getStats();
-        console.log(`✅ Loaded ${stats.totalSteps} step definitions from ${filesToLoad.size} files`);
+    private async extractRequiredSteps(featureFiles: string[]): Promise<Set<string>> {
+        const requiredSteps = new Set<string>();
+
+        for (const featureFile of featureFiles) {
+            try {
+                const feature = await this.featureParser.parseFile(featureFile);
+                this.extractStepsFromFeature(feature, requiredSteps);
+            } catch (error) {
+                OptimizedStepDefinitionLoader.logger.warn(`Failed to parse feature file ${featureFile}:`, error as Error);
+            }
+        }
+
+        return requiredSteps;
     }
 
-    /**
-     * Load step definitions for a specific project
-     */
-    public async loadProjectSteps(project: string): Promise<void> {
-        console.log(`📦 Loading step definitions for project: ${project}`);
+    private extractStepsFromFeature(feature: Feature, stepSet: Set<string>): void {
+        for (const scenario of feature.scenarios) {
+            if (scenario.type === 'background') {
+                for (const step of scenario.steps) {
+                    stepSet.add(this.normalizeStepText(step));
+                }
+            } else {
+                for (const step of scenario.steps) {
+                    stepSet.add(this.normalizeStepText(step));
+                }
+            }
+        }
+    }
+
+    private normalizeStepText(step: Step): string {
+        return step.text.trim();
+    }
+
+    private async buildStepFileIndex(): Promise<void> {
+        const cacheKey = 'step-file-index';
         
-        const projectPaths = this.getProjectStepPaths(project);
-        const files = await this.findStepFilesInPaths(projectPaths);
-        
-        console.log(`📁 Found ${files.length} step files for project ${project}`);
-        
-        // Load only new files
-        const newFiles = files.filter(file => !this.loadedFiles.has(file));
-        if (newFiles.length === 0) {
-            console.log(`✅ All step files for project ${project} already loaded`);
+        const cachedIndex = await this.loadCachedIndex(cacheKey);
+        if (cachedIndex) {
+            this.stepPatternToFileMap = cachedIndex;
+            if (process.env.DEBUG === 'true') OptimizedStepDefinitionLoader.logger.debug('Using cached step file index');
             return;
         }
-        
-        // Load files in parallel
-        const loadPromises = newFiles.map(file => this.loadStepFile(file));
-        await Promise.all(loadPromises);
-        
-        const stats = stepRegistry.getStats();
-        console.log(`✅ Loaded ${stats.totalSteps} total step definitions`);
+
+        const startTime = Date.now();
+
+        const stepFiles = await this.findAllStepFiles();
+
+        for (const file of stepFiles) {
+            try {
+                const patterns = await this.extractStepPatternsFromFile(file);
+                for (const pattern of patterns) {
+                    if (!this.stepPatternToFileMap.has(pattern)) {
+                        this.stepPatternToFileMap.set(pattern, []);
+                    }
+                    this.stepPatternToFileMap.get(pattern)!.push(file);
+                }
+            } catch (error) {
+                OptimizedStepDefinitionLoader.logger.debug(`Failed to extract patterns from ${file}:`, error as Error);
+            }
+        }
+
+        const duration = Date.now() - startTime;
+        if (process.env.DEBUG === 'true') {
+            OptimizedStepDefinitionLoader.logger.debug(`Built index of ${this.stepPatternToFileMap.size} patterns in ${duration}ms`);
+        }
+
+        await this.saveCachedIndex(cacheKey, this.stepPatternToFileMap);
     }
 
-    /**
-     * Extract required step patterns from features
-     */
-    private extractRequiredSteps(features: Feature[]): Set<string> {
-        const steps = new Set<string>();
+    private async extractStepPatternsFromFile(filePath: string): Promise<string[]> {
+        const patterns: string[] = [];
         
-        for (const feature of features) {
-            // Extract from background
-            if (feature.background) {
-                for (const step of feature.background.steps) {
-                    steps.add(this.normalizeStepText(step.text));
+        try {
+            const content = await fs.readFile(filePath, 'utf-8');
+            
+            const decoratorRegex = /@(Given|When|Then|And|But)\s*\(\s*['"](.*?)['"]/g;
+            const stepDefRegex = /CSBDDStepDef\s*\(\s*['"]?(Given|When|Then|And|But)['"]?\s*,\s*['"](.*?)['"]/g;
+            
+            let match;
+            
+            while ((match = decoratorRegex.exec(content)) !== null) {
+                if (match[2]) {
+                    patterns.push(match[2]);
                 }
             }
             
-            // Extract from scenarios
-            for (const scenario of feature.scenarios) {
-                for (const step of scenario.steps) {
-                    steps.add(this.normalizeStepText(step.text));
+            while ((match = stepDefRegex.exec(content)) !== null) {
+                if (match[2]) {
+                    patterns.push(match[2]);
                 }
             }
-        }
-        
-        return steps;
-    }
-
-    /**
-     * Normalize step text for matching
-     */
-    private normalizeStepText(text: string): string {
-        // Remove quotes and parameters for basic matching
-        return text
-            .replace(/"[^"]*"/g, '"{string}"')
-            .replace(/\d+/g, '{int}')
-            .replace(/\d*\.\d+/g, '{float}');
-    }
-
-    /**
-     * Build an index of step patterns to file mappings
-     */
-    private async buildStepFileIndex(): Promise<void> {
-        console.log('🔨 Building step file index...');
-        
-        const indexFile = path.join(process.cwd(), '.step-index.json');
-        
-        // Try to load existing index
-        try {
-            const indexContent = await fs.readFile(indexFile, 'utf-8');
-            this.stepFileIndex = new Map(JSON.parse(indexContent));
-            console.log('✅ Loaded step index from cache');
-            return;
+            
         } catch (error) {
-            // Index doesn't exist, build it
-            console.log('📝 Building new step index...');
-        }
-        
-        // Build new index
-        this.stepFileIndex = new Map();
-        const files = await this.findAllStepFiles();
-        
-        for (const file of files) {
-            try {
-                const content = await fs.readFile(file, 'utf-8');
-                const patterns = this.extractStepPatterns(content);
-                
-                for (const pattern of patterns) {
-                    const existing = this.stepFileIndex.get(pattern) || [];
-                    existing.push(file);
-                    this.stepFileIndex.set(pattern, existing);
-                }
-            } catch (error) {
-                console.error(`Failed to index file ${file}:`, error);
-            }
-        }
-        
-        // Save index for future use
-        try {
-            await fs.writeFile(indexFile, JSON.stringify([...this.stepFileIndex]), 'utf-8');
-            console.log('💾 Saved step index to cache');
-        } catch (error) {
-            console.error('Failed to save step index:', error);
-        }
-    }
-
-    /**
-     * Extract step patterns from file content without loading it
-     */
-    private extractStepPatterns(content: string): string[] {
-        const patterns: string[] = [];
-        
-        // Match @Given, @When, @Then, @And, @But decorators
-        const decoratorRegex = /@(?:Given|When|Then|And|But)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g;
-        let match;
-        
-        while ((match = decoratorRegex.exec(content)) !== null) {
-            if (match[1]) {
-                patterns.push(match[1]);
-            }
-        }
-        
-        // Also match CSBDDStepDef patterns
-        const stepDefRegex = /@CSBDDStepDef\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g;
-        while ((match = stepDefRegex.exec(content)) !== null) {
-            if (match[1]) {
-                patterns.push(match[1]);
-            }
+            OptimizedStepDefinitionLoader.logger.debug(`Error reading file ${filePath}:`, error as Error);
         }
         
         return patterns;
     }
 
-    /**
-     * Find files that contain steps matching the required patterns
-     */
-    private async findFilesForSteps(requiredSteps: Set<string>): Promise<Set<string>> {
-        const files = new Set<string>();
-        
-        if (!this.stepFileIndex) {
-            // Fallback to loading all files if index not available
-            console.warn('⚠️ Step index not available, loading all step files');
-            const allFiles = await this.findAllStepFiles();
-            allFiles.forEach(file => files.add(file));
-            return files;
-        }
-        
-        // Use index to find relevant files
+    private async findRequiredStepFiles(requiredSteps: Set<string>): Promise<Set<string>> {
+        const requiredFiles = new Set<string>();
+        const unmatchedSteps = new Set<string>();
+
         for (const stepText of requiredSteps) {
-            // Try exact match first
-            const exactMatches = this.stepFileIndex.get(stepText);
-            if (exactMatches) {
-                exactMatches.forEach(file => files.add(file));
-                continue;
-            }
-            
-            // Try pattern matching
-            for (const [pattern, fileList] of this.stepFileIndex) {
+            let matched = false;
+
+            for (const [pattern, files] of this.stepPatternToFileMap) {
                 if (this.stepMatchesPattern(stepText, pattern)) {
-                    fileList.forEach(file => files.add(file));
+                    files.forEach(file => requiredFiles.add(file));
+                    matched = true;
+                    break;
                 }
             }
+
+            if (!matched) {
+                unmatchedSteps.add(stepText);
+            }
         }
+
+        const commonStepFiles = await this.getCommonStepFiles();
+        commonStepFiles.forEach(file => requiredFiles.add(file));
+
+        if (unmatchedSteps.size > 0 && process.env.DEBUG === 'true') {
+            OptimizedStepDefinitionLoader.logger.debug(`${unmatchedSteps.size} steps could not be matched to files`);
+            const samples = Array.from(unmatchedSteps).slice(0, 5);
+            samples.forEach(step => {
+                OptimizedStepDefinitionLoader.logger.debug(`  - "${step}"`);
+            });
+        }
+
+        return requiredFiles;
+    }
+
+    private stepMatchesPattern(stepText: string, pattern: string): boolean {
+        const regexPattern = this.convertPatternToRegex(pattern);
         
+        try {
+            const regex = new RegExp(`^${regexPattern}$`, 'i');
+            return regex.test(stepText);
+        } catch (error) {
+            return stepText.toLowerCase().includes(pattern.toLowerCase());
+        }
+    }
+
+    private convertPatternToRegex(pattern: string): string {
+        return pattern
+            .replace(/\\/g, '\\\\')
+            .replace(/\{string\}/g, '"([^"]*)"')
+            .replace(/\{int\}/g, '(\\d+)')
+            .replace(/\{float\}/g, '(\\d*\\.?\\d+)')
+            .replace(/\{word\}/g, '([^\\s]+)')
+            .replace(/\{\}/g, '(.+)')
+            .replace(/"/g, '"')
+            .replace(/\(/g, '\\(')
+            .replace(/\)/g, '\\)')
+            .replace(/\[/g, '\\[')
+            .replace(/\]/g, '\\]');
+    }
+
+    private async getCommonStepFiles(): Promise<string[]> {
+        const patterns = [
+            'src/steps/ui/InteractionSteps.{ts,js}',
+            'src/steps/ui/ValidationSteps.{ts,js}',
+            'src/steps/ui/NavigationSteps.{ts,js}'
+        ];
+
+        const files: string[] = [];
+        for (const pattern of patterns) {
+            const matches = await glob(pattern, {
+                cwd: process.cwd(),
+                absolute: true
+            });
+            files.push(...matches);
+        }
+
         return files;
     }
 
-    /**
-     * Check if a step text matches a pattern
-     */
-    private stepMatchesPattern(stepText: string, pattern: string): boolean {
-        // Convert pattern to regex
-        const regexPattern = pattern
-            .replace(/\{string\}/g, '"[^"]*"')
-            .replace(/\{int\}/g, '\\d+')
-            .replace(/\{float\}/g, '\\d*\\.?\\d+')
-            .replace(/\{word\}/g, '[^\\s]+')
-            .replace(/\{}\|{.*?}/g, '.*');
-            
-        try {
-            const regex = new RegExp(`^${regexPattern}$`);
-            return regex.test(stepText);
-        } catch (error) {
-            return false;
-        }
-    }
-
-    /**
-     * Get step file paths for a specific project
-     */
-    private getProjectStepPaths(project: string): string[] {
-        // Define project-specific paths
-        const projectPaths: Record<string, string[]> = {
-            'akhan': [
-                '**/test/akhan/steps/**/*.ts',
-                '**/test/akhan/steps/**/*.js'
-            ],
-            'api': [
-                '**/test/api/steps/**/*.ts',
-                '**/test/api/steps/**/*.js',
-                '**/src/steps/api/**/*.ts'
-            ],
-            'common': [
-                '**/src/steps/ui/**/*.ts',
-                '**/src/steps/database/**/*.ts'
-            ]
-        };
-        
-        return projectPaths[project] || ['**/src/steps/**/*.ts'];
-    }
-
-    /**
-     * Find all step definition files
-     */
     private async findAllStepFiles(): Promise<string[]> {
         const patterns = [
-            '**/test/**/steps/**/*.ts',
-            '**/test/**/*.steps.ts',
-            '**/test/**/*.step.ts',
-            '**/src/steps/**/*.ts'
+            'test/**/steps/**/*.{ts,js}',
+            'src/steps/**/*.{ts,js}'
         ];
-        
+
         const files = await Promise.all(patterns.map(async pattern => {
-            const matches = await glob(pattern, { 
-                ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
+            const matches = await glob(pattern, {
+                ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/*.d.ts'],
                 cwd: process.cwd(),
-                absolute: true
+                absolute: true,
+                maxDepth: 8
             });
             return matches;
         }));
@@ -308,81 +266,68 @@ export class OptimizedStepDefinitionLoader {
         return Array.from(new Set(files.flat()));
     }
 
-    /**
-     * Find step files in specific paths
-     */
-    private async findStepFilesInPaths(patterns: string[]): Promise<string[]> {
-        const files = await Promise.all(patterns.map(async pattern => {
-            const matches = await glob(pattern, { 
-                ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
-                cwd: process.cwd(),
-                absolute: true
-            });
-            return matches;
-        }));
+    private async loadStepFiles(files: string[]): Promise<void> {
+        const loadPromises = files.map(async file => {
+            if (this.loadedFiles.has(file)) {
+                return;
+            }
 
-        return Array.from(new Set(files.flat()));
-    }
+            try {
+                if (process.env.DEBUG === 'true') OptimizedStepDefinitionLoader.logger.debug(`Loading step file: ${file}`);
+                await import(file);
+                this.loadedFiles.add(file);
+                stepRegistry.markFileLoaded(file);
+            } catch (error) {
+                OptimizedStepDefinitionLoader.logger.error(`Failed to load step file ${file}:`, error as Error);
+            }
+        });
 
-    /**
-     * Load a single step file
-     */
-    private async loadStepFile(filePath: string): Promise<void> {
-        if (this.loadedFiles.has(filePath)) {
-            return;
-        }
-
-        try {
-            console.log(`📄 Loading: ${path.basename(filePath)}`);
-            await import(filePath);
-            this.loadedFiles.add(filePath);
-        } catch (error) {
-            console.error(`❌ Failed to load ${filePath}:`, error);
-            throw error;
-        }
-    }
-
-    /**
-     * Preload commonly used step definitions
-     */
-    private async preloadCommonSteps(): Promise<void> {
-        const commonStepPatterns = [
-            '**/src/steps/ui/InteractionSteps.ts',
-            '**/src/steps/ui/ValidationSteps.ts',
-            '**/src/steps/ui/NavigationSteps.ts'
-        ];
-        
-        const files = await this.findStepFilesInPaths(commonStepPatterns);
-        console.log(`📦 Preloading ${files.length} common step files...`);
-        
-        const loadPromises = files.map(file => this.loadStepFile(file));
         await Promise.all(loadPromises);
     }
 
-    /**
-     * Clear all loaded step definitions
-     */
-    public reset(): void {
-        this.loadedFiles.clear();
-        this.stepToFileMap.clear();
-        stepRegistry.clear();
-        this.isInitialized = false;
-        console.log('🔄 Step definition loader reset');
+    private async loadCachedIndex(cacheKey: string): Promise<Map<string, string[]> | null> {
+        try {
+            const cacheDir = path.join(process.cwd(), '.cs-framework-cache');
+            const cacheFile = path.join(cacheDir, `${cacheKey}.json`);
+            
+            const stat = await fs.stat(cacheFile);
+            const cacheAge = Date.now() - stat.mtime.getTime();
+            
+            if (cacheAge > 24 * 60 * 60 * 1000) {
+                return null;
+            }
+
+            const content = await fs.readFile(cacheFile, 'utf-8');
+            const data = JSON.parse(content);
+            return new Map(data);
+        } catch (error) {
+            return null;
+        }
     }
 
-    /**
-     * Get loading statistics
-     */
-    public getStats(): {
-        loadedFiles: number;
-        totalSteps: number;
-        indexSize: number;
-    } {
-        const stepStats = stepRegistry.getStats();
-        return {
-            loadedFiles: this.loadedFiles.size,
-            totalSteps: stepStats.totalSteps,
-            indexSize: this.stepFileIndex?.size || 0
-        };
+    private async saveCachedIndex(cacheKey: string, index: Map<string, string[]>): Promise<void> {
+        try {
+            const cacheDir = path.join(process.cwd(), '.cs-framework-cache');
+            await fs.mkdir(cacheDir, { recursive: true });
+            
+            const cacheFile = path.join(cacheDir, `${cacheKey}.json`);
+            const data = Array.from(index.entries());
+            await fs.writeFile(cacheFile, JSON.stringify(data, null, 2));
+        } catch (error) {
+            OptimizedStepDefinitionLoader.logger.debug('Failed to save cache:', error as Error);
+        }
+    }
+
+    public isLoaded(): boolean {
+        return this.isInitialized;
+    }
+
+    public reset(): void {
+        this.stepDefinitions.clear();
+        this.stepFileCache.clear();
+        this.loadedFiles.clear();
+        this.stepPatternToFileMap.clear();
+        this.isInitialized = false;
+        if (process.env.DEBUG === 'true') OptimizedStepDefinitionLoader.logger.debug('Optimized step definition loader reset');
     }
 }

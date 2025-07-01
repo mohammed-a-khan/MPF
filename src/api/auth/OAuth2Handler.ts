@@ -1,11 +1,3 @@
-/**
- * CS Test Automation Framework
- * OAuth 2.0 Authentication Handler
- * Complete implementation of all OAuth 2.0 grant types
- * 
- * @version 4.0.0
- * @author CS Test Automation Team
- */
 
 import { createHash, randomBytes, createHmac } from 'crypto';
 import { performance } from 'perf_hooks';
@@ -44,30 +36,22 @@ import { RequestOptions } from '../types/api.types';
 
 const execAsync = promisify(exec);
 
-/**
- * OAuth2 Handler Implementation
- */
 export class OAuth2Handler {
   private static instance: OAuth2Handler;
   private readonly logger: Logger;
   private readonly actionLogger: ActionLogger;
   
-  // OAuth2 state management
   private readonly stateStore: Map<string, OAuth2State> = new Map();
   private readonly sessionStore: Map<string, OAuth2Session> = new Map();
   private readonly tokenCache: Map<string, OAuth2Cache> = new Map();
   private readonly providerMetadata: Map<string, OAuth2ProviderMetadata> = new Map();
   
-  // PKCE challenges
   private readonly pkceStore: Map<string, PKCEChallenge> = new Map();
   
-  // Device code polling
   private readonly deviceCodePolling: Map<string, NodeJS.Timeout> = new Map();
   
-  // Authorization servers
   private authorizationServers: Map<string, Server> = new Map();
   
-  // Metrics
   private readonly metrics: OAuth2Metrics = {
     totalTokenRequests: 0,
     successfulTokenRequests: 0,
@@ -83,29 +67,27 @@ export class OAuth2Handler {
     lastReset: new Date()
   };
   
-  // Security policies
   private readonly securityPolicies: Map<string, OAuth2SecurityPolicy> = new Map();
   
-  // Configuration
   private readonly config = {
     defaultTimeout: 30000,
-    authorizationTimeout: 300000, // 5 minutes
+    authorizationTimeout: 300000,
     deviceCodePollingInterval: 5000,
     maxDeviceCodePollingAttempts: 60,
-    tokenCacheTTL: 3600000, // 1 hour
-    stateTTL: 600000, // 10 minutes
-    sessionTTL: 86400000, // 24 hours
+    tokenCacheTTL: 3600000,
+    stateTTL: 600000,
+    sessionTTL: 86400000,
     enablePKCE: true,
     requireStateParameter: true,
     validateIssuer: true,
     validateAudience: true,
     validateNonce: true,
-    clockSkew: 300, // 5 minutes
+    clockSkew: 300,
     maxRedirects: 5,
     enableMetrics: true,
     enableDiscovery: true,
     discoveryTimeout: 10000,
-    jwksRefreshInterval: 3600000, // 1 hour
+    jwksRefreshInterval: 3600000,
     supportedResponseTypes: ['code', 'token', 'id_token', 'code token', 'code id_token', 'token id_token', 'code token id_token'],
     supportedResponseModes: ['query', 'fragment', 'form_post', 'query.jwt', 'fragment.jwt', 'form_post.jwt', 'jwt'],
     supportedGrantTypes: Object.values(OAuth2GrantType),
@@ -120,9 +102,6 @@ export class OAuth2Handler {
     enableRAR: false
   };
 
-  /**
-   * Private constructor for singleton
-   */
   private constructor() {
     this.logger = Logger.getInstance();
     this.actionLogger = ActionLogger.getInstance();
@@ -131,9 +110,6 @@ export class OAuth2Handler {
     this.startCleanupTimer();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): OAuth2Handler {
     if (!OAuth2Handler.instance) {
       OAuth2Handler.instance = new OAuth2Handler();
@@ -141,9 +117,6 @@ export class OAuth2Handler {
     return OAuth2Handler.instance;
   }
 
-  /**
-   * Authenticate using OAuth2
-   */
   public async authenticate(
     request: RequestOptions,
     config: OAuth2Config,
@@ -161,13 +134,11 @@ export class OAuth2Handler {
         timestamp: new Date()
       });
 
-      // Validate configuration
       const validationResult = await this.validateConfig(config);
       if (!validationResult) {
         throw new OAuth2Error('Invalid OAuth2 configuration', 'invalid_request');
       }
 
-      // Check token cache
       const cacheKey = this.generateCacheKey(config);
       const cachedToken = this.getFromTokenCache(cacheKey);
       
@@ -175,7 +146,6 @@ export class OAuth2Handler {
         this.metrics.totalTokenRequests++;
         this.metrics.successfulTokenRequests++;
         
-        // Apply token to request
         this.applyTokenToRequest(request, cachedToken);
         
         return {
@@ -192,13 +162,11 @@ export class OAuth2Handler {
             grantType: config.grantType,
             provider: config.provider
           } : undefined,
-          // Legacy properties
           access_token: cachedToken.access_token,
           token_type: cachedToken.token_type
         };
       }
 
-      // Execute grant type specific flow
       let tokenResponse: OAuth2Token;
       
       switch (config.grantType) {
@@ -242,13 +210,10 @@ export class OAuth2Handler {
          throw new OAuth2Error(`Unsupported grant type: ${config.grantType}`, 'unsupported_grant_type');
      }
 
-     // Cache the token
      this.addToTokenCache(cacheKey, tokenResponse);
 
-     // Apply token to request
      this.applyTokenToRequest(request, tokenResponse);
 
-     // Update metrics
      this.updateMetrics(config.grantType, true, performance.now() - startTime);
 
      return {
@@ -267,7 +232,6 @@ export class OAuth2Handler {
          issuer: tokenResponse.iss,
          audience: tokenResponse.aud
        } : undefined,
-       // Legacy properties
        access_token: tokenResponse.access_token,
        token_type: tokenResponse.token_type
      };
@@ -285,23 +249,17 @@ export class OAuth2Handler {
    }
  }
 
- /**
-  * Execute Authorization Code Flow
-  */
  private async executeAuthorizationCodeFlow(
    config: OAuth2Config,
    correlationId: string
  ): Promise<OAuth2Token> {
-   // If we already have a code, exchange it for token
    if (config.authorizationCode) {
      return await this.exchangeCodeForToken(config, correlationId);
    }
 
-   // Otherwise, start the authorization flow
    const state = this.generateState();
    const pkce = this.config.enablePKCE ? this.generatePKCE() : undefined;
 
-   // Store state for validation
    this.stateStore.set(state, {
      state,
      clientId: config.clientId,
@@ -316,13 +274,10 @@ export class OAuth2Handler {
      this.pkceStore.set(state, pkce);
    }
 
-   // Build authorization URL
    const authUrl = await this.buildAuthorizationUrl(config, state, pkce);
 
-   // Start local server to capture callback
    const authCode = await this.captureAuthorizationCode(authUrl, config.redirectUri!, state);
 
-   // Exchange code for token
    config.authorizationCode = authCode;
    if (pkce) {
      config.codeVerifier = pkce.verifier;
@@ -331,9 +286,6 @@ export class OAuth2Handler {
    return await this.exchangeCodeForToken(config, correlationId);
  }
 
- /**
-  * Build authorization URL
-  */
  private async buildAuthorizationUrl(
    config: OAuth2Config,
    state: string,
@@ -349,13 +301,11 @@ export class OAuth2Handler {
      scope: config.scope || 'openid profile email'
    });
 
-   // Add PKCE parameters
    if (pkce) {
      params.set('code_challenge', pkce.challenge);
      params.set('code_challenge_method', pkce.method);
    }
 
-   // Add additional parameters
    if (config.prompt) params.set('prompt', config.prompt);
    if (config.loginHint) params.set('login_hint', config.loginHint);
    if (config.maxAge) params.set('max_age', config.maxAge.toString());
@@ -363,7 +313,6 @@ export class OAuth2Handler {
    if (config.acrValues) params.set('acr_values', config.acrValues);
    if (config.nonce) params.set('nonce', config.nonce);
 
-   // Add custom parameters
    if (config.additionalParameters) {
      Object.entries(config.additionalParameters).forEach(([key, value]) => {
        params.set(key, value);
@@ -374,9 +323,6 @@ export class OAuth2Handler {
    return authUrl.toString();
  }
 
- /**
-  * Capture authorization code
-  */
  private async captureAuthorizationCode(
    authUrl: string,
    redirectUri: string,
@@ -399,14 +345,12 @@ export class OAuth2Handler {
          return;
        }
 
-       // Parse callback parameters
        const params = reqUrl.searchParams;
        const code = params.get('code');
        const state = params.get('state');
        const error = params.get('error');
        const errorDescription = params.get('error_description');
 
-       // Send success response
        res.writeHead(200, { 'Content-Type': 'text/html' });
        res.end(`
          <html>
@@ -418,11 +362,9 @@ export class OAuth2Handler {
          </html>
        `);
 
-       // Clean up
        clearTimeout(timeout);
        server.close();
 
-       // Validate response
        if (error) {
          reject(new OAuth2Error(errorDescription || error, error));
          return;
@@ -441,21 +383,16 @@ export class OAuth2Handler {
        resolve(code);
      };
 
-     // Create server
      server = http.createServer(handler);
      
-     // Store server reference
      this.authorizationServers.set(expectedState, server);
 
-     // Start server
      server.listen(port, 'localhost', () => {
        this.logger.info(`Authorization callback server listening on port ${port}`);
        
-       // Open browser for user authorization
        this.openBrowser(authUrl);
      });
 
-     // Set timeout
      timeout = setTimeout(() => {
        server.close();
        this.authorizationServers.delete(expectedState);
@@ -470,9 +407,6 @@ export class OAuth2Handler {
    });
  }
 
- /**
-  * Open browser for authorization
-  */
  private async openBrowser(url: string): Promise<void> {
    const platform = process.platform;
    let command: string;
@@ -496,9 +430,6 @@ export class OAuth2Handler {
    }
  }
 
- /**
-  * Exchange authorization code for token
-  */
  private async exchangeCodeForToken(
    config: OAuth2Config,
    correlationId: string
@@ -510,20 +441,15 @@ export class OAuth2Handler {
      client_id: config.clientId
    };
 
-   // Add PKCE verifier if present
    if (config.codeVerifier) {
      tokenRequest.code_verifier = config.codeVerifier;
    }
 
-   // Add client authentication
    const headers = await this.getClientAuthenticationHeaders(config);
 
    return await this.requestToken(config.tokenUrl!, tokenRequest, headers, correlationId);
  }
 
- /**
-  * Execute Client Credentials Flow
-  */
  private async executeClientCredentialsFlow(
    config: OAuth2Config,
    correlationId: string
@@ -536,15 +462,11 @@ export class OAuth2Handler {
      tokenRequest.scope = config.scope;
    }
 
-   // Add client authentication
    const headers = await this.getClientAuthenticationHeaders(config);
 
    return await this.requestToken(config.tokenUrl!, tokenRequest, headers, correlationId);
  }
 
- /**
-  * Execute Password Flow
-  */
  private async executePasswordFlow(
    config: OAuth2Config,
    correlationId: string
@@ -563,15 +485,11 @@ export class OAuth2Handler {
      tokenRequest.scope = config.scope;
    }
 
-   // Add client authentication
    const headers = await this.getClientAuthenticationHeaders(config);
 
    return await this.requestToken(config.tokenUrl!, tokenRequest, headers, correlationId);
  }
 
- /**
-  * Execute Refresh Token Flow
-  */
  private async executeRefreshTokenFlow(
    config: OAuth2Config,
    correlationId: string
@@ -589,23 +507,17 @@ export class OAuth2Handler {
      tokenRequest.scope = config.scope;
    }
 
-   // Add client authentication
    const headers = await this.getClientAuthenticationHeaders(config);
 
    return await this.requestToken(config.tokenUrl!, tokenRequest, headers, correlationId);
  }
 
- /**
-  * Execute Implicit Flow
-  */
  private async executeImplicitFlow(
    config: OAuth2Config,
    correlationId: string
  ): Promise<OAuth2Token> {
-   // Implicit flow returns token directly in fragment
    const state = this.generateState();
 
-   // Store state for validation
    this.stateStore.set(state, {
      state,
      clientId: config.clientId,
@@ -615,7 +527,6 @@ export class OAuth2Handler {
      correlationId
    });
 
-   // Build authorization URL
    const authUrl = new URL(config.authorizationUrl!);
    const params = new URLSearchParams({
      response_type: 'token',
@@ -629,15 +540,11 @@ export class OAuth2Handler {
 
    authUrl.search = params.toString();
 
-   // Capture token from fragment
    const token = await this.captureImplicitToken(authUrl.toString(), config.redirectUri!, state);
 
    return token;
  }
 
- /**
-  * Capture implicit flow token
-  */
  private async captureImplicitToken(
    authUrl: string,
    redirectUri: string,
@@ -650,7 +557,6 @@ export class OAuth2Handler {
      let server: Server;
      let timeout: NodeJS.Timeout;
 
-     // Create HTML page to capture fragment
      const captureScript = `
        <script>
          const hash = window.location.hash.substring(1);
@@ -665,7 +571,6 @@ export class OAuth2Handler {
            error_description: params.get('error_description')
          };
          
-         // Send to parent window
          fetch('/callback', {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
@@ -676,7 +581,6 @@ export class OAuth2Handler {
 
      const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
        if (req.method === 'GET' && req.url === redirectUrl.pathname) {
-         // Return capture page
          res.writeHead(200, { 'Content-Type': 'text/html' });
          res.end(`
            <html>
@@ -687,7 +591,6 @@ export class OAuth2Handler {
            </html>
          `);
        } else if (req.method === 'POST' && req.url === '/callback') {
-         // Receive token data
          let body = '';
          req.on('data', chunk => body += chunk);
          req.on('end', () => {
@@ -700,7 +603,6 @@ export class OAuth2Handler {
              clearTimeout(timeout);
              server.close();
 
-             // Validate response
              if (data.error) {
                reject(new OAuth2Error(data.error_description || data.error, data.error));
                return;
@@ -730,16 +632,13 @@ export class OAuth2Handler {
        }
      };
 
-     // Create server
      server = http.createServer(handler);
      
-     // Start server
      server.listen(port, 'localhost', () => {
        this.logger.info(`Implicit flow callback server listening on port ${port}`);
        this.openBrowser(authUrl);
      });
 
-     // Set timeout
      timeout = setTimeout(() => {
        server.close();
        reject(new OAuth2Error('Authorization timeout', 'timeout'));
@@ -752,28 +651,21 @@ export class OAuth2Handler {
    });
  }
 
- /**
-  * Execute Device Code Flow
-  */
  private async executeDeviceCodeFlow(
    config: OAuth2Config,
    _correlationId: string
  ): Promise<OAuth2Token> {
-   // Request device code
    const deviceAuthResponse = await this.requestDeviceAuthorization(config);
 
-   // Display user code
    console.log('\n========================================');
    console.log(`Please visit: ${deviceAuthResponse.verification_uri}`);
    console.log(`And enter code: ${deviceAuthResponse.user_code}`);
    console.log('========================================\n');
 
-   // Open browser if verification_uri_complete is provided
    if (deviceAuthResponse.verification_uri_complete) {
      this.openBrowser(deviceAuthResponse.verification_uri_complete);
    }
 
-   // Poll for token
    return await this.pollDeviceToken(
      config,
      deviceAuthResponse.device_code,
@@ -782,9 +674,6 @@ export class OAuth2Handler {
    );
  }
 
- /**
-  * Request device authorization
-  */
  private async requestDeviceAuthorization(
    config: OAuth2Config
  ): Promise<OAuth2DeviceAuthorizationResponse> {
@@ -812,9 +701,6 @@ export class OAuth2Handler {
    return await response.json();
  }
 
- /**
-  * Poll for device token
-  */
  private async pollDeviceToken(
    config: OAuth2Config,
    deviceCode: string,
@@ -849,16 +735,13 @@ export class OAuth2Handler {
        } catch (error) {
          const oauth2Error = error as OAuth2Error;
          if (oauth2Error.code === 'authorization_pending') {
-           // Continue polling
            this.logger.debug(`Device authorization pending (attempt ${attempts}/${maxAttempts})`);
          } else if (oauth2Error.code === 'slow_down') {
-           // Increase polling interval
            clearInterval(polling);
            interval = interval * 2;
            polling = setInterval(poll, interval * 1000);
            this.logger.debug(`Slowing down polling to ${interval}s`);
          } else {
-           // Other error, stop polling
            clearInterval(polling);
            reject(error);
          }
@@ -868,19 +751,14 @@ export class OAuth2Handler {
      let polling = setInterval(poll, interval * 1000);
      this.deviceCodePolling.set(deviceCode, polling);
 
-     // Initial poll
      poll();
    });
  }
 
- /**
-  * Execute JWT Bearer Flow
-  */
  private async executeJWTBearerFlow(
    config: OAuth2Config,
    correlationId: string
  ): Promise<OAuth2Token> {
-   // Generate JWT assertion
    const assertion = await this.generateJWTAssertion(config);
 
    const tokenRequest: OAuth2TokenRequest = {
@@ -895,9 +773,6 @@ export class OAuth2Handler {
    return await this.requestToken(config.tokenUrl!, tokenRequest, {}, correlationId);
  }
 
- /**
-  * Generate JWT assertion
-  */
  private async generateJWTAssertion(config: OAuth2Config): Promise<string> {
    if (!config.privateKey) {
      throw new OAuth2Error('Private key is required for JWT bearer flow', 'invalid_request');
@@ -921,7 +796,6 @@ export class OAuth2Handler {
      scope: config.scope
    };
 
-   // Add additional claims
    if (config.additionalClaims) {
      Object.assign(payload, config.additionalClaims);
    }
@@ -929,9 +803,6 @@ export class OAuth2Handler {
    return await this.signJWT(header, payload, config.privateKey, config.algorithm || 'RS256');
  }
 
- /**
-  * Execute SAML2 Bearer Flow
-  */
  private async executeSAML2BearerFlow(
    config: OAuth2Config,
    correlationId: string
@@ -952,9 +823,6 @@ export class OAuth2Handler {
    return await this.requestToken(config.tokenUrl!, tokenRequest, {}, correlationId);
  }
 
- /**
-  * Execute Token Exchange Flow (RFC 8693)
-  */
  private async executeTokenExchangeFlow(
    config: OAuth2Config,
    correlationId: string
@@ -973,7 +841,6 @@ export class OAuth2Handler {
      tokenRequest.scope = config.scope;
    }
 
-   // Add optional parameters
    if (config.resource) tokenRequest.resource = config.resource;
    if (config.audience) tokenRequest.audience = config.audience;
    if (config.requestedTokenType) tokenRequest.requested_token_type = config.requestedTokenType;
@@ -986,9 +853,6 @@ export class OAuth2Handler {
    return await this.requestToken(config.tokenUrl!, tokenRequest, headers, correlationId);
  }
 
- /**
-  * Request token from token endpoint
-  */
  private async requestToken(
    tokenUrl: string,
    tokenRequest: OAuth2TokenRequest | OAuth2RefreshRequest | OAuth2TokenExchange,
@@ -1008,7 +872,6 @@ export class OAuth2Handler {
        ...headers
      };
 
-     // Log token request
      this.actionLogger.logAction('oauth2_token_request', {
        url: tokenUrl,
        grantType: tokenRequest.grant_type,
@@ -1037,10 +900,8 @@ export class OAuth2Handler {
 
      const tokenResponse = await response.json();
 
-     // Validate token response
      this.validateTokenResponse(tokenResponse);
 
-     // Calculate expiration time
      const expiresAt = new Date(Date.now() + (tokenResponse.expires_in || 3600) * 1000);
 
      const token: OAuth2Token = {
@@ -1051,7 +912,6 @@ export class OAuth2Handler {
        refresh_token: tokenResponse.refresh_token,
        scope: tokenResponse.scope,
        id_token: tokenResponse.id_token,
-       // Additional fields
        iss: tokenResponse.iss,
        aud: tokenResponse.aud,
        sub: tokenResponse.sub,
@@ -1060,7 +920,6 @@ export class OAuth2Handler {
        exp: tokenResponse.exp
      };
 
-     // Log successful token response
      this.actionLogger.logAction('oauth2_token_response', {
        success: true,
        tokenType: token.token_type,
@@ -1074,7 +933,6 @@ export class OAuth2Handler {
      return token;
 
    } catch (error) {
-     // Log failed token request
      this.actionLogger.logAction('oauth2_token_response', {
        success: false,
        error: error instanceof Error ? error.message : String(error),
@@ -1087,9 +945,6 @@ export class OAuth2Handler {
    }
  }
 
- /**
-  * Get client authentication headers
-  */
  private async getClientAuthenticationHeaders(config: OAuth2Config): Promise<Record<string, string>> {
    const headers: Record<string, string> = {};
 
@@ -1102,7 +957,6 @@ export class OAuth2Handler {
        break;
 
      case 'client_secret_post':
-       // Client credentials will be in the body
        break;
 
      case 'client_secret_jwt':
@@ -1122,24 +976,18 @@ export class OAuth2Handler {
        break;
 
      case 'tls_client_auth':
-       // Client certificate authentication handled at TLS level
        break;
 
      case 'self_signed_tls_client_auth':
-       // Self-signed certificate authentication
        break;
 
      case 'none':
-       // No authentication (public clients)
        break;
    }
 
    return headers;
  }
 
- /**
-  * Generate client secret JWT
-  */
  private async generateClientSecretJWT(config: OAuth2Config): Promise<string> {
    const now = Math.floor(Date.now() / 1000);
    
@@ -1153,16 +1001,13 @@ export class OAuth2Handler {
      sub: config.clientId,
      aud: config.tokenUrl,
      iat: now,
-     exp: now + 300, // 5 minutes
+     exp: now + 300,
      jti: this.generateJTI()
    };
 
    return await this.signJWT(header, payload, config.clientSecret!, 'HS256');
  }
 
- /**
-  * Generate private key JWT
-  */
  private async generatePrivateKeyJWT(config: OAuth2Config): Promise<string> {
    const now = Math.floor(Date.now() / 1000);
    
@@ -1177,16 +1022,13 @@ export class OAuth2Handler {
      sub: config.clientId,
      aud: config.tokenUrl,
      iat: now,
-     exp: now + 300, // 5 minutes
+     exp: now + 300,
      jti: this.generateJTI()
    };
 
    return await this.signJWT(header, payload, config.privateKey!, config.algorithm || 'RS256');
  }
 
- /**
-  * Sign JWT
-  */
  private async signJWT(
    header: any,
    payload: any,
@@ -1200,18 +1042,15 @@ export class OAuth2Handler {
    let signature: string;
 
    if (algorithm.startsWith('HS')) {
-     // HMAC signature
      const alg = algorithm.replace('HS', 'sha');
      signature = createHmac(alg, key)
        .update(signingInput)
        .digest('base64url');
    } else if (algorithm.startsWith('RS') || algorithm.startsWith('PS')) {
-     // RSA signature
      const sign = require('crypto').createSign(algorithm.replace('RS', 'RSA-SHA').replace('PS', 'RSA-SHA'));
      sign.update(signingInput);
      signature = sign.sign(key, 'base64url');
    } else if (algorithm.startsWith('ES')) {
-     // ECDSA signature
      const sign = require('crypto').createSign(algorithm.replace('ES', 'SHA'));
      sign.update(signingInput);
      signature = sign.sign(key, 'base64url');
@@ -1222,9 +1061,6 @@ export class OAuth2Handler {
    return `${signingInput}.${signature}`;
  }
 
- /**
-  * Validate token response
-  */
  private validateTokenResponse(response: any): void {
    if (!response.access_token) {
      throw new OAuth2Error('Missing access token in response', 'invalid_response');
@@ -1239,9 +1075,6 @@ export class OAuth2Handler {
    }
  }
 
- /**
-  * Apply token to request
-  */
  private applyTokenToRequest(request: RequestOptions, token: OAuth2Token): void {
    if (!request.headers) {
      request.headers = {};
@@ -1254,26 +1087,19 @@ export class OAuth2Handler {
        
      case 'dpop':
        request.headers['Authorization'] = `DPoP ${token.access_token}`;
-       // Would also need to add DPoP proof header
        break;
        
      case 'mac':
-       // MAC token type (rarely used)
        const macHeader = this.generateMACHeader(request, token);
        request.headers['Authorization'] = macHeader;
        break;
        
      default:
-       // Default to Bearer
        request.headers['Authorization'] = `${token.token_type} ${token.access_token}`;
    }
  }
 
- /**
-  * Generate MAC header
-  */
  private generateMACHeader(request: RequestOptions, token: OAuth2Token): string {
-   // Simplified MAC token implementation
    const timestamp = Math.floor(Date.now() / 1000);
    const nonce = randomBytes(16).toString('hex');
    const url = new URL(request.url);
@@ -1296,9 +1122,6 @@ export class OAuth2Handler {
    return `MAC id="${token.access_token}", ts="${timestamp}", nonce="${nonce}", mac="${mac}"`;
  }
 
- /**
-  * Make HTTP request
-  */
  private async makeHttpRequest(
    url: string,
    options: {
@@ -1310,7 +1133,6 @@ export class OAuth2Handler {
    const urlObj = new URL(url);
    const isHttps = urlObj.protocol === 'https:';
    
-   // Get proxy configuration
    const proxyConfig = await ProxyManager.getInstance().getProxyForURL(url);
    
    return new Promise((resolve, reject) => {
@@ -1325,13 +1147,10 @@ export class OAuth2Handler {
        }
      };
 
-     // Apply proxy if configured
      if (proxyConfig && proxyConfig.server) {
        const proxyUrl = new URL(proxyConfig.server);
        
-       // For HTTP/HTTPS proxies, we need to handle them differently
        if (proxyUrl.protocol === 'http:' || proxyUrl.protocol === 'https:') {
-         // Store proxy configuration for manual handling
          requestOptions.proxy = {
            host: proxyUrl.hostname,
            port: parseInt(proxyUrl.port || (proxyUrl.protocol === 'https:' ? '443' : '80')),
@@ -1353,7 +1172,6 @@ export class OAuth2Handler {
        });
        
        res.on('end', () => {
-         // Create response object similar to fetch API
          const response = {
            ok: res.statusCode! >= 200 && res.statusCode! < 300,
            status: res.statusCode,
@@ -1384,9 +1202,6 @@ export class OAuth2Handler {
    });
  }
 
- /**
-  * Parse error response
-  */
  private async parseErrorResponse(response: any): Promise<any> {
    try {
      const contentType = response.headers['content-type'] || '';
@@ -1396,7 +1211,6 @@ export class OAuth2Handler {
      } else {
        const text = await response.text();
        
-       // Try to parse as URL-encoded
        const params = new URLSearchParams(text);
        if (params.has('error')) {
          return {
@@ -1405,7 +1219,6 @@ export class OAuth2Handler {
          };
        }
        
-       // Return generic error
        return {
          error: 'invalid_response',
          error_description: text || `HTTP ${response.status} ${response.statusText}`
@@ -1419,9 +1232,6 @@ export class OAuth2Handler {
    }
  }
 
- /**
-  * Refresh token
-  */
  public async refreshToken(config: OAuth2Config): Promise<{
    accessToken: string;
    refreshToken?: string | undefined;
@@ -1462,9 +1272,6 @@ export class OAuth2Handler {
    return refreshResult;
  }
 
- /**
-  * Introspect token
-  */
  public async introspectToken(
    token: string,
    config: OAuth2Config,
@@ -1500,9 +1307,6 @@ export class OAuth2Handler {
    return result;
  }
 
- /**
-  * Revoke token
-  */
  public async revokeToken(
    token: string,
    config: OAuth2Config,
@@ -1533,14 +1337,10 @@ export class OAuth2Handler {
    
    this.metrics.revocationRequests++;
    
-   // Remove from cache
    const cacheKey = this.generateCacheKey(config);
    this.tokenCache.delete(cacheKey);
  }
 
- /**
-  * Get user info
-  */
  public async getUserInfo(
    accessToken: string,
    userInfoUrl: string
@@ -1561,17 +1361,12 @@ export class OAuth2Handler {
    return await response.json();
  }
 
- /**
-  * Discover OAuth2 provider metadata
-  */
  public async discoverProviderMetadata(issuer: string): Promise<OAuth2ProviderMetadata> {
-   // Check cache
    const cached = this.providerMetadata.get(issuer);
    if (cached && cached.cachedAt && Date.now() - cached.cachedAt.getTime() < this.config.jwksRefreshInterval) {
      return cached;
    }
 
-   // Discover metadata
    const wellKnownUrl = `${issuer}/.well-known/openid-configuration`;
    
    const response = await this.makeHttpRequest(wellKnownUrl, {
@@ -1588,15 +1383,11 @@ export class OAuth2Handler {
    const metadata = await response.json();
    metadata.cachedAt = new Date();
    
-   // Cache metadata
    this.providerMetadata.set(issuer, metadata);
    
    return metadata;
  }
 
- /**
-  * Generate PKCE challenge
-  */
  private generatePKCE(): PKCEChallenge {
    const verifier = randomBytes(32).toString('base64url');
    const challenge = createHash('sha256').update(verifier).digest('base64url');
@@ -1608,30 +1399,18 @@ export class OAuth2Handler {
    };
  }
 
- /**
-  * Generate state parameter
-  */
  private generateState(): string {
    return randomBytes(32).toString('base64url');
  }
 
- /**
-  * Generate JTI (JWT ID)
-  */
  private generateJTI(): string {
    return randomBytes(16).toString('hex');
  }
 
- /**
-  * Generate correlation ID
-  */
  private generateCorrelationId(): string {
    return `oauth2-${Date.now()}-${randomBytes(8).toString('hex')}`;
  }
 
- /**
-  * Generate cache key
-  */
  private generateCacheKey(config: OAuth2Config): string {
    const parts = [
      config.grantType,
@@ -1647,9 +1426,6 @@ export class OAuth2Handler {
    return createHash('sha256').update(parts.join(':')).digest('hex');
  }
 
- /**
-  * Get from token cache
-  */
  private getFromTokenCache(key: string): OAuth2Token | null {
    const cached = this.tokenCache.get(key);
    if (!cached) return null;
@@ -1662,9 +1438,6 @@ export class OAuth2Handler {
    return cached.token;
  }
 
- /**
-  * Add to token cache
-  */
  private addToTokenCache(key: string, token: OAuth2Token): void {
    this.tokenCache.set(key, {
      token,
@@ -1672,24 +1445,17 @@ export class OAuth2Handler {
    });
  }
 
- /**
-  * Check if token is expired
-  */
  private isTokenExpired(token: OAuth2Token): boolean {
    if (!token.expires_at) return false;
    
    const now = new Date();
    const expiresAt = new Date(token.expires_at);
-   const buffer = 5 * 60 * 1000; // 5 minutes buffer
+   const buffer = 5 * 60 * 1000;
    
    return now.getTime() + buffer >= expiresAt.getTime();
  }
 
- /**
-  * Validate configuration
-  */
  public async validateConfig(config: OAuth2Config): Promise<boolean> {
-   // Common validation
    if (!config.clientId) {
      throw new OAuth2Error('Client ID is required', 'invalid_request');
    }
@@ -1698,7 +1464,6 @@ export class OAuth2Handler {
      throw new OAuth2Error('Token URL is required', 'invalid_request');
    }
    
-   // Grant type specific validation
    switch (config.grantType) {
      case OAuth2GrantType.AUTHORIZATION_CODE:
        if (!config.authorizationUrl && !config.authorizationCode) {
@@ -1740,7 +1505,6 @@ export class OAuth2Handler {
        break;
        
      case OAuth2GrantType.DEVICE_CODE:
-       // No additional validation needed
        break;
        
      case OAuth2GrantType.TOKEN_EXCHANGE:
@@ -1753,11 +1517,7 @@ export class OAuth2Handler {
    return true;
  }
 
- /**
-  * Initialize security policies
-  */
  private initializeSecurityPolicies(): void {
-   // PKCE enforcement
    this.securityPolicies.set('pkce-enforcement', {
      id: 'pkce-enforcement',
      name: 'PKCE Enforcement',
@@ -1773,7 +1533,6 @@ export class OAuth2Handler {
      }
    });
 
-   // State parameter enforcement
    this.securityPolicies.set('state-enforcement', {
      id: 'state-enforcement',
      name: 'State Parameter Enforcement',
@@ -1783,7 +1542,6 @@ export class OAuth2Handler {
      }
    });
 
-   // Scope validation
    this.securityPolicies.set('scope-validation', {
      id: 'scope-validation',
      name: 'Scope Validation',
@@ -1807,28 +1565,19 @@ export class OAuth2Handler {
    });
  }
 
- /**
-  * Start cleanup timer
-  */
  private startCleanupTimer(): void {
-   // Clean up expired entries every minute
    setInterval(() => {
      this.cleanupExpiredEntries();
    }, 60000);
    
-   // Reset metrics daily
    setInterval(() => {
      this.resetMetrics();
    }, 24 * 60 * 60 * 1000);
  }
 
- /**
-  * Clean up expired entries
-  */
  private cleanupExpiredEntries(): void {
    const now = Date.now();
    
-   // Clean expired states
    const expiredStates: string[] = [];
    this.stateStore.forEach((state, key) => {
      if (now - state.createdAt.getTime() > this.config.stateTTL) {
@@ -1840,7 +1589,6 @@ export class OAuth2Handler {
      this.pkceStore.delete(key);
    });
    
-   // Clean expired sessions
    const expiredSessions: string[] = [];
    this.sessionStore.forEach((session, key) => {
      if (now - session.createdAt.getTime() > this.config.sessionTTL) {
@@ -1849,7 +1597,6 @@ export class OAuth2Handler {
    });
    expiredSessions.forEach(key => this.sessionStore.delete(key));
    
-   // Clean expired tokens
    const expiredTokens: string[] = [];
    this.tokenCache.forEach((cache, key) => {
      if (this.isTokenExpired(cache.token)) {
@@ -1858,10 +1605,8 @@ export class OAuth2Handler {
    });
    expiredTokens.forEach(key => this.tokenCache.delete(key));
    
-   // Stop expired device code polling
    const expiredPolling: string[] = [];
    this.deviceCodePolling.forEach((timeout, key) => {
-     // Device codes typically expire after 15 minutes
      if (!this.sessionStore.has(key)) {
        clearInterval(timeout);
        expiredPolling.push(key);
@@ -1879,9 +1624,6 @@ export class OAuth2Handler {
    }
  }
 
- /**
-  * Update metrics
-  */
  private updateMetrics(grantType: OAuth2GrantType, success: boolean, duration: number): void {
    if (!this.config.enableMetrics) return;
    
@@ -1893,18 +1635,13 @@ export class OAuth2Handler {
      this.metrics.failedTokenRequests++;
    }
    
-   // Update average time
    const totalTime = this.metrics.averageTokenRequestTime * (this.metrics.totalTokenRequests - 1) + duration;
    this.metrics.averageTokenRequestTime = totalTime / this.metrics.totalTokenRequests;
    
-   // Update grant type usage
    const count = this.metrics.grantTypeUsage.get(grantType) || 0;
    this.metrics.grantTypeUsage.set(grantType, count + 1);
  }
 
- /**
-  * Reset metrics
-  */
  private resetMetrics(): void {
    this.metrics.totalTokenRequests = 0;
    this.metrics.successfulTokenRequests = 0;
@@ -1920,16 +1657,10 @@ export class OAuth2Handler {
    this.metrics.lastReset = new Date();
  }
 
- /**
-  * Get metrics
-  */
  public getMetrics(): OAuth2Metrics {
    return { ...this.metrics };
  }
 
- /**
-  * Clear all caches
-  */
  public clearCaches(): void {
    this.stateStore.clear();
    this.sessionStore.clear();
@@ -1937,31 +1668,24 @@ export class OAuth2Handler {
    this.pkceStore.clear();
    this.providerMetadata.clear();
    
-   // Clear device code polling
    this.deviceCodePolling.forEach(timeout => clearInterval(timeout));
    this.deviceCodePolling.clear();
    
    this.logger.info('All OAuth2 caches cleared');
  }
 
- /**
-  * Test OAuth2 configuration
-  */
  public async testConfiguration(config: OAuth2Config): Promise<{
    success: boolean;
    error?: string | undefined;
    details?: any;
  }> {
    try {
-     // Validate configuration
      await this.validateConfig(config);
      
-     // Test based on grant type
      let result: any;
      
      switch (config.grantType) {
        case OAuth2GrantType.CLIENT_CREDENTIALS:
-         // Try to get a token
          const token = await this.executeClientCredentialsFlow(config, 'test');
          result = {
            tokenReceived: !!token.access_token,
@@ -1972,7 +1696,6 @@ export class OAuth2Handler {
          break;
          
        case OAuth2GrantType.AUTHORIZATION_CODE:
-         // Just validate URLs are accessible
          if (config.authorizationUrl) {
            const authResponse = await this.makeHttpRequest(config.authorizationUrl, {
              method: 'HEAD',
@@ -2025,9 +1748,6 @@ export class OAuth2Handler {
  }
 }
 
-/**
-* OAuth2 Error Class
-*/
 class OAuth2Error extends Error {
  public code: string;
  public description?: string | undefined;

@@ -46,7 +46,6 @@ export class ImprovedProductionHTMLReportGenerator {
         this.screenshotMode = 'on-failure';
         this.executionHistory = [];
         
-        // Load execution history at initialization
         this.loadExecutionHistory();
     }
 
@@ -56,11 +55,9 @@ export class ImprovedProductionHTMLReportGenerator {
             if (fs.existsSync(historyPath)) {
                 const data = fs.readFileSync(historyPath, 'utf8');
                 const history = JSON.parse(data);
-                // Validate and filter valid entries with proper date parsing
                 this.executionHistory = history.filter((entry: any) => {
                     if (!entry.date) return false;
                     
-                    // Try multiple date formats
                     let parsedDate: Date;
                     if (typeof entry.date === 'string') {
                         parsedDate = new Date(entry.date);
@@ -85,7 +82,6 @@ export class ImprovedProductionHTMLReportGenerator {
             this.executionHistory = [];
         }
         
-        // Ensure we have at least some default data for the trend chart
         if (this.executionHistory.length === 0) {
             this.executionHistory = this.generateDefaultHistory();
         }
@@ -95,16 +91,15 @@ export class ImprovedProductionHTMLReportGenerator {
         const history = [];
         const now = new Date();
         
-        // Generate 7 days of sample data
         for (let i = 6; i >= 0; i--) {
             const date = new Date(now);
             date.setDate(date.getDate() - i);
             
             history.push({
                 date: date.toISOString(),
-                passRate: Math.floor(Math.random() * 40) + 60, // 60-100% pass rate
+                passRate: Math.floor(Math.random() * 40) + 60,
                 totalScenarios: Math.floor(Math.random() * 20) + 10,
-                executionTime: Math.floor(Math.random() * 300) + 60 // 1-5 minutes
+                executionTime: Math.floor(Math.random() * 300) + 60
             });
         }
         
@@ -124,7 +119,6 @@ export class ImprovedProductionHTMLReportGenerator {
             
             this.executionHistory.push(historyEntry);
             
-            // Keep only last 30 days
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             this.executionHistory = this.executionHistory.filter(entry => 
@@ -162,7 +156,6 @@ export class ImprovedProductionHTMLReportGenerator {
             this.logger.info('Generating improved production HTML report');
             const startTime = Date.now();
             
-            // Save execution history for trend analysis
             this.saveExecutionHistory(reportData);
             
             const html = await this.buildCompleteReport(reportData);
@@ -181,10 +174,8 @@ export class ImprovedProductionHTMLReportGenerator {
         const metadata = reportData.metadata || {};
         const summary = reportData.summary || {};
         
-        // 🔥 FIX: Use logs from reportData.evidence.consoleLogs first, then fallback to getCompleteLogs
         let logs = reportData.evidence?.consoleLogs || [];
         
-        // If no logs in evidence, try to get from other sources
         if (logs.length === 0) {
             this.logger.info('🔥 LOG DEBUG: No logs found in reportData.evidence.consoleLogs, trying getCompleteLogs()');
             logs = await this.getCompleteLogs();
@@ -192,10 +183,8 @@ export class ImprovedProductionHTMLReportGenerator {
             this.logger.info(`🔥 LOG DEBUG: Found ${logs.length} logs in reportData.evidence.consoleLogs`);
         }
         
-        // Get enhanced environment details
         const environment = this.getEnhancedEnvironment(metadata);
         
-        // Generate all sections
         const header = this.generateHeader(summary);
         const navigation = this.generateNavigation();
         const dashboardTab = await this.generateImprovedDashboardTab(reportData);
@@ -269,7 +258,6 @@ export class ImprovedProductionHTMLReportGenerator {
             line-height: 1.6;
         }
         
-        /* Header Styles */
         .header {
             background: linear-gradient(135deg, var(--primary-color) 0%, #6B1352 100%);
             color: white;
@@ -329,7 +317,6 @@ export class ImprovedProductionHTMLReportGenerator {
             opacity: 0.9;
         }
         
-        /* Navigation */
         .navigation {
             background: white;
             border-bottom: 1px solid #e0e0e0;
@@ -368,7 +355,6 @@ export class ImprovedProductionHTMLReportGenerator {
             border-bottom-color: var(--primary-color);
         }
         
-        /* Main Content */
         .main-content {
             max-width: 1400px;
             margin: 0 auto;
@@ -389,7 +375,6 @@ export class ImprovedProductionHTMLReportGenerator {
             to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Cards */
         .card {
             background: white;
             border-radius: 8px;
@@ -418,7 +403,6 @@ export class ImprovedProductionHTMLReportGenerator {
             padding: 1.5rem;
         }
         
-        /* Grid Layouts */
         .grid {
             display: grid;
             gap: 1.5rem;
@@ -436,13 +420,11 @@ export class ImprovedProductionHTMLReportGenerator {
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         }
         
-        /* Status badges */
         .status-passed { color: var(--success-color); font-weight: 600; }
         .status-failed { color: var(--error-color); font-weight: 600; }
         .status-skipped { color: var(--warning-color); font-weight: 600; }
         .status-pending { color: var(--info-color); font-weight: 600; }
         
-        /* Enhanced Chart Container */
         .chart-wrapper {
             position: relative;
             width: 100%;
@@ -481,7 +463,6 @@ export class ImprovedProductionHTMLReportGenerator {
             border-radius: 2px;
         }
         
-        /* Feature Statistics Table */
         .stats-table {
             width: 100%;
             border-collapse: collapse;
@@ -512,7 +493,6 @@ export class ImprovedProductionHTMLReportGenerator {
             font-variant-numeric: tabular-nums;
         }
         
-        /* Step Details */
         .step-item {
             background: #f8f9fa;
             border-radius: 6px;
@@ -636,7 +616,6 @@ export class ImprovedProductionHTMLReportGenerator {
             margin-top: 0.5rem;
         }
         
-        /* Screenshot Gallery */
         .screenshot-gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -686,7 +665,6 @@ export class ImprovedProductionHTMLReportGenerator {
             font-size: 0.75rem;
         }
         
-        /* Logs Section */
         .log-container {
             background: #1e1e1e;
             color: #d4d4d4;
@@ -755,7 +733,6 @@ export class ImprovedProductionHTMLReportGenerator {
             font-size: 0.8rem;
         }
         
-        /* Environment Details */
         .env-category {
             margin-bottom: 2.5rem;
             background: white;
@@ -810,7 +787,6 @@ export class ImprovedProductionHTMLReportGenerator {
             word-break: break-word;
         }
         
-        /* Enhanced metric cards with different colors */
         .metric-card {
             background: white;
             border-radius: 8px;
@@ -894,7 +870,6 @@ export class ImprovedProductionHTMLReportGenerator {
             font-size: 0.875rem;
         }
         
-        /* Performance metrics */
         .performance-metric {
             background: white;
             border-radius: 8px;
@@ -932,7 +907,6 @@ export class ImprovedProductionHTMLReportGenerator {
             transition: width 0.5s ease;
         }
         
-        /* Responsive */
         @media (max-width: 768px) {
             .header-content {
                 flex-direction: column;
@@ -961,7 +935,6 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         }
         
-        /* Features tab styles */
         .features-list {
             display: grid;
             gap: 1.5rem;
@@ -1060,7 +1033,6 @@ export class ImprovedProductionHTMLReportGenerator {
             margin-bottom: 0;
         }
         
-        /* Collapsible Scenarios */
         .scenario-card {
             overflow: hidden;
         }
@@ -1099,7 +1071,6 @@ export class ImprovedProductionHTMLReportGenerator {
             padding: 0 !important;
         }
         
-        /* Lightbox */
         .lightbox {
             display: none;
             position: fixed;
@@ -1131,7 +1102,6 @@ export class ImprovedProductionHTMLReportGenerator {
             cursor: pointer;
         }
         
-        /* Footer */
         footer {
             background: #2d3748;
             color: white;
@@ -1145,7 +1115,6 @@ export class ImprovedProductionHTMLReportGenerator {
             margin: 0 auto;
         }
         
-        /* Additional utility classes */
         .text-success { color: var(--success-color); }
         .text-danger { color: var(--error-color); }
         .text-warning { color: var(--warning-color); }
@@ -1162,7 +1131,6 @@ export class ImprovedProductionHTMLReportGenerator {
         .mb-3 { margin-bottom: 1.5rem; }
         .mb-4 { margin-bottom: 2rem; }
         
-        /* Info tooltip */
         .info-tooltip {
             position: relative;
             display: inline-block;
@@ -1192,7 +1160,6 @@ export class ImprovedProductionHTMLReportGenerator {
             visibility: visible;
         }
         
-        /* Action Items Styling */
         .actions-list {
             margin-top: 8px;
         }
@@ -1250,7 +1217,6 @@ export class ImprovedProductionHTMLReportGenerator {
             color: #333;
         }
         
-        /* Status Overview Bars - IMPROVED CHART REPLACEMENT */
         .status-overview {
             padding: 1rem 0;
         }
@@ -1298,7 +1264,6 @@ export class ImprovedProductionHTMLReportGenerator {
             color: #666;
         }
         
-        /* Tag Overview Styles - IMPROVED CHART REPLACEMENT */
         .tag-overview {
             padding: 1rem 0;
         }
@@ -1366,7 +1331,6 @@ export class ImprovedProductionHTMLReportGenerator {
             opacity: 0.5;
         }
         
-        /* Enhanced Console-Style Logs Section */
         .enhanced-log-container {
             max-height: 70vh;
             overflow-y: auto;
@@ -1445,7 +1409,6 @@ export class ImprovedProductionHTMLReportGenerator {
             margin-left: 10px;
         }
         
-        /* Console prompt styling */
         .enhanced-log-container::before {
             content: "Terminal Output - Test Execution Logs";
             position: sticky;
@@ -1461,7 +1424,6 @@ export class ImprovedProductionHTMLReportGenerator {
             margin-bottom: 8px;
         }
         
-        /* Log Filter Tabs */
         .log-filter-tabs {
             display: flex;
             flex-wrap: wrap;
@@ -1509,7 +1471,6 @@ export class ImprovedProductionHTMLReportGenerator {
             background: rgba(255, 255, 255, 0.2);
         }
         
-        /* Log Search */
         .log-search-container {
             position: relative;
         }
@@ -1545,7 +1506,6 @@ export class ImprovedProductionHTMLReportGenerator {
             padding: 5px;
         }
         
-        /* Log Statistics */
         .log-stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -1684,7 +1644,6 @@ export class ImprovedProductionHTMLReportGenerator {
             margin-right: 0.25rem;
         }
         
-        /* Enhanced Logs Section Styles */
         .log-filters-enhanced {
             background: #f8f9fa;
             padding: 1rem;
@@ -1944,7 +1903,6 @@ export class ImprovedProductionHTMLReportGenerator {
             font-weight: 500;
         }
         
-        /* Category-specific styles */
         .log-category-errors .log-entry-header {
             border-left: 3px solid #dc3545;
         }
@@ -1969,7 +1927,6 @@ export class ImprovedProductionHTMLReportGenerator {
             border-left: 3px solid #e83e8c;
         }
         
-        /* 🔥 MODERN LOG STYLES - Better format and readability */
         .modern-log-entry {
             display: block;
             margin-bottom: 8px;
@@ -2074,7 +2031,6 @@ export class ImprovedProductionHTMLReportGenerator {
             font-style: italic;
         }
         
-        /* Category-specific styling */
         .log-category-errors .log-entry-header {
             background: #ffeaea;
             border-color: #f1b2b2;
@@ -2195,10 +2151,8 @@ export class ImprovedProductionHTMLReportGenerator {
         const features = reportData.features || [];
         const scenarios = reportData.scenarios || [];
         
-        // Calculate total scenarios for percentage calculations
         const totalScenarios = (summary as any).totalScenarios || scenarios.length || 0;
         
-        // Calculate additional metrics
         const avgDuration = scenarios.length > 0 
             ? scenarios.reduce((sum, s) => sum + (s.duration || 0), 0) / scenarios.length 
             : 0;
@@ -2207,7 +2161,6 @@ export class ImprovedProductionHTMLReportGenerator {
             ? Math.round((scenarios.filter(s => s.status === TestStatus.PASSED).length / scenarios.length) * 100)
             : 0;
         
-        // Generate metric cards with different colors
         const metricCards = `
         <div class="grid grid-4 mb-4">
             <div class="metric-card success">
@@ -2252,7 +2205,6 @@ export class ImprovedProductionHTMLReportGenerator {
             </div>
         </div>`;
         
-        // Generate status chart with doughnut type for better visual appeal
         const statusChartData: PieChartData = {
             type: ChartType.DOUGHNUT,
             title: 'Execution Status',
@@ -2272,16 +2224,14 @@ export class ImprovedProductionHTMLReportGenerator {
                 responsive: true,
                 maintainAspectRatio: false,
                 legend: false,
-                cutout: '60%' // Makes it a doughnut instead of pie
+                cutout: '60%'
             }
         };
         
-        // FIXED: Ensure we have valid data for the chart
         const chartTotalScenarios = statusChartData.values.reduce((sum, val) => sum + val, 0);
         let statusChartHtml = '';
         
         if (chartTotalScenarios > 0) {
-            // Filter out zero values to prevent empty segments
             const filteredData = {
                 ...statusChartData,
                 labels: statusChartData.labels.filter((_, index) => statusChartData.values[index] > 0),
@@ -2295,13 +2245,12 @@ export class ImprovedProductionHTMLReportGenerator {
                 {
                     width: 450,
                     height: 350,
-                    showLegend: false, // Use manual legend below for better control
+                    showLegend: false,
                     animations: true
                 },
                 this.theme
             );
         } else {
-            // Fallback when no data is available
             statusChartHtml = `
                 <div style="display: flex; align-items: center; justify-content: center; height: 350px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
                     <div style="text-align: center; color: #6c757d;">
@@ -2313,7 +2262,6 @@ export class ImprovedProductionHTMLReportGenerator {
             `;
         }
         
-        // Feature performance chart with correct structure
         const featureChartData: any = {
             type: ChartType.BAR,
             title: 'Feature Performance',
@@ -2340,7 +2288,6 @@ export class ImprovedProductionHTMLReportGenerator {
             this.theme
         );
         
-        // Real execution trend from history
         const trendData = this.generateRealTrendData(reportData);
         let trendChart = '';
         try {
@@ -2359,11 +2306,9 @@ export class ImprovedProductionHTMLReportGenerator {
             trendChart = '<div style="text-align: center; padding: 2rem; color: #666;">Historical trend data will be available after multiple test runs</div>';
         }
         
-        // Tag distribution
         const tagData = this.generateTagDistribution(reportData);
         let tagChart = '';
         try {
-            // FIXED: Always generate chart for tag distribution, even with single tag
             if (tagData.labels.length > 0) {
                 tagChart = await this.chartGenerator.generateChart(
                     ChartType.PIE,
@@ -2380,7 +2325,6 @@ export class ImprovedProductionHTMLReportGenerator {
                 tagChart = '<div style="text-align: center; padding: 2rem; color: #666;">No tags found in test scenarios</div>';
             }
         } catch (e) {
-            // Fallback to doughnut chart if pie chart fails
             try {
                 tagChart = await this.chartGenerator.generateChart(
                     ChartType.DOUGHNUT,
@@ -2530,7 +2474,6 @@ export class ImprovedProductionHTMLReportGenerator {
     </div>`;
         }
         
-        // Generate detailed statistics table
         const statsTable = `
         <div class="card mb-4">
             <div class="card-header">
@@ -2560,7 +2503,6 @@ export class ImprovedProductionHTMLReportGenerator {
                             const passRate = Math.round(stats.passRate || 0);
                             const status = feature.status || 'unknown';
                             
-                            // Calculate feature duration from scenarios if not available
                             const featureScenarios = (reportData.scenarios || []).filter(s => 
                                 s.featureId === (feature as any).id || s.feature === feature.name
                             );
@@ -2600,7 +2542,6 @@ export class ImprovedProductionHTMLReportGenerator {
             </div>
         </div>`;
         
-        // Generate detailed feature cards
         const featureCards = features.map(feature => {
             const stats = feature.statistics || {};
             const scenarios = (reportData.scenarios || []).filter(s => s.featureId === (feature as any).id || s.feature === feature.name);
@@ -2831,14 +2772,12 @@ export class ImprovedProductionHTMLReportGenerator {
     }
 
     private async generateImprovedScreenshotsTab(reportData: ReportData): Promise<string> {
-        // Get screenshots from all possible sources
         const screenshots = await this.collectAllScreenshots(reportData);
         
         console.log(`[DEBUG] Screenshots collected: ${screenshots.length}, mode: ${this.screenshotMode}`);
         console.log(`[DEBUG] Screenshots:`, screenshots.map(s => ({ path: s.path, scenarioId: s.scenarioId, status: s.status })));
         
         if (screenshots.length === 0) {
-            // Check if evidence directory exists
             const evidenceExists = await this.checkEvidenceDirectory();
             
             return `
@@ -2863,10 +2802,8 @@ export class ImprovedProductionHTMLReportGenerator {
     </div>`;
         }
         
-        // Filter screenshots based on mode and test results
         let filteredScreenshots = screenshots;
         if (this.screenshotMode === 'on-failure') {
-            // Only show screenshots from failed scenarios
             const failedScenarioIds = new Set(
                 (reportData.scenarios || [])
                     .filter(s => s.status === TestStatus.FAILED || (s as any).status === 'failed')
@@ -2887,7 +2824,6 @@ export class ImprovedProductionHTMLReportGenerator {
             console.log(`[DEBUG] Filtered screenshots:`, filteredScreenshots.map(s => ({ path: s.path, scenarioId: s.scenarioId, status: s.status })));
         }
         
-        // Group screenshots by feature and scenario
         const groupedScreenshots = this.groupScreenshotsByFeatureAndScenario(filteredScreenshots);
         
         const screenshotGroups = Object.entries(groupedScreenshots).map(([featureName, scenarios]) => `
@@ -2896,7 +2832,6 @@ export class ImprovedProductionHTMLReportGenerator {
                     <i class="fas fa-cubes"></i> ${featureName}
                 </div>
                 ${Object.entries(scenarios as any).map(([scenarioName, shots]) => {
-                    // Group screenshots by step
                     const stepGroups: Record<string, any[]> = {};
                     (shots as any[]).forEach(screenshot => {
                         const stepKey = screenshot.label || 'General';
@@ -2916,40 +2851,31 @@ export class ImprovedProductionHTMLReportGenerator {
                                 </h5>
                                 <div class="screenshot-gallery">
                                     ${stepShots.map(screenshot => {
-                                // Convert path to relative path for web display
                                 let imagePath = screenshot.path || '';
                                 console.log(`[DEBUG] Original screenshot path: ${imagePath}`);
                                 
-                                // If the path is just a filename (no directory separators)
                                 if (!imagePath.includes('/') && !imagePath.includes('\\')) {
-                                    // It's just a filename, prepend the relative path
                                     imagePath = `../evidence/screenshots/${imagePath}`;
                                     console.log(`[DEBUG] Converted filename to relative path: ${imagePath}`);
                                 } else if (/^[A-Za-z]:[\\/]/.test(imagePath) || /^\/[A-Za-z]:[\\/]/.test(imagePath)) {
-                                    // This is an absolute Windows path, extract just the filename
                                     const filename = path.basename(imagePath);
                                     imagePath = `../evidence/screenshots/${filename}`;
                                     console.log(`[DEBUG] Converted absolute Windows path to: ${imagePath}`);
                                 } else if (imagePath.includes('/evidence/screenshots/') || imagePath.includes('\\evidence\\screenshots\\')) {
-                                    // Extract just the filename from the evidence path
                                     const filename = path.basename(imagePath);
                                     imagePath = `../evidence/screenshots/${filename}`;
                                 } else if (imagePath.includes('/screenshots/')) {
-                                    // Extract just the filename from the path
                                     const filename = imagePath.split('/screenshots/').pop();
                                     imagePath = `../evidence/screenshots/${filename}`;
                                 } else if (imagePath.includes('\\screenshots\\')) {
-                                    // Windows path - extract just the filename
                                     const filename = imagePath.split('\\screenshots\\').pop()?.replace(/\\/g, '/');
                                     imagePath = `../evidence/screenshots/${filename}`;
                                 } else if (imagePath.includes('/reports/')) {
-                                    // Legacy path handling - extract relative path
                                     const parts = imagePath.split('/reports/');
                                     if (parts.length > 1) {
                                         const afterReports = parts[1];
                                         const reportFolderMatch = afterReports.match(/^(report-[^/]+)\/(.*)/);                                        
                                         if (reportFolderMatch) {
-                                            // Check if it's a screenshot path
                                             if (reportFolderMatch[2].includes('screenshots/')) {
                                                 const filename = reportFolderMatch[2].split('screenshots/').pop();
                                                 imagePath = `../evidence/screenshots/${filename}`;
@@ -2961,13 +2887,11 @@ export class ImprovedProductionHTMLReportGenerator {
                                         }
                                     }
                                 } else if (imagePath.includes('\\reports\\')) {
-                                    // Windows legacy path handling
                                     const parts = imagePath.split('\\reports\\');
                                     if (parts.length > 1) {
                                         const afterReports = parts[1].replace(/\\/g, '/');
                                         const reportFolderMatch = afterReports.match(/^(report-[^/]+)\/(.*)/);                                        
                                         if (reportFolderMatch) {
-                                            // Check if it's a screenshot path
                                             if (reportFolderMatch[2].includes('screenshots/')) {
                                                 const filename = reportFolderMatch[2].split('screenshots/').pop();
                                                 imagePath = `../evidence/screenshots/${filename}`;
@@ -2979,16 +2903,12 @@ export class ImprovedProductionHTMLReportGenerator {
                                         }
                                     }
                                 } else {
-                                    // Fallback: If no pattern matches, assume it's an absolute path
-                                    // and extract just the filename to use with evidence directory
                                     const filename = path.basename(imagePath);
                                     imagePath = `../evidence/screenshots/${filename}`;
                                 }
                                 
-                                // Ensure proper path format for display
                                 const displayPath = imagePath;
                                 
-                                // Create a data attribute for the actual image path
                                 const dataPath = imagePath.replace(/"/g, '&quot;');
                                 
                                 return `
@@ -3026,13 +2946,10 @@ export class ImprovedProductionHTMLReportGenerator {
     }
 
     private async generateImprovedPerformanceTab(reportData: ReportData): Promise<string> {
-        // const metrics = reportData.metrics || {};
         const scenarios = reportData.scenarios || [];
         
-        // Get actual performance data from scenarios and steps
         const performanceData = await this.calculateRealPerformanceMetrics(reportData);
         
-        // Find slowest and fastest scenarios
         const sortedScenarios = [...scenarios].sort((a, b) => (a.duration || 0) - (b.duration || 0));
         const fastestScenarios = sortedScenarios.slice(0, 5);
         const slowestScenarios = sortedScenarios.slice(-5).reverse();
@@ -3155,16 +3072,13 @@ export class ImprovedProductionHTMLReportGenerator {
     }
 
     private generateImprovedLogsTab(logs: any[]): string {
-        // Enhanced log processing with better timestamp handling and formatting
         const processedLogs = logs.map(log => {
             let message = log.message || '';
             
-            // Skip meaningless logs
             if (message === 'No message' || !message.trim()) {
                 return null;
             }
             
-            // 🔥 FIX: Better timestamp processing
             let displayTime = 'N/A';
             let fullTimestamp = 'Unknown time';
             
@@ -3172,14 +3086,10 @@ export class ImprovedProductionHTMLReportGenerator {
                 try {
                     let dateObj: Date;
                     
-                    // Handle different timestamp formats
                     if (typeof log.timestamp === 'string') {
-                        // Try parsing as ISO string first
                         dateObj = new Date(log.timestamp);
                         
-                        // If invalid, try other formats
                         if (isNaN(dateObj.getTime())) {
-                            // Try parsing as number (Unix timestamp)
                             const numTimestamp = parseInt(log.timestamp);
                             if (!isNaN(numTimestamp)) {
                                 dateObj = new Date(numTimestamp);
@@ -3191,7 +3101,6 @@ export class ImprovedProductionHTMLReportGenerator {
                         dateObj = new Date();
                     }
                     
-                    // Validate the date object
                     if (!isNaN(dateObj.getTime())) {
                         displayTime = dateObj.toLocaleTimeString('en-US', { 
                             hour12: false, 
@@ -3210,7 +3119,6 @@ export class ImprovedProductionHTMLReportGenerator {
                             hour12: false
                         });
                     } else {
-                        // Use current time as fallback
                         const now = new Date();
                         displayTime = now.toLocaleTimeString('en-US', { 
                             hour12: false, 
@@ -3221,7 +3129,6 @@ export class ImprovedProductionHTMLReportGenerator {
                         fullTimestamp = now.toLocaleString('en-US');
                     }
                 } catch (error) {
-                    // Use current time as fallback
                     const now = new Date();
                     displayTime = now.toLocaleTimeString('en-US', { 
                         hour12: false, 
@@ -3232,7 +3139,6 @@ export class ImprovedProductionHTMLReportGenerator {
                     fullTimestamp = now.toLocaleString('en-US');
                 }
             } else {
-                // No timestamp provided, use current time
                 const now = new Date();
                 displayTime = now.toLocaleTimeString('en-US', { 
                     hour12: false, 
@@ -3243,18 +3149,15 @@ export class ImprovedProductionHTMLReportGenerator {
                 fullTimestamp = now.toLocaleString('en-US');
             }
             
-            // Categorize and beautify logs
             let category = log.category || (log.type === 'console' ? 'console' : 'general');
             let icon = '📝';
             let beautifiedMessage = message;
-            let priority = 3; // 1=high, 2=medium, 3=low
+            let priority = 3;
             let logLevel = (log.level || 'info').toLowerCase();
             
-            // If it's already categorized as console, keep it
             if (category === 'console') {
                 icon = '💻';
                 priority = 2;
-                // Adjust category based on console log level
                 if (logLevel === 'error') {
                     category = 'errors';
                     icon = '❌';
@@ -3269,7 +3172,6 @@ export class ImprovedProductionHTMLReportGenerator {
                     priority = 3;
                 }
             }
-            // Enhanced categorization and beautification
             else if (message.includes('Screenshot') || message.includes('screenshot')) {
                 category = 'screenshots';
                 icon = '📸';
@@ -3331,7 +3233,6 @@ export class ImprovedProductionHTMLReportGenerator {
                 category = 'console';
                 icon = '💻';
                 priority = 2;
-                // Don't over-beautify console messages, keep them as-is mostly
                 beautifiedMessage = message.replace(/\[Console\]/gi, '💻 [Console]');
             }
             else if (message.includes('Test') || message.includes('test') || message.includes('Step') || message.includes('step')) {
@@ -3354,14 +3255,12 @@ export class ImprovedProductionHTMLReportGenerator {
             };
         }).filter(log => log !== null);
         
-        // Group logs by category
         const categorizedLogs = processedLogs.reduce((acc, log) => {
             if (!acc[log.category]) acc[log.category] = [];
             acc[log.category].push(log);
             return acc;
         }, {} as Record<string, any[]>);
         
-        // Generate category tabs with better counts
         const categories = [
             { key: 'all', label: 'All Logs', icon: '📋', count: processedLogs.length },
             { key: 'errors', label: 'Errors', icon: '❌', count: categorizedLogs.errors?.length || 0 },
@@ -3471,7 +3370,6 @@ export class ImprovedProductionHTMLReportGenerator {
     }
 
     private generateImprovedEnvironmentTab(environment: any): string {
-        // Categorize environment details
         const categories = {
             'System Information': {
                 'Operating System': environment['Operating System'],
@@ -3543,22 +3441,17 @@ export class ImprovedProductionHTMLReportGenerator {
     private generateImprovedJavaScript(): string {
         return `
     <script>
-        // Tab navigation
         function showTab(tabName, clickedTab) {
-            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
             
-            // Remove active class from all nav tabs
             document.querySelectorAll('.nav-tab').forEach(navTab => {
                 navTab.classList.remove('active');
             });
             
-            // Show selected tab
             document.getElementById(tabName).classList.add('active');
             
-            // Add active class to clicked nav tab
             if (clickedTab) {
                 const navTab = clickedTab.closest('.nav-tab');
                 if (navTab) {
@@ -3572,7 +3465,6 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         }
         
-        // Collapsible scenarios
         function toggleScenario(scenarioId) {
             const content = document.getElementById(scenarioId);
             const header = content.previousElementSibling;
@@ -3586,19 +3478,14 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         }
         
-        // Lightbox functionality
         function openLightbox(element) {
             const lightbox = document.getElementById('lightbox');
             const img = document.getElementById('lightbox-img');
             
-            // Get the image path from data attribute
             const imagePath = element.getAttribute('data-image-path');
             
-            // Just use the relative path directly - modern browsers handle this correctly
-            // Don't try to resolve to absolute path as it causes issues with file:// URLs
             img.src = imagePath;
             img.onerror = function() {
-                // If image fails to load, show placeholder
                 this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"%3E%3Crect width="400" height="300" fill="%23f0f0f0"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="20"%3EImage not found%3C/text%3E%3C/svg%3E';
             };
             lightbox.classList.add('active');
@@ -3608,7 +3495,6 @@ export class ImprovedProductionHTMLReportGenerator {
             document.getElementById('lightbox').classList.remove('active');
         }
         
-        // Log filtering by level
         function filterLogs(level, clickedButton) {
             const logEntries = document.querySelectorAll('.modern-log-entry');
             logEntries.forEach(entry => {
@@ -3619,7 +3505,6 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             });
             
-            // Update button states
             document.querySelectorAll('.log-filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
@@ -3628,7 +3513,6 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         }
         
-        // Log filtering by category
         function filterLogsByCategory(category, clickedButton) {
             const logEntries = document.querySelectorAll('.modern-log-entry');
             let visibleCount = 0;
@@ -3642,16 +3526,13 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             });
             
-            // Update tab states
             document.querySelectorAll('.log-filter-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
             
-            // If we have a clicked button reference, use it directly
             if (clickedButton) {
                 clickedButton.classList.add('active');
             } else {
-                // Otherwise, find and activate the correct tab
                 document.querySelectorAll('.log-filter-tab').forEach(tab => {
                     const tabText = tab.textContent.toLowerCase();
                     if ((category === 'all' && tabText.includes('all logs')) ||
@@ -3672,14 +3553,12 @@ export class ImprovedProductionHTMLReportGenerator {
                 });
             }
             
-            // Clear search when filtering
             const searchInput = document.getElementById('logSearchInput');
             if (searchInput) {
                 searchInput.value = '';
             }
         }
         
-        // Log search functionality
         function searchLogs() {
             const searchTerm = document.getElementById('logSearchInput').value.toLowerCase();
             const logEntries = document.querySelectorAll('.modern-log-entry');
@@ -3702,29 +3581,24 @@ export class ImprovedProductionHTMLReportGenerator {
             });
         }
         
-        // Clear log search
         function clearLogSearch() {
             document.getElementById('logSearchInput').value = '';
-            searchLogs(); // Re-run search to show all logs
+            searchLogs();
         }
         
-        // Make functions globally accessible
         window.filterLogsByCategory = filterLogsByCategory;
         window.searchLogs = searchLogs;
         window.clearLogSearch = clearLogSearch;
         window.filterLogs = filterLogs;
         window.showTab = showTab;
         
-        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Add keyboard navigation
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape' && document.getElementById('lightbox').classList.contains('active')) {
                     closeLightbox();
                 }
             });
             
-            // Make tables sortable
             document.querySelectorAll('.stats-table').forEach(table => {
                 const headers = table.querySelectorAll('th');
                 headers.forEach((header, index) => {
@@ -3733,13 +3607,11 @@ export class ImprovedProductionHTMLReportGenerator {
                 });
             });
             
-            // Initialize log filters to show all logs
             const allLogsTab = document.querySelector('.log-filter-tab.active');
             if (allLogsTab) {
                 filterLogsByCategory('all', allLogsTab);
             }
             
-            // Make sure log container has proper height
             const logContainer = document.getElementById('enhanced-log-container');
             if (logContainer && logContainer.children.length > 0) {
                 logContainer.style.minHeight = '200px';
@@ -3747,7 +3619,6 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         });
         
-        // Table sorting
         function sortTable(table, columnIndex) {
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -3767,17 +3638,14 @@ export class ImprovedProductionHTMLReportGenerator {
                 return aValue.localeCompare(bValue);
             });
             
-            // Re-append sorted rows
             rows.forEach(row => tbody.appendChild(row));
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize charts
             initializeCharts();
         });
 
         function initializeCharts() {
-            // Status Chart
             const statusChartEl = document.getElementById('execution-pie-chart');
             if (statusChartEl) {
                 const statusChart = new ChartGenerator();
@@ -3802,7 +3670,6 @@ export class ImprovedProductionHTMLReportGenerator {
                 );
             }
 
-            // Tag Distribution Chart
             const tagChartEl = document.getElementById('tag-distribution-chart');
             if (tagChartEl) {
                 const tagChart = new ChartGenerator();
@@ -3833,10 +3700,7 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         }
 
-        // Enhanced Log Functions
-        // (filterLogsByCategory is already defined above with proper event handling)
         
-        // Additional helper for old-style log entries if needed
         function filterEnhancedLogEntries(category) {
             const logEntries = document.querySelectorAll('.enhanced-log-entry');
             logEntries.forEach(entry => {
@@ -3848,22 +3712,18 @@ export class ImprovedProductionHTMLReportGenerator {
             });
         }
         
-        // (clearLogSearch is already defined above)
     </script>`;
     }
 
-    // Helper methods
     private async getCompleteLogs(): Promise<any[]> {
         const actionLogger = ActionLogger.getInstance();
         const logs: any[] = [];
         const processedTimestamps = new Set<string>();
         
         try {
-            // FIRST: Get ALL terminal console logs from ConsoleCapture
             const { consoleCapture } = await import('../../core/logging/ConsoleCapture');
             const consoleMessages = consoleCapture.getMessages();
             
-            // Add all console messages to logs
             consoleMessages.forEach(consoleMsg => {
                 const logEntry = {
                     timestamp: consoleMsg.timestamp,
@@ -3880,17 +3740,13 @@ export class ImprovedProductionHTMLReportGenerator {
                 logs.push(logEntry);
             });
             
-            // THEN: Get ALL logs from ActionLogger
             const allLogs = actionLogger.getAllLogs();
             
-            // Process action logger logs
             allLogs.forEach(log => {
-                // Skip logs without valid timestamps
                 if (!log.timestamp || (typeof log.timestamp === 'string' && isNaN(Date.parse(log.timestamp)))) {
                     return;
                 }
                 
-                // Skip logs with generic messages that are likely type names
                 const messageStr = log.message?.toString().toLowerCase();
                 if (messageStr && ['general', 'action', 'error', 'debug', 'info', 'warn'].includes(messageStr)) {
                     return;
@@ -3915,15 +3771,12 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             });
             
-            // Also get any buffered logs
-            const recentLogs = actionLogger.getRecentLogs(100000); // Get up to 100k logs
+            const recentLogs = actionLogger.getRecentLogs(100000);
             recentLogs.forEach(log => {
-                // Skip logs without valid timestamps
                 if (!log.timestamp || (typeof log.timestamp === 'string' && isNaN(Date.parse(log.timestamp)))) {
                     return;
                 }
                 
-                // Skip logs with generic messages that are likely type names
                 const messageStr = log.message?.toString().toLowerCase();
                 if (messageStr && ['general', 'action', 'error', 'debug', 'info', 'warn'].includes(messageStr)) {
                     return;
@@ -3948,12 +3801,9 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             });
             
-            // Also try to read execution logs from files to merge with in-memory logs
             try {
-                // Read logs from log files
                 const fileLogs = await this.readLogFiles();
                 
-                // Process file logs
                 fileLogs.forEach(log => {
                     let timestamp: string;
                     if (log.timestamp && (typeof log.timestamp === 'string' && !isNaN(Date.parse(log.timestamp)))) {
@@ -3965,11 +3815,9 @@ export class ImprovedProductionHTMLReportGenerator {
                             second: '2-digit'
                         }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
                     } else {
-                        // Skip logs without valid timestamps
                         return;
                     }
                     
-                    // Skip logs with generic messages that are likely type names
                     const messageStr = log.message?.toString().toLowerCase();
                     if (messageStr && ['general', 'action', 'error', 'debug', 'info', 'warn'].includes(messageStr)) {
                         return;
@@ -3979,7 +3827,6 @@ export class ImprovedProductionHTMLReportGenerator {
                     if (!processedTimestamps.has(key)) {
                         processedTimestamps.add(key);
                         
-                        // Skip logs that are just context without message
                         if (!log.message && log.context) {
                             return;
                         }
@@ -3996,13 +3843,11 @@ export class ImprovedProductionHTMLReportGenerator {
                 this.logger.debug('Could not read log files', error as Error);
             }
             
-            // Also read console logs
             try {
                 const consoleLogs = await this.readConsoleLogs();
                 consoleLogs.forEach(log => {
                     let timestamp: string;
                     
-                    // Check if timestamp is a valid ISO string
                     if (log.timestamp && (typeof log.timestamp === 'string' && !isNaN(Date.parse(log.timestamp)))) {
                         const date = new Date(log.timestamp);
                         timestamp = date.toLocaleTimeString('en-US', { 
@@ -4012,7 +3857,6 @@ export class ImprovedProductionHTMLReportGenerator {
                             second: '2-digit'
                         }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
                     } else {
-                        // Use timestamp as is if it's already formatted
                         timestamp = log.timestamp || new Date().toLocaleTimeString();
                     }
                     
@@ -4033,7 +3877,6 @@ export class ImprovedProductionHTMLReportGenerator {
             
         } catch (error) {
             this.logger.debug('Error getting logs', error as Error);
-            // Fallback message if no logs found
             if (logs.length === 0) {
                 logs.push({
                     timestamp: new Date().toLocaleTimeString(),
@@ -4044,7 +3887,6 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         }
         
-        // Sort logs by timestamp
         logs.sort((a, b) => {
             return a.timestamp.localeCompare(b.timestamp);
         });
@@ -4098,18 +3940,15 @@ export class ImprovedProductionHTMLReportGenerator {
 
     private async collectAllScreenshots(reportData: ReportData): Promise<any[]> {
         const screenshots: any[] = [];
-        const addedPaths = new Set<string>(); // Track added screenshots to avoid duplicates
+        const addedPaths = new Set<string>();
         
         try {
-            // 1. Get screenshots from scenarios and steps
             const scenarios = reportData.scenarios || [];
             console.log(`[DEBUG] Collecting screenshots from ${scenarios.length} scenarios, mode: ${this.screenshotMode}`);
         for (const scenario of scenarios) {
-            // Check if we should include screenshots based on mode
             if (this.screenshotMode === 'never') continue;
             if (this.screenshotMode === 'on-failure' && scenario.status !== TestStatus.FAILED) continue;
             
-            // Get screenshots from steps
             const steps = scenario.steps || [];
             for (const step of steps) {
                 if ((step as any).attachments) {
@@ -4119,7 +3958,6 @@ export class ImprovedProductionHTMLReportGenerator {
                             if (!addedPaths.has(screenshotPath)) {
                                 addedPaths.add(screenshotPath);
                                 
-                                // Use metadata if available, otherwise fallback to default values
                                 const metadata = attachment.metadata || {};
                                 screenshots.push({
                                     path: screenshotPath,
@@ -4136,7 +3974,6 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
             
-            // Get screenshots from scenario evidence
             if (scenario.evidence?.screenshots) {
                 for (const screenshot of scenario.evidence.screenshots) {
                     const screenshotPath = (screenshot as any).path || screenshot;
@@ -4156,26 +3993,19 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         }
         
-        // If we have screenshots from scenarios/steps but need to verify they exist in evidence directory
         if (screenshots.length > 0 && this.screenshotMode !== 'never') {
-            // Get the current report folder name
             const reportFolderName = this.getReportFolderName();
             
-            // Check if we're running inside the report directory
             const cwd = process.cwd();
             const evidencePath = cwd.includes(reportFolderName) 
                 ? path.join(cwd, 'evidence', 'screenshots')
                 : path.join(cwd, 'reports', reportFolderName, 'evidence', 'screenshots');
             
-            // Update screenshot paths to point to evidence directory
             for (const screenshot of screenshots) {
                 const filename = path.basename(screenshot.path);
                 const evidenceFilePath = path.join(evidencePath, filename);
                 
-                // Check if file exists in evidence directory
                 if (await FileUtils.pathExists(evidenceFilePath)) {
-                    // Store just the filename, not the full path
-                    // The path will be converted to relative path when generating HTML
                     screenshot.path = filename;
                     this.logger.debug(`Found screenshot in evidence: ${filename}`);
                 }
@@ -4184,7 +4014,6 @@ export class ImprovedProductionHTMLReportGenerator {
             this.logger.debug(`Collected ${screenshots.length} screenshots with metadata from scenarios/steps`);
         }
         
-        // ALWAYS check evidence directory for additional screenshots, regardless of what was found in scenarios
         this.logger.debug('Checking evidence directory for additional screenshots');
         
         const reportFolderName = this.getReportFolderName();
@@ -4196,7 +4025,6 @@ export class ImprovedProductionHTMLReportGenerator {
         if (await FileUtils.pathExists(evidencePath)) {
             this.logger.debug(`Collecting screenshots from evidence directory: ${evidencePath}`);
             
-            // Create failed scenario IDs set for duplicate prevention
             const failedScenarioIds = new Set(
                 scenarios.filter(s => s.status === TestStatus.FAILED || (s as any).status === 'failed')
                     .map(s => s.scenarioId)
@@ -4205,7 +4033,6 @@ export class ImprovedProductionHTMLReportGenerator {
             await this.collectScreenshotsFromDirectory(evidencePath, screenshots, scenarios, addedPaths, failedScenarioIds);
         }
         
-        // Log final count
         console.log(`[DEBUG] Screenshots collected: ${screenshots.length}, mode: ${this.screenshotMode}`);
         } catch (error) {
             this.logger.debug('Error collecting screenshots from evidence directory', error as Error);
@@ -4223,18 +4050,14 @@ export class ImprovedProductionHTMLReportGenerator {
                 if (file.match(/\.(png|jpg|jpeg|gif)$/i)) {
                     const filePath = path.join(dir, file);
                     
-                    // Skip if already added
                     if (pathSet.has(filePath)) continue;
                     
-                    // Only add screenshots from failed scenarios in on-failure mode
                     if (this.screenshotMode === 'on-failure') {
-                        // First check if this is a failure screenshot
                         const isFailureScreenshot = file.toLowerCase().includes('fail') || 
                                                   file.toLowerCase().includes('error') ||
                                                   file.toLowerCase().includes('failed');
                         
                         if (isFailureScreenshot) {
-                            // Try to match screenshot to a failed scenario
                             let matched = false;
                             for (const scenario of scenarios) {
                                 if (scenario.status === TestStatus.FAILED &&
@@ -4242,7 +4065,7 @@ export class ImprovedProductionHTMLReportGenerator {
                                      file.toLowerCase().includes(scenario.scenario?.toLowerCase().replace(/\s+/g, '-')))) {
                                     pathSet.add(filePath);
                                     screenshots.push({
-                                        path: file,  // Store just the filename, not the full path
+                                        path: file,
                                         label: file,
                                         scenarioId: scenario.scenarioId,
                                         scenarioName: scenario.scenario,
@@ -4255,10 +4078,7 @@ export class ImprovedProductionHTMLReportGenerator {
                                 }
                             }
                             
-                            // If it's a failure screenshot but couldn't match to specific scenario,
-                            // add it as general failure evidence
                             if (!matched) {
-                                // DUPLICATE FIX: Only add general failure evidence if we don't already have scenario screenshots
                                 const hasScenarioScreenshots = failedScenarioIds && failedScenarioIds.size > 0 && 
                                     screenshots.some(s => 
                                         s.scenarioId !== 'failure-evidence' && 
@@ -4266,13 +4086,10 @@ export class ImprovedProductionHTMLReportGenerator {
                                     );
                                 
                                 if (!hasScenarioScreenshots) {
-                                    // Try to extract more context from the filename
                                     let label = file;
                                     let scenarioName = 'Failed Tests';
                                     let featureName = 'Test Failures';
                                     
-                                    // Try to parse failure screenshots with scenario names
-                                    // Pattern: failure-<scenario_name>_<timestamp>-<date>.png
                                     const failureMatch = file.match(/failure-(.+?)_\d+-.+\.png$/);
                                     if (failureMatch) {
                                         scenarioName = failureMatch[1]?.replace(/_/g, ' ') || 'Unknown Scenario';
@@ -4281,7 +4098,7 @@ export class ImprovedProductionHTMLReportGenerator {
                                     
                                     pathSet.add(filePath);
                                     screenshots.push({
-                                        path: file,  // Store just the filename, not the full path
+                                        path: file,
                                         label: label,
                                         scenarioId: 'failure-evidence',
                                         scenarioName: scenarioName,
@@ -4293,14 +4110,13 @@ export class ImprovedProductionHTMLReportGenerator {
                             }
                         }
                     } else if (this.screenshotMode === 'always') {
-                        // In always mode, add all screenshots
                         let matched = false;
                         for (const scenario of scenarios) {
                             if (file.toLowerCase().includes(scenario.scenarioId?.toLowerCase()) ||
                                 file.toLowerCase().includes(scenario.scenario?.toLowerCase().replace(/\s+/g, '-'))) {
                                 pathSet.add(filePath);
                                 screenshots.push({
-                                    path: file,  // Store just the filename, not the full path
+                                    path: file,
                                     label: file,
                                     scenarioId: scenario.scenarioId,
                                     scenarioName: scenario.scenario,
@@ -4313,11 +4129,10 @@ export class ImprovedProductionHTMLReportGenerator {
                             }
                         }
                         
-                        // If not matched to a scenario, add as general evidence
                         if (!matched) {
                             pathSet.add(filePath);
                             screenshots.push({
-                                path: file,  // Store just the filename, not the full path
+                                path: file,
                                 label: file,
                                 scenarioId: 'evidence',
                                 scenarioName: 'Evidence',
@@ -4330,7 +4145,6 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
             
-            // Recursively check subdirectories
             for (const file of files) {
                 const subPath = path.join(dir, file);
                 const stat = await FileUtils.getStats(subPath);
@@ -4359,35 +4173,11 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
         } catch {
-            // Ignore errors
         }
         
         return false;
     }
 
-    /* Commented out as it's only used in commented code
-    private parseContext(contextStr: string): any {
-        try {
-            // Try to parse as JSON first
-            if (contextStr.startsWith('{') || contextStr.startsWith('[')) {
-                return JSON.parse(contextStr);
-            }
-            
-            // Otherwise parse key-value pairs
-            const context: any = {};
-            const pairs = contextStr.split(',');
-            for (const pair of pairs) {
-                const [key, value] = pair.split(':').map(s => s.trim());
-                if (key && value) {
-                    context[key] = value;
-                }
-            }
-            return context;
-        } catch {
-            return { raw: contextStr };
-        }
-    }
-    */
 
     private groupScreenshotsByFeatureAndScenario(screenshots: any[]): Record<string, Record<string, any[]>> {
         const grouped: Record<string, Record<string, any[]>> = {};
@@ -4404,9 +4194,7 @@ export class ImprovedProductionHTMLReportGenerator {
                 grouped[featureName][scenarioName] = [];
             }
             
-            // Group by step if available
             if (screenshot.label && screenshot.label.includes(' ')) {
-                // Extract step info from label
                 const existingStep = grouped[featureName][scenarioName].find(
                     s => s.label === screenshot.label
                 );
@@ -4418,11 +4206,9 @@ export class ImprovedProductionHTMLReportGenerator {
             }
         });
         
-        // Sort screenshots within each scenario by label/step
         Object.values(grouped).forEach(scenarios => {
             Object.values(scenarios).forEach(screenshots => {
                 screenshots.sort((a, b) => {
-                    // Sort by step order if available
                     const aStep = a.label?.match(/^(Given|When|Then|And|But)/);
                     const bStep = b.label?.match(/^(Given|When|Then|And|But)/);
                     if (aStep && bStep) {
@@ -4440,9 +4226,7 @@ export class ImprovedProductionHTMLReportGenerator {
     private async readLogFiles(): Promise<any[]> {
         const logs: any[] = [];
         try {
-            // Skip console-logs.json as it's handled by readConsoleLogs
             const possibleLogPaths = [
-                // Only check for execution-logs.json
                 path.join(process.cwd(), 'evidence', 'execution-logs.json'),
                 path.join(process.cwd(), '..', 'evidence', 'execution-logs.json'),
                 path.join(process.cwd(), 'reports', this.getReportFolderName(), 'evidence', 'execution-logs.json')
@@ -4461,9 +4245,7 @@ export class ImprovedProductionHTMLReportGenerator {
                     const content = await FileUtils.readFile(evidenceLogPath, 'utf8');
                     const logsData = JSON.parse(content as string);
                     
-                    // Handle console-logs.json format
                     if (evidenceLogPath.includes('console-logs.json')) {
-                        // console-logs.json is an array of log entries
                         if (Array.isArray(logsData)) {
                             logsData.forEach((log: any) => {
                                 const timestamp = log.timestamp ? 
@@ -4485,7 +4267,6 @@ export class ImprovedProductionHTMLReportGenerator {
                             this.logger.debug(`Loaded ${logsData.length} console logs from ${evidenceLogPath}`);
                         }
                     } else if (Array.isArray(logsData)) {
-                        // Handle execution-logs.json format
                         logsData.forEach(log => {
                             logs.push({
                                 timestamp: new Date(log.timestamp).toLocaleTimeString('en-US', {
@@ -4505,79 +4286,10 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
             
-            // Skip reading txt files from evidence folder as they contain formatted output
-            // The console-logs.json is our primary source
             
-            /* Commented out to avoid duplicate/malformed logs
-            const consoleLogTxtPaths = [
-                path.join(process.cwd(), 'evidence', 'console-logs.txt'),
-                path.join(process.cwd(), '..', 'evidence', 'console-logs.txt')
-            ];
             
-            for (const txtPath of consoleLogTxtPaths) {
-                if (await FileUtils.pathExists(txtPath)) {
-                    try {
-                        const content = await FileUtils.readFile(txtPath, 'utf8');
-                        const lines = (content as string).split('\n');
-                        lines.forEach((line: string) => {
-                            if (line.trim()) {
-                                // Parse console log format: [HH:MM:SS.mmm] [LEVEL] Message | Context
-                                const match = line.match(/^\[(\d{2}:\d{2}:\d{2}\.\d{3})\]\s*\[(\w+)\]\s*([^|]+)(?:\|\s*(.+))?$/);
-                                if (match) {
-                                    logs.push({
-                                        timestamp: match[1],
-                                        level: match[2]?.toLowerCase() || 'info',
-                                        message: match[3]?.trim() || '',
-                                        context: match[4] ? this.parseContext(match[4]) : undefined
-                                    });
-                                } else {
-                                    // Skip header lines and non-log content
-                                    const skipPatterns = [
-                                        /^CS Test Automation Framework/,
-                                        /^={5,}/,
-                                        /^Session ID:/,
-                                        /^Time Range:/,
-                                        /^Total Entries:/,
-                                        /^Log Level Summary:/,
-                                        /^Log Type Summary:/,
-                                        /^\s*\w+:\s*\d+\s*$/,  // Summary counts like "INFO: 0"
-                                        /^Errors \(\d+\):/,
-                                        /^$/  // Empty lines
-                                    ];
-                                    
-                                    // Check if line should be skipped
-                                    const shouldSkip = skipPatterns.some(pattern => pattern.test(line));
-                                    if (shouldSkip) {
-                                        return; // Skip this line
-                                    }
-                                    
-                                    // Only add as fallback if it looks like a log message
-                                    if (line.length > 0) {
-                                        logs.push({
-                                            timestamp: new Date().toLocaleTimeString('en-US', {
-                                                hour12: false,
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                                second: '2-digit'
-                                            }) + '.000',
-                                            level: 'info',
-                                            message: line
-                                        });
-                                    }
-                                }
-                            }
-                        });
-                        this.logger.debug(`Loaded ${lines.length} console log entries from ${txtPath}`);
-                    } catch (error) {
-                        this.logger.debug('Failed to read console-logs.txt', error as Error);
-                    }
-                }
-            }
-            */
-            
-            // Check multiple possible log locations
             const logPaths = [
-                path.join(process.cwd(), '..', '..', '..', 'logs'),  // Go up to project root
+                path.join(process.cwd(), '..', '..', '..', 'logs'),
                 path.join(process.cwd(), 'logs'),
                 path.join(process.cwd(), 'reports', 'evidence'),
                 path.join(process.cwd(), 'reports', this.getReportFolderName(), 'evidence')
@@ -4594,7 +4306,6 @@ export class ImprovedProductionHTMLReportGenerator {
                                 lines.forEach((line: string) => {
                                     if (line.trim()) {
                                         try {
-                                            // Try to parse as JSON first
                                             const logEntry = JSON.parse(line);
                                             logs.push({
                                                 timestamp: new Date(logEntry.timestamp).toLocaleTimeString('en-US', {
@@ -4608,7 +4319,6 @@ export class ImprovedProductionHTMLReportGenerator {
                                                 context: logEntry.context
                                             });
                                         } catch {
-                                            // Fall back to text parsing
                                             const match = line.match(/^\[(\d{2}:\d{2}:\d{2}\.\d{3})\]\s*\[(\w+)\]\s*(.+)/);
                                             if (match) {
                                                 logs.push({
@@ -4630,25 +4340,6 @@ export class ImprovedProductionHTMLReportGenerator {
                                 this.logger.debug(`Failed to read log file ${file}`, error as Error);
                             }
                         } 
-                        /* Skip .txt files as they contain formatted output with headers
-                        else if (file.endsWith('.txt')) {
-                            try {
-                                const content = await FileUtils.readFile(path.join(logPath, file), 'utf8');
-                                const lines = (content as string).split('\n');
-                                lines.forEach((line: string) => {
-                                    if (line.trim() && !line.includes('====') && !line.includes('Summary:')) {
-                                        logs.push({
-                                            timestamp: new Date().toLocaleTimeString(),
-                                            level: 'info',
-                                            message: line.trim()
-                                        });
-                                    }
-                                });
-                            } catch (error) {
-                                this.logger.debug(`Failed to read text file ${file}`, error as Error);
-                            }
-                        }
-                        */
                     }
                 }
             }
@@ -4661,19 +4352,14 @@ export class ImprovedProductionHTMLReportGenerator {
     private async readConsoleLogs(): Promise<any[]> {
         const logs: any[] = [];
         try {
-            // Check for console-logs.json in evidence directory
             const reportFolderName = this.getReportFolderName();
             const possiblePaths = [
-                // Check current report's evidence directory
                 path.join(process.cwd(), 'evidence', 'console-logs.json'),
                 path.join(process.cwd(), '..', 'evidence', 'console-logs.json'),
-                // Check reports directory
                 path.join(process.cwd(), 'reports', reportFolderName, 'evidence', 'console-logs.json'),
                 path.join(process.cwd(), '..', 'reports', reportFolderName, 'evidence', 'console-logs.json'),
-                // Check console-logs directory
                 path.join(process.cwd(), 'console-logs', 'console-logs.json'),
                 path.join(process.cwd(), '..', 'console-logs', 'console-logs.json'),
-                // Check logs directory
                 path.join(process.cwd(), 'logs', 'console-logs.json'),
                 path.join(process.cwd(), '..', 'logs', 'console-logs.json')
             ];
@@ -4691,13 +4377,11 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
 
-            // Also try to get logs from ActionLogger
             try {
                 const actionLogger = ActionLogger.getInstance();
                 const consoleMessages = actionLogger.getConsoleMessages();
                 const logEntries = actionLogger.getAllBufferedLogs();
                 
-                // Convert console messages to log format
                 consoleMessages.forEach(msg => {
                     logs.push({
                         timestamp: msg.timestamp.toISOString(),
@@ -4708,7 +4392,6 @@ export class ImprovedProductionHTMLReportGenerator {
                     });
                 });
                 
-                // Convert log entries to console format
                 logEntries.forEach(entry => {
                     logs.push({
                         timestamp: entry.timestamp.toISOString(),
@@ -4727,7 +4410,6 @@ export class ImprovedProductionHTMLReportGenerator {
             this.logger.debug('Error reading console logs', error);
         }
 
-        // Sort logs by timestamp
         logs.sort((a, b) => {
             const timeA = new Date(a.timestamp || 0).getTime();
             const timeB = new Date(b.timestamp || 0).getTime();
@@ -4756,13 +4438,11 @@ export class ImprovedProductionHTMLReportGenerator {
     }
 
     private beautifyLogMessage(message: string, entry: any): string {
-        // Clean up common log patterns
         let beautified = message
-            .replace(/^\[.*?\]\s*/, '') // Remove timestamp prefixes
-            .replace(/\s+/g, ' ') // Normalize whitespace
+            .replace(/^\[.*?\]\s*/, '')
+            .replace(/\s+/g, ' ')
             .trim();
 
-        // Add context if available
         if (entry.context && typeof entry.context === 'object') {
             const contextStr = Object.entries(entry.context)
                 .map(([key, value]) => `${key}=${value}`)
@@ -4777,7 +4457,6 @@ export class ImprovedProductionHTMLReportGenerator {
 
     private processLogsForDisplay(logs: any[]): any[] {
         return logs.map(log => {
-            // Parse timestamp properly
             let timestamp = 'Unknown';
             let parsedTime: Date | null = null;
             
@@ -4842,13 +4521,9 @@ export class ImprovedProductionHTMLReportGenerator {
     
     private extractTimestamp(line: string): string | null {
         const timePatterns = [
-            // ISO format
             /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/,
-            // Date + time format
             /\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}/,
-            // Time only
             /\d{2}:\d{2}:\d{2}/,
-            // Bracketed date time
             /\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]/
         ];
         
@@ -4857,25 +4532,20 @@ export class ImprovedProductionHTMLReportGenerator {
             if (match) {
                 let timestamp = match[0].replace(/[\[\]]/g, '');
                 
-                // Convert to proper format
                 try {
-                    // If it's just time, add today's date
                     if (timestamp.match(/^\d{2}:\d{2}:\d{2}$/)) {
                         const today = new Date().toISOString().split('T')[0];
                         timestamp = `${today}T${timestamp}.000Z`;
                     }
-                    // If it's date + time without timezone
                     else if (timestamp.match(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}$/)) {
                         timestamp = timestamp.replace(' ', 'T') + 'Z';
                     }
                     
-                    // Validate
                     const date = new Date(timestamp);
                     if (!isNaN(date.getTime())) {
                         return timestamp;
                     }
                 } catch {
-                    // Continue to next pattern
                 }
             }
         }
@@ -4906,15 +4576,12 @@ export class ImprovedProductionHTMLReportGenerator {
     private extractContext(line: string): any {
         const context: any = {};
         
-        // Extract URLs
         const urlMatch = line.match(/https?:\/\/[^\s]+/);
         if (urlMatch) context.url = urlMatch[0];
         
-        // Extract durations
         const durationMatch = line.match(/(\d+)ms/);
         if (durationMatch) context.duration = durationMatch[1];
         
-        // Extract status codes
         const statusMatch = line.match(/\b(2\d{2}|3\d{2}|4\d{2}|5\d{2})\b/);
         if (statusMatch) context.status = statusMatch[1];
         
@@ -4945,8 +4612,6 @@ export class ImprovedProductionHTMLReportGenerator {
     }
     
     private async addBrowserConsoleLogs(consoleLogs: any[]): Promise<void> {
-        // This would be enhanced to capture real browser console logs
-        // For now, we'll add some sample browser console entries if they exist
         try {
             const browserLogPath = path.join(process.cwd(), 'test-results', 'browser-console.log');
             if (await FileUtils.pathExists(browserLogPath)) {
@@ -4965,21 +4630,17 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
         } catch (error) {
-            // Silently handle browser log reading errors
         }
     }
     
     private getReportFolderName(): string {
-        // Extract report folder name from current working directory
         const cwd = process.cwd();
         
-        // First check if we're inside a report folder
         let match = cwd.match(/report-\d{8}-\d{6}-\w+/);
         if (match) {
             return match[0];
         }
         
-        // If not, try to get it from CURRENT_REPORT_DIR configuration
         try {
             const currentReportDir = ConfigurationManager.get('CURRENT_REPORT_DIR', '');
             if (currentReportDir) {
@@ -4989,10 +4650,8 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
         } catch {
-            // ConfigurationManager might not be initialized
         }
         
-        // If still not found, try to find the most recent report folder
         try {
             const reportsDir = path.join(process.cwd(), 'reports');
             if (fs.existsSync(reportsDir)) {
@@ -5004,7 +4663,6 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             }
         } catch {
-            // Ignore errors
         }
         
         return '';
@@ -5015,12 +4673,10 @@ export class ImprovedProductionHTMLReportGenerator {
         const passRates: number[] = [];
         const executionTimes: number[] = [];
         
-        // Ensure we have execution history
         if (!this.executionHistory || this.executionHistory.length === 0) {
             this.executionHistory = this.generateDefaultHistory();
         }
         
-        // Use real historical data (last 7 entries)
         const recentHistory = this.executionHistory.slice(-7);
         
         recentHistory.forEach(entry => {
@@ -5029,14 +4685,13 @@ export class ImprovedProductionHTMLReportGenerator {
                 if (!isNaN(date.getTime())) {
                     dates.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
                     passRates.push(Math.round(entry.passRate || 0));
-                    executionTimes.push(Math.round((entry.executionTime || 0) / 1000)); // Convert to seconds
+                    executionTimes.push(Math.round((entry.executionTime || 0) / 1000));
                 }
             } catch (error) {
                 this.logger.debug('Skipping invalid history entry', error);
             }
         });
         
-        // Add current execution data
         const currentPassRate = reportData.summary.totalScenarios > 0 
             ? Math.round((reportData.summary.passedScenarios / reportData.summary.totalScenarios) * 100)
             : 0;
@@ -5049,7 +4704,6 @@ export class ImprovedProductionHTMLReportGenerator {
         passRates.push(currentPassRate);
         executionTimes.push(currentExecutionTime);
         
-        // Ensure we have at least 3 data points for a meaningful trend
         while (dates.length < 3) {
             const randomDate = new Date();
             randomDate.setDate(randomDate.getDate() - dates.length - 1);
@@ -5086,18 +4740,15 @@ export class ImprovedProductionHTMLReportGenerator {
     private generateTagDistribution(reportData: ReportData): PieChartData {
         const tagCounts: Record<string, number> = {};
         
-        // Count tags from scenarios
         const scenarios = reportData.scenarios || [];
         scenarios.forEach(scenario => {
             (scenario.tags || []).forEach(tag => {
-                // Exclude @DataProvider tags from tag distribution
                 if (!tag.startsWith('@DataProvider')) {
                     tagCounts[tag] = (tagCounts[tag] || 0) + 1;
                 }
             });
         });
         
-        // If no tags, create default distribution
         if (Object.keys(tagCounts).length === 0) {
             tagCounts['@untagged'] = scenarios.length;
         }
@@ -5133,7 +4784,6 @@ export class ImprovedProductionHTMLReportGenerator {
         const scenarios = reportData.scenarios || [];
         const steps = scenarios.flatMap(s => s.steps || []);
         
-        // Extract performance data from action logs if available
         let pageLoadTime = 0;
         let responseTime = 0;
         let networkLatency = 0;
@@ -5142,7 +4792,6 @@ export class ImprovedProductionHTMLReportGenerator {
             const actionLogger = ActionLogger.getInstance();
             const logs = actionLogger.getRecentLogs(10000);
             
-            // Look for performance metrics in logs
             logs.forEach(log => {
                 if (log.message?.includes('Page load time:')) {
                     const match = log.message.match(/Page load time: (\d+)ms/);
@@ -5158,10 +4807,8 @@ export class ImprovedProductionHTMLReportGenerator {
                 }
             });
         } catch {
-            // Use defaults if logs not available
         }
         
-        // Calculate average durations
         const avgScenarioDuration = scenarios.length > 0
             ? scenarios.reduce((sum, s) => sum + (s.duration || 0), 0) / scenarios.length
             : 0;
@@ -5173,12 +4820,11 @@ export class ImprovedProductionHTMLReportGenerator {
         const totalDuration = reportData.summary?.executionTime || scenarios.reduce((sum, s) => sum + (s.duration || 0), 0);
         const stepsPerSecond = totalDuration > 0 ? (steps.length / (totalDuration / 1000)) : 0;
         
-        // Use actual metrics from reportData if available
         const metrics = reportData.metrics || {};
         
         return {
             pageLoadTime: pageLoadTime || (metrics.performance as any)?.avgPageLoadTime || 
-                          Math.round(avgStepDuration * 0.4), // Estimate if not available
+                          Math.round(avgStepDuration * 0.4),
             responseTime: responseTime || (metrics.performance as any)?.avgResponseTime || 
                           Math.round(avgStepDuration * 0.2),
             networkLatency: networkLatency || (metrics.performance as any)?.avgNetworkLatency || 
@@ -5202,7 +4848,6 @@ export class ImprovedProductionHTMLReportGenerator {
         
         const osName = osMap[platform] || platform;
         
-        // Try to get more specific Windows version
         if (platform === 'win32') {
             const release = os.release();
             const version = release.split('.').map(Number);

@@ -17,25 +17,9 @@ import {
 } from '../types/reporting.types';
 import { Logger } from '../../core/utils/Logger';
 
-/**
- * Feature Report Generator - Creates Detailed Feature-Level Reports
- * 
- * Generates comprehensive feature reports with:
- * - Feature overview and statistics
- * - Scenario details with steps
- * - Error analysis
- * - Visual evidence
- * - Execution timeline
- * - Historical trends
- * 
- * Production-ready implementation with zero dependencies.
- */
 export class FeatureReportGenerator {
   private readonly logger = Logger.getInstance();
   
-  /**
-   * Generate feature reports HTML
-   */
   async generateFeatureReports(features: FeatureReport[], theme: ReportTheme): Promise<string> {
     this.logger.info(`Generating feature reports for ${features.length} features`);
     
@@ -50,9 +34,6 @@ ${this.generateFeatureStyles(theme)}
 ${this.generateFeatureScripts()}`;
   }
 
-  /**
-   * Generate feature navigation sidebar
-   */
   private generateFeatureNavigation(features: FeatureReport[]): string {
     return `
 <nav class="feature-navigation">
@@ -96,9 +77,6 @@ ${this.generateFeatureScripts()}`;
 </nav>`;
   }
 
-  /**
-   * Generate individual feature report
-   */
   private generateFeatureReport(feature: FeatureReport, theme: ReportTheme): string {
     const passRate = this.calculatePassRate(feature);
     
@@ -114,9 +92,6 @@ ${this.generateFeatureScripts()}`;
 </article>`;
   }
 
-  /**
-   * Generate feature header
-   */
   private generateFeatureHeader(feature: FeatureReport, passRate: number, theme: ReportTheme): string {
     return `
 <header class="feature-header ${feature.status}">
@@ -160,9 +135,6 @@ ${this.generateFeatureScripts()}`;
 </header>`;
   }
 
-  /**
-   * Generate feature statistics
-   */
   private generateFeatureStats(feature: FeatureReport): string {
     const stats = feature.statistics;
     
@@ -238,9 +210,6 @@ ${this.generateFeatureScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate feature tags
-   */
   private generateFeatureTags(tags: string[]): string {
     if (!tags || tags.length === 0) return '';
     
@@ -260,9 +229,6 @@ ${this.generateFeatureScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate background section
-   */
   private generateBackground(background: BackgroundReport): string {
     return `
 <section class="feature-background">
@@ -286,9 +252,6 @@ ${this.generateFeatureScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate scenarios section
-   */
   private generateScenarios(scenarios: ScenarioSummary[]): string {
     return `
 <section class="feature-scenarios">
@@ -312,11 +275,8 @@ ${this.generateFeatureScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate individual scenario
-   */
   private generateScenario(scenario: ScenarioSummary): string {
-    const hasEvidence = false; // ScenarioSummary doesn't have evidence details
+    const hasEvidence = false;
     
     return `
 <div class="scenario ${scenario.status}" data-scenario-id="${scenario.scenarioId}" data-status="${scenario.status}">
@@ -407,9 +367,6 @@ ${this.generateFeatureScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate step
-   */
   private generateStep(step: StepReport, includeActions: boolean): string {
     const hasAttachments = step.embeddings.length > 0 || 
                           step.rows || 
@@ -437,9 +394,6 @@ ${this.generateFeatureScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate simple step for ScenarioSummary
-   */
   private generateSimpleStep(step: any): string {
     return `
     <div class="step ${step.status}">
@@ -451,9 +405,6 @@ ${this.generateFeatureScripts()}`;
     </div>`;
   }
 
-  /**
-   * Generate simple error for ScenarioSummary
-   */
   private generateSimpleError(error: string, errorStack?: string): string {
     return `
     <div class="scenario-error">
@@ -468,9 +419,6 @@ ${this.generateFeatureScripts()}`;
     </div>`;
   }
 
-  /**
-   * Generate simple evidence for ScenarioSummary
-   */
   private generateSimpleEvidence(scenario: ScenarioSummary): string {
     return `
     <div class="scenario-evidence">
@@ -526,9 +474,6 @@ ${this.generateFeatureScripts()}`;
   }
 
 
-  /**
-   * Generate data table
-   */
   private generateDataTable(rows: DataTableRow[]): string {
     if (!rows || rows.length === 0) return '';
     
@@ -546,9 +491,6 @@ ${this.generateFeatureScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate doc string
-   */
   private generateDocString(docString: DocString): string {
     return `
 <div class="doc-string">
@@ -559,9 +501,6 @@ ${this.generateFeatureScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate actions timeline
-   */
   private generateActions(actions: ActionLog[]): string {
     return `
 <div class="actions-timeline">
@@ -595,9 +534,6 @@ ${this.generateFeatureScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate embeddings
-   */
   private generateEmbeddings(embeddings: Embedding[]): string {
     return `
 <div class="embeddings">
@@ -626,9 +562,6 @@ ${this.generateFeatureScripts()}`;
   }
 
 
-  /**
-   * Generate step error
-   */
   private generateStepError(error: ErrorDetails): string {
     return `
 <div class="step-error">
@@ -644,9 +577,6 @@ ${this.generateFeatureScripts()}`;
 
 
 
-  /**
-   * Generate feature timeline
-   */
   private generateFeatureTimeline(feature: FeatureReport): string {
     const scenarios = feature.scenarios;
     const totalDuration = feature.endTime.getTime() - feature.startTime.getTime();
@@ -664,7 +594,7 @@ ${this.generateFeatureScripts()}`;
         <div class="timeline-chart">
             ${scenarios.map(scenario => {
               if (!scenario.startTime || !scenario.endTime) {
-                return ''; // Skip scenarios without timing info
+                return '';
               }
               const startOffset = ((scenario.startTime.getTime() - feature.startTime.getTime()) / totalDuration) * 100;
               const width = ((scenario.endTime.getTime() - scenario.startTime.getTime()) / totalDuration) * 100;
@@ -691,9 +621,6 @@ ${this.generateFeatureScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate feature errors section
-   */
   private generateFeatureErrors(feature: FeatureReport): string {
     const failedScenarios = feature.scenarios.filter(s => s.status === TestStatus.FAILED);
     if (failedScenarios.length === 0) return '';
@@ -736,9 +663,6 @@ ${this.generateFeatureScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate gauge chart SVG
-   */
   private generateGaugeChart(value: number, theme: ReportTheme): string {
     const radius = 60;
     const strokeWidth = 10;
@@ -774,9 +698,6 @@ ${this.generateFeatureScripts()}`;
 </svg>`;
   }
 
-  /**
-   * Generate mini bar chart SVG
-   */
   private generateMiniBarChart(stats: FeatureReport['statistics']): string {
     const passed = stats.passedScenarios;
     const failed = stats.failedScenarios;
@@ -797,24 +718,16 @@ ${this.generateFeatureScripts()}`;
 </svg>`;
   }
 
-  /**
-   * Generate feature styles
-   */
   private generateFeatureStyles(theme: ReportTheme): string {
     return `
 <style>
-/* ========================================
-   FEATURE REPORT STYLES - PRODUCTION READY
-   ======================================== */
 
-/* Feature Reports Container */
 .feature-reports {
     display: flex;
     gap: 30px;
     position: relative;
 }
 
-/* Feature Navigation */
 .feature-navigation {
     width: 300px;
     background: #1a1a2e;
@@ -963,13 +876,11 @@ ${this.generateFeatureScripts()}`;
     transition: width 0.5s ease;
 }
 
-/* Feature Content */
 .feature-content {
     flex: 1;
     min-width: 0;
 }
 
-/* Feature Report */
 .feature-report {
     background: #1a1a2e;
     border: 1px solid #2a2a4a;
@@ -990,7 +901,6 @@ ${this.generateFeatureScripts()}`;
     }
 }
 
-/* Feature Header */
 .feature-header {
     padding: 30px;
     background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
@@ -1083,7 +993,6 @@ ${this.generateFeatureScripts()}`;
     color: #a0a0a0;
 }
 
-/* Feature Stats */
 .feature-stats {
     padding: 30px;
     border-bottom: 1px solid #2a2a4a;
@@ -1189,7 +1098,6 @@ ${this.generateFeatureScripts()}`;
     margin-top: 10px;
 }
 
-/* Feature Tags */
 .feature-tags {
     padding: 20px 30px;
     border-bottom: 1px solid #2a2a4a;
@@ -1226,7 +1134,6 @@ ${this.generateFeatureScripts()}`;
     fill: currentColor;
 }
 
-/* Background Section */
 .feature-background {
     padding: 30px;
     border-bottom: 1px solid #2a2a4a;
@@ -1266,7 +1173,6 @@ ${this.generateFeatureScripts()}`;
     margin-bottom: 15px;
 }
 
-/* Scenarios Section */
 .feature-scenarios {
     padding: 30px;
 }
@@ -1298,7 +1204,6 @@ ${this.generateFeatureScripts()}`;
     color: #fff;
 }
 
-/* Scenario */
 .scenario {
     background: #0f0f23;
     border: 1px solid #2a2a4a;
@@ -1424,7 +1329,6 @@ ${this.generateFeatureScripts()}`;
     max-height: none;
 }
 
-/* Steps */
 .scenario-steps {
     padding: 0 20px 20px;
 }
@@ -1490,7 +1394,6 @@ ${this.generateFeatureScripts()}`;
     margin-top: 15px;
 }
 
-/* Data Table */
 .data-table-container {
     margin-top: 10px;
     overflow-x: auto;
@@ -1520,7 +1423,6 @@ ${this.generateFeatureScripts()}`;
     color: #e0e0e0;
 }
 
-/* Doc String */
 .doc-string {
     margin-top: 10px;
     background: #0f0f23;
@@ -1546,7 +1448,6 @@ ${this.generateFeatureScripts()}`;
     white-space: pre-wrap;
 }
 
-/* Actions Timeline */
 .actions-timeline {
     margin-top: 15px;
     background: #0f0f23;
@@ -1658,7 +1559,6 @@ ${this.generateFeatureScripts()}`;
     transform: scale(1.05);
 }
 
-/* Embeddings */
 .embeddings {
     margin-top: 15px;
 }
@@ -1685,7 +1585,6 @@ ${this.generateFeatureScripts()}`;
     overflow-x: auto;
 }
 
-/* Errors */
 .scenario-error,
 .step-error {
     margin-top: 15px;
@@ -1832,7 +1731,6 @@ ${this.generateFeatureScripts()}`;
     color: #e0e0e0;
 }
 
-/* Evidence Section */
 .scenario-evidence {
     padding: 20px;
     background: rgba(23, 162, 184, 0.05);
@@ -1999,7 +1897,6 @@ ${this.generateFeatureScripts()}`;
     font-size: 0.8rem;
 }
 
-/* AI Healing Info */
 .ai-healing-info {
     padding: 20px;
     background: rgba(147, 24, 108, 0.05);
@@ -2096,7 +1993,6 @@ ${this.generateFeatureScripts()}`;
     color: #a0a0a0;
 }
 
-/* Feature Timeline */
 .feature-timeline {
     padding: 30px;
     border-bottom: 1px solid #2a2a4a;
@@ -2196,7 +2092,6 @@ ${this.generateFeatureScripts()}`;
     color: #6c757d;
 }
 
-/* Feature Errors */
 .feature-errors {
     padding: 30px;
 }
@@ -2249,7 +2144,6 @@ ${this.generateFeatureScripts()}`;
     color: #e0e0e0;
 }
 
-/* Hooks Section */
 .hooks-section {
     margin-bottom: 15px;
     padding: 10px;
@@ -2304,7 +2198,6 @@ ${this.generateFeatureScripts()}`;
     color: ${theme.failureColor};
 }
 
-/* Image Modal */
 .image-modal {
     position: fixed;
     top: 0;
@@ -2343,7 +2236,6 @@ ${this.generateFeatureScripts()}`;
     color: ${theme.primaryColor};
 }
 
-/* Responsive Design */
 @media (max-width: 1200px) {
     .feature-reports {
         flex-direction: column;
@@ -2386,7 +2278,6 @@ ${this.generateFeatureScripts()}`;
     }
 }
 
-/* Print Styles */
 @media print {
     .feature-navigation {
         display: none;
@@ -2410,24 +2301,14 @@ ${this.generateFeatureScripts()}`;
 </style>`;
   }
 
-  /**
-   * Generate feature scripts
-   */
   private generateFeatureScripts(): string {
     return `
 <script>
-// ========================================
-// FEATURE REPORT SCRIPTS - PRODUCTION READY
-// ========================================
 
-// Initialize on load
 document.addEventListener('DOMContentLoaded', function() {
     initializeFeatureReports();
 });
 
-/**
- * Initialize feature reports
- */
 function initializeFeatureReports() {
     setupNavigation();
     setupFilters();
@@ -2438,9 +2319,6 @@ function initializeFeatureReports() {
     setupTagFiltering();
 }
 
-/**
- * Setup navigation
- */
 function setupNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
     
@@ -2450,13 +2328,10 @@ function setupNavigation() {
             const featureElement = document.getElementById('feature-' + featureId);
             
             if (featureElement) {
-                // Remove active class from all items
                 navItems.forEach(item => item.classList.remove('active'));
                 
-                // Add active class to clicked item
                 this.classList.add('active');
                 
-                // Scroll to feature with offset for sticky header
                 const offset = 100;
                 const elementPosition = featureElement.getBoundingClientRect().top;
                 const offsetPosition = elementPosition + window.pageYOffset - offset;
@@ -2470,9 +2345,6 @@ function setupNavigation() {
     });
 }
 
-/**
- * Setup search functionality
- */
 function setupSearch() {
     const searchInput = document.querySelector('.nav-search');
     if (searchInput) {
@@ -2490,9 +2362,6 @@ function setupSearch() {
     }
 }
 
-/**
- * Setup scenario filters
- */
 function setupFilters() {
     const filterButtons = document.querySelectorAll('.filter-btn');
     const scenarios = document.querySelectorAll('.scenario');
@@ -2501,11 +2370,9 @@ function setupFilters() {
         button.addEventListener('click', function() {
             const filter = this.getAttribute('data-filter');
             
-            // Update active button
             filterButtons.forEach(btn => btn.classList.remove('active'));
             this.classList.add('active');
             
-            // Filter scenarios
             scenarios.forEach(scenario => {
                 const status = scenario.getAttribute('data-status');
                 const shouldShow = filter === 'all' || status === filter;
@@ -2516,9 +2383,6 @@ function setupFilters() {
     });
 }
 
-/**
- * Setup scenario toggles
- */
 function setupScenarioToggles() {
     const scenarios = document.querySelectorAll('.scenario');
     
@@ -2527,22 +2391,18 @@ function setupScenarioToggles() {
         const content = scenario.querySelector('.scenario-content');
         
         if (header && content) {
-            // Set initial state
             content.style.maxHeight = '0px';
             
             header.addEventListener('click', function() {
                 const isExpanded = scenario.classList.contains('expanded');
                 
                 if (isExpanded) {
-                    // Collapse
                     scenario.classList.remove('expanded');
                     content.style.maxHeight = '0px';
                 } else {
-                    // Expand
                     scenario.classList.add('expanded');
                     content.style.maxHeight = content.scrollHeight + 'px';
                     
-                    // Update max-height if content changes
                     setTimeout(() => {
                         if (scenario.classList.contains('expanded')) {
                             content.style.maxHeight = content.scrollHeight + 'px';
@@ -2554,9 +2414,6 @@ function setupScenarioToggles() {
     });
 }
 
-/**
- * Toggle scenario manually
- */
 function toggleScenario(scenarioId) {
     const scenario = document.querySelector('[data-scenario-id="' + scenarioId + '"]');
     if (scenario) {
@@ -2567,11 +2424,7 @@ function toggleScenario(scenarioId) {
     }
 }
 
-/**
- * Setup image modal
- */
 function setupImageModal() {
-    // Create modal if it doesn't exist
     let modal = document.getElementById('image-modal');
     if (!modal) {
         modal = document.createElement('div');
@@ -2580,14 +2433,12 @@ function setupImageModal() {
         modal.innerHTML = '<span class="modal-close">&times;</span><img class="modal-image" src="" alt="Screenshot">';
         document.body.appendChild(modal);
         
-        // Close modal on click
         modal.addEventListener('click', function(e) {
             if (e.target === modal || e.target.className === 'modal-close') {
                 closeImageModal();
             }
         });
         
-        // Close on escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && modal.classList.contains('active')) {
                 closeImageModal();
@@ -2596,9 +2447,6 @@ function setupImageModal() {
     }
 }
 
-/**
- * Open image modal
- */
 function openImageModal(src) {
     const modal = document.getElementById('image-modal');
     const modalImage = modal.querySelector('.modal-image');
@@ -2608,18 +2456,12 @@ function openImageModal(src) {
     document.body.style.overflow = 'hidden';
 }
 
-/**
- * Close image modal
- */
 function closeImageModal() {
     const modal = document.getElementById('image-modal');
     modal.classList.remove('active');
     document.body.style.overflow = '';
 }
 
-/**
- * Download HAR file
- */
 function downloadHAR(harData) {
     const blob = new Blob([harData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2632,14 +2474,10 @@ function downloadHAR(harData) {
     URL.revokeObjectURL(url);
 }
 
-/**
- * Highlight active feature based on scroll
- */
 function highlightActiveFeature() {
     const features = document.querySelectorAll('.feature-report');
     const navItems = document.querySelectorAll('.nav-item');
     
-    // Create intersection observer
     const observerOptions = {
         root: null,
         rootMargin: '-20% 0px -70% 0px',
@@ -2651,7 +2489,6 @@ function highlightActiveFeature() {
             if (entry.isIntersecting) {
                 const featureId = entry.target.id.replace('feature-', '');
                 
-                // Update navigation
                 navItems.forEach(item => {
                     if (item.getAttribute('data-feature-id') === featureId) {
                         item.classList.add('active');
@@ -2663,15 +2500,11 @@ function highlightActiveFeature() {
         });
     }, observerOptions);
     
-    // Observe all features
     features.forEach(feature => {
         observer.observe(feature);
     });
 }
 
-/**
- * Setup tag filtering
- */
 function setupTagFiltering() {
     const tags = document.querySelectorAll('.tag');
     
@@ -2683,9 +2516,6 @@ function setupTagFiltering() {
     });
 }
 
-/**
- * Filter scenarios by tag
- */
 function filterByTag(tagName) {
     const scenarios = document.querySelectorAll('.scenario');
     
@@ -2697,25 +2527,18 @@ function filterByTag(tagName) {
         scenario.style.display = hasTag ? 'block' : 'none';
     });
     
-    // Update filter button
     const filterButtons = document.querySelectorAll('.filter-btn');
     filterButtons.forEach(btn => btn.classList.remove('active'));
     
-    // Show filter info
     showFilterInfo('Filtered by tag: ' + tagName);
 }
 
-/**
- * Show filter information
- */
 function showFilterInfo(message) {
-    // Remove existing info
     const existingInfo = document.querySelector('.filter-info');
     if (existingInfo) {
         existingInfo.remove();
     }
     
-    // Create new info
     const info = document.createElement('div');
     info.className = 'filter-info';
     info.innerHTML = '<span>' + message + '</span><button onclick="clearFilters()">Clear Filter</button>';
@@ -2726,17 +2549,12 @@ function showFilterInfo(message) {
     }
 }
 
-/**
- * Clear all filters
- */
 function clearFilters() {
-    // Show all scenarios
     const scenarios = document.querySelectorAll('.scenario');
     scenarios.forEach(scenario => {
         scenario.style.display = 'block';
     });
     
-    // Reset filter buttons
     const filterButtons = document.querySelectorAll('.filter-btn');
     filterButtons.forEach(btn => {
         if (btn.getAttribute('data-filter') === 'all') {
@@ -2746,16 +2564,12 @@ function clearFilters() {
         }
     });
     
-    // Remove filter info
     const filterInfo = document.querySelector('.filter-info');
     if (filterInfo) {
         filterInfo.remove();
     }
 }
 
-/**
- * Expand all scenarios
- */
 function expandAllScenarios() {
     const scenarios = document.querySelectorAll('.scenario');
     
@@ -2769,9 +2583,6 @@ function expandAllScenarios() {
     });
 }
 
-/**
- * Collapse all scenarios
- */
 function collapseAllScenarios() {
     const scenarios = document.querySelectorAll('.scenario');
     
@@ -2785,9 +2596,6 @@ function collapseAllScenarios() {
     });
 }
 
-/**
- * Copy error details to clipboard
- */
 function copyErrorDetails(errorElement) {
     const errorMessage = errorElement.querySelector('.error-message').textContent;
     const errorType = errorElement.querySelector('.error-type').textContent;
@@ -2802,17 +2610,12 @@ function copyErrorDetails(errorElement) {
     });
 }
 
-/**
- * Show toast notification
- */
 function showToast(message) {
-    // Remove existing toast
     const existingToast = document.querySelector('.toast');
     if (existingToast) {
         existingToast.remove();
     }
     
-    // Create new toast
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = message;
@@ -2820,36 +2623,27 @@ function showToast(message) {
     
     document.body.appendChild(toast);
     
-    // Remove after 3 seconds
     setTimeout(() => {
         toast.style.animation = 'slideDown 0.3s ease';
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
 
-/**
- * Export feature report
- */
 function exportFeatureReport(featureId) {
     const feature = document.getElementById('feature-' + featureId);
     if (!feature) return;
     
-    // Clone feature for export
     const clone = feature.cloneNode(true);
     
-    // Remove interactive elements
     clone.querySelectorAll('.scenario-toggle, .filter-btn').forEach(el => el.remove());
     
-    // Expand all scenarios in clone
     clone.querySelectorAll('.scenario-content').forEach(content => {
         content.style.maxHeight = 'none';
     });
     
-    // Create export HTML
     const styles = document.querySelector('style').textContent;
     const exportHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Feature Report Export</title><style>' + styles + '.feature-navigation { display: none; }.scenario-content { max-height: none !important; }</style></head><body><div class="feature-reports"><div class="feature-content">' + clone.outerHTML + '</div></div></body></html>';
     
-    // Download file
     const blob = new Blob([exportHtml], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2861,14 +2655,10 @@ function exportFeatureReport(featureId) {
     URL.revokeObjectURL(url);
 }
 
-/**
- * Print feature report
- */
 function printFeatureReport(featureId) {
     const feature = document.getElementById('feature-' + featureId);
     if (!feature) return;
     
-    // Expand all scenarios before printing
     const scenarios = feature.querySelectorAll('.scenario');
     const expandedScenarios = [];
     
@@ -2883,10 +2673,8 @@ function printFeatureReport(featureId) {
         }
     });
     
-    // Print
     window.print();
     
-    // Restore collapsed scenarios
     setTimeout(() => {
         expandedScenarios.forEach(scenario => {
             scenario.classList.remove('expanded');
@@ -2898,11 +2686,7 @@ function printFeatureReport(featureId) {
     }, 100);
 }
 
-/**
- * Keyboard shortcuts
- */
 document.addEventListener('keydown', function(e) {
-    // Ctrl/Cmd + F - Focus search
     if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         const searchInput = document.querySelector('.nav-search');
@@ -2911,20 +2695,17 @@ document.addEventListener('keydown', function(e) {
         }
     }
     
-    // Ctrl/Cmd + E - Expand all
     if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
         expandAllScenarios();
     }
     
-    // Ctrl/Cmd + Shift + E - Collapse all
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
         e.preventDefault();
         collapseAllScenarios();
     }
 });
 
-// Add CSS animations
 const style = document.createElement('style');
 style.textContent = '@keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } } @keyframes slideDown { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 20px); } } .filter-info { display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; background: rgba(147, 24, 108, 0.1); border: 1px solid rgba(147, 24, 108, 0.3); border-radius: 8px; margin-left: auto; } .filter-info button { padding: 4px 12px; background: none; border: 1px solid currentColor; border-radius: 4px; color: #93186C; cursor: pointer; font-size: 0.85rem; } .filter-info button:hover { background: rgba(147, 24, 108, 0.1); }';
 document.head.appendChild(style);
@@ -2932,9 +2713,6 @@ document.head.appendChild(style);
 </script>`;
   }
 
-  /**
-   * Calculate pass rate for a feature
-   */
   private calculatePassRate(feature: FeatureReport): number {
     const total = feature.statistics.totalScenarios;
     if (total === 0) return 0;
@@ -2943,9 +2721,6 @@ document.head.appendChild(style);
     return (passed / total) * 100;
   }
 
-  /**
-   * Get progress bar color based on feature status
-   */
   private getProgressColor(feature: FeatureReport): string {
     const passRate = this.calculatePassRate(feature);
     
@@ -2954,9 +2729,6 @@ document.head.appendChild(style);
     return STATUS_COLORS.failed;
   }
 
-  /**
-   * Format duration for display
-   */
   private formatDuration(milliseconds: number): string {
     const seconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -2973,9 +2745,6 @@ document.head.appendChild(style);
     }
   }
 
-  /**
-   * Format date for display
-   */
   private formatDate(date: Date): string {
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
@@ -2986,9 +2755,6 @@ document.head.appendChild(style);
     }).format(new Date(date));
   }
 
-  /**
-   * Format time for display
-   */
   private formatTime(date: Date): string {
     return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
@@ -2997,40 +2763,26 @@ document.head.appendChild(style);
     }).format(new Date(date));
   }
 
-  /**
-   * Truncate text with ellipsis
-   */
   private truncateText(text: string, maxLength: number): string {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength - 3) + '...';
   }
 
-  /**
-   * Highlight parameters in step text
-   */
   private highlightParameters(text: string): string {
-    // Highlight quoted strings
     text = text.replace(/"([^"]*)"/g, '<span class="step-parameter">"$1"</span>');
     
-    // Highlight numbers
     text = text.replace(/\b(\d+)\b/g, '<span class="step-parameter">$1</span>');
     
     return text;
   }
 
-  /**
-   * Format stack trace for display
-   */
   private formatStackTrace(stack: string): string {
-    // Split by newline and format each line
     const lines = stack.split('\n');
     
     return lines.map(line => {
-      // Highlight file paths
       line = line.replace(/([a-zA-Z0-9_\-./]+\.(js|ts|jsx|tsx):\d+:\d+)/g, 
         '<span class="stack-file">$1</span>');
       
-      // Highlight function names
       line = line.replace(/at\s+([a-zA-Z0-9_$.]+)/g, 
         'at <span class="stack-function">$1</span>');
       
@@ -3038,9 +2790,6 @@ document.head.appendChild(style);
     }).join('\n');
   }
 
-  /**
-   * Escape HTML for safe display
-   */
   private escapeHtml(text: string): string {
     const element = document.createElement('div');
     element.textContent = text;

@@ -1,20 +1,3 @@
-/**
- * CS Test Automation Framework - LogFormatter
- * 
- * Comprehensive log formatting system that transforms log entries into
- * various output formats with full customization and template support.
- * 
- * Features:
- * - Multiple output formats (JSON, Pretty, Compact, XML, CSV, Syslog)
- * - Custom format templates with variable interpolation
- * - Color coding for terminal output
- * - Structured data formatting
- * - Performance-optimized formatting
- * - Format validation and error handling
- * 
- * @author CS Test Automation Team
- * @version 4.0.0
- */
 
 import * as util from 'util';
 import {
@@ -59,7 +42,6 @@ export class LogFormatter {
     reverse: '\x1b[7m',
     hidden: '\x1b[8m',
     
-    // Foreground colors
     black: '\x1b[30m',
     red: '\x1b[31m',
     green: '\x1b[32m',
@@ -70,7 +52,6 @@ export class LogFormatter {
     white: '\x1b[37m',
     gray: '\x1b[90m',
     
-    // Bright foreground colors
     brightRed: '\x1b[91m',
     brightGreen: '\x1b[92m',
     brightYellow: '\x1b[93m',
@@ -79,7 +60,6 @@ export class LogFormatter {
     brightCyan: '\x1b[96m',
     brightWhite: '\x1b[97m',
     
-    // Background colors
     bgBlack: '\x1b[40m',
     bgRed: '\x1b[41m',
     bgGreen: '\x1b[42m',
@@ -90,7 +70,6 @@ export class LogFormatter {
     bgWhite: '\x1b[47m',
     bgGray: '\x1b[100m',
     
-    // Bright background colors
     bgBrightRed: '\x1b[101m',
     bgBrightGreen: '\x1b[102m',
     bgBrightYellow: '\x1b[103m',
@@ -113,34 +92,28 @@ export class LogFormatter {
   }
 
   format(entry: LogEntry, format: LogFormat = 'json', options?: FormatOptions): string {
-    // Check cache first
     const cacheKey = this.generateCacheKey(entry, format, options);
     const cached = this.formatCache.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    // Get formatter
     const formatter = this.formatters.get(format);
     if (!formatter) {
       throw new Error(`Unknown log format: ${format}`);
     }
 
-    // Format entry
     let formatted: string;
     try {
       formatted = formatter(entry, options);
       
-      // Apply custom formatters if any
       if (this.customFormatters.has(format)) {
         formatted = this.applyCustomFormatters(format, formatted, entry);
       }
     } catch (error) {
-      // Fallback to basic formatting on error
       formatted = this.formatError(entry, error);
     }
 
-    // Cache result
     this.formatCache.set(cacheKey, formatted);
 
     return formatted;
@@ -170,31 +143,22 @@ export class LogFormatter {
   }
 
   private registerDefaultFormatters(): void {
-    // JSON Formatter
     this.formatters.set('json', (entry, options) => this.formatJSON(entry, options));
     
-    // Pretty Formatter (for console)
     this.formatters.set('pretty', (entry, options) => this.formatPretty(entry, options));
     
-    // Compact Formatter
     this.formatters.set('compact', (entry, options) => this.formatCompact(entry, options));
     
-    // XML Formatter
     this.formatters.set('xml', (entry, options) => this.formatXML(entry, options));
     
-    // CSV Formatter
     this.formatters.set('csv', (entry, options) => this.formatCSV(entry, options));
     
-    // Syslog Formatter
     this.formatters.set('syslog', (entry, options) => this.formatSyslog(entry, options));
     
-    // Custom Template Formatter
     this.formatters.set('template', (entry, options) => this.formatTemplate(entry, options));
     
-    // Logstash Formatter
     this.formatters.set('logstash', (entry, options) => this.formatLogstash(entry, options));
     
-    // CloudWatch Formatter
     this.formatters.set('cloudwatch', (entry, options) => this.formatCloudWatch(entry, options));
   }
 
@@ -217,7 +181,6 @@ export class LogFormatter {
       sessionId: entry.sessionId
     };
 
-    // Add type-specific fields
     switch (entry.type) {
       case 'action':
         const actionEntry = entry as ActionLogEntry;
@@ -319,17 +282,14 @@ export class LogFormatter {
         break;
     }
 
-    // Add context if not empty
     if (entry.context && Object.keys(entry.context).length > 0) {
       obj.context = entry.context;
     }
 
-    // Add metadata if present
     if (entry.metadata) {
       obj.metadata = entry.metadata;
     }
 
-    // Add thread and process info if requested
     if (options?.includeSystemInfo) {
       obj.threadId = entry.threadId;
       obj.processId = entry.processId;
@@ -347,7 +307,6 @@ export class LogFormatter {
     
     let message = `${timestamp} ${level} ${type}`;
     
-    // Add correlation ID if not root
     if (entry.correlationId && entry.correlationId !== 'root') {
       const correlationId = useColors 
         ? `${this.ansiColors.dim}[${entry.correlationId}]${this.ansiColors.reset}`
@@ -355,17 +314,14 @@ export class LogFormatter {
       message += ` ${correlationId}`;
     }
 
-    // Format type-specific content
     const content = this.formatPrettyContent(entry, useColors, options);
     message += ` ${content}`;
 
-    // Add context if present
     if (entry.context && Object.keys(entry.context).length > 0 && options?.includeContext !== false) {
       const contextStr = this.formatContext(entry.context, useColors);
       message += `\n  ${contextStr}`;
     }
 
-    // Add metadata if present
     if (entry.metadata && options?.includeMetadata) {
       const metadataStr = this.formatMetadata(entry.metadata, useColors);
       message += `\n  ${metadataStr}`;
@@ -766,7 +722,6 @@ export class LogFormatter {
     
     let message = `${timestamp} ${level} ${type}`;
     
-    // Add compact content based on type
     switch (entry.type) {
       case 'action':
         const actionEntry = entry as ActionLogEntry;
@@ -816,18 +771,15 @@ export class LogFormatter {
     xml += `${spaces}<correlationId>${this.escapeXML(entry.correlationId)}</correlationId>\n`;
     xml += `${spaces}<sessionId>${this.escapeXML(entry.sessionId)}</sessionId>\n`;
     
-    // Add type-specific fields
     const typeData = this.getTypeSpecificData(entry);
     xml += this.objectToXML(typeData, indent, 1);
     
-    // Add context
     if (entry.context && Object.keys(entry.context).length > 0) {
       xml += `${spaces}<context>\n`;
       xml += this.objectToXML(entry.context, indent, 2);
       xml += `${spaces}</context>\n`;
     }
     
-    // Add metadata
     if (entry.metadata) {
       xml += `${spaces}<metadata>\n`;
       xml += this.objectToXML(entry.metadata, indent, 2);
@@ -851,7 +803,6 @@ export class LogFormatter {
       entry.sessionId
     ];
     
-    // Add type-specific fields
     switch (entry.type) {
       case 'action':
         const actionEntry = entry as ActionLogEntry;
@@ -897,7 +848,6 @@ export class LogFormatter {
         }
     }
     
-    // Escape and quote fields
     const escapedFields = fields.map(field => {
       if (typeof field === 'string' && (field.includes(delimiter) || field.includes(quote) || field.includes('\n'))) {
         return `${quote}${this.escapeCSV(field, quote)}${quote}`;
@@ -909,8 +859,7 @@ export class LogFormatter {
   }
 
   private formatSyslog(entry: LogEntry, options?: FormatOptions): string {
-    // Syslog format: <priority>timestamp hostname app[pid]: message
-    const facility = options?.facility || 16; // Local0
+    const facility = options?.facility || 16;
     const severity = this.mapLogLevelToSyslogSeverity(entry.level);
     const priority = facility * 8 + severity;
     
@@ -921,7 +870,6 @@ export class LogFormatter {
     
     let message = this.formatSyslogMessage(entry);
     
-    // Add structured data if present
     if (entry.metadata || entry.context) {
       const structuredData = this.formatSyslogStructuredData({
         ...entry.metadata,
@@ -968,7 +916,6 @@ export class LogFormatter {
     return JSON.stringify(cloudWatchEntry);
   }
 
-  // Helper Methods
 
   private formatTimestamp(timestamp: Date, format?: string): string {
     if (!format) {
@@ -1132,8 +1079,8 @@ export class LogFormatter {
   private formatStackTrace(stack: string): string {
     const lines = stack.split('\n');
     return lines.map((line, index) => {
-      if (index === 0) return line; // Keep error message as is
-      return `  ${line.trim()}`; // Indent stack frames
+      if (index === 0) return line;
+      return `  ${line.trim()}`;
     }).join('\n');
   }
 
@@ -1198,7 +1145,6 @@ export class LogFormatter {
   }
 
   private truncateQuery(query: string, maxLength: number = 100): string {
-    // Remove excessive whitespace
     const normalized = query.replace(/\s+/g, ' ').trim();
     return this.truncate(normalized, maxLength);
   }
@@ -1260,7 +1206,6 @@ export class LogFormatter {
         data.loadTime = navEntry.loadTime;
         break;
         
-      // ... other types
     }
     
     return data;
@@ -1268,11 +1213,11 @@ export class LogFormatter {
 
   private mapLogLevelToSyslogSeverity(level?: LogLevel): number {
     const mapping = {
-      [LogLevel.TRACE]: 7, // Debug
-      [LogLevel.DEBUG]: 7, // Debug
-      [LogLevel.INFO]: 6,  // Informational
+      [LogLevel.TRACE]: 7,
+      [LogLevel.DEBUG]: 7,
+      [LogLevel.INFO]: 6,
       [LogLevel.WARN]: 4,  // Warning
-      [LogLevel.ERROR]: 3, // Error
+      [LogLevel.ERROR]: 3,
       [LogLevel.FATAL]: 2  // Critical
     };
     
@@ -1339,7 +1284,6 @@ export class LogFormatter {
       metadata: entry.metadata,
       ...this.getTypeSpecificData(entry),
       
-      // Helper functions
       formatDate: (date: Date, format: string) => this.formatTimestamp(date, format),
       truncate: (str: string, len: number) => this.truncate(str, len),
       json: (obj: any) => JSON.stringify(obj),
@@ -1349,16 +1293,13 @@ export class LogFormatter {
   }
 
   private supportsColors(): boolean {
-    // Check for color support in terminal
     if (process.env['NO_COLOR']) return false;
     if (process.env['FORCE_COLOR']) return true;
     
-    // Check if stdout is TTY
     if (!process.stdout.isTTY) return false;
     
-    // Check terminal type
     if (process.platform === 'win32') {
-      return true; // Modern Windows terminals support colors
+      return true;
     }
     
     if (process.env['TERM']) {
@@ -1384,7 +1325,6 @@ export class LogFormatter {
   }
 
   private registerDefaultDataFormatters(): void {
-    // URL formatter
     this.dataFormatters.set('url', {
       format: (url: string) => {
         try {
@@ -1396,7 +1336,6 @@ export class LogFormatter {
       }
     });
     
-    // Duration formatter
     this.dataFormatters.set('duration', {
       format: (ms: number) => {
         if (ms < 1000) return `${ms}ms`;
@@ -1405,12 +1344,10 @@ export class LogFormatter {
       }
     });
     
-    // Size formatter
     this.dataFormatters.set('size', {
       format: (bytes: number) => this.formatFileSize(bytes)
     });
     
-    // Error formatter
     this.dataFormatters.set('error', {
       format: (error: any) => {
         if (error.message) return error.message;
@@ -1421,19 +1358,16 @@ export class LogFormatter {
   }
 
   private registerDefaultStructuredFormatters(): void {
-    // JSON Lines formatter
     this.structuredFormatters.set('jsonl', {
       format: (entries: LogEntry[]) => {
         return entries.map(e => JSON.stringify(e)).join('\n');
       }
     });
     
-    // CSV with headers
     this.structuredFormatters.set('csv-full', {
       format: (entries: LogEntry[]) => {
         if (entries.length === 0) return '';
         
-        // Extract all unique fields
         const allFields = new Set<string>();
         entries.forEach(entry => {
           Object.keys(this.prepareJSONObject(entry)).forEach(field => {
@@ -1469,12 +1403,10 @@ export class LogFormatter {
   }
 
   private registerDefaultTemplates(): void {
-    // Default template
     this.templateEngine.register('default', 
       '{{formatDate timestamp "HH:mm:ss.SSS"}} [{{upper level}}] [{{upper type}}] {{message}}'
     );
     
-    // Detailed template
     this.templateEngine.register('detailed',
       `{{formatDate timestamp "YYYY-MM-DD HH:mm:ss.SSS"}} [{{level}}] [{{type}}] {{correlationId}}
   Message: {{message}}
@@ -1482,7 +1414,6 @@ export class LogFormatter {
   Metadata: {{json metadata}}`
     );
     
-    // Minimal template
     this.templateEngine.register('minimal',
       '{{formatDate timestamp "HH:mm:ss"}} {{level}} {{message}}'
     );
@@ -1521,7 +1452,6 @@ export class LogFormatter {
   }
 }
 
-// Helper Classes
 
 class TemplateEngine implements ITemplateEngine {
   private templates: Map<string, string> = new Map();
@@ -1546,7 +1476,6 @@ class TemplateEngine implements ITemplateEngine {
       return template.replace(/\{\{([^}]+)\}\}/g, (_match, expression) => {
         const trimmed = expression.trim();
         
-        // Handle function calls
         if (trimmed.includes('(')) {
           const [funcName, ...args] = trimmed.split(/[(),]/).map((s: string) => s.trim());
           if (context[funcName] && typeof context[funcName] === 'function') {
@@ -1560,7 +1489,6 @@ class TemplateEngine implements ITemplateEngine {
           }
         }
         
-        // Handle property access
         return String(this.getValue(context, trimmed) || '');
       });
     };
@@ -1593,14 +1521,12 @@ class FormatCache implements IFormatCache {
   get(key: string): string | undefined {
     const value = this.cache.get(key);
     if (value) {
-      // Update access order
       this.updateAccessOrder(key);
     }
     return value;
   }
 
   set(key: string, value: string): void {
-    // Remove oldest if at capacity
     if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
       const oldest = this.accessOrder.shift();
       if (oldest) {

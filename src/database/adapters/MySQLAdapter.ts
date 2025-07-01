@@ -14,9 +14,6 @@ import {
 import { DatabaseAdapter } from './DatabaseAdapter';
 import { logger } from '../../core/utils/Logger';
 
-/**
- * MySQL database adapter implementation
- */
 export class MySQLAdapter extends DatabaseAdapter {
   private mysql2: any;
   readonly capabilities: DatabaseCapabilities = {
@@ -35,9 +32,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     super();
   }
 
-  /**
-   * Load mysql2 module dynamically
-   */
   private async loadDriver(): Promise<void> {
     if (!this.mysql2) {
       try {
@@ -48,9 +42,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Connect to MySQL
-   */
   async connect(config: DatabaseConfig): Promise<DatabaseConnection> {
     await this.loadDriver();
     this.config = config;
@@ -70,7 +61,6 @@ export class MySQLAdapter extends DatabaseAdapter {
         ...config.additionalOptions
       };
 
-      // Handle connection string from additionalOptions
       if (config.additionalOptions?.['connectionString']) {
         const url = new URL(config.additionalOptions['connectionString']);
         connectionConfig.host = url.hostname;
@@ -80,7 +70,6 @@ export class MySQLAdapter extends DatabaseAdapter {
         connectionConfig.password = url.password;
       }
 
-      // Create connection pool
       const poolSize = config.connectionPoolSize || config.additionalOptions?.['poolSize'];
       if (poolSize && poolSize > 1) {
         const pool = await this.mysql2.createPool({
@@ -90,13 +79,11 @@ export class MySQLAdapter extends DatabaseAdapter {
           waitForConnections: true
         });
         
-        // Test connection
         const connection = await pool.getConnection();
         connection.release();
         
         return pool;
       } else {
-        // Single connection
         return await this.mysql2.createConnection(connectionConfig);
       }
     } catch (error) {
@@ -104,9 +91,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Disconnect from MySQL
-   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const conn = connection as any;
@@ -114,7 +98,6 @@ export class MySQLAdapter extends DatabaseAdapter {
       if (conn.end) {
         await conn.end();
       } else if (conn.pool) {
-        // Connection pool
         await conn.pool.end();
       }
     } catch (error) {
@@ -123,9 +106,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute query
-   */
   async query(
     connection: DatabaseConnection, 
     sql: string, 
@@ -134,12 +114,10 @@ export class MySQLAdapter extends DatabaseAdapter {
   ): Promise<QueryResult> {
     const conn = connection as any;
     
-    // Get connection from pool if needed
     const isPool = conn.getConnection !== undefined;
     const queryConn = isPool ? await conn.getConnection() : conn;
 
     try {
-      // Set query timeout
       if (options?.timeout) {
         await queryConn.query(`SET SESSION max_execution_time=${options.timeout}`);
       }
@@ -148,11 +126,9 @@ export class MySQLAdapter extends DatabaseAdapter {
       const [rows, fields] = await queryConn.execute(sql, params || []);
       const executionTime = Date.now() - startTime;
 
-      // Parse result based on query type
       let result: QueryResult;
       
       if (Array.isArray(rows)) {
-        // SELECT query
         result = {
           rows: rows as any[],
           rowCount: rows.length,
@@ -161,7 +137,6 @@ export class MySQLAdapter extends DatabaseAdapter {
           command: sql.trim().split(' ')[0]?.toUpperCase() || 'UNKNOWN'
         };
       } else {
-        // INSERT/UPDATE/DELETE query
         result = {
           rows: [],
           rowCount: (rows as any).affectedRows || 0,
@@ -183,9 +158,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute stored procedure
-   */
   async executeStoredProcedure(
     connection: DatabaseConnection,
     procedureName: string,
@@ -197,7 +169,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     
     const result = await this.query(connection, sql, params, options);
     
-    // MySQL returns multiple result sets for stored procedures
     if (Array.isArray(result) && result.length > 0) {
       return result[0];
     }
@@ -205,9 +176,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     return result;
   }
 
-  /**
-   * Execute function
-   */
   async executeFunction(
     connection: DatabaseConnection,
     functionName: string,
@@ -221,22 +189,17 @@ export class MySQLAdapter extends DatabaseAdapter {
     return result.rows[0]?.result;
   }
 
-  /**
-   * Begin transaction
-   */
   async beginTransaction(
     connection: DatabaseConnection,
     options?: TransactionOptions
   ): Promise<void> {
     const conn = connection as any;
     
-    // Set isolation level if specified
     if (options?.isolationLevel) {
       const level = this.getIsolationLevelSQL(options.isolationLevel);
       await this.query(connection, `SET TRANSACTION ISOLATION LEVEL ${level}`);
     }
 
-    // Get connection from pool if needed
     if (conn.getConnection) {
       const txConn = await conn.getConnection();
       await txConn.beginTransaction();
@@ -246,62 +209,42 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Commit transaction
-   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     const conn = connection as any;
     const txConn = conn._transactionConnection || conn;
     
     await txConn.commit();
     
-    // Release connection if from pool
     if (conn._transactionConnection) {
       conn._transactionConnection.release();
       delete conn._transactionConnection;
     }
   }
 
-  /**
-   * Rollback transaction
-   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     const conn = connection as any;
     const txConn = conn._transactionConnection || conn;
     
     await txConn.rollback();
     
-    // Release connection if from pool
     if (conn._transactionConnection) {
       conn._transactionConnection.release();
       delete conn._transactionConnection;
     }
   }
 
-  /**
-   * Create savepoint
-   */
   async createSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `SAVEPOINT ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Release savepoint
-   */
   async releaseSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `RELEASE SAVEPOINT ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Rollback to savepoint
-   */
   async rollbackToSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `ROLLBACK TO SAVEPOINT ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Prepare statement
-   */
   async prepare(connection: DatabaseConnection, sql: string): Promise<PreparedStatement> {
     const conn = connection as any;
     const isPool = conn.getConnection !== undefined;
@@ -327,9 +270,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     } as PreparedStatement;
   }
 
-  /**
-   * Execute prepared statement
-   */
   async executePrepared(
     statement: PreparedStatement,
     params?: any[]
@@ -337,9 +277,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     return await (statement as any).execute(params);
   }
 
-  /**
-   * Ping connection
-   */
   async ping(connection: DatabaseConnection): Promise<void> {
     const conn = connection as any;
     
@@ -350,14 +287,10 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Get database metadata
-   */
   async getMetadata(connection: DatabaseConnection): Promise<DatabaseMetadata> {
     const versionResult = await this.query(connection, 'SELECT VERSION() AS version');
     const dbNameResult = await this.query(connection, 'SELECT DATABASE() AS dbname');
     
-    // Get table count for metadata (not used in return value)
     await this.query(connection, `
       SELECT COUNT(*) as count 
       FROM information_schema.tables 
@@ -377,9 +310,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Get table information
-   */
   async getTableInfo(connection: DatabaseConnection, tableName: string): Promise<TableInfo> {
     const columnsResult = await this.query(connection, `
       SELECT 
@@ -397,7 +327,6 @@ export class MySQLAdapter extends DatabaseAdapter {
       ORDER BY ORDINAL_POSITION
     `, [tableName]);
 
-    // Get constraints for future use
     await this.query(connection, `
       SELECT 
         CONSTRAINT_NAME as name,
@@ -418,7 +347,6 @@ export class MySQLAdapter extends DatabaseAdapter {
       ORDER BY INDEX_NAME, SEQ_IN_INDEX
     `, [tableName]);
 
-    // Group indexes
     const indexes = new Map<string, any>();
     indexResult.rows.forEach(row => {
       if (!indexes.has(row.indexName)) {
@@ -432,7 +360,6 @@ export class MySQLAdapter extends DatabaseAdapter {
       indexes.get(row.indexName).columns.push(row.columnName);
     });
 
-    // Find primary key columns
     const primaryKeyResult = await this.query(connection, `
       SELECT COLUMN_NAME 
       FROM information_schema.KEY_COLUMN_USAGE
@@ -480,9 +407,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     return tableInfo;
   }
 
-  /**
-   * Bulk insert
-   */
   async bulkInsert(
     connection: DatabaseConnection,
     table: string,
@@ -490,12 +414,10 @@ export class MySQLAdapter extends DatabaseAdapter {
   ): Promise<number> {
     if (data.length === 0) return 0;
 
-    // Get columns from first row
     const columns = Object.keys(data[0]);
     const columnNames = columns.map(col => this.escapeIdentifier(col)).join(', ');
     const placeholders = columns.map(() => '?').join(', ');
     
-    // Build values array
     const values: any[] = [];
     const valuePlaceholders: string[] = [];
     
@@ -512,9 +434,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     return result.affectedRows || data.length;
   }
 
-  /**
-   * Parse fields metadata
-   */
   private parseFields(fields: any[]): any {
     if (!fields) return undefined;
     
@@ -527,11 +446,7 @@ export class MySQLAdapter extends DatabaseAdapter {
     }));
   }
 
-  /**
-   * Map MySQL field type to generic type
-   */
   private mapFieldType(mysqlType: number): string {
-    // MySQL field type constants
     const types: Record<number, string> = {
       0: 'DECIMAL',
       1: 'TINY',
@@ -566,9 +481,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     return types[mysqlType] || 'UNKNOWN';
   }
 
-  /**
-   * Get table row count
-   */
   private async getTableRowCount(connection: DatabaseConnection, tableName: string): Promise<number> {
     const result = await this.query(
       connection, 
@@ -577,9 +489,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     return result.rows[0].count;
   }
 
-  /**
-   * Parse query error
-   */
   parseQueryError(error: any, sql?: string): Error {
     const message = `MySQL Error: ${error.message}\nSQL: ${sql ? sql.substring(0, 200) + (sql.length > 200 ? '...' : '') : 'No SQL provided'}`;
     const enhancedError = new Error(message);
@@ -596,16 +505,10 @@ export class MySQLAdapter extends DatabaseAdapter {
     return enhancedError;
   }
 
-  /**
-   * Escape identifier
-   */
   override escapeIdentifier(identifier: string): string {
     return `\`${identifier.replace(/`/g, '``')}\``;
   }
 
-  /**
-   * Stream query results
-   */
   override async *stream(
     connection: DatabaseConnection,
     sql: string,
@@ -629,9 +532,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Set session parameter
-   */
   override async setSessionParameter(
     connection: DatabaseConnection,
     parameter: string,
@@ -641,9 +541,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     await this.query(connection, sql, [value]);
   }
 
-  /**
-   * Get server info
-   */
   override async getServerInfo(connection: DatabaseConnection): Promise<any> {
     const variablesResult = await this.query(connection, `
       SELECT 

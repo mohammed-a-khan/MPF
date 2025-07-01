@@ -1,7 +1,6 @@
 // src/core/elements/types/element.types.ts
 import { Locator } from 'playwright';
 
-// Define BoundingBox type based on Playwright's return type
 export interface BoundingBox {
   x: number;
   y: number;
@@ -10,23 +9,19 @@ export interface BoundingBox {
 }
 
 export interface CSGetElementOptions {
-  // Basic locators
   locatorType: 'css' | 'xpath' | 'id' | 'text' | 'role' | 'testid' | 'label' | 'placeholder' | 'alt' | 'title';
   locatorValue: string;
   description: string;
   
-  // Text matching
   exact?: boolean;
   caseSensitive?: boolean;
   
-  // Advanced options
   hasText?: string;
   hasNotText?: string;
   has?: CSGetElementOptions;
   hasNot?: CSGetElementOptions;
   filter?: CSGetElementOptions;
   
-  // Layout selectors
   leftOf?: CSGetElementOptions;
   rightOf?: CSGetElementOptions;
   above?: CSGetElementOptions;
@@ -34,36 +29,29 @@ export interface CSGetElementOptions {
   near?: CSGetElementOptions;
   maxDistance?: number;
   
-  // Component selectors
   react?: string;
   vue?: string;
   
-  // Nth selectors
   nth?: number | 'first' | 'last';
   
-  // Fallbacks
   fallbacks?: Array<{
     locatorType: string;
     value: string;
   }>;
   
-  // AI options
   aiEnabled?: boolean;
   aiDescription?: string;
   aiConfidenceThreshold?: number;
   
-  // Wait options
   waitTimeout?: number;
   waitForVisible?: boolean;
   waitForEnabled?: boolean;
   
-  // Frame/Shadow DOM
   iframe?: string | number;
   shadowRoot?: boolean;
   
-  // Validation
-  strict?: boolean;  // Fail if multiple elements match
-  required?: boolean;  // Whether the element is required for page validation
+  strict?: boolean;
+  required?: boolean;
 }
 
 export interface ElementAction {

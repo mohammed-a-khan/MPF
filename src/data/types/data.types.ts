@@ -1,21 +1,15 @@
 // src/data/types/data.types.ts
 
-/**
- * Test data record
- */
 export interface TestData extends Record<string, any> {
-    // Core fields
     id?: string | number;
     name?: string;
     description?: string;
     
-    // Execution control
     ExecutionFlag?: ExecutionFlag;
     Priority?: number;
     Environment?: string;
     Tags?: string[];
     
-    // Cleanup metadata
     __dbId?: string | number;
     __tableName?: string;
     __connectionName?: string;
@@ -41,88 +35,64 @@ export interface TestData extends Record<string, any> {
     __cleanupPriority?: number;
 }
 
-/**
- * Execution flag for test data
- */
-export type ExecutionFlag = 'Y' | 'N' | 'S'; // Yes, No, Skip
+export type ExecutionFlag = 'Y' | 'N' | 'S';
 
-/**
- * Data source types
- */
 export type DataSource = 'excel' | 'csv' | 'json' | 'xml' | 'database' | 'file';
 
-/**
- * Data provider options
- */
 export interface DataProviderOptions {
-    // Source configuration
     source?: string;
     type?: DataSource;
     tagValue?: string;
     
-    // Context
     scenarioName?: string;
     featurePath?: string;
     
-    // Excel/CSV specific
     sheet?: string;
     range?: string;
     headers?: boolean;
     skipRows?: number;
     
-    // Database specific
     connection?: string;
     table?: string;
     query?: string;
     params?: any[];
     
-    // JSON/XML specific
     jsonPath?: string;
     xmlPath?: string;
     namespace?: Record<string, string>;
     
-    // Filtering
     filter?: Record<string, any>;
     where?: string;
     having?: string;
     
-    // Execution control
     executionFlagColumn?: string;
     skipExecutionFlag?: boolean;
     environment?: string;
     
-    // Transformation
     transformations?: DataTransformation[];
     interpolateVariables?: boolean;
     variables?: Record<string, any>;
     
-    // Merging
     mergeSources?: Array<{
         source: string;
         type: DataSource;
         mergeOptions?: MergeOptions;
     }>;
     
-    // Validation
     schemaPath?: string;
     requiredFields?: string[];
     uniqueFields?: string[];
     validations?: DataValidation[];
     
-    // Performance
     streaming?: boolean;
     batchSize?: number;
     maxRecords?: number;
     
-    // Caching
     cacheKey?: string;
     cacheTTL?: number;
     skipCache?: boolean;
 }
 
-/**
- * Data provider configuration
- */
 export interface DataProviderConfig {
     cacheEnabled: boolean;
     cacheTTL: number;
@@ -136,9 +106,6 @@ export interface DataProviderConfig {
     defaultExecutionFlag: ExecutionFlag;
 }
 
-/**
- * Data provider result
- */
 export interface DataProviderResult {
     data: TestData[];
     metadata?: {
@@ -151,9 +118,6 @@ export interface DataProviderResult {
     };
 }
 
-/**
- * Data handler interface
- */
 export interface DataHandler {
     load(options: DataProviderOptions): Promise<DataProviderResult>;
     validate?(data: TestData[]): Promise<ValidationResult>;
@@ -164,9 +128,6 @@ export interface DataHandler {
     getMetadata?(options: DataProviderOptions): Promise<Record<string, any>>;
 }
 
-/**
- * Data transformation
- */
 export interface DataTransformation {
     type: 'map' | 'filter' | 'reduce' | 'sort' | 'group' | 'pivot' | 'custom';
     field?: string;
@@ -177,9 +138,6 @@ export interface DataTransformation {
     options?: Record<string, any>;
 }
 
-/**
- * Data validation
- */
 export interface DataValidation {
     field: string;
     type: 'required' | 'unique' | 'format' | 'range' | 'custom';
@@ -191,9 +149,6 @@ export interface DataValidation {
     validator?: (value: any, record: TestData) => boolean;
 }
 
-/**
- * Validation result
- */
 export interface ValidationResult {
     isValid: boolean;
     errors: string[];
@@ -206,9 +161,6 @@ export interface ValidationResult {
     }>;
 }
 
-/**
- * Merge options
- */
 export interface MergeOptions {
     strategy: 'append' | 'merge' | 'replace' | 'join';
     key?: string | string[];
@@ -217,9 +169,6 @@ export interface MergeOptions {
     conflictResolver?: (original: TestData, updated: TestData) => TestData;
 }
 
-/**
- * Cache entry
- */
 export interface CacheEntry<T> {
     data: T;
     timestamp: number;
@@ -229,9 +178,6 @@ export interface CacheEntry<T> {
     size?: number;
 }
 
-/**
- * Cache statistics
- */
 export interface CacheStatistics {
     size: number;
     maxSize: number;
@@ -245,9 +191,6 @@ export interface CacheStatistics {
     mostAccessed: { key: string; count: number } | null;
 }
 
-/**
- * Iterator options
- */
 export interface IteratorOptions {
     batchSize?: number;
     shuffle?: boolean;
@@ -261,9 +204,6 @@ export interface IteratorOptions {
     onError?: (error: any, item: TestData, state: IteratorState) => void;
 }
 
-/**
- * Iterator state
- */
 export interface IteratorState {
     totalItems: number;
     currentIndex: number;
@@ -281,14 +221,8 @@ export interface IteratorState {
     elapsedTime?: number;
 }
 
-/**
- * Cleanup strategy
- */
 export type CleanupStrategy = 'database' | 'api' | 'file' | 'cache' | 'custom';
 
-/**
- * Cleanup task
- */
 export interface CleanupTask {
     id: string;
     type: CleanupStrategy;
@@ -302,9 +236,6 @@ export interface CleanupTask {
     rollback?: () => Promise<void>;
 }
 
-/**
- * Cleanup statistics
- */
 export interface CleanupStatistics {
     pendingTasks: number;
     executedTasks: number;
@@ -316,9 +247,6 @@ export interface CleanupStatistics {
     autoCleanupEnabled: boolean;
 }
 
-/**
- * Execution flag options
- */
 export interface ExecutionFlagOptions {
     columnName: string;
     environment: string;
@@ -327,9 +255,6 @@ export interface ExecutionFlagOptions {
     treatSAsSkip?: boolean;
 }
 
-/**
- * Schema definition
- */
 export interface DataSchema {
     version?: string;
     fields: Array<{
@@ -356,23 +281,17 @@ export interface DataSchema {
     }>;
 }
 
-/**
- * Parser options
- */
 export interface ParserOptions {
-    // Common options
     encoding?: string;
     skipEmptyRows?: boolean;
     trimValues?: boolean;
     
-    // Excel specific
     sheetName?: string;
     sheetIndex?: number;
     range?: string;
     headerRow?: number;
     formulaValues?: boolean;
     
-    // CSV specific
     delimiter?: string;
     quote?: string;
     escape?: string;
@@ -380,10 +299,8 @@ export interface ParserOptions {
     skipRows?: number;
     maxRows?: number;
     
-    // JSON specific
     jsonPath?: string;
     
-    // XML specific
     xmlPath?: string;
     namespaces?: Record<string, string>;
     attributePrefix?: string;
@@ -391,9 +308,6 @@ export interface ParserOptions {
     ignoreAttributes?: boolean;
 }
 
-/**
- * Stream options
- */
 export interface StreamOptions extends ParserOptions {
     highWaterMark?: number;
     batchSize?: number;
@@ -402,9 +316,6 @@ export interface StreamOptions extends ParserOptions {
     onEnd?: () => void;
 }
 
-/**
- * Type conversion options
- */
 export interface TypeConversionOptions {
     dateFormat?: string;
     numberFormat?: string;
@@ -418,9 +329,6 @@ export interface TypeConversionOptions {
     parseBooleans?: boolean;
 }
 
-/**
- * Variable interpolation context
- */
 export interface InterpolationContext extends Record<string, any> {
     env: Record<string, string>;
     random: {
@@ -446,9 +354,6 @@ export interface InterpolationContext extends Record<string, any> {
     };
 }
 
-/**
- * Handler registration
- */
 export interface HandlerRegistration {
     type: string;
     handler: new() => DataHandler;

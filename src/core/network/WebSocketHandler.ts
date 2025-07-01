@@ -12,10 +12,6 @@ import {
     WebSocketEvent
 } from './types/network.types';
 
-/**
- * WebSocketHandler - Complete WebSocket connection management
- * Handles WebSocket connections, messages, and real-time communication
- */
 export class WebSocketHandler {
     private page: Page;
     private connections: Map<string, WebSocketConnection> = new Map();
@@ -38,9 +34,6 @@ export class WebSocketHandler {
         };
     }
 
-    /**
-     * Start monitoring WebSocket connections
-     */
     async startMonitoring(): Promise<void> {
         if (this.isMonitoring) {
             const logger = Logger.getInstance();
@@ -48,7 +41,6 @@ export class WebSocketHandler {
             return;
         }
 
-        // Set up WebSocket event listeners
         this.page.on('websocket', ws => this.handleNewWebSocket(ws));
         
         this.isMonitoring = true;
@@ -58,9 +50,6 @@ export class WebSocketHandler {
         });
     }
 
-    /**
-     * Stop monitoring WebSocket connections
-     */
     async stopMonitoring(): Promise<void> {
         if (!this.isMonitoring) {
             return;
@@ -74,9 +63,6 @@ export class WebSocketHandler {
         });
     }
 
-    /**
-     * Wait for WebSocket connection
-     */
     async waitForWebSocket(url: string, timeout?: number): Promise<WebSocket> {
         const timeoutMs = timeout || this.options.messageTimeout;
         
@@ -95,10 +81,8 @@ export class WebSocketHandler {
                 return false;
             };
 
-            // Check if already connected
             if (checkExisting()) return;
 
-            // Wait for new connection
             const listener = (ws: WebSocket) => {
                 if (ws.url().includes(url)) {
                     clearTimeout(timer);
@@ -111,15 +95,10 @@ export class WebSocketHandler {
         });
     }
 
-    /**
-     * Send message through WebSocket
-     */
     async sendMessage(ws: WebSocket, message: string | Buffer): Promise<void> {
         try {
-            // Ensure connection is open
             await this.ensureConnected(ws);
             
-            // Send message through page evaluation
             await this.page.evaluate(
                 ({ url, message }) => {
                     const sockets = Array.from((window as any).__websockets || []) as any[];
@@ -133,7 +112,6 @@ export class WebSocketHandler {
                 { url: ws.url(), message: typeof message === 'string' ? message : message.toString('base64') }
             );
             
-            // Record message
             this.recordMessage(ws.url(), {
                 type: 'sent',
                 data: message,
@@ -152,17 +130,11 @@ export class WebSocketHandler {
         }
     }
 
-    /**
-     * Send JSON message
-     */
     async sendJSON(ws: WebSocket, data: any): Promise<void> {
         const jsonString = JSON.stringify(data);
         await this.sendMessage(ws, jsonString);
     }
 
-    /**
-     * Wait for specific message
-     */
     async waitForMessage(
         ws: WebSocket, 
         matcher?: MessageMatcher,
@@ -190,9 +162,6 @@ export class WebSocketHandler {
         });
     }
 
-    /**
-     * Wait for JSON message
-     */
     async waitForJSON(
         ws: WebSocket, 
         matcher?: JSONMatcher,
@@ -210,9 +179,6 @@ export class WebSocketHandler {
         return JSON.parse(message);
     }
 
-    /**
-     * Close WebSocket connection
-     */
     async closeWebSocket(
         ws: WebSocket, 
         code?: number, 
@@ -224,7 +190,6 @@ export class WebSocketHandler {
                 connection.state = 'closing';
             }
 
-            // Close with code and reason if provided
             if (code !== undefined) {
                 await this.page.evaluate(
                     ({ url, code, reason }) => {
@@ -237,7 +202,6 @@ export class WebSocketHandler {
                     { url: ws.url(), code, reason }
                 );
             } else {
-                // Close through page evaluation
                 await this.page.evaluate(
                     (url) => {
                         const sockets = Array.from((window as any).__websockets || []) as any[];
@@ -275,9 +239,6 @@ export class WebSocketHandler {
         }
     }
 
-    /**
-     * Get WebSocket state
-     */
     getWebSocketState(ws: WebSocket): WebSocketState {
         const connection = this.connections.get(ws.url());
         
@@ -298,31 +259,21 @@ export class WebSocketHandler {
         };
     }
 
-    /**
-     * Get message history for WebSocket
-     */
     getWebSocketMessages(ws: WebSocket): Message[] {
         return this.messageHistory.get(ws.url()) || [];
     }
 
-    /**
-     * Clear message history
-     */
     clearMessageHistory(ws: WebSocket): void {
         this.messageHistory.delete(ws.url());
         
         ActionLogger.logInfo('websocket_history_cleared', { url: ws.url() });
     }
 
-    /**
-     * Simulate disconnect
-     */
     async simulateDisconnect(ws: WebSocket): Promise<void> {
         await this.page.evaluate((url) => {
             const sockets = Array.from((window as any).__websockets || []) as any[];
             const socket = sockets.find((s: any) => s.url === url) as any;
             if (socket && typeof socket.close === 'function') {
-                // Simulate network disconnect
                 socket.close(1006, 'Abnormal Closure');
             }
         }, ws.url());
@@ -334,9 +285,6 @@ export class WebSocketHandler {
         });
     }
 
-    /**
-     * Simulate reconnect
-     */
     async simulateReconnect(ws: WebSocket): Promise<WebSocket> {
         const url = ws.url();
         const connection = this.connections.get(url);
@@ -345,13 +293,10 @@ export class WebSocketHandler {
             throw new Error('WebSocket connection not found');
         }
 
-        // Close existing connection
         await this.simulateDisconnect(ws);
         
-        // Wait a bit
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Create new connection
         const newWs = await this.createWebSocket(url, connection.protocols);
         
         this.recordEvent(url, {
@@ -363,17 +308,11 @@ export class WebSocketHandler {
         return newWs;
     }
 
-    /**
-     * Get all active connections
-     */
     getActiveConnections(): WebSocketConnection[] {
         return Array.from(this.connections.values())
             .filter(conn => conn.state === 'open');
     }
 
-    /**
-     * Get connection metrics
-     */
     getConnectionMetrics(ws: WebSocket): WebSocketMetrics {
         const connection = this.connections.get(ws.url());
         
@@ -384,9 +323,6 @@ export class WebSocketHandler {
         return { ...connection.metrics };
     }
 
-    /**
-     * Subscribe to messages
-     */
     subscribeToMessages(
         ws: WebSocket, 
         callback: (message: Message) => void
@@ -399,7 +335,6 @@ export class WebSocketHandler {
         
         this.messageListeners.get(url)!.add(callback);
         
-        // Return unsubscribe function
         return () => {
             const listeners = this.messageListeners.get(url);
             if (listeners) {
@@ -408,9 +343,6 @@ export class WebSocketHandler {
         };
     }
 
-    /**
-     * Export connection data
-     */
     exportConnectionData(ws: WebSocket): any {
         const connection = this.connections.get(ws.url());
         const messages = this.messageHistory.get(ws.url()) || [];
@@ -432,12 +364,10 @@ export class WebSocketHandler {
         };
     }
 
-    // Private helper methods
 
     private handleNewWebSocket(ws: WebSocket): void {
         const url = ws.url();
         
-        // Create connection record
         const connection: WebSocketConnection = {
             websocket: ws,
             url,
@@ -464,7 +394,6 @@ export class WebSocketHandler {
     }
 
     private setupWebSocketListeners(ws: WebSocket, connection: WebSocketConnection): void {
-        // Connection opened
         ws.on('framesent', () => {
             if (connection.state === 'connecting') {
                 connection.state = 'open';
@@ -479,7 +408,6 @@ export class WebSocketHandler {
             }
         });
 
-        // Message received
         ws.on('framereceived', (data: { payload: string | Buffer }) => {
             const messageData = typeof data.payload === 'string' ? data.payload : data.payload.toString();
             const message: Message = {
@@ -492,7 +420,6 @@ export class WebSocketHandler {
             connection.metrics.messagesReceived++;
             connection.metrics.bytesReceived += typeof data.payload === 'string' ? data.payload.length : data.payload.length;
 
-            // Notify listeners
             const listeners = this.messageListeners.get(ws.url());
             if (listeners) {
                 listeners.forEach(callback => callback(message));
@@ -507,13 +434,11 @@ export class WebSocketHandler {
             }
         });
 
-        // Message sent
         ws.on('framesent', (data: { payload: string | Buffer }) => {
             connection.metrics.messagesSent++;
             connection.metrics.bytesSent += typeof data.payload === 'string' ? data.payload.length : data.payload.length;
         });
 
-        // Connection closed
         ws.on('close', () => {
             connection.state = 'closed';
             this.recordEvent(ws.url(), {
@@ -521,7 +446,6 @@ export class WebSocketHandler {
                 timestamp: new Date()
             });
 
-            // Handle auto-reconnect if enabled
             if (this.options.autoReconnect && connection.metrics.reconnects < this.options.maxReconnectAttempts!) {
                 this.attemptReconnect(ws.url(), connection);
             }
@@ -532,7 +456,6 @@ export class WebSocketHandler {
             });
         });
 
-        // Error occurred
         ws.on('socketerror', (error) => {
             connection.metrics.errors++;
             this.recordEvent(ws.url(), {
@@ -549,13 +472,11 @@ export class WebSocketHandler {
         const connection = this.connections.get(ws.url());
         
         if (!connection || connection.state !== 'open') {
-            // Wait for connection to open
             await new Promise<void>((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('WebSocket not connected'));
                 }, 5000);
 
-                // Check periodically
                 const interval = setInterval(() => {
                     const conn = this.connections.get(ws.url());
                     if (conn && conn.state === 'open') {
@@ -576,7 +497,6 @@ export class WebSocketHandler {
         const history = this.messageHistory.get(url)!;
         history.push(message);
 
-        // Limit history size
         if (history.length > this.options.maxHistorySize!) {
             history.shift();
         }
@@ -590,7 +510,6 @@ export class WebSocketHandler {
         const history = this.eventHistory.get(url)!;
         history.push(event);
 
-        // Limit history size
         if (history.length > this.options.maxHistorySize!) {
             history.shift();
         }
@@ -606,19 +525,16 @@ export class WebSocketHandler {
     }
 
     private async createWebSocket(url: string, protocols?: string[]): Promise<WebSocket> {
-        // Create WebSocket through page evaluation
         await this.page.evaluate(
             ({ url, protocols }) => {
                 const ws = new WebSocket(url, protocols);
                 
-                // Store reference for later access
                 (window as any).__websockets = (window as any).__websockets || [];
                 (window as any).__websockets.push(ws);
             },
             { url, protocols }
         );
         
-        // Wait for the WebSocket to be created
         const ws = await this.waitForWebSocket(url, 5000);
         return ws;
     }
@@ -635,7 +551,6 @@ export class WebSocketHandler {
             try {
                 const newWs = await this.createWebSocket(url, connection.protocols);
                 
-                // Update connection
                 connection.websocket = newWs;
                 connection.state = 'connecting';
                 

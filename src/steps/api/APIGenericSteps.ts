@@ -10,10 +10,6 @@ import { ResponseStorage } from '../../bdd/context/ResponseStorage';
 import { FileUtils } from '../../core/utils/FileUtils';
 import { ValidationUtils } from '../../core/utils/ValidationUtils';
 
-/**
- * Generic API testing step definitions for core operations
- * Provides fundamental API testing capabilities
- */
 @StepDefinitions
 export class APIGenericSteps extends CSBDDBaseStepDefinition {
     private apiContextManager: APIContextManager;
@@ -26,10 +22,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         this.responseStorage = ResponseStorage.getInstance();
     }
 
-    /**
-     * Sets the current API context for subsequent operations
-     * Example: Given user is working with "users" API
-     */
     @CSBDDStepDef("user is working with {string} API")
     async setAPIContext(apiName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -40,7 +32,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         });
         
         try {
-            // Verify apiContextManager is available
             if (!this.apiContextManager) {
                 this.apiContextManager = APIContextManager.getInstance();
                 if (!this.apiContextManager) {
@@ -48,9 +39,7 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 }
             }
             
-            // Create or get existing context
             if (this.apiContextManager.hasContext(apiName)) {
-                // Context already exists, get it
                 this.currentContext = this.apiContextManager.getContext(apiName);
                 await actionLogger.logAction('API Context Reused', { 
                     description: `Reusing existing API context for '${apiName}'`,
@@ -58,7 +47,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                     details: `Found existing context configuration for ${apiName}`
                 });
             } else {
-                // Context doesn't exist, create it
                 this.currentContext = this.apiContextManager.createContext(apiName);
                 await actionLogger.logAction('API Context Created', { 
                     description: `Created new API context for '${apiName}'`,
@@ -67,10 +55,8 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 });
             }
             
-            // Switch to the newly created context so it becomes the current context
             this.apiContextManager.switchContext(apiName);
             
-            // Load API-specific configuration
             const apiConfig = await this.loadAPIConfig(apiName);
             if (apiConfig) {
                 this.currentContext.setBaseUrl(apiConfig.baseUrl);
@@ -80,13 +66,10 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 this.currentContext.setTimeout(apiConfig.timeout || 30000);
             }
             
-            // Store in BDD context for other steps (only if scenario context is available)
             try {
                 this.store('currentAPIContext', this.currentContext);
                 this.store('currentAPIName', apiName);
             } catch (error) {
-                // Scenario context not available - this is fine for standalone API tests
-                // The context is still stored in the instance variables
             }
             
             await actionLogger.logAction('API Context Ready', { 
@@ -102,10 +85,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets the base URL for API requests
-     * Example: Given user sets API base URL to "https://api.example.com"
-     */
     @CSBDDStepDef("user sets API base URL to {string}")
     async setAPIBaseURL(baseUrl: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -116,12 +95,10 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         });
         
         try {
-            // Validate URL format
             if (!ValidationUtils.isValidUrl(baseUrl)) {
                 throw new Error(`Invalid URL format: ${baseUrl}`);
             }
             
-            // Get current context or create default
             if (!this.currentContext) {
                 if (this.apiContextManager.hasContext('default')) {
                     this.currentContext = this.apiContextManager.getContext('default');
@@ -130,7 +107,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 }
             }
             
-            // Interpolate variables if present
             const interpolatedUrl = await this.interpolateValue(baseUrl);
             
             this.currentContext.setBaseUrl(interpolatedUrl);
@@ -147,10 +123,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets the timeout for API requests
-     * Example: Given user sets API timeout to 60 seconds
-     */
     @CSBDDStepDef("user sets API timeout to {int} seconds")
     async setAPITimeout(timeoutSeconds: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -184,10 +156,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Enables or disables SSL certificate validation
-     * Example: Given user disables SSL validation
-     */
     @CSBDDStepDef("user disables SSL validation")
     async disableSSLValidation(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -209,10 +177,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Enables SSL certificate validation (default)
-     * Example: Given user enables SSL validation
-     */
     @CSBDDStepDef("user enables SSL validation")
     async enableSSLValidation(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -233,10 +197,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets the number of retry attempts for failed requests
-     * Example: Given user sets API retry count to 3
-     */
     @CSBDDStepDef("user sets API retry count to {int}")
     async setRetryCount(retryCount: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -261,10 +221,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets the delay between retry attempts
-     * Example: Given user sets API retry delay to 2 seconds
-     */
     @CSBDDStepDef("user sets API retry delay to {int} seconds")
     async setRetryDelay(delaySeconds: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -293,10 +249,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Enables request logging for debugging
-     * Example: Given user enables API request logging
-     */
     @CSBDDStepDef("user enables API request logging")
     async enableRequestLogging(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -322,10 +274,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Disables request/response logging
-     * Example: Given user disables API request logging
-     */
     @CSBDDStepDef("user disables API request logging")
     async disableRequestLogging(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -336,7 +284,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 this.currentContext = await this.apiContextManager.createContext('default');
             }
             
-            // Store request logging preference in variables
             this.currentContext.setVariable('requestLogging', false);
             
             await actionLogger.logAction('requestLoggingDisabled', {});
@@ -346,10 +293,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Clears all stored API responses
-     * Example: Given user clears all API responses
-     */
     @CSBDDStepDef("user clears all API responses")
     async clearAllResponses(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -358,9 +301,7 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         try {
             this.responseStorage.clear();
             
-            // Clear any stored responses in context state
             if (this.currentContext) {
-                // Clear any response-related data from variables
                 this.currentContext.setVariable('lastResponse', null);
             }
             
@@ -371,10 +312,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Switches to a different API context
-     * Example: Given user switches to "payments" API context
-     */
     @CSBDDStepDef("user switches to {string} API context")
     async switchAPIContext(contextName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -400,10 +337,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Creates a new named API context
-     * Example: Given user creates "internal" API context
-     */
     @CSBDDStepDef("user creates {string} API context")
     async createAPIContext(contextName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -422,10 +355,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets a custom user agent for API requests
-     * Example: Given user sets API user agent to "MyTestAgent/1.0"
-     */
     @CSBDDStepDef("user sets API user agent to {string}")
     async setUserAgent(userAgent: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -449,10 +378,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Enables following redirects (default behavior)
-     * Example: Given user enables redirect following
-     */
     @CSBDDStepDef("user enables redirect following")
     async enableRedirectFollowing(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -473,10 +398,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Disables following redirects
-     * Example: Given user disables redirect following
-     */
     @CSBDDStepDef("user disables redirect following")
     async disableRedirectFollowing(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -497,10 +418,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets maximum number of redirects to follow
-     * Example: Given user sets maximum redirects to 5
-     */
     @CSBDDStepDef("user sets maximum redirects to {int}")
     async setMaxRedirects(maxRedirects: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -515,7 +432,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 this.currentContext = await this.apiContextManager.createContext('default');
             }
             
-            // Store max redirects in variables since APIContext doesn't have this property directly
             this.currentContext.setVariable('maxRedirects', maxRedirects);
             
             await actionLogger.logAction('maxRedirectsSet', { maxRedirects });
@@ -525,12 +441,8 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to load API-specific configuration
-     */
     private async loadAPIConfig(apiName: string): Promise<any> {
         try {
-            // Try to load from our API config file
             const configPath = 'config/api.config.json';
             if (await FileUtils.exists(configPath)) {
                 const configContent = await FileUtils.readFile(configPath);
@@ -542,7 +454,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 }
             }
             
-            // Try to load from configuration
             const configKey = `API_${apiName.toUpperCase()}_CONFIG`;
             const configPath2 = ConfigurationManager.get(configKey);
             
@@ -552,7 +463,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 return JSON.parse(configContent.toString());
             }
             
-            // Try to load from standard location
             const standardPath = `config/api/${apiName}.json`;
             if (await FileUtils.exists(standardPath)) {
                 const configContent = await FileUtils.readFile(standardPath);
@@ -560,7 +470,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 return JSON.parse(configContent.toString());
             }
             
-            // Return default config with basic defaults
             return {
                 baseUrl: this.getDefaultBaseUrl(apiName),
                 timeout: 30000,
@@ -585,9 +494,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Get default base URL for known API names
-     */
     private getDefaultBaseUrl(apiName: string): string {
         const defaultUrls: Record<string, string> = {
             'httpbin': 'https://httpbin.org',
@@ -598,25 +504,19 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         return defaultUrls[apiName] || 'https://httpbin.org';
     }
 
-    /**
-     * Helper method to interpolate variables in values
-     */
     private async interpolateValue(value: string): Promise<string> {
         if (!value.includes('{{')) {
             return value;
         }
         
-        // Get variables from context - using retrieve for stored variables
         const variables: Record<string, any> = {};
         
-        // Try to get common variables from the BDD context
         const currentContext = this.retrieve('currentAPIContext');
         if (currentContext && typeof currentContext === 'object' && 'getVariables' in currentContext) {
             const apiVars = (currentContext as APIContext).getVariables();
             Object.assign(variables, apiVars);
         }
         
-        // Replace placeholders
         let interpolated = value;
         for (const [key, val] of Object.entries(variables)) {
             interpolated = interpolated.replace(new RegExp(`{{${key}}}`, 'g'), String(val));
@@ -625,19 +525,11 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         return interpolated;
     }
 
-    /**
-     * Sets base URL (alias for user sets API base URL to)
-     * Example: Given user sets base URL to "https://api.example.com"
-     */
     @CSBDDStepDef("user sets base URL to {string}")
     async setBaseURL(baseUrl: string): Promise<void> {
         return await this.setAPIBaseURL(baseUrl);
     }
 
-    /**
-     * Loads test data from a file
-     * Example: Given user loads test data from "api/test-data.json" as "testData"
-     */
     @CSBDDStepDef("user loads test data from {string} as {string}")
     async loadTestData(filePath: string, dataName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -646,17 +538,14 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         try {
             const resolvedPath = await this.resolveDataFilePath(filePath);
             
-            // Check if file exists
             if (!require('fs').existsSync(resolvedPath)) {
                 throw new Error(`Test data file not found: ${resolvedPath}`);
             }
             
-            // Read file content
             const content = require('fs').readFileSync(resolvedPath);
             const contentString = content.toString('utf8');
             let data: any;
             
-            // Parse based on file extension
             if (filePath.endsWith('.json')) {
                 try {
                     if (contentString.trim()) {
@@ -681,7 +570,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`Unsupported file format: ${filePath}. Supported formats: .json, .csv`);
             }
             
-            // Store the data in context with the given name
             this.store(dataName, data);
             
             await actionLogger.logAction('testDataLoaded', { 
@@ -696,10 +584,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets ADO test case ID for tracking
-     * Example: Given user sets ADO test case ID "TC-001"
-     */
     @CSBDDStepDef("user sets ADO test case ID {string}")
     async setADOTestCaseID(testCaseId: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -719,10 +603,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Stores response JSON value as a variable
-     * Example: Given user stores response JSON "token" as "auth_token"
-     */
     @CSBDDStepDef("user stores response JSON {string} as {string}")
     async storeResponseJSONValue(jsonPath: string, variableName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -734,7 +614,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 throw new Error('No response available to extract value from');
             }
             
-            // Parse response body as JSON
             let responseBody: any;
             try {
                 responseBody = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
@@ -742,7 +621,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`Response body is not valid JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
             }
             
-            // Extract value using simple path (e.g., "token", "user.id")
             let value = responseBody;
             const pathParts = jsonPath.split('.');
             
@@ -754,7 +632,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 }
             }
             
-            // Store the value
             this.store(variableName, value);
             
             if (!this.currentContext) {
@@ -774,10 +651,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Captures response as ADO evidence
-     * Example: Given user captures response as ADO evidence
-     */
     @CSBDDStepDef("user captures response as ADO evidence")
     async captureResponseAsADOEvidence(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -789,7 +662,6 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
                 throw new Error('No response available to capture as evidence');
             }
             
-            // Store response data for ADO evidence collection
             const evidenceData = {
                 timestamp: new Date().toISOString(),
                 statusCode: response.status,
@@ -811,18 +683,13 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to resolve data file paths
-     */
     private async resolveDataFilePath(filePath: string): Promise<string> {
         const path = await import('path');
         
-        // Check if absolute path
         if (path.isAbsolute(filePath)) {
             return filePath;
         }
         
-        // Try relative to test data directory
         const testDataPath = ConfigurationManager.get('TEST_DATA_PATH', './test/data');
         const resolvedPath = path.join(testDataPath, filePath);
         
@@ -830,13 +697,9 @@ export class APIGenericSteps extends CSBDDBaseStepDefinition {
             return resolvedPath;
         }
         
-        // Try relative to project root
         return filePath;
     }
 
-    /**
-     * Helper method to parse CSV content
-     */
     private parseCSV(content: string): any {
         const lines = content.split('\n');
         if (lines.length > 0 && lines[0]) {

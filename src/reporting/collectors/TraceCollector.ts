@@ -1,8 +1,3 @@
-/**
- * Trace Collector
- * Captures Chrome DevTools Protocol traces for performance analysis
- * Includes screenshots, performance metrics, and execution timeline
- */
 
 import { Page, CDPSession } from 'playwright';
 import * as fs from 'fs';
@@ -19,7 +14,6 @@ import {
   CollectorOptions
 } from '../types/reporting.types';
 
-// Define trace-specific types
 export interface TraceEvent {
   cat?: string;
   name?: string;
@@ -139,7 +133,6 @@ export interface CoverageData {
 
 const gzipAsync = promisify(zlib.gzip);
 
-// Define TraceData interface
 interface TraceData {
   events: TraceEvent[];
   metadata?: any;
@@ -226,11 +219,9 @@ export class TraceCollector {
     await FileUtils.ensureDir(scenarioPath);
 
     try {
-      // Create CDP session
       const client = await page.context().newCDPSession(page);
       this.cdpSessions.set(scenarioId, client);
 
-      // Initialize trace data
       this.traces.set(scenarioId, {
         scenarioId,
         scenarioName,
@@ -241,21 +232,16 @@ export class TraceCollector {
         endTime: 0
       });
 
-      // Initialize step traces
       this.stepTraces.set(scenarioId, new Map());
 
-      // Enable necessary domains
       await this.enableDomains(client);
 
-      // Start tracing
       await this.startTracing(client, scenarioId);
 
-      // Start collecting metrics
       if (this.options.customMetrics) {
         await this.startMetricsCollection(page, scenarioId);
       }
 
-      // Start coverage collection if enabled
       if (this.options.includeCoverage) {
         await this.startCoverageCollection(page, scenarioId);
       }
@@ -273,13 +259,11 @@ export class TraceCollector {
   async startStep(scenarioId: string, stepId: string): Promise<void> {
     this.currentSteps.set(scenarioId, stepId);
     
-    // Mark step start in trace
     const client = this.cdpSessions.get(scenarioId);
     if (client) {
       await this.injectStepMarker(client, stepId, 'start');
     }
 
-    // Initialize step trace storage
     const stepTraces = this.stepTraces.get(scenarioId);
     if (stepTraces) {
       stepTraces.set(stepId, []);
@@ -287,13 +271,11 @@ export class TraceCollector {
   }
 
   async endStep(scenarioId: string, stepId: string): Promise<void> {
-    // Mark step end in trace
     const client = this.cdpSessions.get(scenarioId);
     if (client) {
       await this.injectStepMarker(client, stepId, 'end');
     }
 
-    // Clear current step
     if (this.currentSteps.get(scenarioId) === stepId) {
       this.currentSteps.delete(scenarioId);
     }
@@ -314,11 +296,9 @@ export class TraceCollector {
     const evidenceFiles: string[] = [];
 
     try {
-      // Extract step-specific trace events
       const stepEvents = await this.extractStepEvents(scenarioId, stepId);
       
       if (stepEvents.length > 0) {
-        // Generate step trace file
         const tracePath = path.join(stepPath, `${stepId}-trace.json`);
         const stepTrace = {
           stepId,
@@ -337,13 +317,11 @@ export class TraceCollector {
           evidenceFiles.push(tracePath);
         }
 
-        // Generate performance analysis
         const analysisPath = path.join(stepPath, `${stepId}-performance.json`);
         const analysis = await this.analyzeStepPerformance(stepEvents);
         await fs.promises.writeFile(analysisPath, JSON.stringify(analysis, null, 2));
         evidenceFiles.push(analysisPath);
 
-        // Extract screenshots if any
         const screenshots = await this.extractStepScreenshots(stepEvents);
         if (screenshots.length > 0) {
           const screenshotsPath = path.join(stepPath, `${stepId}-screenshots.json`);
@@ -355,7 +333,6 @@ export class TraceCollector {
         }
       }
 
-      // Capture custom metrics for this step
       const stepMetrics = await this.captureStepMetrics(scenarioId, stepId);
       if (stepMetrics) {
         const metricsPath = path.join(stepPath, `${stepId}-metrics.json`);
@@ -378,30 +355,23 @@ export class TraceCollector {
   }
 
   private async enableDomains(client: CDPSession): Promise<void> {
-    // Enable Page domain for screenshots
     await client.send('Page.enable');
 
-    // Enable Runtime domain for console and exceptions
     await client.send('Runtime.enable');
 
-    // Enable Network domain
     await client.send('Network.enable');
 
-    // Enable Performance domain for metrics
     await client.send('Performance.enable');
 
-    // Enable HeapProfiler if memory profiling is enabled
     if (this.options.includeMemory) {
       await client.send('HeapProfiler.enable');
     }
 
-    // Enable Profiler if CPU profiling is enabled
     if (this.options.includeCPUProfile) {
       await client.send('Profiler.enable');
       await client.send('Profiler.setSamplingInterval', { interval: 100 });
     }
 
-    // Enable Coverage if enabled
     if (this.options.includeCoverage) {
       await client.send('Profiler.startPreciseCoverage', {
         callCount: true,
@@ -411,27 +381,23 @@ export class TraceCollector {
       await client.send('CSS.startRuleUsageTracking');
     }
 
-    // Enable LayerTree for paint events
     await client.send('LayerTree.enable');
 
-    // Enable DOM for DOM operations
     await client.send('DOM.enable');
 
-    // Enable Overlay for highlighting
     await client.send('Overlay.enable');
   }
 
   private async startTracing(client: CDPSession, scenarioId: string): Promise<void> {
     const tracingOptions: TracingStartOptions = {
       categories: this.options.categories || [],
-      options: 'sampling-frequency=10000'  // 10kHz sampling
+      options: 'sampling-frequency=10000'
     };
 
     if (this.options.screenshots) {
       tracingOptions.screenshots = true;
     }
 
-    // Configure trace buffer
     await client.send('Tracing.start', {
       traceConfig: {
         recordMode: 'recordContinuously',
@@ -456,7 +422,6 @@ export class TraceCollector {
 
     this.tracingStarted.set(scenarioId, true);
 
-    // Set up event listeners
     client.on('Tracing.dataCollected', (params) => {
       this.handleTraceData(scenarioId, params.value);
     });
@@ -485,10 +450,8 @@ export class TraceCollector {
     const currentStep = this.currentSteps.get(scenarioId);
 
     for (const event of data) {
-      // Add to main trace
       traceData.events.push(event);
 
-      // Add to step trace if we have a current step
       if (currentStep) {
         const stepTraces = this.stepTraces.get(scenarioId);
         if (stepTraces) {
@@ -498,7 +461,6 @@ export class TraceCollector {
         }
       }
 
-      // Extract screenshots
       if (event.name === 'Screenshot' && event.args && event.args.snapshot) {
         const screenshotData: any = {
           timestamp: event.ts,
@@ -514,7 +476,6 @@ export class TraceCollector {
         }
       }
 
-      // Update metrics based on events
       if (traceData.metrics) {
         this.updateMetricsFromEvent(traceData.metrics, event);
       }
@@ -522,26 +483,24 @@ export class TraceCollector {
   }
 
   private updateMetricsFromEvent(metrics: TraceMetrics, event: TraceEvent): void {
-    // Frame metrics
     if (event.name === 'DrawFrame') {
       if (metrics['frames']) {
         (metrics['frames'] as any).total++;
         
         const duration = event.dur || 0;
-        if (duration > 16666) { // Longer than 16.66ms (60fps)
+        if (duration > 16666) {
           (metrics['frames'] as any).dropped++;
         }
       }
     }
 
-    // Long tasks (>50ms)
     if (event.name === 'RunTask' && event.dur && event.dur > 50000) {
       if (metrics.longTasks) {
         metrics.longTasks.push({
           name: 'RunTask',
           entryType: 'longtask',
           startTime: event.ts || 0,
-          duration: event.dur / 1000, // Convert to ms
+          duration: event.dur / 1000,
           attribution: [{
             name: event.args?.data?.functionName || 'anonymous',
             entryType: 'script',
@@ -556,7 +515,6 @@ export class TraceCollector {
       }
     }
 
-    // Layout shifts
     if (event.name === 'LayoutShift' && event.args && metrics.layoutShifts) {
       const shift: LayoutShift = {
         score: event.args.data?.score || 0,
@@ -572,19 +530,16 @@ export class TraceCollector {
       }
     }
 
-    // Parse events
     if (event.name === 'ParseHTML' && event.dur) {
       const currentParseTime = metrics['parseTime'] || 0;
       (metrics as any)['parseTime'] = currentParseTime + (event.dur / 1000);
     }
 
-    // Script execution
     if (event.name === 'EvaluateScript' && event.dur) {
       const currentScriptTime = metrics['scriptTime'] || 0;
       (metrics as any)['scriptTime'] = currentScriptTime + (event.dur / 1000);
     }
 
-    // Layout time
     if (event.name === 'Layout' && event.dur) {
       const currentLayoutTime = metrics['layoutTime'] || 0;
       const currentLayoutCount = metrics['layoutCount'] || 0;
@@ -592,7 +547,6 @@ export class TraceCollector {
       (metrics as any)['layoutCount'] = currentLayoutCount + 1;
     }
 
-    // Paint time
     if (event.name === 'Paint' && event.dur) {
       const currentPaintTime = metrics['paintTime'] || 0;
       const currentPaintCount = metrics['paintCount'] || 0;
@@ -600,7 +554,6 @@ export class TraceCollector {
       (metrics as any)['paintCount'] = currentPaintCount + 1;
     }
 
-    // Style recalculation
     if (event.name === 'UpdateLayoutTree' && event.dur) {
       const currentStyleTime = metrics['styleTime'] || 0;
       const currentStyleCount = metrics['styleCount'] || 0;
@@ -608,7 +561,6 @@ export class TraceCollector {
       (metrics as any)['styleCount'] = currentStyleCount + 1;
     }
 
-    // First paint markers
     if (event.name === 'firstPaint' && !metrics['firstPaint']) {
       (metrics as any)['firstPaint'] = event.ts;
     }
@@ -617,13 +569,11 @@ export class TraceCollector {
       (metrics as any)['firstContentfulPaint'] = event.ts;
     }
 
-    // Largest contentful paint
     if (event.name === 'largestContentfulPaint::Candidate') {
       (metrics as any)['largestContentfulPaint'] = event.ts;
       (metrics as any)['largestContentfulPaintSize'] = event.args?.data?.size || 0;
     }
 
-    // User interactions
     if (event.name === 'EventDispatch') {
       const eventType = event.args?.data?.type;
       if (['click', 'tap', 'keydown', 'keyup'].includes(eventType)) {
@@ -632,19 +582,16 @@ export class TraceCollector {
       }
     }
 
-    // Resource timing
     if (event.name === 'ResourceSendRequest') {
       const currentResources = metrics['totalResources'] || 0;
       (metrics as any)['totalResources'] = currentResources + 1;
     }
 
-    // JavaScript heap
     if (event.name === 'UpdateCounters' && event.args?.data?.jsHeapSizeUsed) {
       const currentHeapUsed = metrics['jsHeapUsed'] || 0;
       (metrics as any)['jsHeapUsed'] = Math.max(currentHeapUsed, event.args.data.jsHeapSizeUsed);
     }
 
-    // DOM nodes
     if (event.name === 'UpdateCounters' && event.args?.data?.nodes) {
       const currentDomNodes = metrics['domNodes'] || 0;
       (metrics as any)['domNodes'] = Math.max(currentDomNodes, event.args.data.nodes);
@@ -653,19 +600,16 @@ export class TraceCollector {
 
   private async injectStepMarker(client: CDPSession, stepId: string, type: 'start' | 'end'): Promise<void> {
     try {
-      // Inject a custom user timing mark
       await client.send('Runtime.evaluate', {
         expression: `performance.mark('step-${stepId}-${type}');`,
         includeCommandLineAPI: true
       });
 
-      // Also inject a trace event
       await client.send('Runtime.evaluate', {
         expression: `console.timeStamp('Step ${stepId} ${type}');`,
         includeCommandLineAPI: true
       });
     } catch (error) {
-      // Page might be navigating
     }
   }
 
@@ -708,7 +652,6 @@ export class TraceCollector {
           };
         });
 
-        // Store user timings
         if (metrics.userTimings) {
           const timings = this.userTimings.get(scenarioId) || [];
           
@@ -735,38 +678,30 @@ export class TraceCollector {
           this.userTimings.set(scenarioId, timings);
         }
 
-        // Clear performance entries to avoid duplicates
         await page.evaluate(() => {
           performance.clearMarks();
           performance.clearMeasures();
         });
 
       } catch (error) {
-        // Page might be closed
       }
     };
 
-    // Collect metrics every second
     const interval = setInterval(collectMetrics, 1000);
     
-    // Store interval for cleanup
     (page as any)._metricsInterval = interval;
     
-    // Clear interval when page closes
     page.once('close', () => {
       clearInterval(interval);
     });
 
-    // Collect initial metrics
     await collectMetrics();
   }
 
   private async startCoverageCollection(page: Page, scenarioId: string): Promise<void> {
     try {
-      // Start JavaScript coverage
       await page.coverage.startJSCoverage();
       
-      // Start CSS coverage
       await page.coverage.startCSSCoverage();
 
       ActionLogger.logInfo('Coverage collection started', { scenarioId });
@@ -781,7 +716,6 @@ export class TraceCollector {
 
     const stepEvents = stepTraces.get(stepId) || [];
     
-    // Also extract events based on step markers
     const traceData = this.traces.get(scenarioId);
     if (!traceData) return stepEvents;
 
@@ -791,7 +725,6 @@ export class TraceCollector {
     let startTime: number | null = null;
     let endTime: number | null = null;
 
-    // Find step boundaries
     for (const event of traceData.events) {
       if (event.name === 'TimeStamp' && event.args?.data?.message?.includes(startMarker)) {
         startTime = event.ts ?? 0;
@@ -803,15 +736,12 @@ export class TraceCollector {
     }
 
     if (startTime && endTime) {
-      // Extract events within step boundaries
       const boundedEvents = traceData.events.filter(event => 
         (event.ts ?? 0) >= startTime! && (event.ts ?? 0) <= endTime!
       );
       
-      // Merge with tracked events
       const allEvents = [...stepEvents, ...boundedEvents];
       
-      // Remove duplicates based on timestamp and name
       const uniqueEvents = Array.from(
         new Map(allEvents.map(e => [`${e.ts}-${e.name}`, e])).values()
       );
@@ -838,32 +768,28 @@ export class TraceCollector {
 
     const startTime = Math.min(...events.map(e => e.ts ?? 0));
     const endTime = Math.max(...events.map(e => (e.ts ?? 0) + (e.dur || 0)));
-    metrics.duration = (endTime - startTime) / 1000; // Convert to ms
+    metrics.duration = (endTime - startTime) / 1000;
 
     let busyTime = 0;
 
     for (const event of events) {
       const duration = event.dur ? event.dur / 1000 : 0;
 
-      // Script execution
       if (['EvaluateScript', 'FunctionCall', 'RunMicrotasks'].includes(event.name ?? '')) {
         metrics.scriptTime += duration;
         busyTime += duration;
       }
 
-      // Layout
       if (['Layout', 'UpdateLayoutTree', 'InvalidateLayout'].includes(event.name ?? '')) {
         metrics.layoutTime += duration;
         busyTime += duration;
       }
 
-      // Paint
       if (['Paint', 'PaintImage', 'Rasterize'].includes(event.name ?? '')) {
         metrics.paintTime += duration;
         busyTime += duration;
       }
 
-      // Long tasks
       if (event.name === 'RunTask' && duration > 50) {
         metrics.longTasks.push({
           name: 'RunTask',
@@ -883,7 +809,6 @@ export class TraceCollector {
         });
       }
 
-      // Frames
       if (event.name === 'DrawFrame') {
         metrics.frameCount++;
         if (duration > 16.66) {
@@ -939,7 +864,6 @@ export class TraceCollector {
     const endTime = Math.max(...events.map(e => (e.ts ?? 0) + (e.dur || 0)));
     (analysis.summary as any).totalTime = (endTime - startTime) / 1000;
 
-    // Categorize time spent
     const timeByCategory = new Map<string, number>();
     const memorySnapshots: number[] = [];
     const frameDurations: number[] = [];
@@ -950,7 +874,6 @@ export class TraceCollector {
       
       timeByCategory.set(category, (timeByCategory.get(category) || 0) + duration);
 
-      // Long tasks
       if (event.name === 'RunTask' && duration > 50) {
         const longTask: LongTask = {
           name: 'RunTask',
@@ -974,7 +897,6 @@ export class TraceCollector {
         (analysis.summary as any).longTaskTime += duration;
       }
 
-      // Layout shifts
       if (event.name === 'LayoutShift' && event.args?.data) {
         const layoutShifts = (analysis.metrics as any).layoutShifts || [];
         layoutShifts.push({
@@ -985,7 +907,6 @@ export class TraceCollector {
         (analysis.metrics as any).layoutShifts = layoutShifts;
       }
 
-      // Frame metrics
       if (event.name === 'DrawFrame') {
         const frameMetrics = (analysis.metrics as any).frameMetrics || { total: 0, dropped: 0 };
         frameMetrics.total++;
@@ -997,13 +918,11 @@ export class TraceCollector {
         (analysis.metrics as any).frameMetrics = frameMetrics;
       }
 
-      // Memory metrics
       if (event.name === 'UpdateCounters' && event.args?.data?.jsHeapSizeUsed) {
         memorySnapshots.push(event.args.data.jsHeapSizeUsed);
       }
     }
 
-    // Calculate summary times
     (analysis.summary as any).scriptingTime = timeByCategory.get('scripting') || 0;
     (analysis.summary as any).renderingTime = timeByCategory.get('rendering') || 0;
     (analysis.summary as any).paintingTime = timeByCategory.get('painting') || 0;
@@ -1014,13 +933,11 @@ export class TraceCollector {
       (analysis.summary as any).paintingTime
     );
 
-    // Calculate frame metrics
     if (frameDurations.length > 0) {
       const avgFrameDuration = frameDurations.reduce((a, b) => a + b, 0) / frameDurations.length;
       const frameMetrics = (analysis.metrics as any).frameMetrics || {};
       frameMetrics.fps = 1000 / avgFrameDuration;
       
-      // Calculate jank (frame time variance)
       const variance = frameDurations.reduce((sum, duration) => {
         return sum + Math.pow(duration - avgFrameDuration, 2);
       }, 0) / frameDurations.length;
@@ -1028,7 +945,6 @@ export class TraceCollector {
       (analysis.metrics as any).frameMetrics = frameMetrics;
     }
 
-    // Calculate memory metrics
     if (memorySnapshots.length > 0) {
       const memoryMetrics = (analysis.metrics as any).memoryMetrics || {};
       memoryMetrics.peakJSHeapSize = Math.max(...memorySnapshots);
@@ -1037,7 +953,6 @@ export class TraceCollector {
       (analysis.metrics as any).memoryMetrics = memoryMetrics;
     }
 
-    // Generate recommendations
     this.generatePerformanceRecommendations(analysis);
 
     return analysis;
@@ -1068,7 +983,6 @@ export class TraceCollector {
 
 
   private generatePerformanceRecommendations(analysis: TraceAnalysis): void {
-    // Long task recommendations
     const longTasks = (analysis.metrics as any)?.longTasks || [];
     if (longTasks.length > 0) {
       const totalLongTaskTime = longTasks.reduce((sum: number, task: any) => sum + task.duration, 0);
@@ -1086,7 +1000,6 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
 
-    // Layout shift recommendations
     const layoutShifts = (analysis.metrics as any)?.layoutShifts || [];
     const unstableShifts = layoutShifts.filter((shift: any) => !shift.hadRecentInput);
     if (unstableShifts.length > 0) {
@@ -1104,7 +1017,6 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
 
-    // Frame rate recommendations
     const frameMetrics = (analysis.metrics as any)?.frameMetrics;
     if (frameMetrics && frameMetrics.fps < 60 && frameMetrics.total > 0) {
       const dropRate = (frameMetrics.dropped / frameMetrics.total) * 100;
@@ -1121,7 +1033,6 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
 
-    // Scripting time recommendations
     const scriptingTime = (analysis.summary as any).scriptingTime || 0;
     const totalTime = (analysis.summary as any).totalTime || 1;
     const scriptingPercentage = (scriptingTime / totalTime) * 100;
@@ -1138,9 +1049,8 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
 
-    // Memory recommendations
     const memoryMetrics = (analysis.metrics as any)?.memoryMetrics;
-    if (memoryMetrics && memoryMetrics.peakJSHeapSize > 100 * 1024 * 1024) { // 100MB
+    if (memoryMetrics && memoryMetrics.peakJSHeapSize > 100 * 1024 * 1024) {
       const recommendations = (analysis.metrics as any).recommendations || [];
       recommendations.push({
         category: 'memory',
@@ -1178,10 +1088,8 @@ export class TraceCollector {
     if (!client) return null;
 
     try {
-      // Get current performance metrics
       const perfMetrics = await client.send('Performance.getMetrics');
       
-      // Get memory info
       let memoryInfo = null;
       if (this.options.includeMemory) {
         try {
@@ -1193,11 +1101,9 @@ export class TraceCollector {
             external: perfMetrics.metrics.find(m => m.name === 'JSExternalMemory')?.value || 0
           };
         } catch {
-          // Heap profiler might not be available
         }
       }
 
-      // Get layout metrics
       const layoutMetrics = await client.send('Page.getLayoutMetrics');
 
       return {
@@ -1277,24 +1183,20 @@ export class TraceCollector {
       customMetrics: []
     };
 
-    // Process each scenario
     for (const [scenarioId, traceData] of Array.from(this.traces.entries())) {
       const scenarioPath = path.join(this.evidencePath, scenarioId);
       
       try {
-        // Stop tracing if still active
         const client = this.cdpSessions.get(scenarioId);
         if (client && this.tracingStarted.get(scenarioId)) {
           await this.stopTracing(client, scenarioId);
         }
 
-        // Collect final coverage data
         let coverageData = null;
         if (this.options.includeCoverage && client) {
           coverageData = await this.collectCoverageData(client, scenarioId);
         }
 
-        // Generate complete trace file
         const tracePath = path.join(scenarioPath, `${scenarioId}-trace.json`);
         const completeTrace = {
           traceEvents: traceData.events,
@@ -1322,20 +1224,17 @@ export class TraceCollector {
           (summary as any)['traceFiles'].push(tracePath);
         }
 
-        // Generate analysis report
         const analysisPath = path.join(scenarioPath, `${scenarioId}-analysis.json`);
         const analysis = await this.generateCompleteAnalysis(traceData);
         await fs.promises.writeFile(analysisPath, JSON.stringify(analysis, null, 2));
         (summary as any)['analysisReports'].push(analysisPath);
 
-        // Save coverage report if collected
         if (coverageData) {
           const coveragePath = path.join(scenarioPath, `${scenarioId}-coverage.json`);
           await fs.promises.writeFile(coveragePath, JSON.stringify(coverageData, null, 2));
           (summary as any)['coverageReports'].push(coveragePath);
         }
 
-        // Save custom metrics
         const customMetrics = this.customMetrics.get(scenarioId);
         if (customMetrics && customMetrics.length > 0) {
           const metricsPath = path.join(scenarioPath, `${scenarioId}-custom-metrics.json`);
@@ -1346,12 +1245,10 @@ export class TraceCollector {
           (summary as any)['customMetrics'].push(metricsPath);
         }
 
-        // Generate flame chart data
         const flameChartPath = path.join(scenarioPath, `${scenarioId}-flamechart.json`);
         const flameChart = await this.generateFlameChart(traceData.events);
         await fs.promises.writeFile(flameChartPath, JSON.stringify(flameChart, null, 2));
 
-        // Update summary
         (summary as any)['totalEvents'] += traceData.events.length;
         (summary as any)['totalDuration'] += (performance.now() - (traceData.startTime ?? 0));
         
@@ -1368,24 +1265,20 @@ export class TraceCollector {
       } catch (error) {
         ActionLogger.logError('Error finalizing trace for scenario', error as Error);
       } finally {
-        // Cleanup CDP session
         const client = this.cdpSessions.get(scenarioId);
         if (client) {
           try {
             await client.detach();
           } catch {
-            // Session might already be detached
           }
           this.cdpSessions.delete(scenarioId);
         }
       }
     }
 
-    // Generate execution summary
     const summaryPath = path.join(this.evidencePath, 'trace-summary.json');
     await fs.promises.writeFile(summaryPath, JSON.stringify(summary, null, 2));
 
-    // Generate consolidated metrics
     const metricsPath = path.join(this.evidencePath, 'performance-metrics.json');
     const consolidatedMetrics = this.generateConsolidatedMetrics();
     await fs.promises.writeFile(metricsPath, JSON.stringify(consolidatedMetrics, null, 2));
@@ -1405,7 +1298,6 @@ export class TraceCollector {
       await client.send('Tracing.end');
       this.tracingStarted.set(scenarioId, false);
       
-      // Give some time for final events to be collected
       await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error) {
@@ -1430,14 +1322,12 @@ export class TraceCollector {
     };
 
     try {
-      // Get JavaScript coverage
       const jsCoverage = await client.send('Profiler.takePreciseCoverage');
       
       for (const script of jsCoverage.result) {
         let totalBytes = 0;
         let usedBytes = 0;
         
-        // Process functions
         for (const func of script.functions) {
           for (const range of func.ranges) {
             const bytes = range.endOffset - range.startOffset;
@@ -1464,14 +1354,12 @@ export class TraceCollector {
         });
       }
       
-      // Get CSS coverage
       const cssCoverage = await client.send('CSS.takeCoverageDelta');
       
       for (const stylesheet of cssCoverage.coverage) {
         let totalBytes = stylesheet.endOffset - stylesheet.startOffset;
         let usedBytes = 0;
         
-        // Calculate used bytes from ranges
         if ((stylesheet as any).usedRanges) {
           for (const range of (stylesheet as any).usedRanges) {
             usedBytes += range.endOffset - range.startOffset;
@@ -1494,13 +1382,11 @@ export class TraceCollector {
         });
       }
       
-      // Calculate overall percentages
       coverage.js.percentage = coverage.js.total > 0 ? 
         (coverage.js.used / coverage.js.total) * 100 : 0;
       coverage.css.percentage = coverage.css.total > 0 ? 
         (coverage.css.used / coverage.css.total) * 100 : 0;
       
-      // Stop coverage collection
       await client.send('Profiler.stopPreciseCoverage');
       await client.send('CSS.stopRuleUsageTracking');
       
@@ -1564,7 +1450,6 @@ export class TraceCollector {
       }
     };
     
-    // Calculate idle time
     const summaryTotalTime = (analysis.summary as any).totalTime || 0;
     const summaryScriptingTime = (analysis.summary as any).scriptingTime || 0;
     const summaryRenderingTime = (analysis.summary as any).renderingTime || 0;
@@ -1577,14 +1462,12 @@ export class TraceCollector {
       summaryPaintingTime
     );
     
-    // Calculate FPS if we have frame data
     if ((metrics as any).frames?.total > 0 && (analysis.summary as any).totalTime > 0) {
       const frameMetrics = (analysis as any).frameMetrics || {};
       frameMetrics.fps = (metrics as any).frames.total / (analysis.summary as any).totalTime;
       (analysis as any).frameMetrics = frameMetrics;
     }
     
-    // Analyze CPU usage by category
     const cpuByCategory = new Map<string, number>();
     let totalCPUTime = 0;
     
@@ -1601,7 +1484,6 @@ export class TraceCollector {
     (analysis as any).cpuMetrics.idleTime = Math.max(0, (analysis.summary as any).totalTime - totalCPUTime);
     (analysis as any).cpuMetrics.categories = Object.fromEntries(cpuByCategory);
     
-    // Detect memory leaks
     const memoryEvents = events
       .filter((e: TraceEvent) => e.name === 'UpdateCounters' && e.args?.data?.jsHeapSizeUsed)
       .map((e: TraceEvent) => ({
@@ -1616,7 +1498,6 @@ export class TraceCollector {
       (analysis as any).memoryMetrics = memoryMetrics;
     }
     
-    // Generate performance recommendations
     this.generateCompleteRecommendations(analysis, events);
     
     return analysis;
@@ -1628,13 +1509,11 @@ export class TraceCollector {
     
     if (memoryEvents.length < windowSize * 2) return leaks;
     
-    // Simple linear regression over sliding windows
     for (let i = 0; i <= memoryEvents.length - windowSize; i++) {
       const window = memoryEvents.slice(i, i + windowSize);
       const slope = this.calculateSlope(window);
       
-      // If memory is growing consistently (positive slope)
-      if (slope > 1000) { // 1KB per timestamp unit
+      if (slope > 1000) {
         const startTime = window[0]?.timestamp ?? 0;
         const endTime = window[window.length - 1]?.timestamp ?? 0;
         const growth = (window[window.length - 1]?.heapSize ?? 0) - (window[0]?.heapSize ?? 0);
@@ -1648,7 +1527,6 @@ export class TraceCollector {
           severity: slope > 10000 ? 'high' : 'medium'
         });
         
-        // Skip ahead to avoid duplicate detections
         i += windowSize - 1;
       }
     }
@@ -1672,7 +1550,6 @@ export class TraceCollector {
   }
 
   private generateCompleteRecommendations(analysis: TraceAnalysis, events: TraceEvent[]): void {
-    // Long task analysis
     const longTasks = (analysis.metrics as any)?.longTasks || [];
     if (longTasks.length > 5) {
       const topTasks = longTasks
@@ -1697,7 +1574,6 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
     
-    // Memory leak detection
     const memoryMetrics = (analysis.metrics as any)?.memoryMetrics;
     if (memoryMetrics && memoryMetrics.leaks && memoryMetrics.leaks.length > 0) {
       const totalGrowth = memoryMetrics.leaks.reduce((sum: number, leak: any) => sum + leak.growth, 0);
@@ -1717,9 +1593,8 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
     
-    // Layout thrashing detection
     const layoutEvents = events.filter((e: TraceEvent) => e.name === 'Layout');
-    const consecutiveLayouts = this.findConsecutiveEvents(layoutEvents, 10); // within 10ms
+    const consecutiveLayouts = this.findConsecutiveEvents(layoutEvents, 10);
     
     if (consecutiveLayouts.length > 0) {
       const recommendations = (analysis.metrics as any).recommendations || [];
@@ -1734,9 +1609,8 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
     
-    // Render blocking resources
     const renderBlockingTime = this.calculateRenderBlockingTime(events);
-    if (renderBlockingTime > 1000) { // > 1 second
+    if (renderBlockingTime > 1000) {
       const recommendations = (analysis.metrics as any).recommendations || [];
       recommendations.push({
         category: 'performance',
@@ -1749,7 +1623,6 @@ export class TraceCollector {
       (analysis.metrics as any).recommendations = recommendations;
     }
     
-    // CPU usage recommendations
     const cpuMetrics = (analysis as any).cpuMetrics;
     const summaryTotalTime = (analysis.summary as any).totalTime || 1;
     const cpuTotalTime = cpuMetrics?.totalTime || 0;
@@ -1778,7 +1651,7 @@ export class TraceCollector {
       if (!currentEvent || !nextEvent) continue;
       const gap = (nextEvent?.ts ?? 0) - ((currentEvent?.ts ?? 0) + (currentEvent?.dur ?? 0));
       
-      if (gap < threshold * 1000) { // Convert ms to microseconds
+      if (gap < threshold * 1000) {
         if (current.length === 0) current.push(currentEvent);
         current.push(nextEvent);
       } else {
@@ -1799,7 +1672,6 @@ export class TraceCollector {
   private calculateRenderBlockingTime(events: TraceEvent[]): number {
     let blockingTime = 0;
     
-    // Find parse blocking scripts
     const scriptEvaluations = events.filter((e: TraceEvent) => 
       e.name === 'EvaluateScript' && 
       e.args?.data?.url && 
@@ -1807,15 +1679,13 @@ export class TraceCollector {
       !e.args.data.url.includes('defer')
     );
     
-    // Find render blocking stylesheets
     const styleParses = events.filter((e: TraceEvent) => 
       e.name === 'ParseAuthorStyleSheet'
     );
     
-    // Calculate total blocking time
     [...scriptEvaluations, ...styleParses].forEach((event: TraceEvent) => {
       if (event.dur) {
-        blockingTime += event.dur / 1000; // Convert to ms
+        blockingTime += event.dur / 1000;
       }
     });
     
@@ -1823,7 +1693,6 @@ export class TraceCollector {
   }
 
   private async generateFlameChart(events: TraceEvent[]): Promise<any> {
-    // Build call tree for flame chart
     const callTree = {
       name: 'root',
       value: 0,
@@ -1833,7 +1702,6 @@ export class TraceCollector {
     const stack: any[] = [callTree];
     const eventsByThread = new Map<string, TraceEvent[]>();
     
-    // Group events by thread
     for (const event of events) {
       const tid = String(event.tid || 'main');
       if (!eventsByThread.has(tid)) {
@@ -1842,12 +1710,11 @@ export class TraceCollector {
       eventsByThread.get(tid)!.push(event);
     }
     
-    // Process main thread events
     const mainThreadEvents = eventsByThread.get('main') || events;
     const sortedEvents = mainThreadEvents.sort((a, b) => (a.ts || 0) - (b.ts || 0));
     
     for (const event of sortedEvents) {
-      if (event.ph === 'B' || event.ph === 'X') { // Begin or Complete
+      if (event.ph === 'B' || event.ph === 'X') {
         const node = {
           name: event.name,
           value: event.dur || 0,
@@ -1858,7 +1725,6 @@ export class TraceCollector {
           children: []
         };
         
-        // Pop stack until we find parent
         while (stack.length > 1) {
           const parent = stack[stack.length - 1];
           if (parent.endTime > (event.ts ?? 0)) {
@@ -1867,11 +1733,9 @@ export class TraceCollector {
           stack.pop();
         }
         
-        // Add to parent
         const parent = stack[stack.length - 1];
         parent.children.push(node);
         
-        // Push to stack if it's a duration event
         if (event.ph === 'B' || event.dur) {
           stack.push(node);
         }
@@ -1926,7 +1790,6 @@ export class TraceCollector {
     let clsCount = 0;
     let heapSizes: number[] = [];
     
-    // Aggregate metrics from all scenarios
     for (const [scenarioId, traceData] of Array.from(this.traces.entries())) {
       const metrics = traceData.metrics;
       
@@ -1957,7 +1820,6 @@ export class TraceCollector {
         heapSizes.push(jsHeapUsed);
       }
       
-      // Aggregate user timings
       const timings = this.userTimings.get(scenarioId) || [];
       for (const timing of timings) {
         if (timing.entryType === 'mark' && !consolidated.userTimings.marks.includes(timing.name)) {
@@ -1968,7 +1830,6 @@ export class TraceCollector {
       }
     }
     
-    // Calculate averages
     if (fpsCount > 0) {
       consolidated.summary.averageFPS = totalFPS / fpsCount;
     }
@@ -1989,7 +1850,6 @@ export class TraceCollector {
       consolidated.performance.paintingTime
     );
     
-    // Aggregate coverage data
     for (const [_scenarioId, coverage] of Array.from(this.coverageData.entries())) {
       consolidated.coverage.jsTotal += coverage.js.total;
       consolidated.coverage.jsUsed += coverage.js.used;
@@ -2000,5 +1860,3 @@ export class TraceCollector {
     return consolidated;
   }
 }
-
-// Helper interfaces for trace data (removing duplicate, using the main interface)

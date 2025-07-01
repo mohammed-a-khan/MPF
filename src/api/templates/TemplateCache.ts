@@ -1,15 +1,12 @@
 import { CacheEntry, CacheStats, CacheOptions } from '../types/api.types';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Template cache implementation with TTL support and memory management
- */
 export class TemplateCache {
     private static instance: TemplateCache;
     private cache: Map<string, CacheEntry> = new Map();
-    private maxSize: number = 1000; // Maximum number of entries
-    private maxMemory: number = 50 * 1024 * 1024; // 50MB default
-    private defaultTTL: number = 300000; // 5 minutes default
+    private maxSize: number = 1000;
+    private maxMemory: number = 50 * 1024 * 1024;
+    private defaultTTL: number = 300000;
     private cleanupInterval: NodeJS.Timeout | null = null;
     private stats: CacheStats = {
         hits: 0,
@@ -31,9 +28,6 @@ export class TemplateCache {
         return TemplateCache.instance;
     }
 
-    /**
-     * Get cached value
-     */
     public get(key: string): string | null {
         const entry = this.cache.get(key);
 
@@ -42,14 +36,12 @@ export class TemplateCache {
             return null;
         }
 
-        // Check if expired
         if (this.isExpired(entry)) {
             this.delete(key);
             this.stats.misses++;
             return null;
         }
 
-        // Update access time and hit count
         entry.lastAccessed = Date.now();
         entry.hitCount++;
         this.stats.hits++;
@@ -58,19 +50,14 @@ export class TemplateCache {
         return entry.value;
     }
 
-    /**
-     * Set cache value
-     */
     public set(key: string, value: string, ttl?: number): void {
         try {
             const size = this.calculateSize(value);
             
-            // Check memory limit
             if (this.wouldExceedMemoryLimit(size)) {
                 this.evictEntries(size);
             }
 
-            // Check size limit
             if (this.cache.size >= this.maxSize) {
                 this.evictLRU();
             }
@@ -85,7 +72,6 @@ export class TemplateCache {
                 hitCount: 0
             };
 
-            // If updating existing entry, adjust memory usage
             const existingEntry = this.cache.get(key);
             if (existingEntry) {
                 this.stats.memoryUsage -= existingEntry.size;
@@ -102,9 +88,6 @@ export class TemplateCache {
         }
     }
 
-    /**
-     * Delete cache entry
-     */
     public delete(key: string): boolean {
         const entry = this.cache.get(key);
         
@@ -120,9 +103,6 @@ export class TemplateCache {
         return true;
     }
 
-    /**
-     * Clear all cache entries
-     */
     public clear(): void {
         const size = this.cache.size;
         this.cache.clear();
@@ -132,17 +112,11 @@ export class TemplateCache {
         ActionLogger.getInstance().info('Template cache cleared');
     }
 
-    /**
-     * Check if key exists
-     */
     public has(key: string): boolean {
         const entry = this.cache.get(key);
         return entry !== undefined && !this.isExpired(entry);
     }
 
-    /**
-     * Get all keys
-     */
     public keys(): string[] {
         const validKeys: string[] = [];
         
@@ -155,9 +129,6 @@ export class TemplateCache {
         return validKeys;
     }
 
-    /**
-     * Get cache statistics
-     */
     public getStats(): CacheStats {
         return {
             ...this.stats,
@@ -166,9 +137,6 @@ export class TemplateCache {
         };
     }
 
-    /**
-     * Configure cache options
-     */
     public configure(options: CacheOptions): void {
         if (options.maxSize !== undefined) {
             this.maxSize = options.maxSize;
@@ -189,9 +157,6 @@ export class TemplateCache {
         ActionLogger.getInstance().info('Template cache configured', options);
     }
 
-    /**
-     * Get cache size info
-     */
     public getSizeInfo(): { entries: number; memory: number; maxMemory: number } {
         return {
             entries: this.cache.size,
@@ -200,9 +165,6 @@ export class TemplateCache {
         };
     }
 
-    /**
-     * Manually trigger cleanup
-     */
     public cleanup(): number {
         let cleaned = 0;
         const now = Date.now();
@@ -221,36 +183,22 @@ export class TemplateCache {
         return cleaned;
     }
 
-    /**
-     * Check if entry is expired
-     */
     private isExpired(entry: CacheEntry, now?: number): boolean {
         const currentTime = now || Date.now();
         return currentTime - entry.created > entry.ttl;
     }
 
-    /**
-     * Calculate string size in bytes
-     */
     private calculateSize(value: string): number {
-        // Rough estimate: 2 bytes per character for Unicode
         return value.length * 2;
     }
 
-    /**
-     * Check if adding size would exceed memory limit
-     */
     private wouldExceedMemoryLimit(additionalSize: number): boolean {
         return this.stats.memoryUsage + additionalSize > this.maxMemory;
     }
 
-    /**
-     * Evict entries to free up memory
-     */
     private evictEntries(requiredSize: number): void {
         const entries = Array.from(this.cache.values())
             .sort((a, b) => {
-                // Sort by score: lower score = more likely to evict
                 const scoreA = this.calculateEvictionScore(a);
                 const scoreB = this.calculateEvictionScore(b);
                 return scoreA - scoreB;
@@ -272,9 +220,6 @@ export class TemplateCache {
         ActionLogger.getInstance().debug(`Evicted entries to free ${freedMemory} bytes`);
     }
 
-    /**
-     * Evict least recently used entry
-     */
     private evictLRU(): void {
         let lruEntry: CacheEntry | null = null;
         let lruKey: string | null = null;
@@ -293,20 +238,12 @@ export class TemplateCache {
         }
     }
 
-    /**
-     * Calculate eviction score (lower = more likely to evict)
-     */
     private calculateEvictionScore(entry: CacheEntry): number {
         const now = Date.now();
         const age = now - entry.created;
         const timeSinceAccess = now - entry.lastAccessed;
         const remainingTTL = Math.max(0, entry.ttl - age);
 
-        // Factors that increase score (less likely to evict):
-        // - High hit count
-        // - Recently accessed
-        // - Large remaining TTL
-        // - Small size
 
         const hitScore = entry.hitCount * 1000;
         const accessScore = 1000000 / (timeSinceAccess + 1);
@@ -316,9 +253,6 @@ export class TemplateCache {
         return hitScore + accessScore + ttlScore + sizeScore;
     }
 
-    /**
-     * Start cleanup timer
-     */
     private startCleanupTimer(interval: number = 60000): void {
         if (this.cleanupInterval) {
             clearInterval(this.cleanupInterval);
@@ -328,7 +262,6 @@ export class TemplateCache {
             this.cleanup();
         }, interval);
 
-        // Ensure cleanup on process exit
         process.on('exit', () => {
             if (this.cleanupInterval) {
                 clearInterval(this.cleanupInterval);
@@ -336,16 +269,10 @@ export class TemplateCache {
         });
     }
 
-    /**
-     * Restart cleanup timer with new interval
-     */
     private restartCleanupTimer(interval: number): void {
         this.startCleanupTimer(interval);
     }
 
-    /**
-     * Export cache contents
-     */
     public export(): Record<string, any> {
         const data: Record<string, any> = {};
         const now = Date.now();
@@ -364,9 +291,6 @@ export class TemplateCache {
         return data;
     }
 
-    /**
-     * Import cache contents
-     */
     public import(data: Record<string, any>): void {
         const now = Date.now();
 
@@ -384,9 +308,6 @@ export class TemplateCache {
         ActionLogger.getInstance().info(`Imported ${Object.keys(data).length} cache entries`);
     }
 
-    /**
-     * Get entries matching pattern
-     */
     public getMatching(pattern: string | RegExp): Record<string, string> {
         const result: Record<string, string> = {};
         const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
@@ -400,9 +321,6 @@ export class TemplateCache {
         return result;
     }
 
-    /**
-     * Delete entries matching pattern
-     */
     public deleteMatching(pattern: string | RegExp): number {
         const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern;
         const keysToDelete: string[] = [];
@@ -424,9 +342,6 @@ export class TemplateCache {
         return keysToDelete.length;
     }
 
-    /**
-     * Touch entry to update access time
-     */
     public touch(key: string): boolean {
         const entry = this.cache.get(key);
 
@@ -438,9 +353,6 @@ export class TemplateCache {
         return true;
     }
 
-    /**
-     * Get entry metadata
-     */
     public getMetadata(key: string): Omit<CacheEntry, 'value'> | null {
         const entry = this.cache.get(key);
 
@@ -458,9 +370,6 @@ export class TemplateCache {
         };
     }
 
-    /**
-     * Reset statistics
-     */
     public resetStats(): void {
         this.stats = {
             hits: 0,
@@ -468,17 +377,14 @@ export class TemplateCache {
             sets: 0,
             deletes: 0,
             evictions: 0,
-            memoryUsage: this.stats.memoryUsage // Keep current memory usage
+            memoryUsage: this.stats.memoryUsage
         };
 
         ActionLogger.getInstance().debug('Cache statistics reset');
     }
 
-    /**
-     * Optimize cache by removing least valuable entries
-     */
     public optimize(targetMemoryUsage?: number): number {
-        const target = targetMemoryUsage || this.maxMemory * 0.8; // Default to 80% of max
+        const target = targetMemoryUsage || this.maxMemory * 0.8;
         
         if (this.stats.memoryUsage <= target) {
             return 0;
@@ -506,9 +412,6 @@ export class TemplateCache {
         return removed;
     }
 
-    /**
-     * Warm cache with frequently used templates
-     */
     public async warmUp(templates: Array<{ key: string; value: string; ttl?: number }>): Promise<void> {
         const startTime = Date.now();
         let loaded = 0;
@@ -526,9 +429,6 @@ export class TemplateCache {
         ActionLogger.getInstance().info(`Cache warmed up with ${loaded} entries in ${duration}ms`);
     }
 
-    /**
-     * Get top entries by hit count
-     */
     public getTopEntries(count: number = 10): Array<{ key: string; hitCount: number; size: number }> {
         return Array.from(this.cache.entries())
             .filter(([_, entry]) => !this.isExpired(entry))
@@ -541,9 +441,6 @@ export class TemplateCache {
             }));
     }
 
-    /**
-     * Destroy cache instance
-     */
     public destroy(): void {
         if (this.cleanupInterval) {
             clearInterval(this.cleanupInterval);

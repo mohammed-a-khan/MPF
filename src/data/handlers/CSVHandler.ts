@@ -10,13 +10,8 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createReadStream, statSync } from 'fs';
-// import { pipeline } from 'stream/promises'; // Not used
 import { Transform } from 'stream';
 
-/**
- * Handler for CSV files
- * Supports streaming for large files
- */
 export class CSVHandler implements DataHandler {
     private parser: CSVParser;
     private validator: DataValidator;
@@ -27,29 +22,23 @@ export class CSVHandler implements DataHandler {
         this.parser = new CSVParser();
         this.validator = new DataValidator();
         this.transformer = new DataTransformer();
-        this.streamingThreshold = parseInt(process.env['CSV_STREAMING_THRESHOLD'] || '5242880'); // 5MB
+        this.streamingThreshold = parseInt(process.env['CSV_STREAMING_THRESHOLD'] || '5242880');
     }
 
-    /**
-     * Load data from CSV file
-     */
     async load(options: DataProviderOptions): Promise<DataProviderResult> {
         const startTime = Date.now();
         ActionLogger.logInfo('Data handler operation: csv_load', { operation: 'csv_load', options });
         
         try {
-            // Validate file exists
             const filePath = await this.resolveFilePath(options.source!);
             await this.validateFile(filePath);
             
-            // Auto-detect delimiter if not specified
             const csvOptions = options as any;
             if (!csvOptions.delimiter) {
                 csvOptions.delimiter = await this.detectDelimiter(filePath);
                 logger.debug(`Auto-detected delimiter: ${csvOptions.delimiter}`);
             }
             
-            // Determine if streaming is needed
             const fileSize = this.getFileSize(filePath);
             const useStreaming = options.streaming || fileSize > this.streamingThreshold;
             
@@ -62,7 +51,6 @@ export class CSVHandler implements DataHandler {
                 data = result.data;
                 metadata = result.metadata || {};
             } else {
-                // Load entire file
                 const content = await fs.readFile(filePath, 'utf-8');
                 const parseResult = await this.parser.parse(content, {
                     delimiter: csvOptions.delimiter || ',',
@@ -79,12 +67,10 @@ export class CSVHandler implements DataHandler {
                 metadata = parseResult.metadata || {};
             }
             
-            // Apply transformations if specified
             if (options.transformations && options.transformations.length > 0) {
                 data = await this.transformer.transform(data, options.transformations);
             }
             
-            // Process encrypted data (decrypt sensitive fields)
             data = await DataEncryptionManager.processTestData(data);
             
             const loadTime = Date.now() - startTime;
@@ -108,9 +94,6 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load CSV file using streaming
-     */
     private async loadStreaming(filePath: string, options: DataProviderOptions): Promise<DataProviderResult> {
         const data: TestData[] = [];
         const batchSize = options.batchSize || 1000;
@@ -126,9 +109,8 @@ export class CSVHandler implements DataHandler {
             skipRows: options.skipRows || 0,
             ...(options.maxRecords && { maxRows: options.maxRecords }),
             batchSize,
-            highWaterMark: 65536, // 64KB chunks
+            highWaterMark: 65536,
             onBatch: async (batch: TestData[]) => {
-                // Apply filter if specified
                 if (options.filter) {
                     batch = batch.filter(row => this.matchesFilter(row, options.filter!));
                 }
@@ -136,7 +118,6 @@ export class CSVHandler implements DataHandler {
                 data.push(...batch);
                 rowCount += batch.length;
                 
-                // Check max records limit
                 if (options.maxRecords && data.length >= options.maxRecords) {
                     throw new Error('MAX_RECORDS_REACHED');
                 }
@@ -150,7 +131,6 @@ export class CSVHandler implements DataHandler {
             const fileStream = createReadStream(filePath, { encoding: 'utf-8', highWaterMark: streamOptions.highWaterMark });
             await this.parser.streamParse(fileStream, streamOptions);
             
-            // Trim to max records if exceeded
             if (options.maxRecords && data.length > options.maxRecords) {
                 data.splice(options.maxRecords);
             }
@@ -183,9 +163,6 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Stream data from CSV file
-     */
     async *stream(options: DataProviderOptions): AsyncIterableIterator<TestData> {
         const filePath = await this.resolveFilePath(options.source!);
         const csvOptions = options as any;
@@ -197,14 +174,13 @@ export class CSVHandler implements DataHandler {
             escape: '"',
             headers: options.headers !== false,
             skipRows: options.skipRows || 0,
-            batchSize: 1 // Yield one record at a time
+            batchSize: 1
         };
         
         const fileStream = createReadStream(filePath, { encoding: 'utf-8' });
         let recordCount = 0;
         
         for await (const record of this.parser.streamRecords(fileStream, streamOptions)) {
-            // Apply filter
             if (options.filter && !this.matchesFilter(record, options.filter)) {
                 continue;
             }
@@ -212,16 +188,12 @@ export class CSVHandler implements DataHandler {
             yield record;
             recordCount++;
             
-            // Check max records
             if (options.maxRecords && recordCount >= options.maxRecords) {
                 return;
             }
         }
     }
 
-    /**
-     * Load partial data from CSV file
-     */
     async loadPartial(
         options: DataProviderOptions, 
         offset: number, 
@@ -236,11 +208,9 @@ export class CSVHandler implements DataHandler {
             
             const data: TestData[] = [];
             let currentIndex = 0;
-            // let _headers: string[] | undefined = undefined;
             
             const fileStream = createReadStream(filePath, { encoding: 'utf-8' });
             
-            // Create transform stream to handle offset and limit
             const transformStream = new Transform({
                 objectMode: true,
                 transform(chunk: any, _encoding: string, callback: Function) {
@@ -250,7 +220,7 @@ export class CSVHandler implements DataHandler {
                     currentIndex++;
                     
                     if (data.length >= limit) {
-                        this.destroy(); // Stop reading
+                        this.destroy();
                     }
                     
                     callback();
@@ -286,12 +256,8 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load schema from CSV file
-     */
     async loadSchema(options: DataProviderOptions): Promise<any> {
         try {
-            // Read sample data to infer schema
             const sampleSize = 100;
             const sampleData = await this.loadPartial(options, 0, sampleSize);
             
@@ -307,9 +273,6 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get CSV file metadata
-     */
     async getMetadata(options: DataProviderOptions): Promise<Record<string, any>> {
         try {
             const filePath = await this.resolveFilePath(options.source!);
@@ -317,7 +280,6 @@ export class CSVHandler implements DataHandler {
             const csvOptions = options as any;
             const delimiter = csvOptions.delimiter || await this.detectDelimiter(filePath);
             
-            // Count rows efficiently
             let rowCount = 0;
             const fileStream = createReadStream(filePath, { encoding: 'utf-8' });
             
@@ -331,7 +293,6 @@ export class CSVHandler implements DataHandler {
                     .on('error', reject);
             });
             
-            // Get headers
             const firstLine = await this.getFirstLine(filePath);
             const headers = firstLine.split(delimiter).map(h => h.trim());
             
@@ -353,11 +314,7 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Validate data
-     */
     async validate(data: TestData[]): Promise<ValidationResult> {
-        // Build basic validation rules
         const validationRules: Record<string, any> = {};
         
         const result = await this.validator.validate(data, validationRules, {
@@ -377,16 +334,10 @@ export class CSVHandler implements DataHandler {
         };
     }
 
-    /**
-     * Transform data
-     */
     async transform(data: TestData[], transformations: DataTransformation[]): Promise<TestData[]> {
         return await this.transformer.transform(data, transformations);
     }
 
-    /**
-     * Detect CSV delimiter
-     */
     private async detectDelimiter(filePath: string): Promise<string> {
         const sample = await this.getFirstNLines(filePath, 10);
         const delimiters = [',', ';', '\t', '|'];
@@ -396,22 +347,15 @@ export class CSVHandler implements DataHandler {
             counts[delimiter] = (sample.match(new RegExp(delimiter, 'g')) || []).length;
         }
         
-        // Return delimiter with highest count
         const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
         return sorted[0]?.[0] || ',';
     }
 
-    /**
-     * Get first line of file
-     */
     private async getFirstLine(filePath: string): Promise<string> {
         const lines = await this.getFirstNLines(filePath, 1);
         return lines.split('\n')[0] || '';
     }
 
-    /**
-     * Get first N lines of file
-     */
     private async getFirstNLines(filePath: string, n: number): Promise<string> {
         const stream = createReadStream(filePath, { encoding: 'utf-8' });
         let content = '';
@@ -434,22 +378,16 @@ export class CSVHandler implements DataHandler {
         });
     }
 
-    /**
-     * Resolve file path
-     */
     private async resolveFilePath(source: string): Promise<string> {
-        // Check if absolute path
         if (path.isAbsolute(source)) {
             return source;
         }
         
-        // Try relative to current directory
         const relativePath = path.resolve(process.cwd(), source);
         if (await this.fileExists(relativePath)) {
             return relativePath;
         }
         
-        // Try relative to test data directory
         const testDataPath = path.resolve(
             process.cwd(),
             process.env['DEFAULT_DATA_PATH'] || './test-data',
@@ -463,9 +401,6 @@ export class CSVHandler implements DataHandler {
         throw new Error(`CSV file not found: ${source}`);
     }
 
-    /**
-     * Validate file
-     */
     private async validateFile(filePath: string): Promise<void> {
         const stats = await fs.stat(filePath);
         
@@ -478,8 +413,7 @@ export class CSVHandler implements DataHandler {
             throw new Error(`Invalid CSV file extension: ${ext}`);
         }
         
-        // Check file size limit
-        const maxSize = parseInt(process.env['MAX_CSV_FILE_SIZE'] || '524288000'); // 500MB
+        const maxSize = parseInt(process.env['MAX_CSV_FILE_SIZE'] || '524288000');
         if (stats.size > maxSize) {
             throw new Error(
                 `CSV file too large: ${stats.size} bytes (max: ${maxSize} bytes). ` +
@@ -488,9 +422,6 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if file exists
-     */
     private async fileExists(filePath: string): Promise<boolean> {
         try {
             await fs.access(filePath);
@@ -500,9 +431,6 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get file size
-     */
     private getFileSize(filePath: string): number {
         try {
             return statSync(filePath).size;
@@ -511,9 +439,6 @@ export class CSVHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if record matches filter
-     */
     private matchesFilter(record: TestData, filter: Record<string, any>): boolean {
         for (const [key, value] of Object.entries(filter)) {
             if (record[key] !== value) {
@@ -523,9 +448,6 @@ export class CSVHandler implements DataHandler {
         return true;
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, options: DataProviderOptions): Error {
         const csvOptions = options as any;
         const enhancedError = new Error(

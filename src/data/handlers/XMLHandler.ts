@@ -12,10 +12,6 @@ import { createReadStream, statSync } from 'fs';
 import * as xml2js from 'xml2js';
 import * as sax from 'sax';
 
-/**
- * Handler for XML files
- * Supports XPath queries and streaming for large files
- */
 export class XMLHandler implements DataHandler {
     private parser: XMLParser;
     private validator: DataValidator;
@@ -26,22 +22,17 @@ export class XMLHandler implements DataHandler {
         this.parser = new XMLParser();
         this.validator = new DataValidator();
         this.transformer = new DataTransformer();
-        this.streamingThreshold = parseInt(process.env['XML_STREAMING_THRESHOLD'] || '10485760'); // 10MB
+        this.streamingThreshold = parseInt(process.env['XML_STREAMING_THRESHOLD'] || '10485760');
     }
 
-    /**
-     * Load data from XML file
-     */
     async load(options: DataProviderOptions): Promise<DataProviderResult> {
         const startTime = Date.now();
         ActionLogger.logInfo('Data handler operation: xml_load', { operation: 'xml_load', options });
         
         try {
-            // Validate file exists
             const filePath = await this.resolveFilePath(options.source!);
             await this.validateFile(filePath);
             
-            // Determine if streaming is needed
             const fileSize = this.getFileSize(filePath);
             const useStreaming = options.streaming || fileSize > this.streamingThreshold;
             
@@ -54,7 +45,6 @@ export class XMLHandler implements DataHandler {
                 data = result.data;
                 metadata = result.metadata || {};
             } else {
-                // Load entire file
                 const content = await fs.readFile(filePath, 'utf-8');
                 const parseResult = await this.parser.parse(content, {
                     xmlPath: options.xmlPath,
@@ -68,17 +58,14 @@ export class XMLHandler implements DataHandler {
                 metadata = parseResult.metadata || {};
             }
             
-            // Apply filter if specified
             if (options.filter) {
                 data = data.filter(row => this.matchesFilter(row, options.filter!));
             }
             
-            // Apply transformations if specified
             if (options.transformations && options.transformations.length > 0) {
                 data = await this.transformer.transform(data, options.transformations);
             }
             
-            // Process encrypted data (decrypt sensitive fields)
             data = await DataEncryptionManager.processTestData(data);
             
             const loadTime = Date.now() - startTime;
@@ -101,9 +88,6 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load XML file using streaming
-     */
     private async loadStreaming(filePath: string, options: DataProviderOptions): Promise<DataProviderResult> {
         const data: TestData[] = [];
         const xmlPath = options.xmlPath || '';
@@ -126,12 +110,10 @@ export class XMLHandler implements DataHandler {
                 currentPath.push(node.name);
                 currentText = '';
                 
-                // Check if we're at the target path
                 if (this.matchesPath(currentPath, pathParts)) {
                     isTargetElement = true;
                     currentElement = {};
                     
-                    // Add attributes
                     if (node.attributes) {
                         for (const [key, value] of Object.entries(node.attributes)) {
                             currentElement[`@${key}`] = value;
@@ -148,18 +130,15 @@ export class XMLHandler implements DataHandler {
             
             parser.on('closetag', (_tagName: string) => {
                 if (isTargetElement && currentPath.join('/') === xmlPath) {
-                    // Complete element
                     if (currentText.trim()) {
                         currentElement['#text'] = currentText.trim();
                     }
                     
                     const normalized = this.normalizeItem(currentElement);
                     
-                    // Apply filter inline
                     if (!options.filter || this.matchesFilter(normalized, options.filter)) {
                         data.push(normalized);
                         
-                        // Check max records
                         if (options.maxRecords && data.length >= options.maxRecords) {
                             stream.destroy();
                         }
@@ -191,9 +170,6 @@ export class XMLHandler implements DataHandler {
         });
     }
 
-    /**
-     * Stream data from XML file
-     */
     async *stream(options: DataProviderOptions): AsyncIterableIterator<TestData> {
         const filePath = await this.resolveFilePath(options.source!);
         const xmlPath = options.xmlPath || '';
@@ -210,7 +186,6 @@ export class XMLHandler implements DataHandler {
         let currentElement: any = null;
         let recordCount = 0;
         
-        // Set up parser event handlers
         const elements: TestData[] = [];
         let resolveNext: ((value: IteratorResult<TestData>) => void) | null = null;
         
@@ -220,7 +195,6 @@ export class XMLHandler implements DataHandler {
             if (this.matchesPath(currentPath, pathParts)) {
                 currentElement = {};
                 
-                // Add attributes
                 if (node.attributes) {
                     for (const [key, value] of Object.entries(node.attributes)) {
                         currentElement[`@${key}`] = value;
@@ -233,7 +207,6 @@ export class XMLHandler implements DataHandler {
             if (currentElement && currentPath.join('/') === xmlPath) {
                 const normalized = this.normalizeItem(currentElement);
                 
-                // Apply filter
                 if (!options.filter || this.matchesFilter(normalized, options.filter)) {
                     elements.push(normalized);
                     
@@ -244,7 +217,6 @@ export class XMLHandler implements DataHandler {
                     
                     recordCount++;
                     
-                    // Check max records
                     if (options.maxRecords && recordCount >= options.maxRecords) {
                         stream.destroy();
                     }
@@ -258,12 +230,10 @@ export class XMLHandler implements DataHandler {
         
         stream.pipe(parser);
         
-        // Yield elements as they become available
         while (true) {
             if (elements.length > 0) {
                 yield elements.shift()!;
             } else {
-                // Wait for next element
                 const result = await new Promise<IteratorResult<TestData>>((resolve) => {
                     resolveNext = resolve;
                     
@@ -278,9 +248,6 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load partial data from XML file
-     */
     async loadPartial(
         options: DataProviderOptions, 
         offset: number, 
@@ -291,7 +258,6 @@ export class XMLHandler implements DataHandler {
         try {
             const filePath = await this.resolveFilePath(options.source!);
             
-            // For XML, we need to parse and then slice
             const content = await fs.readFile(filePath, 'utf-8');
             const parseOptions: any = {};
             if (options.xmlPath) {
@@ -325,21 +291,16 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load schema from XML file
-     */
     async loadSchema(options: DataProviderOptions): Promise<any> {
         try {
             const filePath = await this.resolveFilePath(options.source!);
             
-            // Check for XSD file
             const xsdPath = filePath.replace(/\.xml$/i, '.xsd');
             if (await this.fileExists(xsdPath)) {
                 const xsdContent = await fs.readFile(xsdPath, 'utf-8');
                 return await this.parser.parseXSD(xsdContent);
             }
             
-            // Otherwise infer from data
             const content = await fs.readFile(filePath, 'utf-8');
             const parseOptions: any = {};
             if (options.xmlPath) {
@@ -361,15 +322,11 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get XML file metadata
-     */
     async getMetadata(options: DataProviderOptions): Promise<Record<string, any>> {
         try {
             const filePath = await this.resolveFilePath(options.source!);
             const stats = await fs.stat(filePath);
             
-            // Parse to get structure info
             const content = await fs.readFile(filePath, 'utf-8');
             const parseOptions: xml2js.ParserOptions = {
                 ignoreAttrs: false,
@@ -389,7 +346,6 @@ export class XMLHandler implements DataHandler {
                 namespaces: this.extractNamespaces(content)
             };
             
-            // Get document structure
             const root = result[metadata['rootElement']];
             if (root) {
                 metadata['childElements'] = Object.keys(root).filter(k => !k.startsWith('@'));
@@ -404,14 +360,9 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Validate data
-     */
     async validate(data: TestData[]): Promise<ValidationResult> {
-        // Build basic validation rules
         const validationRules: Record<string, any> = {};
         
-        // Add basic required field validation for common fields
         const commonFields = ['id', 'name'];
         for (const field of commonFields) {
             validationRules[field] = { type: 'required', field };
@@ -436,16 +387,10 @@ export class XMLHandler implements DataHandler {
         };
     }
 
-    /**
-     * Transform data
-     */
     async transform(data: TestData[], transformations: DataTransformation[]): Promise<TestData[]> {
         return await this.transformer.transform(data, transformations);
     }
 
-    /**
-     * Check if path matches
-     */
     private matchesPath(currentPath: string[], targetPath: string[]): boolean {
         if (targetPath.length === 0) return true;
         if (currentPath.length < targetPath.length) return false;
@@ -459,9 +404,6 @@ export class XMLHandler implements DataHandler {
         return true;
     }
 
-    /**
-     * Normalize data to array of objects
-     */
     private normalizeData(data: any): TestData[] {
         if (Array.isArray(data)) {
             return data.map(item => this.normalizeItem(item));
@@ -472,15 +414,11 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Normalize single item
-     */
     private normalizeItem(item: any): TestData {
         const normalized: TestData = {};
         
         for (const [key, value] of Object.entries(item)) {
             if (Array.isArray(value) && value.length === 1) {
-                // Unwrap single-item arrays
                 normalized[key] = this.normalizeValue(value[0]);
             } else {
                 normalized[key] = this.normalizeValue(value);
@@ -490,16 +428,11 @@ export class XMLHandler implements DataHandler {
         return normalized;
     }
 
-    /**
-     * Normalize value
-     */
     private normalizeValue(value: any): any {
         if (typeof value === 'object' && value !== null) {
             if (value['#text'] !== undefined && Object.keys(value).length === 1) {
-                // Plain text node
                 return value['#text'];
             } else if (value.$ && value._ !== undefined) {
-                // Element with attributes and text
                 return {
                     ...value.$,
                     value: value._
@@ -510,17 +443,11 @@ export class XMLHandler implements DataHandler {
         return value;
     }
 
-    /**
-     * Detect XML encoding
-     */
     private detectEncoding(content: string): string {
         const match = content.match(/<\?xml[^>]+encoding=["']([^"']+)["']/i);
         return match ? match[1] || 'utf-8' : 'utf-8';
     }
 
-    /**
-     * Extract namespaces
-     */
     private extractNamespaces(content: string): Record<string, string> {
         const namespaces: Record<string, string> = {};
         const regex = /xmlns:?([^=]*)="([^"]+)"/g;
@@ -534,22 +461,16 @@ export class XMLHandler implements DataHandler {
         return namespaces;
     }
 
-    /**
-     * Resolve file path
-     */
     private async resolveFilePath(source: string): Promise<string> {
-        // Check if absolute path
         if (path.isAbsolute(source)) {
             return source;
         }
         
-        // Try relative to current directory
         const relativePath = path.resolve(process.cwd(), source);
         if (await this.fileExists(relativePath)) {
             return relativePath;
         }
         
-        // Try relative to test data directory
         const testDataPath = path.resolve(
             process.cwd(),
             process.env['DEFAULT_DATA_PATH'] || './test-data',
@@ -563,9 +484,6 @@ export class XMLHandler implements DataHandler {
         throw new Error(`XML file not found: ${source}`);
     }
 
-    /**
-     * Validate file
-     */
     private async validateFile(filePath: string): Promise<void> {
         const stats = await fs.stat(filePath);
         
@@ -578,8 +496,7 @@ export class XMLHandler implements DataHandler {
             throw new Error(`Invalid XML file extension: ${ext}`);
         }
         
-        // Check file size limit
-        const maxSize = parseInt(process.env['MAX_XML_FILE_SIZE'] || '104857600'); // 100MB
+        const maxSize = parseInt(process.env['MAX_XML_FILE_SIZE'] || '104857600');
         if (stats.size > maxSize) {
             throw new Error(
                 `XML file too large: ${stats.size} bytes (max: ${maxSize} bytes). ` +
@@ -588,9 +505,6 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if file exists
-     */
     private async fileExists(filePath: string): Promise<boolean> {
         try {
             await fs.access(filePath);
@@ -600,9 +514,6 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get file size
-     */
     private getFileSize(filePath: string): number {
         try {
             return statSync(filePath).size;
@@ -611,9 +522,6 @@ export class XMLHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if record matches filter
-     */
     private matchesFilter(record: TestData, filter: Record<string, any>): boolean {
         for (const [key, value] of Object.entries(filter)) {
             if (record[key] !== value) {
@@ -623,9 +531,6 @@ export class XMLHandler implements DataHandler {
         return true;
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, options: DataProviderOptions): Error {
         const message = error instanceof Error ? error.message : String(error);
         const enhancedError = new Error(

@@ -1,30 +1,10 @@
 // src/reporting/types/reporting.types.ts
 
-/**
- * CS Test Automation Framework - Reporting System Type Definitions
- * 
- * Complete type definitions for the entire reporting system including:
- * - Report generation interfaces
- * - Evidence collection types
- * - Export format definitions
- * - Theme configuration
- * - Metric structures
- * - Dashboard visualization types
- * - Chart configurations
- * 
- * @version 2.0.0
- */
 
 import { ExecutionStatus } from '../../bdd/types/bdd.types';
 import { HookType } from '../../bdd/types/bdd.types';
 
-// ============================================================================
-// SUMMARY GENERATOR TYPES
-// ============================================================================
 
-/**
- * Summary statistics for execution
- */
 export interface SummaryStats {
   totalFeatures: number;
   totalScenarios: number;
@@ -50,9 +30,6 @@ export interface SummaryStats {
   };
 }
 
-/**
- * Highlight item for summary
- */
 export interface HighlightItem {
   type: 'success' | 'improvement' | 'warning' | 'alert' | 'info';
   title: string;
@@ -60,9 +37,6 @@ export interface HighlightItem {
   icon: string;
 }
 
-/**
- * Recommendation item for improvements
- */
 export interface RecommendationItem {
   priority: 'high' | 'medium' | 'low';
   category: string;
@@ -73,13 +47,7 @@ export interface RecommendationItem {
   effort: string;
 }
 
-// ============================================================================
-// CORE REPORT TYPES
-// ============================================================================
 
-/**
- * Main report structure containing all execution data
- */
 export interface CSReport {
   metadata: ReportMetadata;
   configuration: ReportConfiguration;
@@ -97,9 +65,6 @@ export interface CSReport {
   aiHealing: AIHealingReport;
 }
 
-/**
- * Report metadata with execution context
- */
 export interface ReportMetadata {
   reportId: string;
   reportName: string;
@@ -125,9 +90,6 @@ export interface ReportMetadata {
   playwrightVersion?: string;
 }
 
-/**
- * Machine information for reproducibility
- */
 export interface MachineInfo {
   hostname: string;
   platform: string;
@@ -138,22 +100,13 @@ export interface MachineInfo {
   osRelease: string;
 }
 
-/**
- * User information for tracking
- */
 export interface UserInfo {
   username: string;
   domain: string;
   executedBy: string;
 }
 
-// ============================================================================
-// EXECUTION SUMMARY
-// ============================================================================
 
-/**
- * High-level execution summary with KPIs
- */
 export interface ExecutionSummary {
   totalFeatures: number;
   passedFeatures: number;
@@ -176,7 +129,6 @@ export interface ExecutionSummary {
   status: ExecutionStatus;
   trends: TrendData;
   statistics: ExecutionStatistics;
-  // Additional properties used in PDFExporter
   projectName?: string;
   executionId?: string;
   passed?: number;
@@ -185,7 +137,6 @@ export interface ExecutionSummary {
   duration?: number;
   startTime?: Date;
   endTime?: Date;
-  // Properties used in SummaryGenerator
   scenarios: ScenarioSummary[];
   features: FeatureReport[];
   environment: string;
@@ -196,11 +147,7 @@ export interface ExecutionSummary {
   };
 }
 
-// ExecutionStatus is now imported from bdd.types.ts
 
-/**
- * Execution statistics
- */
 export interface ExecutionStatistics {
   avgScenarioDuration: number;
   avgStepDuration: number;
@@ -211,9 +158,6 @@ export interface ExecutionStatistics {
   flakyTests: FlakyTest[];
 }
 
-/**
- * Scenario reference
- */
 export interface ScenarioReference {
   scenarioId: string;
   name: string;
@@ -221,9 +165,6 @@ export interface ScenarioReference {
   feature: string;
 }
 
-/**
- * Flaky test information
- */
 export interface FlakyTest {
   scenarioId: string;
   name: string;
@@ -232,13 +173,10 @@ export interface FlakyTest {
   failures: number;
 }
 
-/**
- * Trend data for historical comparison
- */
 export interface TrendData {
-  passRateTrend: number | { data: number[]; change: number; direction: 'up' | 'down' | 'stable' }; // Percentage change
-  executionTimeTrend: number | { data: number[]; change: number; direction: 'up' | 'down' | 'stable' }; // Percentage change
-  failureRateTrend: number | { data: number[]; change: number; direction: 'up' | 'down' | 'stable' }; // Percentage change
+  passRateTrend: number | { data: number[]; change: number; direction: 'up' | 'down' | 'stable' };
+  executionTimeTrend: number | { data: number[]; change: number; direction: 'up' | 'down' | 'stable' };
+  failureRateTrend: number | { data: number[]; change: number; direction: 'up' | 'down' | 'stable' };
   lastExecutions: ExecutionHistory[];
   stabilityTrend?: { data: number[]; change: number; direction: 'up' | 'down' | 'stable' };
   historicalComparison?: Array<{
@@ -253,9 +191,6 @@ export interface TrendData {
   }>;
 }
 
-/**
- * Historical execution data
- */
 export interface ExecutionHistory {
   executionId: string;
   date: Date;
@@ -266,17 +201,11 @@ export interface ExecutionHistory {
   environment?: string;
 }
 
-// ============================================================================
-// FEATURE REPORTING
-// ============================================================================
 
-/**
- * Feature-level report data
- */
 export interface FeatureReport {
   featureId: string;
   feature: string;
-  name?: string; // Added for compatibility
+  name?: string;
   description: string;
   uri: string;
   line: number;
@@ -292,9 +221,6 @@ export interface FeatureReport {
   metadata: Record<string, any>;
 }
 
-/**
- * Background steps for features
- */
 export interface BackgroundReport {
   keyword: string;
   name: string;
@@ -303,9 +229,6 @@ export interface BackgroundReport {
   status: TestStatus;
 }
 
-/**
- * Feature-level statistics
- */
 export interface FeatureStatistics {
   totalScenarios: number;
   passedScenarios: number;
@@ -321,16 +244,12 @@ export interface FeatureStatistics {
   passRate: number;
 }
 
-/**
- * Scenario summary for feature reports
- */
 export interface ScenarioSummary {
   scenarioId: string;
   name: string;
   status: TestStatus;
   duration: number;
   retryCount: number;
-  // Extended properties for reporting
   description?: string;
   tags?: string[];
   line?: number;
@@ -362,13 +281,7 @@ export interface ScenarioSummary {
   }>;
 }
 
-// ============================================================================
-// SCENARIO REPORTING
-// ============================================================================
 
-/**
- * Scenario-level report data
- */
 export interface ScenarioReport {
   scenarioId: string;
   scenario: string;
@@ -391,15 +304,11 @@ export interface ScenarioReport {
   error?: ErrorDetails;
   aiHealing?: AIHealingAttempt[];
   context: ScenarioContext;
-  // Additional properties used in ScenarioReportGenerator
   networkLogs?: NetworkLog[];
   videos?: Array<{ name?: string; path: string }>;
   consoleLogs?: ConsoleLog[];
 }
 
-/**
- * Test status enumeration
- */
 export enum TestStatus {
   PASSED = 'passed',
   FAILED = 'failed',
@@ -409,9 +318,6 @@ export enum TestStatus {
   AMBIGUOUS = 'ambiguous'
 }
 
-/**
- * Data-driven test information
- */
 export interface DataSetInfo {
   index: number;
   name: string;
@@ -419,9 +325,6 @@ export interface DataSetInfo {
   source: string;
 }
 
-/**
- * Hook execution report
- */
 export interface HookReport {
   type: HookType;
   status: TestStatus;
@@ -429,9 +332,6 @@ export interface HookReport {
   error?: ErrorDetails;
 }
 
-/**
- * Scenario execution context
- */
 export interface ScenarioContext {
   browser: string;
   viewport: ViewportSize;
@@ -440,21 +340,12 @@ export interface ScenarioContext {
   worker?: number;
 }
 
-/**
- * Viewport size
- */
 export interface ViewportSize {
   width: number;
   height: number;
 }
 
-// ============================================================================
-// STEP REPORTING
-// ============================================================================
 
-/**
- * Step-level report data
- */
 export interface StepReport {
   stepId: string;
   keyword: string;
@@ -474,26 +365,17 @@ export interface StepReport {
   subSteps?: SubStep[];
 }
 
-/**
- * Step definition match information
- */
 export interface StepMatch {
   location: string;
   arguments: StepArgument[];
 }
 
-/**
- * Step argument details
- */
 export interface StepArgument {
   value: string;
   offset: number;
   parameterType: string;
 }
 
-/**
- * Step execution result
- */
 export interface StepResult {
   status: TestStatus;
   duration: number;
@@ -501,25 +383,16 @@ export interface StepResult {
   screenshot?: string;
 }
 
-/**
- * Data table row
- */
 export interface DataTableRow {
   cells: string[];
 }
 
-/**
- * Doc string content
- */
 export interface DocString {
   contentType: string;
   content: string;
   line: number;
 }
 
-/**
- * Sub-step for detailed actions
- */
 export interface SubStep {
   action: string;
   target?: string;
@@ -529,13 +402,7 @@ export interface SubStep {
   error?: string;
 }
 
-// ============================================================================
-// EVIDENCE COLLECTION
-// ============================================================================
 
-/**
- * Complete evidence collection
- */
 export interface EvidenceCollection {
   screenshots: Screenshot[];
   videos: Video[];
@@ -550,9 +417,6 @@ export interface EvidenceCollection {
   logs?: any[];
 }
 
-/**
- * Scenario-specific evidence
- */
 export interface ScenarioEvidence {
   screenshots: string[];
   video?: string;
@@ -561,9 +425,6 @@ export interface ScenarioEvidence {
   consoleLogs: ConsoleLog[];
 }
 
-/**
- * Screenshot evidence
- */
 export interface Screenshot {
   id: string;
   filename: string;
@@ -579,9 +440,6 @@ export interface Screenshot {
   annotations?: Annotation[];
 }
 
-/**
- * Screenshot type enumeration
- */
 export enum ScreenshotType {
   STEP = 'step',
   FAILURE = 'failure',
@@ -591,17 +449,11 @@ export enum ScreenshotType {
   ELEMENT = 'element'
 }
 
-/**
- * Image dimensions
- */
 export interface ImageDimensions {
   width: number;
   height: number;
 }
 
-/**
- * Annotation
- */
 export interface Annotation {
   x: number;
   y: number;
@@ -611,9 +463,6 @@ export interface Annotation {
   color: string;
 }
 
-/**
- * Video recording evidence
- */
 export interface Video {
   id: string;
   filename: string;
@@ -627,9 +476,6 @@ export interface Video {
   timestamp: Date;
 }
 
-/**
- * Execution trace
- */
 export interface Trace {
   id: string;
   filename: string;
@@ -641,9 +487,6 @@ export interface Trace {
   viewerUrl?: string;
 }
 
-/**
- * Network log entry
- */
 export interface NetworkLog {
   id: string;
   timestamp: Date;
@@ -655,7 +498,6 @@ export interface NetworkLog {
   responseSize: number;
   headers: Record<string, string>;
   timing: NetworkTiming;
-  // Additional properties used in ScenarioReportGenerator
   startTime?: Date;
   endTime?: Date;
   size?: number;
@@ -667,9 +509,6 @@ export interface NetworkLog {
   responseHeaders?: Record<string, string>;
 }
 
-/**
- * Console log entry
- */
 export interface ConsoleLog {
   timestamp: Date;
   level: ConsoleLogLevel;
@@ -679,9 +518,6 @@ export interface ConsoleLog {
   stackTrace?: string;
 }
 
-/**
- * Console log levels
- */
 export enum ConsoleLogLevel {
   ERROR = 'error',
   WARNING = 'warning',
@@ -690,9 +526,6 @@ export enum ConsoleLogLevel {
   VERBOSE = 'verbose'
 }
 
-/**
- * Performance log entry
- */
 export interface PerformanceLog {
   timestamp: Date;
   metric: string;
@@ -701,9 +534,6 @@ export interface PerformanceLog {
   context: string;
 }
 
-/**
- * Download evidence
- */
 export interface Download {
   id: string;
   scenarioId: string;
@@ -714,9 +544,6 @@ export interface Download {
   timestamp: Date;
 }
 
-/**
- * Upload evidence
- */
 export interface Upload {
   id: string;
   scenarioId: string;
@@ -728,9 +555,6 @@ export interface Upload {
   destination: string;
 }
 
-/**
- * Custom evidence
- */
 export interface CustomEvidence {
   id: string;
   type: string;
@@ -741,13 +565,7 @@ export interface CustomEvidence {
   timestamp: Date;
 }
 
-// ============================================================================
-// ACTION LOGGING
-// ============================================================================
 
-/**
- * Detailed action log
- */
 export interface ActionLog {
   id: string;
   timestamp: Date;
@@ -762,9 +580,6 @@ export interface ActionLog {
   elementInfo?: ElementInfo;
 }
 
-/**
- * Action type enumeration
- */
 export enum ActionType {
   NAVIGATION = 'navigation',
   CLICK = 'click',
@@ -778,9 +593,6 @@ export enum ActionType {
   CUSTOM = 'custom'
 }
 
-/**
- * Element information for actions
- */
 export interface ElementInfo {
   selector: string;
   tag: string;
@@ -791,9 +603,6 @@ export interface ElementInfo {
   position: ElementPosition;
 }
 
-/**
- * Element position on page
- */
 export interface ElementPosition {
   x: number;
   y: number;
@@ -801,13 +610,7 @@ export interface ElementPosition {
   height: number;
 }
 
-// ============================================================================
-// PERFORMANCE METRICS
-// ============================================================================
 
-/**
- * Comprehensive performance metrics
- */
 export interface ReportMetrics {
   execution: ExecutionMetrics;
   browser: BrowserMetrics;
@@ -818,9 +621,6 @@ export interface ReportMetrics {
   resources?: any;
 }
 
-/**
- * Quality metrics for test execution
- */
 export interface QualityMetrics {
   testCoverage: number;
   codeCoverage?: number;
@@ -838,7 +638,6 @@ export interface QualityMetrics {
   criticalBugs: number;
   majorBugs: number;
   minorBugs: number;
-  // Additional properties used in MetricsGenerator
   scenarioPassRate: number;
   stepPassRate: number;
   failureRate: number;
@@ -854,9 +653,6 @@ export interface QualityMetrics {
   stabilityScore?: number;
 }
 
-/**
- * Execution performance metrics
- */
 export interface ExecutionMetrics {
   totalDuration: number;
   setupDuration: number;
@@ -875,9 +671,6 @@ export interface ExecutionMetrics {
   tagDistribution?: Array<{ tag: string; count: number }> | Record<string, number>;
 }
 
-/**
- * Browser performance metrics
- */
 export interface BrowserMetrics {
   pageLoadTime: number;
   domContentLoaded: number;
@@ -904,18 +697,12 @@ export interface BrowserMetrics {
   resources?: any[];
 }
 
-/**
- * Memory usage details
- */
 export interface MemoryUsage {
   usedJSHeapSize: number;
   totalJSHeapSize: number;
   jsHeapSizeLimit: number;
 }
 
-/**
- * Network performance metrics
- */
 export interface NetworkMetrics {
   totalRequests: number;
   failedRequests: number;
@@ -940,9 +727,6 @@ export interface NetworkMetrics {
   pageUrl: string;
 }
 
-/**
- * System performance metrics
- */
 export interface SystemMetrics {
   cpuUsage: number;
   memoryUsage: number;
@@ -968,13 +752,7 @@ export interface SystemMetrics {
   };
 }
 
-// ============================================================================
-// NETWORK ANALYSIS
-// ============================================================================
 
-/**
- * Complete network analysis
- */
 export interface NetworkAnalysis {
   summary: NetworkSummary;
   requests: NetworkRequest[];
@@ -986,9 +764,6 @@ export interface NetworkAnalysis {
   waterfall: NetworkWaterfall;
 }
 
-/**
- * Network summary statistics
- */
 export interface NetworkSummary {
   totalRequests: number;
   successfulRequests: number;
@@ -1001,9 +776,6 @@ export interface NetworkSummary {
   totalDuration: number;
 }
 
-/**
- * Network request details
- */
 export interface NetworkRequest {
   requestId: string;
   url: string;
@@ -1018,9 +790,6 @@ export interface NetworkRequest {
   timing: NetworkTiming;
 }
 
-/**
- * Network timing details
- */
 export interface NetworkTiming {
   dns: number;
   connect: number;
@@ -1031,9 +800,6 @@ export interface NetworkTiming {
   total: number;
 }
 
-/**
- * Network timeline visualization data
- */
 export interface NetworkTimeline {
   entries: TimelineEntry[];
   startTime: Date;
@@ -1041,9 +807,6 @@ export interface NetworkTimeline {
   duration: number;
 }
 
-/**
- * Timeline entry for visualization
- */
 export interface TimelineEntry {
   id: string;
   name: string;
@@ -1054,9 +817,6 @@ export interface TimelineEntry {
   details: any;
 }
 
-/**
- * Network performance analysis
- */
 export interface NetworkPerformance {
   avgResponseTime: number;
   p50ResponseTime: number;
@@ -1075,9 +835,6 @@ export interface NetworkPerformance {
   criticalPath?: any;
 }
 
-/**
- * Domain-specific metrics
- */
 export interface DomainMetrics {
   requestCount: number;
   avgResponseTime: number;
@@ -1085,9 +842,6 @@ export interface DomainMetrics {
   errorRate: number;
 }
 
-/**
- * Resource type metrics
- */
 export interface ResourceMetrics {
   count: number;
   totalSize: number;
@@ -1095,9 +849,6 @@ export interface ResourceMetrics {
   avgDuration: number;
 }
 
-/**
- * Network waterfall chart data
- */
 export interface NetworkWaterfall {
   entries: WaterfallEntry[];
   totalDuration: number;
@@ -1107,9 +858,6 @@ export interface NetworkWaterfall {
   duration: number;
 }
 
-/**
- * Waterfall chart entry
- */
 export interface WaterfallEntry {
   id: string;
   url: string;
@@ -1136,9 +884,6 @@ export interface WaterfallEntry {
   initiator: string;
 }
 
-/**
- * Network error details
- */
 export interface NetworkError {
   timestamp: Date;
   url: string;
@@ -1148,9 +893,6 @@ export interface NetworkError {
   stack?: string;
 }
 
-/**
- * Network failure
- */
 export interface NetworkFailure {
   requestId: string;
   url: string;
@@ -1159,9 +901,6 @@ export interface NetworkFailure {
   context: Record<string, any>;
 }
 
-/**
- * Mocked request information
- */
 export interface MockedRequest {
   pattern: string;
   method: string;
@@ -1170,22 +909,13 @@ export interface MockedRequest {
   calls: MockCall[];
 }
 
-/**
- * Mock call details
- */
 export interface MockCall {
   timestamp: Date;
   request: any;
   matched: boolean;
 }
 
-// ============================================================================
-// ERROR ANALYSIS
-// ============================================================================
 
-/**
- * Complete error analysis
- */
 export interface ErrorAnalysis {
   summary: ErrorSummary;
   errors: ErrorDetails[];
@@ -1193,9 +923,6 @@ export interface ErrorAnalysis {
   recommendations: ErrorRecommendation[];
 }
 
-/**
- * Error summary statistics
- */
 export interface ErrorSummary {
   totalErrors: number;
   uniqueErrors: number;
@@ -1205,9 +932,6 @@ export interface ErrorSummary {
   criticalErrors: number;
 }
 
-/**
- * Detailed error information
- */
 export interface ErrorDetails {
   id: string;
   timestamp: Date;
@@ -1223,9 +947,6 @@ export interface ErrorDetails {
   severity: ErrorSeverity;
 }
 
-/**
- * Error type enumeration
- */
 export enum ErrorType {
   ASSERTION = 'assertion',
   ELEMENT_NOT_FOUND = 'elementNotFound',
@@ -1237,9 +958,6 @@ export enum ErrorType {
   UNKNOWN = 'unknown'
 }
 
-/**
- * Element-specific error info
- */
 export interface ElementErrorInfo {
   selector: string;
   description: string;
@@ -1248,9 +966,6 @@ export interface ElementErrorInfo {
   healingSuccessful?: boolean;
 }
 
-/**
- * Error location information
- */
 export interface ErrorLocation {
   feature: string;
   scenario: string;
@@ -1259,9 +974,6 @@ export interface ErrorLocation {
   file: string;
 }
 
-/**
- * Error context for debugging
- */
 export interface ErrorContext {
   browser: string;
   viewport: string;
@@ -1272,9 +984,6 @@ export interface ErrorContext {
   additionalInfo: Record<string, any>;
 }
 
-/**
- * Error occurrence
- */
 export interface ErrorOccurrence {
   scenarioId: string;
   stepId: string;
@@ -1282,9 +991,6 @@ export interface ErrorOccurrence {
   context: Record<string, any>;
 }
 
-/**
- * Common error patterns
- */
 export interface ErrorPattern {
   pattern: string;
   count: number;
@@ -1293,9 +999,6 @@ export interface ErrorPattern {
   severity: ErrorSeverity;
 }
 
-/**
- * Error recommendations
- */
 export interface ErrorRecommendation {
   issue: string;
   severity: ErrorSeverity;
@@ -1305,9 +1008,6 @@ export interface ErrorRecommendation {
   affectedTests: string[];
 }
 
-/**
- * Error severity levels
- */
 export enum ErrorSeverity {
   CRITICAL = 'critical',
   HIGH = 'high',
@@ -1315,9 +1015,6 @@ export enum ErrorSeverity {
   LOW = 'low'
 }
 
-/**
- * Priority levels
- */
 export enum Priority {
   URGENT = 'urgent',
   HIGH = 'high',
@@ -1325,13 +1022,7 @@ export enum Priority {
   LOW = 'low'
 }
 
-// ============================================================================
-// AI HEALING REPORT
-// ============================================================================
 
-/**
- * AI healing analysis report
- */
 export interface AIHealingReport {
   summary: AIHealingSummary;
   healingAttempts: AIHealingAttempt[];
@@ -1340,9 +1031,6 @@ export interface AIHealingReport {
   statistics: HealingStatistics;
 }
 
-/**
- * AI healing summary
- */
 export interface AIHealingSummary {
   totalAttempts: number;
   successfulHeals: number;
@@ -1354,9 +1042,6 @@ export interface AIHealingSummary {
   timeSaved: number;
 }
 
-/**
- * AI healing attempt details
- */
 export interface AIHealingAttempt {
   attemptId: string;
   timestamp: Date;
@@ -1368,7 +1053,6 @@ export interface AIHealingAttempt {
   success: boolean;
   duration: number;
   scenarioId: string;
-  // Additional properties used in ScenarioReportGenerator
   element?: string;
   recommendation?: string;
   errorMessage?: string;
@@ -1376,9 +1060,6 @@ export interface AIHealingAttempt {
   alternatives?: Array<{ locator: string; confidence: number; reason?: string }>;
 }
 
-/**
- * AI element identification
- */
 export interface AIElementIdentification {
   description: string;
   confidence: number;
@@ -1386,18 +1067,12 @@ export interface AIElementIdentification {
   alternatives: AIAlternative[];
 }
 
-/**
- * AI alternative suggestion
- */
 export interface AIAlternative {
   locator: string;
   confidence: number;
   reason: string;
 }
 
-/**
- * Element healing statistics
- */
 export interface ElementHealingStats {
   element: string;
   healCount: number;
@@ -1405,9 +1080,6 @@ export interface ElementHealingStats {
   avgConfidence: number;
 }
 
-/**
- * Element stability analysis
- */
 export interface ElementAnalysis {
   elementId: string;
   element: string;
@@ -1420,9 +1092,6 @@ export interface ElementAnalysis {
   trends: ElementTrend[];
 }
 
-/**
- * Locator suggestion
- */
 export interface LocatorSuggestion {
   locator: string;
   type: string;
@@ -1431,9 +1100,6 @@ export interface LocatorSuggestion {
   reason: string;
 }
 
-/**
- * Element trend
- */
 export interface ElementTrend {
   date: Date;
   stability: number;
@@ -1441,9 +1107,6 @@ export interface ElementTrend {
   locatorChanged: boolean;
 }
 
-/**
- * AI recommendations
- */
 export interface AIRecommendation {
   element: string;
   issue: string;
@@ -1455,9 +1118,6 @@ export interface AIRecommendation {
   suggestedAction: string;
 }
 
-/**
- * Healing statistics
- */
 export interface HealingStatistics {
   healingByStrategy: Record<string, number>;
   healingByConfidence: ConfidenceDistribution;
@@ -1466,22 +1126,13 @@ export interface HealingStatistics {
   totalTimeSaved: number;
 }
 
-/**
- * Confidence distribution
- */
 export interface ConfidenceDistribution {
-  high: number;    // > 90%
-  medium: number;  // 70-90%
-  low: number;     // < 70%
+  high: number;
+  medium: number;
+  low: number;
 }
 
-// ============================================================================
-// LOG COLLECTION
-// ============================================================================
 
-/**
- * Complete log collection
- */
 export interface LogCollection {
   executionLogs: ExecutionLog[];
   frameworkLogs: FrameworkLog[];
@@ -1489,9 +1140,6 @@ export interface LogCollection {
   systemLogs: SystemLog[];
 }
 
-/**
- * Execution log entry
- */
 export interface ExecutionLog {
   id: string;
   timestamp: Date;
@@ -1501,9 +1149,6 @@ export interface ExecutionLog {
   context: LogContext;
 }
 
-/**
- * Log level enumeration
- */
 export enum LogLevel {
   ERROR = 'error',
   WARN = 'warn',
@@ -1512,9 +1157,6 @@ export enum LogLevel {
   TRACE = 'trace'
 }
 
-/**
- * Log context information
- */
 export interface LogContext {
   scenarioId?: string;
   stepId?: string;
@@ -1522,9 +1164,6 @@ export interface LogContext {
   [key: string]: any;
 }
 
-/**
- * Framework log entry
- */
 export interface FrameworkLog {
   timestamp: Date;
   component: string;
@@ -1532,9 +1171,6 @@ export interface FrameworkLog {
   details: any;
 }
 
-/**
- * Test log entry
- */
 export interface TestLog {
   timestamp: Date;
   message: string;
@@ -1542,9 +1178,6 @@ export interface TestLog {
   data?: any;
 }
 
-/**
- * System log entry
- */
 export interface SystemLog {
   timestamp: Date;
   source: string;
@@ -1552,13 +1185,7 @@ export interface SystemLog {
   severity: string;
 }
 
-// ============================================================================
-// CHART DATA
-// ============================================================================
 
-/**
- * Chart data collection for visualizations
- */
 export interface ChartDataCollection {
   executionPieChart: PieChartData;
   passRateTrend: LineChartData;
@@ -1572,9 +1199,6 @@ export interface ChartDataCollection {
   customCharts: Record<string, ChartData>;
 }
 
-/**
- * Base chart data interface
- */
 export interface ChartData {
   type: ChartType;
   title: string;
@@ -1582,9 +1206,6 @@ export interface ChartData {
   options: ChartOptions;
 }
 
-/**
- * Chart type enumeration
- */
 export enum ChartType {
   PIE = 'pie',
   DOUGHNUT = 'doughnut',
@@ -1608,9 +1229,6 @@ export enum ChartType {
   FUNNEL = 'funnel'
 }
 
-/**
- * Chart options
- */
 export interface ChartOptions {
   width?: number;
   height?: number;
@@ -1629,44 +1247,29 @@ export interface ChartOptions {
   showValues?: boolean;
 }
 
-/**
- * Animation options
- */
 export interface AnimationOptions {
   duration: number;
   easing: string;
   delay?: number;
 }
 
-/**
- * Legend options
- */
 export interface LegendOptions {
   display: boolean;
   position: 'top' | 'bottom' | 'left' | 'right';
   align?: 'start' | 'center' | 'end';
 }
 
-/**
- * Tooltip options
- */
 export interface TooltipOptions {
   enabled: boolean;
   mode: 'point' | 'nearest' | 'index' | 'dataset';
   intersect: boolean;
 }
 
-/**
- * Scale options
- */
 export interface ScaleOptions {
   x?: AxisOptions;
   y?: AxisOptions;
 }
 
-/**
- * Axis options
- */
 export interface AxisOptions {
   display: boolean;
   title?: {
@@ -1680,9 +1283,6 @@ export interface AxisOptions {
   };
 }
 
-/**
- * Pie/Doughnut chart data
- */
 export interface PieChartData extends ChartData {
   type: ChartType.PIE | ChartType.DOUGHNUT;
   labels: string[];
@@ -1690,18 +1290,12 @@ export interface PieChartData extends ChartData {
   colors: string[];
 }
 
-/**
- * Bar chart data
- */
 export interface BarChartData extends ChartData {
   type: ChartType.BAR;
   labels: string[];
   datasets: BarDataset[];
 }
 
-/**
- * Bar chart dataset
- */
 export interface BarDataset {
   label: string;
   data: number[];
@@ -1710,18 +1304,12 @@ export interface BarDataset {
   borderWidth?: number;
 }
 
-/**
- * Line/Area chart data
- */
 export interface LineChartData extends ChartData {
   type: ChartType.LINE | ChartType.AREA;
   labels: string[];
   datasets: LineDataset[];
 }
 
-/**
- * Line chart dataset
- */
 export interface LineDataset {
   label: string;
   data: number[];
@@ -1734,18 +1322,12 @@ export interface LineDataset {
   pointRadius?: number;
 }
 
-/**
- * Radar chart data
- */
 export interface RadarChartData extends ChartData {
   type: ChartType.RADAR | ChartType.POLAR;
   labels: string[];
   datasets: RadarDataset[];
 }
 
-/**
- * Radar chart dataset
- */
 export interface RadarDataset {
   label: string;
   data: number[];
@@ -1755,17 +1337,11 @@ export interface RadarDataset {
   pointBorderColor?: string;
 }
 
-/**
- * Scatter chart data
- */
 export interface ScatterChartData extends ChartData {
   type: ChartType.SCATTER | ChartType.BUBBLE;
   datasets: ScatterDataset[];
 }
 
-/**
- * Scatter dataset
- */
 export interface ScatterDataset {
   label: string;
   data: Array<{ x: number; y: number; r?: number }>;
@@ -1773,9 +1349,6 @@ export interface ScatterDataset {
   borderColor?: string | string[];
 }
 
-/**
- * Histogram data
- */
 export interface HistogramData extends ChartData {
   type: ChartType.HISTOGRAM;
   bins: number[];
@@ -1783,9 +1356,6 @@ export interface HistogramData extends ChartData {
   binWidth: number;
 }
 
-/**
- * Waterfall chart data
- */
 export interface WaterfallChartData extends ChartData {
   type: ChartType.WATERFALL;
   categories: string[];
@@ -1793,9 +1363,6 @@ export interface WaterfallChartData extends ChartData {
   isTotal: boolean[];
 }
 
-/**
- * Gantt chart data
- */
 export interface GanttChartData extends ChartData {
   type: ChartType.GANTT;
   tasks: GanttTask[];
@@ -1803,9 +1370,6 @@ export interface GanttChartData extends ChartData {
   endTime: Date;
 }
 
-/**
- * Gantt chart task
- */
 export interface GanttTask {
   id: string;
   name: string;
@@ -1816,9 +1380,6 @@ export interface GanttTask {
   color?: string;
 }
 
-/**
- * Heatmap data
- */
 export interface HeatmapData extends ChartData {
   type: ChartType.HEATMAP;
   xLabels: string[];
@@ -1829,17 +1390,11 @@ export interface HeatmapData extends ChartData {
   colorScale?: string;
 }
 
-/**
- * Treemap data
- */
 export interface TreemapData extends ChartData {
   type: ChartType.TREEMAP;
   data: TreemapNode[];
 }
 
-/**
- * Treemap node
- */
 export interface TreemapNode {
   name: string;
   label?: string;
@@ -1848,18 +1403,12 @@ export interface TreemapNode {
   children?: TreemapNode[];
 }
 
-/**
- * Box plot data
- */
 export interface BoxPlotData extends ChartData {
   type: ChartType.BOX | ChartType.VIOLIN;
   labels: string[];
   datasets: BoxPlotDataset[];
 }
 
-/**
- * Box plot dataset
- */
 export interface BoxPlotDataset {
   label: string;
   data: Array<{
@@ -1872,9 +1421,6 @@ export interface BoxPlotDataset {
   }>;
 }
 
-/**
- * Chart colors configuration
- */
 export interface ChartColors {
   dataColors: string[];
   backgroundColor?: string;
@@ -1885,9 +1431,6 @@ export interface ChartColors {
   heatmapColors?: string[];
 }
 
-/**
- * Point interface for charts
- */
 export interface Point {
   x: number;
   y: number;
@@ -1896,9 +1439,6 @@ export interface Point {
   value?: number;
 }
 
-/**
- * Dataset interface for charts
- */
 export interface DataSet {
   label: string;
   data: number[] | Point[];
@@ -1907,9 +1447,6 @@ export interface DataSet {
   borderColor?: string;
 }
 
-/**
- * Doughnut chart data structure
- */
 export interface DoughnutChart extends ChartData {
   labels: string[];
   values: number[];
@@ -1919,9 +1456,6 @@ export interface DoughnutChart extends ChartData {
   };
 }
 
-/**
- * Bar chart data structure
- */
 export interface BarChart extends ChartData {
   labels: string[];
   datasets: Array<{
@@ -1931,9 +1465,6 @@ export interface BarChart extends ChartData {
   }>;
 }
 
-/**
- * Line chart data structure
- */
 export interface LineChart extends ChartData {
   labels: string[];
   datasets: Array<{
@@ -1947,9 +1478,6 @@ export interface LineChart extends ChartData {
   }>;
 }
 
-/**
- * Area chart data structure
- */
 export interface AreaChart extends ChartData {
   labels: string[];
   datasets: Array<{
@@ -1959,17 +1487,11 @@ export interface AreaChart extends ChartData {
   }>;
 }
 
-/**
- * Pie chart data structure
- */
 export interface PieChart extends ChartData {
   labels: string[];
   values: number[];
 }
 
-/**
- * Radar chart data structure
- */
 export interface RadarChart extends ChartData {
   labels: string[];
   datasets: Array<{
@@ -1979,9 +1501,6 @@ export interface RadarChart extends ChartData {
   }>;
 }
 
-/**
- * Scatter chart data structure
- */
 export interface ScatterChart extends ChartData {
   datasets: Array<{
     label: string;
@@ -1991,9 +1510,6 @@ export interface ScatterChart extends ChartData {
   }>;
 }
 
-/**
- * Bubble chart data structure
- */
 export interface BubbleChart extends ChartData {
   datasets: Array<{
     label: string;
@@ -2002,25 +1518,16 @@ export interface BubbleChart extends ChartData {
   }>;
 }
 
-/**
- * Heatmap chart data structure
- */
 export interface HeatmapChart extends ChartData {
   xLabels: string[];
   yLabels: string[];
   data: number[][];
 }
 
-/**
- * Treemap chart data structure
- */
 export interface TreemapChart extends ChartData {
   data: TreemapNode[];
 }
 
-/**
- * Sankey chart data structure
- */
 export interface SankeyChart extends ChartData {
   nodes: Array<{
     id: string;
@@ -2033,9 +1540,6 @@ export interface SankeyChart extends ChartData {
   }>;
 }
 
-/**
- * Gauge chart data structure
- */
 export interface GaugeChart extends ChartData {
   value: number;
   min: number;
@@ -2049,29 +1553,17 @@ export interface GaugeChart extends ChartData {
   }>;
 }
 
-/**
- * Waterfall chart data structure  
- */
 export interface WaterfallChart extends ChartData {
   categories: string[];
   values: number[];
 }
 
-/**
- * Funnel chart data structure
- */
 export interface FunnelChart extends ChartData {
   labels: string[];
   values: number[];
 }
 
-// ============================================================================
-// REPORT CONFIGURATION
-// ============================================================================
 
-/**
- * Report configuration settings
- */
 export interface ReportConfiguration {
   theme: ReportTheme;
   exportFormats: ExportFormat[];
@@ -2081,9 +1573,6 @@ export interface ReportConfiguration {
   customizations: CustomizationConfig;
 }
 
-/**
- * Report theme configuration
- */
 export interface ReportTheme {
   primaryColor: string;
   secondaryColor: string;
@@ -2119,9 +1608,6 @@ export interface ReportTheme {
   };
 }
 
-/**
- * Export format enumeration
- */
 export enum ExportFormat {
   HTML = 'html',
   PDF = 'pdf',
@@ -2134,9 +1620,6 @@ export enum ExportFormat {
   JIRA = 'jira'
 }
 
-/**
- * Evidence inclusion configuration
- */
 export interface EvidenceConfig {
   includeScreenshots: boolean;
   includeVideos: boolean;
@@ -2148,9 +1631,6 @@ export interface EvidenceConfig {
   embedInReport: boolean;
 }
 
-/**
- * Chart configuration
- */
 export interface ChartConfig {
   enableCharts: boolean;
   chartTypes: ChartType[];
@@ -2159,9 +1639,6 @@ export interface ChartConfig {
   customCharts: CustomChartConfig[];
 }
 
-/**
- * Custom chart configuration
- */
 export interface CustomChartConfig {
   name: string;
   type: ChartType;
@@ -2169,9 +1646,6 @@ export interface CustomChartConfig {
   options: ChartOptions;
 }
 
-/**
- * Report section configuration
- */
 export interface SectionConfig {
   name: string;
   enabled: boolean;
@@ -2180,9 +1654,6 @@ export interface SectionConfig {
   customTemplate?: string;
 }
 
-/**
- * Customization configuration
- */
 export interface CustomizationConfig {
   companyName?: string;
   projectName?: string;
@@ -2193,9 +1664,6 @@ export interface CustomizationConfig {
   customBranding?: CustomBranding;
 }
 
-/**
- * Custom branding options
- */
 export interface CustomBranding {
   logo?: string;
   companyName?: string;
@@ -2203,9 +1671,6 @@ export interface CustomBranding {
   customCSS?: string;
 }
 
-/**
- * Custom metric configuration
- */
 export interface CustomMetricConfig {
   name: string;
   query: string;
@@ -2214,9 +1679,6 @@ export interface CustomMetricConfig {
   display: 'value' | 'chart' | 'both';
 }
 
-/**
- * Webhook configuration for report notifications
- */
 export interface WebhookConfig {
   url: string;
   events: string[];
@@ -2224,13 +1686,7 @@ export interface WebhookConfig {
   payload?: any;
 }
 
-// ============================================================================
-// REPORT GENERATION
-// ============================================================================
 
-/**
- * Report generation options
- */
 export interface ReportGenerationOptions {
   outputDir: string;
   reportName: string;
@@ -2241,25 +1697,16 @@ export interface ReportGenerationOptions {
   notifications: NotificationConfig[];
 }
 
-/**
- * Upload configuration
- */
 export interface UploadConfig {
   type: 'ado' | 's3' | 'sharepoint' | 'confluence';
   config: any;
 }
 
-/**
- * Notification configuration
- */
 export interface NotificationConfig {
   type: 'email' | 'teams' | 'slack' | 'webhook';
   config: any;
 }
 
-/**
- * Report generation result
- */
 export interface ReportGenerationResult {
   success: boolean;
   reportPaths: ReportPath[];
@@ -2269,18 +1716,12 @@ export interface ReportGenerationResult {
   notificationResults?: NotificationResult[];
 }
 
-/**
- * Generated report path
- */
 export interface ReportPath {
   format: ExportFormat;
   path: string;
   size: number;
 }
 
-/**
- * Upload result
- */
 export interface UploadResult {
   type: string;
   success: boolean;
@@ -2288,22 +1729,13 @@ export interface UploadResult {
   error?: string;
 }
 
-/**
- * Notification result
- */
 export interface NotificationResult {
   type: string;
   success: boolean;
   error?: string;
 }
 
-// ============================================================================
-// REPORT TEMPLATES
-// ============================================================================
 
-/**
- * Report template configuration
- */
 export interface ReportTemplate {
   name: string;
   description: string;
@@ -2312,9 +1744,6 @@ export interface ReportTemplate {
   scripts: TemplateScripts;
 }
 
-/**
- * Template section
- */
 export interface TemplateSection {
   id: string;
   type: string;
@@ -2324,37 +1753,22 @@ export interface TemplateSection {
   options: any;
 }
 
-/**
- * Template styles
- */
 export interface TemplateStyles {
   inline: string;
   external: string[];
 }
 
-/**
- * Template scripts
- */
 export interface TemplateScripts {
   inline: string;
   external: string[];
 }
 
-// ============================================================================
-// COLLECTOR INTERFACES
-// ============================================================================
 
-/**
- * Evidence collector interface
- */
 export interface IEvidenceCollector {
   collect(context: any): Promise<Evidence>;
   clear(): void;
 }
 
-/**
- * Base evidence type
- */
 export interface Evidence {
   id?: string;
   type: string | EvidenceType;
@@ -2367,40 +1781,25 @@ export interface Evidence {
   tags?: string[];
 }
 
-/**
- * Metrics collector interface
- */
 export interface IMetricsCollector {
   startCollection(): void;
   stopCollection(): void;
   getMetrics(): any;
 }
 
-/**
- * Log collector interface
- */
 export interface ILogCollector {
   startCapture(): void;
   stopCapture(): void;
   getLogs(): any[];
 }
 
-// ============================================================================
-// EMBEDDING TYPES
-// ============================================================================
 
-/**
- * Step embedding for attachments
- */
 export interface Embedding {
   mimeType: string;
   data: string;
   name?: string;
 }
 
-/**
- * Supported MIME types
- */
 export enum MimeType {
   TEXT = 'text/plain',
   HTML = 'text/html',
@@ -2413,13 +1812,7 @@ export enum MimeType {
   VIDEO_WEBM = 'video/webm'
 }
 
-// ============================================================================
-// HAR FILE TYPES
-// ============================================================================
 
-/**
- * HAR file
- */
 export interface HARFile {
   log: {
     version: string;
@@ -2431,9 +1824,6 @@ export interface HARFile {
   };
 }
 
-/**
- * HAR entry
- */
 export interface HAREntry {
   startedDateTime: string;
   time: number;
@@ -2442,9 +1832,6 @@ export interface HAREntry {
   timings: HARTimings;
 }
 
-/**
- * HAR request
- */
 export interface HARRequest {
   method: string;
   url: string;
@@ -2454,9 +1841,6 @@ export interface HARRequest {
   bodySize: number;
 }
 
-/**
- * HAR response
- */
 export interface HARResponse {
   status: number;
   statusText: string;
@@ -2468,9 +1852,6 @@ export interface HARResponse {
   };
 }
 
-/**
- * HAR timings
- */
 export interface HARTimings {
   blocked: number;
   dns: number;
@@ -2481,13 +1862,7 @@ export interface HARTimings {
   ssl: number;
 }
 
-// ============================================================================
-// TIMELINE DATA
-// ============================================================================
 
-/**
- * Timeline data for execution visualization
- */
 export interface TimelineData {
   entries: TimelineEntry[];
   startTime: Date;
@@ -2496,9 +1871,6 @@ export interface TimelineData {
   milestones: Milestone[];
 }
 
-/**
- * Milestone in timeline
- */
 export interface Milestone {
   name: string;
   timestamp: Date;
@@ -2506,13 +1878,7 @@ export interface Milestone {
   description?: string;
 }
 
-// ============================================================================
-// UTILITY TYPES
-// ============================================================================
 
-/**
- * Execution options from command line
- */
 export interface ExecutionOptions {
   env: string;
   tags?: string;
@@ -2533,17 +1899,11 @@ export interface ExecutionOptions {
   browser?: string;
 }
 
-/**
- * Date range for filtering
- */
 export interface DateRange {
   startDate: Date;
   endDate: Date;
 }
 
-/**
- * Time period
- */
 export enum TimePeriod {
   LAST_HOUR = 'last_hour',
   LAST_24_HOURS = 'last_24_hours',
@@ -2552,25 +1912,16 @@ export enum TimePeriod {
   CUSTOM = 'custom'
 }
 
-/**
- * Sort options
- */
 export interface SortOptions {
   field: string;
   order: 'asc' | 'desc';
 }
 
-/**
- * Sort order
- */
 export enum SortOrder {
   ASC = 'asc',
   DESC = 'desc'
 }
 
-/**
- * Filter options
- */
 export interface FilterOptions {
   status?: TestStatus[];
   tags?: string[];
@@ -2580,9 +1931,6 @@ export interface FilterOptions {
   environment?: string;
 }
 
-/**
- * Filter criteria
- */
 export interface FilterCriteria {
   status?: TestStatus[];
   tags?: string[];
@@ -2592,9 +1940,6 @@ export interface FilterCriteria {
   environment?: string;
 }
 
-/**
- * Pagination options
- */
 export interface PaginationOptions {
   page: number;
   pageSize: number;
@@ -2603,9 +1948,6 @@ export interface PaginationOptions {
   sortOrder?: SortOrder;
 }
 
-/**
- * Response wrapper
- */
 export interface ResponseWrapper<T> {
   success: boolean;
   data?: T;
@@ -2613,13 +1955,7 @@ export interface ResponseWrapper<T> {
   metadata?: Record<string, any>;
 }
 
-// ============================================================================
-// REPORT EVENTS
-// ============================================================================
 
-/**
- * Report generation events
- */
 export enum ReportEvent {
   GENERATION_STARTED = 'generationStarted',
   GENERATION_PROGRESS = 'generationProgress',
@@ -2634,22 +1970,13 @@ export enum ReportEvent {
   NOTIFICATION_SENT = 'notificationSent'
 }
 
-/**
- * Report event data
- */
 export interface ReportEventData {
   event: ReportEvent;
   timestamp: Date;
   data: any;
 }
 
-// ============================================================================
-// ADDITIONAL TYPES FOR REPORT CORE
-// ============================================================================
 
-/**
- * Execution result from test runs
- */
 export interface ExecutionResult {
   executionId: string;
   startTime: Date;
@@ -2675,9 +2002,6 @@ export interface ExecutionResult {
   metadata?: Record<string, any>;
 }
 
-/**
- * Report options (alias for SortOptions for compatibility)
- */
 export interface ReportOptions {
   outputDir?: string;
   reportName?: string;
@@ -2689,9 +2013,6 @@ export interface ReportOptions {
   compress?: boolean;
 }
 
-/**
- * Report result after generation
- */
 export interface ReportResult {
   reportId: string;
   reportPath: string;
@@ -2703,9 +2024,6 @@ export interface ReportResult {
   metadata?: Record<string, any>;
 }
 
-/**
- * Aggregated data for reporting
- */
 export interface AggregatedData {
   executionResult: ExecutionResult;
   evidence: EvidenceCollection;
@@ -2715,19 +2033,10 @@ export interface AggregatedData {
   metadata?: Record<string, any>;
 }
 
-/**
- * Scenario result (similar to ScenarioReport but simplified)
- */
 export type ScenarioResult = ScenarioReport;
 
-/**
- * Feature result (similar to FeatureReport but simplified)
- */
 export type FeatureResult = FeatureReport;
 
-/**
- * Collected data from collectors
- */
 export interface CollectedData {
   screenshots: Screenshot[];
   videos: Video[];
@@ -2738,9 +2047,6 @@ export interface CollectedData {
   metadata?: Record<string, any>;
 }
 
-/**
- * Report task for scheduling
- */
 export interface ReportTask {
   taskId: string;
   name: string;
@@ -2780,9 +2086,6 @@ export interface ReportTask {
   };
 }
 
-/**
- * Schedule options
- */
 export interface ScheduleOptions {
   cronExpression: string;
   timezone?: string;
@@ -2791,9 +2094,6 @@ export interface ScheduleOptions {
   maxRetries?: number;
 }
 
-/**
- * Schedule result
- */
 export interface ScheduleResult {
   taskId: string;
   scheduled: boolean;
@@ -2801,9 +2101,6 @@ export interface ScheduleResult {
   error?: string;
 }
 
-/**
- * Report data structure
- */
 export interface ReportData {
   metadata: ReportMetadata;
   configuration: ReportConfiguration;
@@ -2818,13 +2115,7 @@ export interface ReportData {
   logs?: any[];
 }
 
-// ============================================================================
-// NETWORK COLLECTOR TYPES
-// ============================================================================
 
-/**
- * Network entry for HAR format
- */
 export interface NetworkEntry {
   id: string;
   scenarioId: string;
@@ -2881,9 +2172,6 @@ export interface NetworkEntry {
   };
 }
 
-/**
- * WebSocket frame data
- */
 export interface WebSocketFrame {
   id: string;
   timestamp: string;
@@ -2898,9 +2186,6 @@ export interface WebSocketFrame {
   stepId?: string;
 }
 
-/**
- * Security information for requests
- */
 export interface SecurityInfo {
   url: string;
   protocol: string;
@@ -2915,9 +2200,6 @@ export interface SecurityInfo {
   score: number;
 }
 
-/**
- * Resource timing information
- */
 export interface ResourceTiming {
   name: string;
   entryType: string;
@@ -2943,9 +2225,6 @@ export interface ResourceTiming {
   serverTiming: any[];
 }
 
-/**
- * Network analysis data
- */
 export interface NetworkAnalysis {
   summary: NetworkSummary;
   performance: NetworkPerformance;
@@ -2966,9 +2245,6 @@ export interface NetworkAnalysis {
   protocols?: any;
 }
 
-/**
- * Third-party analysis data
- */
 export interface ThirdPartyAnalysis {
   totalRequests: number;
   domains: Record<string, number>;
@@ -2977,9 +2253,6 @@ export interface ThirdPartyAnalysis {
   dataTransferred: number;
 }
 
-/**
- * Cache analysis data
- */
 export interface CacheAnalysis {
   cacheableResources: number;
   cachedResources: number;
@@ -2988,18 +2261,12 @@ export interface CacheAnalysis {
   recommendations: any[];
 }
 
-/**
- * Performance impact data
- */
 export interface PerformanceImpact {
   responseTime: number;
   dataTransferred: number;
   resourceCount: number;
 }
 
-/**
- * Step timing data
- */
 export interface StepTiming {
   stepId: string;
   startTime: number;
@@ -3008,9 +2275,6 @@ export interface StepTiming {
   webSocketFrames: string[];
 }
 
-/**
- * Network summary data
- */
 export interface NetworkSummary {
   totalRequests: number;
   totalDataTransferred: number;
@@ -3027,9 +2291,6 @@ export interface NetworkSummary {
   webSocketReport?: string;
 }
 
-/**
- * Cache information
- */
 export interface CacheInfo {
   cacheControl?: string;
   etag?: string;
@@ -3048,18 +2309,12 @@ export interface CacheInfo {
   sMaxAge?: number;
 }
 
-/**
- * Server timing data
- */
 export interface ServerTiming {
   name: string;
   duration: number;
   description: string;
 }
 
-/**
- * Network collector options
- */
 export interface NetworkCollectorOptions {
   captureWebSockets?: boolean;
   captureHAR?: boolean;
@@ -3071,9 +2326,6 @@ export interface NetworkCollectorOptions {
   throttling?: NetworkThrottling | null;
 }
 
-/**
- * Network throttling configuration
- */
 export interface NetworkThrottling {
   downloadThroughput: number;
   uploadThroughput: number;
@@ -3081,13 +2333,7 @@ export interface NetworkThrottling {
   connectionType?: string;
 }
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
 
-/**
- * Default report configuration
- */
 export const DEFAULT_REPORT_CONFIG: ReportConfiguration = {
   theme: {
     primaryColor: '#93186C',
@@ -3137,9 +2383,6 @@ export const DEFAULT_REPORT_CONFIG: ReportConfiguration = {
   customizations: {}
 };
 
-/**
- * Report status icons
- */
 export const STATUS_ICONS = {
   passed: '✓',
   failed: '✗',
@@ -3149,9 +2392,6 @@ export const STATUS_ICONS = {
   ambiguous: '!'
 };
 
-/**
- * Report status colors
- */
 export const STATUS_COLORS = {
   passed: '#28A745',
   failed: '#DC3545',
@@ -3161,9 +2401,6 @@ export const STATUS_COLORS = {
   ambiguous: '#E83E8C'
 };
 
-/**
- * Export result interface
- */
 export interface ExportResult {
   success: boolean;
   filePath?: string;
@@ -3174,9 +2411,6 @@ export interface ExportResult {
   metadata?: Record<string, any>;
 }
 
-/**
- * Export options interface
- */
 export interface ExportOptions {
   format: ExportFormat;
   outputPath?: string;
@@ -3186,9 +2420,6 @@ export interface ExportOptions {
   metadata?: Record<string, any>;
 }
 
-/**
- * PDF export options interface
- */
 export interface PDFOptions extends ExportOptions {
   pageFormat?: PDFFormat;
   pageSize?: PDFPageSize;
@@ -3232,7 +2463,6 @@ export interface PDFOptions extends ExportOptions {
     creator?: string;
     producer?: string;
   };
-  // Additional properties used in PDFExporter
   includeToc?: boolean;
   includeBookmarks?: boolean;
   attachments?: Array<{ name: string; path: string; description?: string }>;
@@ -3248,7 +2478,6 @@ export interface PDFOptions extends ExportOptions {
   author?: string;
   subject?: string;
   keywords?: string;
-  // Additional properties for Playwright PDF generation
   margin?: {
     top?: string;
     right?: string;
@@ -3267,19 +2496,10 @@ export interface PDFOptions extends ExportOptions {
   taggedPDF?: boolean;
 }
 
-/**
- * PDF format types
- */
 export type PDFFormat = 'A4' | 'Letter' | 'Legal' | 'Tabloid' | 'Custom';
 
-/**
- * PDF page size types
- */
 export type PDFPageSize = [number, number] | 'A4' | 'Letter' | 'Legal' | 'Tabloid';
 
-/**
- * PDF permissions interface
- */
 export interface PDFPermissions {
   printing?: boolean;
   modifying?: boolean;
@@ -3291,9 +2511,6 @@ export interface PDFPermissions {
   printingHighQuality?: boolean;
 }
 
-/**
- * Collector interface
- */
 export interface CollectorInterface {
   name: string;
   type: EvidenceType;
@@ -3304,9 +2521,6 @@ export interface CollectorInterface {
   finalize(): Promise<void>;
 }
 
-/**
- * Evidence type enum
- */
 export enum EvidenceType {
   SCREENSHOT = 'screenshot',
   VIDEO = 'video',
@@ -3318,9 +2532,6 @@ export enum EvidenceType {
   CUSTOM = 'custom'
 }
 
-/**
- * Collector options
- */
 export interface CollectorOptions {
   enabled?: boolean;
   maxSize?: number;
@@ -3338,9 +2549,6 @@ export interface CollectorOptions {
   performancebudget?: PerformanceThreshold[];
 }
 
-/**
- * Metrics data interface
- */
 export interface MetricsData {
   executionId?: string;
   startTime?: number;
@@ -3379,9 +2587,6 @@ export interface MetricsData {
   };
 }
 
-/**
- * Test metrics interface
- */
 export interface TestMetrics {
   timestamp: Date;
   scenarioId: string;
@@ -3393,9 +2598,6 @@ export interface TestMetrics {
   cpu?: any;
 }
 
-/**
- * Custom metric interface
- */
 export interface CustomMetric {
   name: string;
   value: number;
@@ -3410,9 +2612,6 @@ export interface CustomMetric {
   };
 }
 
-/**
- * Metric type enum
- */
 export enum MetricType {
   COUNTER = 'counter',
   GAUGE = 'gauge',
@@ -3420,9 +2619,6 @@ export enum MetricType {
   SUMMARY = 'summary'
 }
 
-/**
- * Aggregated metrics interface
- */
 export interface AggregatedMetrics {
   startTime: number;
   endTime: number;
@@ -3435,9 +2631,6 @@ export interface AggregatedMetrics {
   errors: { count: number; rate: number };
 }
 
-/**
- * Metric snapshot interface
- */
 export interface MetricSnapshot {
   timestamp: number;
   reason: string;
@@ -3450,9 +2643,6 @@ export interface MetricSnapshot {
   gcMetrics: any[];
 }
 
-/**
- * Metric trend interface
- */
 export interface MetricTrend {
   metric: string;
   direction: 'up' | 'down' | 'stable';
@@ -3464,9 +2654,6 @@ export interface MetricTrend {
   current?: number;
 }
 
-/**
- * Alert interface
- */
 export interface Alert {
   id: string;
   timestamp: Date;
@@ -3479,9 +2666,6 @@ export interface Alert {
   contextId?: string;
 }
 
-/**
- * Alert severity enum
- */
 export enum AlertSeverity {
   INFO = 'info',
   WARNING = 'warning',
@@ -3489,9 +2673,6 @@ export enum AlertSeverity {
   CRITICAL = 'critical'
 }
 
-/**
- * Grafana metric interface
- */
 export interface GrafanaMetric {
   name: string;
   value: number;
@@ -3499,9 +2680,6 @@ export interface GrafanaMetric {
   tags: Record<string, string>;
 }
 
-/**
- * Prometheus metric interface (not used, but defined for compatibility)
- */
 export interface PrometheusMetric {
   name: string;
   help: string;
@@ -3510,13 +2688,7 @@ export interface PrometheusMetric {
   labels?: Record<string, string>;
 }
 
-// ============================================================================
-// PERFORMANCE COLLECTOR TYPES
-// ============================================================================
 
-/**
- * Performance metrics for collectors
- */
 export interface PerformanceMetrics {
   navigationTimings: [string, NavigationTiming[]][];
   resourceTimings: [string, ResourceTiming[]][];
@@ -3541,32 +2713,25 @@ export interface PerformanceMetrics {
   slowestSteps?: Array<{ text: string; duration: number }>;
 }
 
-/**
- * Core Web Vitals metrics
- */
 export interface CoreWebVitals {
   timestamp?: number;
   url?: string;
-  LCP?: number; // Largest Contentful Paint
-  FID?: number; // First Input Delay
-  CLS?: number; // Cumulative Layout Shift
-  FCP?: number; // First Contentful Paint
-  TTFB?: number; // Time to First Byte
-  INP?: number; // Interaction to Next Paint
-  TTI?: number; // Time to Interactive
-  TBT?: number; // Total Blocking Time
-  SI?: number; // Speed Index
+  LCP?: number;
+  FID?: number;
+  CLS?: number;
+  FCP?: number;
+  TTFB?: number;
+  INP?: number;
+  TTI?: number;
+  TBT?: number;
+  SI?: number;
   
-  // Details objects for more information
   LCPDetails?: any;
   FIDDetails?: any;
   CLSDetails?: any;
   INPDetails?: any;
 }
 
-/**
- * Navigation timing data
- */
 export interface NavigationTiming {
   navigationStart: number;
   unloadEventStart: number;
@@ -3595,14 +2760,12 @@ export interface NavigationTiming {
   ttfb?: number;
   total?: number;
   timestamp?: number;
-  // Calculated metrics
   dns: number;
   tcp: number;
   ssl: number;
   transfer: number;
   domProcessing: number;
   onLoad: number;
-  // Additional properties
   protocol?: string;
   transferSize?: number;
   encodedBodySize?: number;
@@ -3610,9 +2773,6 @@ export interface NavigationTiming {
   serverTiming?: any[];
 }
 
-/**
- * User timing data
- */
 export interface UserTiming {
   name: string;
   entryType: string;
@@ -3624,9 +2784,6 @@ export interface UserTiming {
   measures?: any[];
 }
 
-/**
- * Long task data
- */
 export interface LongTask {
   name: string;
   entryType: string;
@@ -3644,9 +2801,6 @@ export interface LongTask {
   }>;
 }
 
-/**
- * Memory information
- */
 export interface MemoryInfo {
   timestamp: number;
   usedJSHeapSize: number;
@@ -3658,9 +2812,6 @@ export interface MemoryInfo {
   arrayBuffers?: number;
 }
 
-/**
- * Performance report
- */
 export interface PerformanceReport {
   timestamp: number;
   scenarioId: string;
@@ -3674,18 +2825,12 @@ export interface PerformanceReport {
   summary: PerformanceSummary;
 }
 
-/**
- * Performance threshold
- */
 export interface PerformanceThreshold {
   metric: string;
   threshold: number;
   unit: string;
 }
 
-/**
- * Performance summary
- */
 export interface PerformanceSummary {
   score: number;
   scores: any;
@@ -3700,9 +2845,6 @@ export interface PerformanceSummary {
   recommendations: string[];
 }
 
-/**
- * Performance violation
- */
 export interface PerformanceViolation {
   metric: string;
   actual: number;

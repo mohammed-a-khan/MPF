@@ -9,7 +9,6 @@ import { ElementFeatures } from '../types/ai.types';
 import { logger } from '../../utils/Logger';
 import { ActionLogger } from '../../logging/ActionLogger';
 
-// BoundingBox interface - matches Playwright's internal type
 interface BoundingBox {
     x: number;
     y: number;
@@ -17,9 +16,6 @@ interface BoundingBox {
     height: number;
 }
 
-/**
- * Base class for all healing strategies
- */
 export abstract class HealingStrategy {
     protected readonly name: string;
     protected readonly confidenceThreshold: number = 0.7;
@@ -28,22 +24,12 @@ export abstract class HealingStrategy {
         this.name = name;
     }
     
-    /**
-     * Attempt to heal the broken element
-     */
     abstract heal(element: CSWebElement, page: Page): Promise<HealingResult | null>;
     
-    /**
-     * Calculate confidence score for the healed element
-     */
     abstract calculateConfidence(original: ElementFeatures, healed: ElementFeatures): number;
     
-    /**
-     * Get last known features for element (from cache or metadata)
-     */
     protected async getLastKnownFeatures(element: CSWebElement): Promise<ElementFeatures | null> {
         try {
-            // Try to get current element and extract features
             const elementHandle = await element.elementHandle();
             if (elementHandle) {
                 const extractor = new ElementFeatureExtractor();
@@ -55,12 +41,8 @@ export abstract class HealingStrategy {
         return null;
     }
     
-    /**
-     * Get last known position for element (from cache or metadata)
-     */
     protected async getLastKnownPosition(element: CSWebElement): Promise<BoundingBox | null> {
         try {
-            // Try to get current element position
             const elementHandle = await element.elementHandle();
             if (elementHandle) {
                 return await elementHandle.boundingBox();
@@ -71,35 +53,25 @@ export abstract class HealingStrategy {
         return null;
     }
     
-    /**
-     * Get strategy name
-     */
     getName(): string {
         return this.name;
     }
     
-    /**
-     * Validate healed element matches expected behavior
-     */
     protected async validateHealedElement(
         original: CSWebElement,
         healedLocator: Locator
     ): Promise<boolean> {
         try {
-            // Check if element exists
             const count = await healedLocator.count();
             if (count === 0) return false;
             
-            // For strict mode, ensure only one element
             if (original.options.strict && count > 1) return false;
             
-            // Check visibility if required
             if (original.options.waitForVisible) {
                 const isVisible = await healedLocator.isVisible();
                 if (!isVisible) return false;
             }
             
-            // Check enabled state if required
             if (original.options.waitForEnabled) {
                 const isEnabled = await healedLocator.isEnabled();
                 if (!isEnabled) return false;
@@ -113,11 +85,8 @@ export abstract class HealingStrategy {
     }
 }
 
-/**
- * Strategy 1: Find element near original position
- */
 export class NearbyElementStrategy extends HealingStrategy {
-    private readonly maxDistance: number = 100; // pixels
+    private readonly maxDistance: number = 100;
     private readonly featureExtractor: ElementFeatureExtractor;
     private readonly similarityCalculator: SimilarityCalculator;
     
@@ -135,14 +104,12 @@ export class NearbyElementStrategy extends HealingStrategy {
         });
         
         try {
-            // Get last known position from snapshot
             const originalPos = await this.getLastKnownPosition(element);
             if (!originalPos) {
                 logger.debug('No position snapshot available for nearby healing');
                 return null;
             }
             
-            // Find all elements of similar type near the original position
             const candidates = await this.findNearbyCandidates(
                 page,
                 originalPos,
@@ -154,7 +121,6 @@ export class NearbyElementStrategy extends HealingStrategy {
                 return null;
             }
             
-            // Score each candidate based on similarity and distance
             const originalFeatures = await this.getLastKnownFeatures(element);
             if (!originalFeatures) {
                 logger.debug('No original features available for scoring');
@@ -167,17 +133,14 @@ export class NearbyElementStrategy extends HealingStrategy {
                 originalFeatures
             );
             
-            // Get best match
             const best = scoredCandidates[0];
             if (!best || best.score < this.confidenceThreshold) {
                 logger.debug(`Best nearby candidate score ${best?.score || 0} below threshold`);
                 return null;
             }
             
-            // Create locator for the healed element
             const healedLocator = await this.createLocatorForElement(page, best.element);
             
-            // Validate the healed element
             if (!await this.validateHealedElement(element, healedLocator)) {
                 logger.debug('Healed element validation failed');
                 return null;
@@ -210,14 +173,11 @@ export class NearbyElementStrategy extends HealingStrategy {
         originalPos: BoundingBox,
         elementType: string
     ): Promise<ElementHandle[]> {
-        // Get tag name based on element type
         const tagNames = this.getTagNamesForType(elementType);
         const selector = tagNames.join(', ');
         
-        // Get all elements of similar type
         const allElements = await page.$$(selector);
         
-        // Filter by distance
         const nearby: ElementHandle[] = [];
         
         for (const el of allElements) {
@@ -245,23 +205,18 @@ export class NearbyElementStrategy extends HealingStrategy {
                 const box = await element.boundingBox();
                 if (!box) continue;
                 
-                // Extract features
                 const features = await this.featureExtractor.extractFeatures(element);
                 
-                // Calculate distance score (closer is better)
                 const distance = this.calculateDistance(originalPos, box);
                 const distanceScore = 1 - (distance / this.maxDistance);
                 
-                // Calculate feature similarity
                 const similarityScore = this.similarityCalculator.calculate(
                     originalFeatures,
                     features
                 );
                 
-                // Combined score (weighted)
                 const totalScore = (distanceScore * 0.3) + (similarityScore * 0.7);
                 
-                // Generate selector
                 const selector = await this.generateSelector(element);
                 
                 scored.push({
@@ -276,7 +231,6 @@ export class NearbyElementStrategy extends HealingStrategy {
             }
         }
         
-        // Sort by score descending
         return scored.sort((a, b) => b.score - a.score);
     }
     
@@ -315,7 +269,6 @@ export class NearbyElementStrategy extends HealingStrategy {
     private async generateSelector(element: ElementHandle): Promise<string> {
         return await element.evaluate(el => {
             const elem = el as Element;
-            // Try to generate a unique selector
             if (elem.id) return `#${elem.id}`;
             
             const tag = elem.tagName.toLowerCase();
@@ -325,7 +278,6 @@ export class NearbyElementStrategy extends HealingStrategy {
                 return `${tag}.${classes.join('.')}`;
             }
             
-            // Use nth-child as fallback
             const parent = el.parentElement;
             if (parent) {
                 const index = Array.from(parent.children).indexOf(el as Element) + 1;
@@ -341,9 +293,6 @@ export class NearbyElementStrategy extends HealingStrategy {
     }
 }
 
-/**
- * Strategy 2: Find element with similar text content
- */
 export class SimilarTextStrategy extends HealingStrategy {
     private readonly minTextSimilarity: number = 0.8;
     private readonly featureExtractor: ElementFeatureExtractor;
@@ -363,7 +312,6 @@ export class SimilarTextStrategy extends HealingStrategy {
         });
         
         try {
-            // Get original text from snapshot
             const originalFeatures = await this.getLastKnownFeatures(element);
             if (!originalFeatures?.text?.content) {
                 logger.debug('No text content in snapshot for text-based healing');
@@ -373,7 +321,6 @@ export class SimilarTextStrategy extends HealingStrategy {
             const originalText = originalFeatures.text.content;
             const originalType = element.options.locatorType;
             
-            // Find elements with similar text
             const candidates = await this.findTextCandidates(
                 page,
                 originalText,
@@ -385,24 +332,20 @@ export class SimilarTextStrategy extends HealingStrategy {
                 return null;
             }
             
-            // Score candidates
             const scoredCandidates = await this.scoreCandidates(
                 candidates,
                 originalText,
                 originalFeatures
             );
             
-            // Get best match
             const best = scoredCandidates[0];
             if (!best || best.score < this.confidenceThreshold) {
                 logger.debug(`Best text candidate score ${best?.score || 0} below threshold`);
                 return null;
             }
             
-            // Create locator
             const healedLocator = page.locator(best.selector);
             
-            // Validate
             if (!await this.validateHealedElement(element, healedLocator)) {
                 logger.debug('Text-healed element validation failed');
                 return null;
@@ -437,18 +380,14 @@ export class SimilarTextStrategy extends HealingStrategy {
     ): Promise<TextCandidate[]> {
         const candidates: TextCandidate[] = [];
         
-        // Use XPath for text search
         const normalizedText = this.normalizeText(originalText);
         const words = normalizedText.split(/\s+/).filter(w => w.length > 2);
         
         if (words.length === 0) return candidates;
         
-        // Get tag names for element type
         const tagNames = this.getTagNamesForType(elementType);
         
-        // Search for elements containing key words
-        for (const word of words.slice(0, 3)) { // Use first 3 significant words
-            // Build XPath with tag name filter
+        for (const word of words.slice(0, 3)) {
             const tagFilter = tagNames.length === 1 && tagNames[0] !== '*' 
                 ? tagNames[0] 
                 : '*';
@@ -475,7 +414,6 @@ export class SimilarTextStrategy extends HealingStrategy {
             }
         }
         
-        // Remove duplicates
         const unique = new Map<string, TextCandidate>();
         for (const candidate of candidates) {
             const key = candidate.text;
@@ -496,19 +434,15 @@ export class SimilarTextStrategy extends HealingStrategy {
         
         for (const candidate of candidates) {
             try {
-                // Extract full features
                 const features = await this.featureExtractor.extractFeatures(candidate.element);
                 
-                // Calculate overall similarity
                 const featureSimilarity = this.similarityCalculator.calculate(
                     originalFeatures,
                     features
                 );
                 
-                // Combined score
                 const totalScore = (candidate.similarity * 0.6) + (featureSimilarity * 0.4);
                 
-                // Generate selector
                 const selector = await this.generateTextSelector(candidate.element, candidate.text);
                 
                 scored.push({
@@ -530,7 +464,6 @@ export class SimilarTextStrategy extends HealingStrategy {
         const norm1 = this.normalizeText(text1);
         const norm2 = this.normalizeText(text2);
         
-        // Levenshtein distance
         const distance = this.levenshteinDistance(norm1, norm2);
         const maxLength = Math.max(norm1.length, norm2.length);
         
@@ -551,10 +484,8 @@ export class SimilarTextStrategy extends HealingStrategy {
         const m = str1.length;
         const n = str2.length;
         
-        // Create and initialize matrix
         const matrix: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
         
-        // Fill first row and column
         for (let i = 0; i <= n; i++) {
             matrix[i]![0] = i;
         }
@@ -562,7 +493,6 @@ export class SimilarTextStrategy extends HealingStrategy {
             matrix[0]![j] = j;
         }
         
-        // Calculate distances
         for (let i = 1; i <= n; i++) {
             for (let j = 1; j <= m; j++) {
                 const cost = str2.charAt(i - 1) === str1.charAt(j - 1) ? 0 : 1;
@@ -598,12 +528,10 @@ export class SimilarTextStrategy extends HealingStrategy {
             const elem = el as Element;
             const tag = elem.tagName.toLowerCase();
             
-            // Try to create a specific text selector
             if (txt.length < 50) {
                 return `${tag}:has-text("${txt.replace(/"/g, '\\"')}")`;
             }
             
-            // For longer text, use partial match
             const words = txt.split(/\s+/).slice(0, 5).join(' ');
             return `${tag}:has-text("${words.replace(/"/g, '\\"')}")`;
         }, text);
@@ -621,9 +549,6 @@ export class SimilarTextStrategy extends HealingStrategy {
     }
 }
 
-/**
- * Strategy 3: Find element with similar attributes
- */
 export class SimilarAttributesStrategy extends HealingStrategy {
     private readonly minAttributeSimilarity: number = 0.7;
     private readonly featureExtractor: ElementFeatureExtractor;
@@ -644,7 +569,6 @@ export class SimilarAttributesStrategy extends HealingStrategy {
         });
         
         try {
-            // Get original attributes from snapshot
             const originalFeatures = await this.getLastKnownFeatures(element);
             if (!originalFeatures?.structural?.attributes) {
                 logger.debug('No attributes in snapshot for attribute-based healing');
@@ -654,7 +578,6 @@ export class SimilarAttributesStrategy extends HealingStrategy {
             const originalAttrs = originalFeatures.structural.attributes;
             const originalTag = originalFeatures.structural.tagName;
             
-            // Find elements with similar attributes
             const candidates = await this.findAttributeCandidates(
                 page,
                 originalTag,
@@ -666,24 +589,20 @@ export class SimilarAttributesStrategy extends HealingStrategy {
                 return null;
             }
             
-            // Score candidates
             const scoredCandidates = await this.scoreCandidates(
                 candidates,
                 originalAttrs,
                 originalFeatures
             );
             
-            // Get best match
             const best = scoredCandidates[0];
             if (!best || best.score < this.confidenceThreshold) {
                 logger.debug(`Best attribute candidate score ${best?.score || 0} below threshold`);
                 return null;
             }
             
-            // Create locator
             const healedLocator = page.locator(best.selector);
             
-            // Validate
             if (!await this.validateHealedElement(element, healedLocator)) {
                 logger.debug('Attribute-healed element validation failed');
                 return null;
@@ -718,7 +637,6 @@ export class SimilarAttributesStrategy extends HealingStrategy {
     ): Promise<AttributeCandidate[]> {
         const candidates: AttributeCandidate[] = [];
         
-        // Get all elements of the same tag
         const elements = await page.$$(originalTag);
         
         for (const element of elements) {
@@ -757,19 +675,15 @@ export class SimilarAttributesStrategy extends HealingStrategy {
         
         for (const candidate of candidates) {
             try {
-                // Extract full features
                 const features = await this.featureExtractor.extractFeatures(candidate.element);
                 
-                // Calculate overall similarity
                 const featureSimilarity = this.similarityCalculator.calculate(
                     originalFeatures,
                     features
                 );
                 
-                // Combined score
                 const totalScore = (candidate.similarity * 0.5) + (featureSimilarity * 0.5);
                 
-                // Generate selector
                 const selector = await this.generateAttributeSelector(
                     candidate.element,
                     candidate.attributes
@@ -797,14 +711,12 @@ export class SimilarAttributesStrategy extends HealingStrategy {
         let matchScore = 0;
         let totalWeight = 0;
         
-        // Check important attributes
         for (const attr of this.importantAttributes) {
             const weight = this.getAttributeWeight(attr);
             totalWeight += weight;
             
             if (attrs1[attr] && attrs2[attr]) {
                 if (attr === 'class') {
-                    // Special handling for classes
                     const classes1 = new Set(attrs1[attr].split(/\s+/));
                     const classes2 = new Set(attrs2[attr].split(/\s+/));
                     
@@ -815,7 +727,6 @@ export class SimilarAttributesStrategy extends HealingStrategy {
                         matchScore += weight * (intersection.size / union.size);
                     }
                 } else {
-                    // Exact match for other attributes
                     if (attrs1[attr] === attrs2[attr]) {
                         matchScore += weight;
                     }
@@ -823,7 +734,6 @@ export class SimilarAttributesStrategy extends HealingStrategy {
             }
         }
         
-        // Check other attributes
         const allKeys = new Set([...Object.keys(attrs1), ...Object.keys(attrs2)]);
         const otherKeys = Array.from(allKeys).filter(k => !this.importantAttributes.includes(k));
         
@@ -856,7 +766,6 @@ export class SimilarAttributesStrategy extends HealingStrategy {
     ): Promise<string> {
         const tag = await element.evaluate(el => (el as Element).tagName.toLowerCase());
         
-        // Build selector from most specific attributes
         const parts = [tag];
         
         if (attributes['id']) {
@@ -866,15 +775,14 @@ export class SimilarAttributesStrategy extends HealingStrategy {
         if (attributes['class']) {
             const classes = attributes['class']
                 .split(/\s+/)
-                .filter(c => c.length > 0 && !c.match(/^js-/)) // Skip JS hook classes
-                .slice(0, 2); // Use first 2 classes
+                .filter(c => c.length > 0 && !c.match(/^js-/))
+                .slice(0, 2);
             
             if (classes.length > 0) {
                 parts.push(`.${classes.join('.')}`);
             }
         }
         
-        // Add other unique attributes
         for (const [key, value] of Object.entries(attributes)) {
             if (['id', 'class', 'style'].includes(key)) continue;
             if (value && value.length < 50) {
@@ -897,9 +805,6 @@ export class SimilarAttributesStrategy extends HealingStrategy {
     }
 }
 
-/**
- * Strategy 4: Find element by parent/child relationship
- */
 export class ParentChildStrategy extends HealingStrategy {
     private readonly featureExtractor: ElementFeatureExtractor;
     private readonly similarityCalculator: SimilarityCalculator;
@@ -918,7 +823,6 @@ export class ParentChildStrategy extends HealingStrategy {
         });
         
         try {
-            // Get structural information from snapshot
             const originalFeatures = await this.getLastKnownFeatures(element);
             if (!originalFeatures?.structural) {
                 logger.debug('No structural information in snapshot for parent-child healing');
@@ -927,7 +831,6 @@ export class ParentChildStrategy extends HealingStrategy {
             
             const structural = originalFeatures.structural;
             
-            // Try healing by parent relationship first
             const parentResult = await this.healByParent(
                 element,
                 page,
@@ -936,7 +839,6 @@ export class ParentChildStrategy extends HealingStrategy {
             );
             if (parentResult) return parentResult;
             
-            // Try healing by children structure
             const childrenResult = await this.healByChildren(
                 element,
                 page,
@@ -945,7 +847,6 @@ export class ParentChildStrategy extends HealingStrategy {
             );
             if (childrenResult) return childrenResult;
             
-            // Try healing by siblings
             const siblingsResult = await this.healBySiblings(
                 element,
                 page,
@@ -970,7 +871,6 @@ export class ParentChildStrategy extends HealingStrategy {
         structural: any,
         originalFeatures: ElementFeatures
     ): Promise<HealingResult | null> {
-        // Use context features for parent information
         const parentTag = originalFeatures.context?.parentTag;
         if (!parentTag) return null;
         
@@ -979,12 +879,10 @@ export class ParentChildStrategy extends HealingStrategy {
             attributes: {}
         };
         
-        // Find parent elements matching the description
         const parentSelector = this.buildSelectorFromInfo(parentInfo);
         const parentElements = await page.$$(parentSelector);
         
         for (const parent of parentElements) {
-            // Look for child matching original element
             const children = await parent.$$(`> ${structural.tagName}`);
             
             for (const child of children) {
@@ -1024,12 +922,10 @@ export class ParentChildStrategy extends HealingStrategy {
         structural: any,
         originalFeatures: ElementFeatures
     ): Promise<HealingResult | null> {
-        // Use structural features for children information
         if (!structural.hasChildren || !structural.tagName) return null;
         
         const childrenInfo: Array<{ tagName: string }> = [];
         
-        // Build query to find elements with similar children
         const candidateElements = await page.$$(structural.tagName);
         
         for (const candidate of candidateElements) {
@@ -1074,7 +970,6 @@ export class ParentChildStrategy extends HealingStrategy {
         _structural: any,
         originalFeatures: ElementFeatures
     ): Promise<HealingResult | null> {
-        // Use context features for sibling information
         const siblingTexts = originalFeatures.context?.siblingTexts;
         if (!siblingTexts || siblingTexts.length === 0) return null;
         
@@ -1082,7 +977,6 @@ export class ParentChildStrategy extends HealingStrategy {
             previous: siblingTexts.length > 0 ? { tagName: '*', text: siblingTexts[0] } : null
         };
         
-        // Find elements with similar siblings
         if (siblingInfo.previous) {
             const prevSelector = this.buildSelectorFromInfo(siblingInfo.previous);
             const prevElements = await page.$$(prevSelector);
@@ -1142,7 +1036,6 @@ export class ParentChildStrategy extends HealingStrategy {
             }
         }
         
-        // Add text selector if available
         if (info.text && typeof info.text === 'string') {
             parts.push(`:has-text("${info.text.substring(0, 30)}")`);
         }
@@ -1232,9 +1125,6 @@ export class ParentChildStrategy extends HealingStrategy {
     }
 }
 
-/**
- * Strategy 5: Use AI to identify element
- */
 export class AIIdentificationStrategy extends HealingStrategy {
     private readonly aiIdentifier: AIElementIdentifier;
     private readonly similarityCalculator: SimilarityCalculator;
@@ -1253,7 +1143,6 @@ export class AIIdentificationStrategy extends HealingStrategy {
         });
         
         try {
-            // Use element description for AI identification
             const description = element.options.aiDescription || element.description;
             
             if (!description) {
@@ -1261,7 +1150,6 @@ export class AIIdentificationStrategy extends HealingStrategy {
                 return null;
             }
             
-            // Let AI find the element
             const aiLocator = await this.aiIdentifier.identifyByDescription(description, page);
             
             if (!aiLocator) {
@@ -1269,14 +1157,12 @@ export class AIIdentificationStrategy extends HealingStrategy {
                 return null;
             }
             
-            // Validate the found element
             if (!await this.validateHealedElement(element, aiLocator)) {
                 logger.debug('AI-identified element validation failed');
                 return null;
             }
             
-            // Since identifyByDescription returns a Locator directly, we'll use a default confidence
-            const confidence = 0.8; // Default high confidence for AI
+            const confidence = 0.8;
             
             ActionLogger.logInfo(`Healing success: ${this.name}`, {
                 strategy: this.name,
@@ -1289,7 +1175,7 @@ export class AIIdentificationStrategy extends HealingStrategy {
                 strategy: this.name,
                 locator: aiLocator,
                 confidence: confidence,
-                selector: '',  // AI result doesn't provide selector
+                selector: '',
                 reason: `AI identified element with ${Math.round(confidence * 100)}% confidence`
             };
             
@@ -1301,20 +1187,16 @@ export class AIIdentificationStrategy extends HealingStrategy {
     }
     
     calculateConfidence(original: ElementFeatures, healed: ElementFeatures): number {
-        // Calculate confidence based on similarity between original and healed
-        if (!original || !healed) return 0.8; // Default high confidence for AI
+        if (!original || !healed) return 0.8;
         
-        // Use similarity calculator to compare features
         try {
             return this.similarityCalculator.calculate(original, healed);
         } catch (error) {
-            // If similarity calculation fails, return default AI confidence
             return 0.8;
         }
     }
 }
 
-// Type definitions for healing
 interface HealingResult {
     strategy: string;
     locator: Locator;

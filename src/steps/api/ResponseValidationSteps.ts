@@ -14,10 +14,6 @@ import { ConfigurationManager } from '../../core/configuration/ConfigurationMana
 import { ResponseStorage } from '../../bdd/context/ResponseStorage';
 import { APIContextManager } from '../../api/context/APIContextManager';
 
-/**
- * Step definitions for validating API responses
- * Provides comprehensive validation capabilities for all response aspects
- */
 @StepDefinitions
 export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
     private statusCodeValidator: StatusCodeValidator;
@@ -41,10 +37,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         this.apiContextManager = APIContextManager.getInstance();
     }
 
-    /**
-     * Validates response status code
-     * Example: Then the response status code should be 200
-     */
     @CSBDDStepDef("the response status code should be {int}")
     async validateStatusCode(expectedCode: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -68,10 +60,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response status code is in range
-     * Example: Then the response status code should be between 200 and 299
-     */
     @CSBDDStepDef("the response status code should be between {int} and {int}")
     async validateStatusCodeRange(minCode: number, maxCode: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -95,10 +83,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response body contains text
-     * Example: Then the response body should contain "success"
-     */
     @CSBDDStepDef("the response body should contain {string}")
     async validateBodyContains(expectedText: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -125,10 +109,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response body does not contain text
-     * Example: Then the response body should not contain "error"
-     */
     @CSBDDStepDef("the response body should not contain {string}")
     async validateBodyNotContains(text: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -154,10 +134,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response body equals expected value
-     * Example: Then the response body should equal "OK"
-     */
     @CSBDDStepDef("the response body should equal {string}")
     async validateBodyEquals(expectedBody: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -184,10 +160,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates JSON path exists
-     * Example: Then the response JSON path "$.data.id" should exist
-     */
     @CSBDDStepDef("the response JSON path {string} should exist")
     async validateJSONPathExists(jsonPath: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -213,10 +185,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates JSON path value equals expected
-     * Example: Then the response JSON path "$.status" should equal "active"
-     */
     @CSBDDStepDef("the response JSON path {string} should equal {string}")
     async validateJSONPathEquals(jsonPath: string, expectedValue: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -227,7 +195,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
             const jsonBody = this.parseResponseAsJSON(response);
             const interpolatedValue = await this.interpolateValue(expectedValue);
             
-            // Parse expected value
             const parsedExpected = this.parseExpectedValue(interpolatedValue);
             
             const result = await this.jsonPathValidator.validatePath(jsonBody, jsonPath, parsedExpected);
@@ -246,10 +213,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates JSON path value contains expected text
-     * Example: Then the response JSON path "$.message" should contain "success"
-     */
     @CSBDDStepDef("the response JSON path {string} should contain {string}")
     async validateJSONPathContains(jsonPath: string, expectedText: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -281,10 +244,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates JSON path array length
-     * Example: Then the response JSON path "$.items" should have 5 elements
-     */
     @CSBDDStepDef("the response JSON path {string} should have {int} elements")
     async validateJSONPathArrayLength(jsonPath: string, expectedLength: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -315,10 +274,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response against JSON schema
-     * Example: Then the response should match schema "user-schema.json"
-     */
     @CSBDDStepDef("the response should match schema {string}")
     async validateJSONSchema(schemaFile: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -328,12 +283,10 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
             const response = this.getLastResponse();
             const jsonBody = this.parseResponseAsJSON(response);
             
-            // Load schema
             const schemaPath = await this.resolveSchemaPath(schemaFile);
             const schemaContent = await FileUtils.readFile(schemaPath);
             const schema = JSON.parse(schemaContent.toString());
             
-            // Validate
             const result = await this.schemaValidator.validateSchema(jsonBody, schema);
             
             if (!result.valid) {
@@ -351,10 +304,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response header exists
-     * Example: Then the response should have header "Content-Type"
-     */
     @CSBDDStepDef("the response should have header {string}")
     async validateHeaderExists(headerName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -378,10 +327,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response header value
-     * Example: Then the response header "Content-Type" should equal "application/json"
-     */
     @CSBDDStepDef("the response header {string} should equal {string}")
     async validateHeaderEquals(headerName: string, expectedValue: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -409,10 +354,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response header contains value
-     * Example: Then the response header "Content-Type" should contain "json"
-     */
     @CSBDDStepDef("the response header {string} should contain {string}")
     async validateHeaderContains(headerName: string, expectedText: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -442,10 +383,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response time
-     * Example: Then the response time should be less than 2000 ms
-     */
     @CSBDDStepDef("the response time should be less than {int} ms")
     async validateResponseTime(maxTimeMs: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -469,10 +406,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates XML response with XPath
-     * Example: Then the XML response path "//user/name" should equal "John"
-     */
     @CSBDDStepDef("the XML response path {string} should equal {string}")
     async validateXPathEquals(xpath: string, expectedValue: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -499,10 +432,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response is empty
-     * Example: Then the response body should be empty
-     */
     @CSBDDStepDef("the response body should be empty")
     async validateBodyEmpty(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -523,10 +452,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates response matches regex pattern
-     * Example: Then the response body should match pattern "^[A-Z0-9]+$"
-     */
     @CSBDDStepDef("the response body should match pattern {string}")
     async validateBodyPattern(pattern: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -548,16 +473,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Validates JSON response against inline schema
-     * Example: Then the response should match JSON schema:
-     *   """json
-     *   {
-     *     "type": "object",
-     *     "required": ["id", "name"]
-     *   }
-     *   """
-     */
     @CSBDDStepDef("the response should match JSON schema:")
     async validateInlineJSONSchema(schemaJson: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -567,7 +482,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
             const response = this.getLastResponse();
             const jsonBody = this.parseResponseAsJSON(response);
             
-            // Parse schema
             let schema: any;
             try {
                 schema = JSON.parse(schemaJson);
@@ -575,7 +489,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`Invalid JSON schema: ${error instanceof Error ? error.message : String(error)}`);
             }
             
-            // Validate
             const result = await this.schemaValidator.validateSchema(jsonBody, schema);
             
             if (!result.valid) {
@@ -590,31 +503,23 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to get last response
-     */
     private getLastResponse(): any {
-        // Try to get from BDD context first (only if scenario context is available)
         try {
             const response = this.retrieve('lastAPIResponse');
             if (response) {
                 return response;
             }
         } catch (error) {
-            // Scenario context not available - try alternative sources
         }
         
-        // Try to get from ResponseStorage with standalone key
         try {
             const response = this.responseStorage.retrieve('last', 'standalone');
             if (response) {
                 return response;
             }
         } catch (error) {
-            // ResponseStorage not available or no response found
         }
         
-        // Try to get from current API context
         try {
             const apiContextManager = APIContextManager.getInstance();
             const currentContext = apiContextManager.getCurrentContext();
@@ -623,15 +528,11 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
                 return response;
             }
         } catch (error) {
-            // API context not available or no response found
         }
         
         throw new Error('No API response found. Please execute a request first');
     }
 
-    /**
-     * Helper method to get response body as string
-     */
     private getResponseBodyAsString(response: any): string {
         if (!response.body) {
             return '';
@@ -648,9 +549,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         return JSON.stringify(response.body);
     }
 
-    /**
-     * Helper method to parse response as JSON
-     */
     private parseResponseAsJSON(response: any): any {
         const bodyText = this.getResponseBodyAsString(response);
         
@@ -661,41 +559,30 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to parse expected values
-     */
     private parseExpectedValue(value: string): any {
-        // Try to parse as JSON first
         try {
             return JSON.parse(value);
         } catch {
-            // Check for special values
             if (value === 'true') return true;
             if (value === 'false') return false;
             if (value === 'null') return null;
             if (value === 'undefined') return undefined;
             
-            // Check if number
             const num = Number(value);
             if (!isNaN(num) && value.trim() !== '') {
                 return num;
             }
             
-            // Return as string
             return value;
         }
     }
 
-    /**
-     * Helper method to resolve schema paths
-     */
     private async resolveSchemaPath(schemaFile: string): Promise<string> {
         const path = await import('path');
         if (path.isAbsolute(schemaFile)) {
             return schemaFile;
         }
         
-        // Try schema directory
         const schemaPath = ConfigurationManager.get('SCHEMA_PATH', './test-data/schemas');
         const resolvedPath = path.join(schemaPath, schemaFile);
         
@@ -703,7 +590,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
             return resolvedPath;
         }
         
-        // Try test data directory
         const testDataPath = ConfigurationManager.get('TEST_DATA_PATH', './test-data');
         const testDataResolvedPath = path.join(testDataPath, 'schemas', schemaFile);
         
@@ -711,7 +597,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
             return testDataResolvedPath;
         }
         
-        // Try relative to project root
         if (await FileUtils.exists(schemaFile)) {
             return schemaFile;
         }
@@ -719,15 +604,11 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         throw new Error(`Schema file not found: ${schemaFile}`);
     }
 
-    /**
-     * Helper method to interpolate variables
-     */
     private async interpolateValue(value: string): Promise<string> {
         if (!value.includes('{{')) {
             return value;
         }
         
-        // Simple placeholder replacement for common variables
         let interpolated = value;
         interpolated = interpolated.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
             const varValue = this.retrieve(varName);
@@ -737,13 +618,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
         return interpolated;
     }
 
-    /**
-     * Validates response contains JSON with data table
-     * Example: Then response should contain JSON:
-     *   | path | type |
-     *   | token | string |
-     *   | user.id | number |
-     */
     @CSBDDStepDef("response should contain JSON:")
     async validateResponseContainsJSON(dataTable: any): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -753,7 +627,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
             const response = this.getLastResponse();
             const jsonBody = this.parseResponseAsJSON(response);
             
-            // Parse data table
             const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
             
             for (const row of rows) {
@@ -765,7 +638,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
                     throw new Error('JSON path cannot be empty');
                 }
                 
-                // Extract value using JSON path
                 let actualValue = jsonBody;
                 const pathParts = path.split('.');
                 
@@ -777,7 +649,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
                     }
                 }
                 
-                // Validate type if specified
                 if (expectedType) {
                     const actualType = Array.isArray(actualValue) ? 'array' : typeof actualValue;
                     if (actualType !== expectedType) {
@@ -785,7 +656,6 @@ export class ResponseValidationSteps extends CSBDDBaseStepDefinition {
                     }
                 }
                 
-                // Validate value if specified
                 if (expectedValue !== undefined && expectedValue !== '') {
                     const interpolatedExpectedValue = await this.interpolateValue(String(expectedValue));
                     const parsedExpectedValue = this.parseExpectedValue(interpolatedExpectedValue);

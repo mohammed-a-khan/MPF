@@ -3,10 +3,6 @@ import { MergeOptions } from '../types/data.types';
 import { ExtendedMergeOptions, MergeResult, MergeStrategy, ConflictResolution } from './merger.types';
 import { logger } from '../../core/utils/Logger';
 
-/**
- * Merge data from multiple sources
- * Handles complex merge scenarios and conflict resolution
- */
 export class DataMerger {
     private readonly defaultOptions: ExtendedMergeOptions = {
         strategy: 'deep',
@@ -22,9 +18,6 @@ export class DataMerger {
         validators: new Map()
     };
 
-    /**
-     * Merge multiple data sources
-     */
     async merge(
         sources: any[],
         options?: Partial<MergeOptions>
@@ -40,7 +33,6 @@ export class DataMerger {
         };
 
         try {
-            // Filter out invalid sources
             const validSources = this.filterValidSources(sources, opts);
             
             if (validSources.length === 0) {
@@ -56,7 +48,6 @@ export class DataMerger {
                 };
             }
 
-            // Perform merge
             let result = validSources[0];
             for (let i = 1; i < validSources.length; i++) {
                 result = await this.mergeTwoValues(
@@ -69,7 +60,6 @@ export class DataMerger {
                 );
             }
 
-            // Apply validators
             if (opts.validators && opts.validators.size > 0) {
                 await this.validateMergedData(result, opts, metadata);
             }
@@ -98,9 +88,6 @@ export class DataMerger {
         }
     }
 
-    /**
-     * Merge two data sources with specific strategy
-     */
     async mergeWith(
         source1: any,
         source2: any,
@@ -114,9 +101,6 @@ export class DataMerger {
         return mergeResult.result;
     }
 
-    /**
-     * Register custom merger for specific paths
-     */
     registerCustomMerger(
         path: string,
         merger: (values: any[], path: string) => any
@@ -127,9 +111,6 @@ export class DataMerger {
         logger.debug(`Registered custom merger for path: ${path}`);
     }
 
-    /**
-     * Register key mapping for property names
-     */
     registerKeyMapping(fromKey: string, toKey: string): void {
         if (this.defaultOptions.keyMappings) {
             this.defaultOptions.keyMappings.set(fromKey, toKey);
@@ -137,9 +118,6 @@ export class DataMerger {
         logger.debug(`Registered key mapping: ${fromKey} -> ${toKey}`);
     }
 
-    /**
-     * Filter valid sources based on options
-     */
     private filterValidSources(sources: any[], options: ExtendedMergeOptions): any[] {
         return sources.filter(source => {
             if (source === null || source === undefined) {
@@ -162,9 +140,6 @@ export class DataMerger {
         });
     }
 
-    /**
-     * Merge two values based on their types
-     */
     private async mergeTwoValues(
         value1: any,
         value2: any,
@@ -173,7 +148,6 @@ export class DataMerger {
         conflicts: Array<{ path: string; values: any[]; resolved: any }>,
         metadata: any
     ): Promise<any> {
-        // Check for custom merger
         const customMerger = options.customMergers?.get(path);
         if (customMerger) {
             const result = customMerger([value1, value2], path);
@@ -181,7 +155,6 @@ export class DataMerger {
             return result;
         }
 
-        // Handle null/undefined
         if (value1 === null || value1 === undefined) {
             return value2;
         }
@@ -189,12 +162,10 @@ export class DataMerger {
             return value1;
         }
 
-        // Same type handling
         const type1 = Array.isArray(value1) ? 'array' : typeof value1;
         const type2 = Array.isArray(value2) ? 'array' : typeof value2;
 
         if (type1 !== type2) {
-            // Type conflict
             return this.resolveConflict(
                 path,
                 [value1, value2],
@@ -203,7 +174,6 @@ export class DataMerger {
             );
         }
 
-        // Merge based on type
         switch (type1) {
             case 'object':
                 return this.mergeObjects(value1, value2, path, options, conflicts, metadata);
@@ -212,7 +182,6 @@ export class DataMerger {
                 return this.mergeArrays(value1, value2, path, options, conflicts, metadata);
             
             default:
-                // Primitive values
                 if (value1 !== value2) {
                     return this.resolveConflict(
                         path,
@@ -225,9 +194,6 @@ export class DataMerger {
         }
     }
 
-    /**
-     * Merge objects
-     */
     private async mergeObjects(
         obj1: Record<string, any>,
         obj2: Record<string, any>,
@@ -238,27 +204,23 @@ export class DataMerger {
     ): Promise<Record<string, any>> {
         const result: Record<string, any> = {};
 
-        // Get all keys
         const allKeys = new Set([
             ...Object.keys(obj1),
             ...Object.keys(obj2)
         ]);
 
-        // Apply key mappings
         const mappedObj2: Record<string, any> = {};
         for (const [key, value] of Object.entries(obj2)) {
             const mappedKey = options.keyMappings?.get(key) || key;
             mappedObj2[mappedKey] = value;
         }
 
-        // Merge each key
         for (const key of Array.from(allKeys)) {
             const path = basePath ? `${basePath}.${key}` : key;
             const value1 = obj1[key];
             const value2 = mappedObj2[key] ?? obj2[key];
 
             if (value1 !== undefined && value2 !== undefined) {
-                // Both have the key - merge
                 result[key] = await this.mergeTwoValues(
                     value1,
                     value2,
@@ -273,7 +235,6 @@ export class DataMerger {
                 result[key] = value2;
             }
 
-            // Apply transformer if exists
             const transformer = options.transformers?.get(path);
             if (transformer && result[key] !== undefined) {
                 result[key] = await transformer(result[key], path);
@@ -286,9 +247,6 @@ export class DataMerger {
         return result;
     }
 
-    /**
-     * Merge arrays based on strategy
-     */
     private async mergeArrays(
         arr1: any[],
         arr2: any[],
@@ -328,12 +286,10 @@ export class DataMerger {
                 result = [...arr1, ...arr2];
         }
 
-        // Remove duplicates if requested
         if (options.removeDuplicates && options.arrayMerge !== 'intersection') {
             result = this.removeDuplicates(result);
         }
 
-        // Preserve order if requested
         if (options.preserveOrder && options.arrayMerge === 'union') {
             result = this.preserveOriginalOrder(result, arr1, arr2);
         }
@@ -342,9 +298,6 @@ export class DataMerger {
         return result;
     }
 
-    /**
-     * Array union (unique values from both)
-     */
     private arrayUnion(arr1: any[], arr2: any[]): any[] {
         const result = [...arr1];
         
@@ -357,16 +310,10 @@ export class DataMerger {
         return result;
     }
 
-    /**
-     * Array intersection (common values)
-     */
     private arrayIntersection(arr1: any[], arr2: any[]): any[] {
         return arr1.filter(item => this.arrayContains(arr2, item));
     }
 
-    /**
-     * Combine arrays by merging objects at same index
-     */
     private async combineArrays(
         arr1: any[],
         arr2: any[],
@@ -402,9 +349,6 @@ export class DataMerger {
         return result;
     }
 
-    /**
-     * Zip arrays together
-     */
     private zipArrays(arr1: any[], arr2: any[]): any[] {
         const maxLength = Math.max(arr1.length, arr2.length);
         const result: any[] = [];
@@ -421,16 +365,10 @@ export class DataMerger {
         return result;
     }
 
-    /**
-     * Check if array contains item (deep comparison)
-     */
     private arrayContains(arr: any[], item: any): boolean {
         return arr.some(element => this.deepEqual(element, item));
     }
 
-    /**
-     * Deep equality comparison
-     */
     private deepEqual(obj1: any, obj2: any): boolean {
         if (obj1 === obj2) return true;
         
@@ -466,9 +404,6 @@ export class DataMerger {
         return false;
     }
 
-    /**
-     * Remove duplicate items from array
-     */
     private removeDuplicates(arr: any[]): any[] {
         const result: any[] = [];
         const seen = new Set<string>();
@@ -484,34 +419,25 @@ export class DataMerger {
         return result;
     }
 
-    /**
-     * Get unique key for item
-     */
     private getItemKey(item: any): string {
         if (item === null) return 'null';
         if (item === undefined) return 'undefined';
         
         if (typeof item === 'object') {
-            // Use ID field if available
             if ('id' in item) return `id:${item.id}`;
             if ('_id' in item) return `_id:${item._id}`;
             if ('key' in item) return `key:${item.key}`;
             
-            // Otherwise use JSON representation
             return JSON.stringify(item);
         }
 
         return String(item);
     }
 
-    /**
-     * Preserve original order when merging
-     */
     private preserveOriginalOrder(merged: any[], arr1: any[], arr2: any[]): any[] {
         const result: any[] = [];
         const used = new Set<number>();
 
-        // Add items from arr1 in order
         for (const item of arr1) {
             const index = merged.findIndex((m, i) => !used.has(i) && this.deepEqual(m, item));
             if (index !== -1) {
@@ -520,7 +446,6 @@ export class DataMerger {
             }
         }
 
-        // Add remaining items from arr2
         for (const item of arr2) {
             const index = merged.findIndex((m, i) => !used.has(i) && this.deepEqual(m, item));
             if (index !== -1) {
@@ -532,9 +457,6 @@ export class DataMerger {
         return result;
     }
 
-    /**
-     * Resolve conflict between values
-     */
     private resolveConflict(
         path: string,
         values: any[],
@@ -584,12 +506,11 @@ export class DataMerger {
                 break;
 
             case 'custom':
-                // Look for custom conflict resolver
                 const customResolver = this.defaultOptions.customMergers?.get(`conflict:${path}`);
                 if (customResolver) {
                     resolved = customResolver(values, path);
                 } else {
-                    resolved = values[values.length - 1]; // Default to override
+                    resolved = values[values.length - 1];
                 }
                 break;
 
@@ -601,9 +522,6 @@ export class DataMerger {
         return resolved;
     }
 
-    /**
-     * Validate merged data
-     */
     private async validateMergedData(
         data: any,
         options: ExtendedMergeOptions,
@@ -624,9 +542,6 @@ export class DataMerger {
         }
     }
 
-    /**
-     * Get value by path from object
-     */
     private getValueByPath(obj: any, path: string): any {
         if (!path) return obj;
 
@@ -638,7 +553,6 @@ export class DataMerger {
                 return undefined;
             }
 
-            // Handle array notation
             const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
             if (arrayMatch) {
                 const fieldName = arrayMatch[1];
@@ -661,9 +575,6 @@ export class DataMerger {
         return current;
     }
 
-    /**
-     * Create a merge plan for preview
-     */
     async createMergePlan(
         sources: any[],
         options?: Partial<MergeOptions>
@@ -684,15 +595,11 @@ export class DataMerger {
         const operations: any[] = [];
         const conflicts: any[] = [];
 
-        // Analyze merge operations
         await this.analyzeMerge(sources, '', opts, operations, conflicts);
 
         return { operations, conflicts };
     }
 
-    /**
-     * Analyze merge operations recursively
-     */
     private async analyzeMerge(
         sources: any[],
         basePath: string,
@@ -700,14 +607,12 @@ export class DataMerger {
         operations: any[],
         conflicts: any[]
     ): Promise<void> {
-        // Get all unique paths
         const allPaths = new Set<string>();
         
         for (const source of sources) {
             this.collectPaths(source, basePath, allPaths);
         }
 
-        // Analyze each path
         for (const path of Array.from(allPaths)) {
             const values = sources.map(s => this.getValueByPath(s, path)).filter(v => v !== undefined);
             
@@ -720,7 +625,6 @@ export class DataMerger {
                     values
                 });
             } else {
-                // Check if all values are equal
                 const firstValue = JSON.stringify(values[0]);
                 const allEqual = values.every(v => JSON.stringify(v) === firstValue);
 
@@ -731,7 +635,6 @@ export class DataMerger {
                         values: [values[0]]
                     });
                 } else {
-                    // Conflict detected
                     const resolution = this.suggestResolution(values, options.conflictResolution || 'override');
                     
                     operations.push({
@@ -749,7 +652,6 @@ export class DataMerger {
                 }
             }
 
-            // Check for transformers
             if (options.transformers?.has(path)) {
                 operations.push({
                     path,
@@ -760,9 +662,6 @@ export class DataMerger {
         }
     }
 
-    /**
-     * Collect all paths from an object
-     */
     private collectPaths(obj: any, basePath: string, paths: Set<string>): void {
         if (obj === null || obj === undefined || typeof obj !== 'object') {
             if (basePath) paths.add(basePath);
@@ -784,9 +683,6 @@ export class DataMerger {
         }
     }
 
-    /**
-     * Suggest resolution for conflict
-     */
     private suggestResolution(values: any[], strategy: ConflictResolution): any {
         switch (strategy) {
             case 'override':
@@ -814,30 +710,22 @@ export class DataMerger {
         }
     }
 
-    /**
-     * Merge with validation
-     */
     async mergeWithValidation(
         sources: any[],
         schema: Record<string, any>,
         options?: Partial<MergeOptions>
     ): Promise<MergeResult> {
-        // Register validators based on schema
         const validators = new Map<string, (value: any, path: string) => boolean>();
         
         for (const [path, rules] of Object.entries(schema)) {
             validators.set(path, (value: any) => this.validateValue(value, rules));
         }
 
-        // Merge with validators
         return this.merge(sources, {
             ...options
         } as any);
     }
 
-    /**
-     * Validate value against rules
-     */
     private validateValue(value: any, rules: any): boolean {
         if (rules.required && (value === null || value === undefined)) {
             return false;
@@ -878,15 +766,10 @@ export class DataMerger {
         return true;
     }
 
-    /**
-     * Create specialized mergers
-     */
     static createConfigMerger(): DataMerger {
         const merger = new DataMerger();
         
-        // Register common config mergers
         merger.registerCustomMerger('database.connectionPool', (values: any[]) => {
-            // Merge connection pool settings by taking max values
             return values.reduce((result, value) => ({
                 min: Math.max(result.min || 0, value.min || 0),
                 max: Math.max(result.max || 10, value.max || 10),
@@ -895,30 +778,23 @@ export class DataMerger {
         });
 
         merger.registerCustomMerger('api.headers', (values: any[]) => {
-            // Merge headers by combining all
             return Object.assign({}, ...values);
         });
 
         merger.registerCustomMerger('features.enabled', (values: any[]) => {
-            // Merge feature flags by OR operation
             return values.some(v => v === true);
         });
 
         return merger;
     }
 
-    /**
-     * Create data table merger
-     */
     static createTableMerger(): DataMerger {
         const merger = new DataMerger();
         
-        // Configure for table/spreadsheet merging
         merger.defaultOptions.arrayMerge = 'combine';
         merger.defaultOptions.conflictResolution = 'override';
         merger.defaultOptions.preserveOrder = true;
         
-        // Register ID-based merging for rows
         merger.registerCustomMerger('rows', (values: any[][]) => {
             const idMap = new Map<string, any>();
             
@@ -928,7 +804,6 @@ export class DataMerger {
                     if (id) {
                         const existing = idMap.get(id);
                         if (existing) {
-                            // Merge row data
                             idMap.set(id, { ...existing, ...row });
                         } else {
                             idMap.set(id, row);

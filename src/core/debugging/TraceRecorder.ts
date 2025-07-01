@@ -19,7 +19,6 @@ import {
     TraceSummary
 } from './types/debug.types';
 
-// Internal extended TraceSession interface
 interface InternalTraceSession extends TraceSession {
     filePath: string;
     fileName: string;
@@ -44,10 +43,6 @@ interface InternalTraceSession extends TraceSession {
     };
 }
 
-/**
- * Records detailed Playwright traces for debugging
- * Captures screenshots, DOM snapshots, network, console logs
- */
 export class TraceRecorder {
     private static instance: TraceRecorder;
     private activeTraces: Map<string, InternalTraceSession> = new Map();
@@ -64,9 +59,8 @@ export class TraceRecorder {
    
    private constructor() {
        this.tracePath = path.join(process.cwd(), 'traces');
-       this.maxTraceSize = 100 * 1024 * 1024; // 100MB default
+       this.maxTraceSize = 100 * 1024 * 1024;
        this.logger = Logger.getInstance('TraceRecorder');
-       // Initialization will happen lazily via ensureInitialized()
    }
    
    static getInstance(): TraceRecorder {
@@ -101,22 +95,18 @@ export class TraceRecorder {
    
    private async initialize(): Promise<void> {
        try {
-           // Ensure trace directory exists
            await FileUtils.ensureDir(this.tracePath);
            
-           // Create subdirectories
            await FileUtils.ensureDir(path.join(this.tracePath, 'active'));
            await FileUtils.ensureDir(path.join(this.tracePath, 'archive'));
            await FileUtils.ensureDir(path.join(this.tracePath, 'checkpoints'));
            
-           // Clean old traces if needed
            if (!this.traceOptions.preserveOutput) {
                await this.cleanOldTraces();
            }
            
-           // Set up auto-save interval
            if (ConfigurationManager.getBoolean('TRACE_AUTO_SAVE', false)) {
-               const interval = ConfigurationManager.getInt('TRACE_AUTO_SAVE_INTERVAL', 300000); // 5 minutes
+               const interval = ConfigurationManager.getInt('TRACE_AUTO_SAVE_INTERVAL', 300000);
                this.autoSaveInterval = setInterval(() => {
                    this.autoSaveActiveTraces();
                }, interval);
@@ -129,9 +119,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Start tracing for a page
-    */
    async startTracing(
        page: Page,
        options?: Partial<TraceOptions>
@@ -142,21 +129,17 @@ export class TraceRecorder {
            const sessionId = this.generateSessionId();
            const traceOpts = { ...this.traceOptions, ...options };
            
-           // Check if already tracing
            if (this.isContextTracing(context)) {
                this.logger.warn('Trace already active for this context');
                return this.getActiveTraceId(context);
            }
            
-           // Check trace size limits
            await this.checkTraceSizeLimits();
            
-           // Create trace file path
            const timestamp = DateUtils.toTimestamp(new Date());
            const fileName = `trace-${timestamp}-${sessionId}.zip`;
            const filePath = path.join(this.tracePath, 'active', fileName);
            
-           // Start Playwright tracing with enhanced options
            const tracingOptions: any = {
                screenshots: traceOpts.screenshots,
                snapshots: traceOpts.snapshots,
@@ -167,7 +150,6 @@ export class TraceRecorder {
            }
            await context.tracing.start(tracingOptions);
            
-           // Create trace session
            const session: InternalTraceSession = {
                id: sessionId,
                startTime: new Date(),
@@ -194,10 +176,8 @@ export class TraceRecorder {
            
            this.activeTraces.set(sessionId, session);
            
-           // Set up event listeners
            this.setupEventListeners(session);
            
-           // Set up performance monitoring
            this.setupPerformanceMonitoring(session);
            
            this.logger.info(`🎬 Trace recording started: ${sessionId}`);
@@ -211,9 +191,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Stop tracing and save trace file
-    */
    async stopTracing(sessionId?: string): Promise<string> {
        await this.ensureInitialized();
        try {
@@ -225,40 +202,30 @@ export class TraceRecorder {
                throw new Error(`No active trace session found${sessionId ? `: ${sessionId}` : ''}`);
            }
            
-           // Stop performance monitoring
            this.stopPerformanceMonitoring(session);
            
-           // Capture final state
            await this.captureFinalState(session);
            
-           // Stop Playwright tracing
            await session.context.tracing.stop({ path: session.filePath });
            
            session.endTime = new Date();
            session.duration = session.endTime.getTime() - session.startTime.getTime();
            
-           // Process and enhance trace
            await this.processTrace(session);
            
-           // Compress if enabled
            if (this.compressionEnabled) {
                await this.compressTrace(session);
            }
            
-           // Archive trace
            const archivedPath = await this.archiveTrace(session);
            
-           // Save metadata
            await this.saveTraceMetadata(session);
            
-           // Generate summary report
            await this.generateSummaryReport(session);
            
-           // Clean up
            this.removeEventListeners(session);
            this.activeTraces.delete(session.id);
            
-           // Log completion
            this.logger.info(`🎬 Trace recording stopped: ${session.id}`);
            this.logger.info(`   Duration: ${this.formatDuration(session.duration)}`);
            this.logger.info(`   Size: ${await this.getFileSize(archivedPath)}`);
@@ -273,9 +240,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Pause trace recording
-    */
    async pauseTracing(sessionId?: string): Promise<void> {
        await this.ensureInitialized();
        try {
@@ -292,13 +256,11 @@ export class TraceRecorder {
                return;
            }
            
-           // Create checkpoint before pausing
            await this.createCheckpoint(session);
            
            session.isPaused = true;
            session.pausedAt = new Date();
            
-           // Record pause event
            this.recordEvent(session, 'trace-paused', {
                timestamp: session.pausedAt,
                reason: 'Manual pause'
@@ -312,9 +274,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Resume trace recording
-    */
    async resumeTracing(sessionId?: string): Promise<void> {
        await this.ensureInitialized();
        try {
@@ -330,7 +289,6 @@ export class TraceRecorder {
            session.totalPauseDuration = (session.totalPauseDuration || 0) + pauseDuration;
            session.isPaused = false;
            
-           // Record resume event
            this.recordEvent(session, 'trace-resumed', {
                timestamp: new Date(),
                pauseDuration
@@ -344,9 +302,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Save current trace without stopping
-    */
    async saveTrace(sessionId?: string): Promise<string> {
        await this.ensureInitialized();
        try {
@@ -366,9 +321,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Attach custom data to trace
-    */
    async attachToTrace(sessionId: string, attachment: TraceAttachment): Promise<void> {
        const session = this.activeTraces.get(sessionId);
        
@@ -376,7 +328,6 @@ export class TraceRecorder {
            throw new Error(`No active trace session found: ${sessionId}`);
        }
        
-       // Record attachment event
        const event: TraceEvent = {
            type: 'attachment',
            timestamp: new Date(),
@@ -386,7 +337,6 @@ export class TraceRecorder {
        
        session.events.push(event);
        
-       // Handle different attachment types
        switch (attachment.type) {
            case 'screenshot':
                session.metrics!.screenshotCount++;
@@ -410,9 +360,6 @@ export class TraceRecorder {
        this.logger.debug(`Attached ${attachment.type} to trace: ${attachment.name}`);
    }
    
-   /**
-    * Get active trace sessions
-    */
    getActiveTraces(): TraceInfo[] {
        return Array.from(this.activeTraces.values()).map(session => ({
            path: session.filePath,
@@ -424,9 +371,6 @@ export class TraceRecorder {
        }));
    }
    
-   /**
-    * Enable global tracing for all tests
-    */
    enableGlobalTracing(options?: Partial<TraceOptions>): void {
        this.isGlobalTracingEnabled = true;
        if (options) {
@@ -436,31 +380,21 @@ export class TraceRecorder {
        this.logger.info('🌍 Global tracing enabled');
    }
    
-   /**
-    * Disable global tracing
-    */
    disableGlobalTracing(): void {
        this.isGlobalTracingEnabled = false;
        this.logger.info('Global tracing disabled');
    }
    
-   /**
-    * Check if global tracing is enabled
-    */
    isGlobalTracingActive(): boolean {
        return this.isGlobalTracingEnabled;
    }
    
-   /**
-    * Analyze trace file
-    */
    async analyzeTrace(tracePath: string): Promise<TraceAnalysis> {
        try {
            if (!await FileUtils.exists(tracePath)) {
                throw new Error(`Trace file not found: ${tracePath}`);
            }
            
-           // Read trace metadata
            const metadataPath = tracePath.replace('.zip', '-metadata.json');
            let metadata: any = {};
            
@@ -468,16 +402,12 @@ export class TraceRecorder {
                metadata = await FileUtils.readJSON(metadataPath);
            }
            
-           // Get file stats
            const stats = await fs.promises.stat(tracePath);
            
-           // Analyze events
            const eventAnalysis = this.analyzeEvents(metadata.events || []);
            
-           // Calculate performance metrics
            const performanceMetrics = this.calculatePerformanceMetrics(metadata.events || []);
            
-           // Identify issues
            const issues = this.identifyIssues(metadata.events || []);
            
            const analysis: TraceAnalysis = {
@@ -509,9 +439,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Merge multiple trace files
-    */
    async mergeTraces(tracePaths: string[], outputPath: string): Promise<string> {
        try {
            const mergedData = {
@@ -527,7 +454,6 @@ export class TraceRecorder {
                }
            };
            
-           // Process each trace
            for (const tracePath of tracePaths) {
                const analysis = await this.analyzeTrace(tracePath);
                mergedData.traces.push({
@@ -535,29 +461,24 @@ export class TraceRecorder {
                    analysis
                });
                
-               // Combine events
                mergedData.combinedEvents.push(...analysis.events);
                
-               // Update metrics
                mergedData.combinedMetrics.totalDuration += analysis.duration;
                mergedData.combinedMetrics.totalEvents += analysis.summary.totalEvents;
                mergedData.combinedMetrics.totalErrors += analysis.summary.errors || 0;
                mergedData.combinedMetrics.totalNetworkRequests += analysis.summary.networkRequests || 0;
            }
            
-           // Sort combined events by timestamp
            mergedData.combinedEvents.sort((a, b) => 
                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
            );
            
-           // Save merged data
            const mergedPath = outputPath.endsWith('.json') 
                ? outputPath 
                : outputPath.replace('.zip', '-merged.json');
                
            await FileUtils.writeJSON(mergedPath, mergedData);
            
-           // Generate merged report
            await this.generateMergedReport(mergedData, mergedPath);
            
            this.logger.info(`Traces merged: ${tracePaths.length} files -> ${mergedPath}`);
@@ -570,9 +491,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Export trace to different format
-    */
    async exportTrace(
        tracePath: string,
        format: 'html' | 'json' | 'har',
@@ -602,9 +520,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Clean up old trace files
-    */
    async cleanOldTraces(daysToKeep: number = 7): Promise<number> {
        try {
            const directories = ['active', 'archive', 'checkpoints'];
@@ -627,7 +542,6 @@ export class TraceRecorder {
                        if (stats.mtime < cutoffDate) {
                            await fs.promises.unlink(filePath);
                            
-                           // Also delete metadata file if exists
                            const metadataPath = filePath.replace('.zip', '-metadata.json');
                            if (await FileUtils.exists(metadataPath)) {
                                await fs.promises.unlink(metadataPath);
@@ -651,9 +565,6 @@ export class TraceRecorder {
        }
    }
    
-   /**
-    * Get trace statistics
-    */
    async getTraceStatistics(): Promise<TraceStatistics> {
        try {
            const stats: TraceStatistics = {
@@ -667,7 +578,6 @@ export class TraceRecorder {
                tracesByDay: new Map()
            };
            
-           // Scan all trace directories
            const directories = ['active', 'archive'];
            const allTraces: TraceFileInfo[] = [];
            
@@ -698,14 +608,12 @@ export class TraceRecorder {
            stats.totalTraces = allTraces.length;
            
            if (allTraces.length > 0) {
-               // Sort by date
                allTraces.sort((a, b) => a.created.getTime() - b.created.getTime());
                
                stats.oldestTrace = allTraces[0] || null;
                stats.newestTrace = allTraces[allTraces.length - 1] || null;
                stats.averageTraceSize = stats.totalSize / allTraces.length;
                
-               // Group by day
                for (const trace of allTraces) {
                    const day = trace.created.toISOString().split('T')[0];
                    if (day) {
@@ -723,11 +631,9 @@ export class TraceRecorder {
        }
    }
    
-   // Private helper methods
    
    private async captureFinalState(session: InternalTraceSession): Promise<void> {
        try {
-           // Capture final page state
            const finalState = await session.page.evaluate(() => ({
                url: window.location.href,
                title: document.title,
@@ -740,7 +646,6 @@ export class TraceRecorder {
            
            this.recordEvent(session, 'final-state', finalState);
            
-           // Capture final screenshot
            try {
                const screenshot = await session.page.screenshot({ fullPage: true });
                await this.attachScreenshot(session, {
@@ -750,7 +655,6 @@ export class TraceRecorder {
                    timestamp: new Date()
                });
            } catch (error) {
-               // Ignore screenshot errors
            }
        } catch (error) {
            this.logger.debug(`Failed to capture final state: ${(error as Error).message}`);
@@ -775,7 +679,6 @@ export class TraceRecorder {
    private setupEventListeners(session: InternalTraceSession): void {
        const page = session.page;
        
-       // Page events
        page.on('load', () => this.recordEvent(session, 'pageLoad', { 
            url: page.url(),
            timestamp: new Date()
@@ -786,7 +689,6 @@ export class TraceRecorder {
            timestamp: new Date()
        }));
        
-       // Console events with full details
        page.on('console', (msg) => {
            const event = {
                level: msg.type(),
@@ -804,7 +706,6 @@ export class TraceRecorder {
            }
        });
        
-       // Error events with stack traces
        page.on('pageerror', (error) => {
            this.recordEvent(session, 'error', {
                message: error.message,
@@ -815,7 +716,6 @@ export class TraceRecorder {
            session.metrics!.errorCount++;
        });
        
-       // Dialog events
        page.on('dialog', (dialog) => this.recordEvent(session, 'dialog', {
            type: dialog.type(),
            message: dialog.message(),
@@ -823,7 +723,6 @@ export class TraceRecorder {
            timestamp: new Date()
        }));
        
-       // Network events with timing
        page.on('request', (request) => {
            this.recordEvent(session, 'network', {
                type: 'request',
@@ -859,14 +758,12 @@ export class TraceRecorder {
            });
        });
        
-       // Download events
        page.on('download', (download) => this.recordEvent(session, 'download', {
            url: download.url(),
            suggestedFilename: download.suggestedFilename(),
            timestamp: new Date()
        }));
        
-       // Frame events
        page.on('frameattached', (frame) => this.recordEvent(session, 'frame', {
            type: 'attached',
            url: frame.url(),
@@ -881,7 +778,6 @@ export class TraceRecorder {
            timestamp: new Date()
        }));
        
-       // Worker events
        page.on('worker', (worker) => this.recordEvent(session, 'worker', {
            type: 'created',
            url: worker.url(),
@@ -890,7 +786,6 @@ export class TraceRecorder {
    }
    
    private setupPerformanceMonitoring(session: InternalTraceSession): void {
-       // Monitor performance metrics periodically
        session.performanceInterval = setInterval(async () => {
            if (session.isPaused) return;
            
@@ -922,9 +817,8 @@ export class TraceRecorder {
                this.recordEvent(session, 'performance', metrics);
                
            } catch (error) {
-               // Ignore performance monitoring errors
            }
-       }, 5000); // Every 5 seconds
+       }, 5000);
    }
    
    private stopPerformanceMonitoring(session: InternalTraceSession): void {
@@ -935,8 +829,6 @@ export class TraceRecorder {
    }
    
    private removeEventListeners(session: InternalTraceSession): void {
-       // Playwright automatically removes listeners when page is closed
-       // Stop performance monitoring
        this.stopPerformanceMonitoring(session);
    }
    
@@ -955,7 +847,6 @@ export class TraceRecorder {
    }
    
    private async attachScreenshot(session: InternalTraceSession, attachment: TraceAttachment): Promise<void> {
-       // Add screenshot attachment to trace
        session.attachments.push({
            ...attachment,
            contentType: 'image/png'
@@ -969,7 +860,6 @@ export class TraceRecorder {
    }
    
    private async attachHTML(session: InternalTraceSession, attachment: TraceAttachment): Promise<void> {
-       // Add HTML attachment to trace
        session.attachments.push({
            ...attachment,
            contentType: 'text/html'
@@ -983,7 +873,6 @@ export class TraceRecorder {
    }
    
    private async attachJSON(session: InternalTraceSession, attachment: TraceAttachment): Promise<void> {
-       // Add JSON attachment to trace
        session.attachments.push({
            ...attachment,
            contentType: 'application/json'
@@ -997,7 +886,6 @@ export class TraceRecorder {
    }
    
    private async attachText(session: InternalTraceSession, attachment: TraceAttachment): Promise<void> {
-       // Add text attachment to trace
        session.attachments.push({
            ...attachment,
            contentType: 'text/plain'
@@ -1011,17 +899,14 @@ export class TraceRecorder {
    }
    
    private async processTrace(session: InternalTraceSession): Promise<void> {
-       // Add session summary
        const summary = this.generateSummary(session);
        
-       // Add final event
        this.recordEvent(session, 'trace-complete', {
            summary,
            duration: session.duration,
            eventCount: session.events.length
        });
        
-       // Process custom categories
        if (session.options.categories?.includes('performance')) {
            await this.enhancePerformanceData(session);
        }
@@ -1033,7 +918,6 @@ export class TraceRecorder {
    
    private async enhancePerformanceData(session: InternalTraceSession): Promise<void> {
        try {
-           // Capture final performance metrics
            const finalMetrics = await session.page.evaluate(() => {
                const entries = performance.getEntries();
                const paint = performance.getEntriesByType('paint');
@@ -1062,12 +946,9 @@ export class TraceRecorder {
    
    private async addAccessibilityData(session: InternalTraceSession): Promise<void> {
        try {
-           // Run accessibility audit
            const violations = await session.page.evaluate(() => {
-               // Simple accessibility checks
                const issues = [];
                
-               // Check for images without alt text
                const imagesWithoutAlt = document.querySelectorAll('img:not([alt])');
                if (imagesWithoutAlt.length > 0) {
                    issues.push({
@@ -1077,7 +958,6 @@ export class TraceRecorder {
                    });
                }
                
-               // Check for buttons without accessible text
                const buttonsWithoutText = Array.from(document.querySelectorAll('button'))
                    .filter(btn => !btn.textContent?.trim() && !btn.getAttribute('aria-label'));
                    
@@ -1102,8 +982,6 @@ export class TraceRecorder {
    }
    
    private async compressTrace(session: InternalTraceSession): Promise<void> {
-       // Playwright already creates compressed traces
-       // This method is for additional compression if needed
        
        try {
            const stats = await fs.promises.stat(session.filePath);
@@ -1119,10 +997,8 @@ export class TraceRecorder {
    private async archiveTrace(session: InternalTraceSession): Promise<string> {
        const archivePath = session.filePath.replace('/active/', '/archive/');
        
-       // Ensure archive directory exists
        await FileUtils.ensureDir(path.dirname(archivePath));
        
-       // Move trace file
        await fs.promises.rename(session.filePath, archivePath);
        
        session.archivedPath = archivePath;
@@ -1687,10 +1563,8 @@ export class TraceRecorder {
    }
    
    private async exportToHAR(analysis: TraceAnalysis, outputPath: string): Promise<string> {
-       // Extract network events
        const networkEvents = analysis.events.filter(e => e.type === 'network');
        
-       // Group requests and responses
        const requests = new Map<string, any>();
        const responses = new Map<string, any>();
        
@@ -1704,7 +1578,6 @@ export class TraceRecorder {
            }
        }
        
-       // Create HAR entries
        const entries = [];
        let entryIndex = 0;
        
@@ -1784,7 +1657,6 @@ export class TraceRecorder {
            entryIndex++;
        }
        
-       // Create HAR format
        const har = {
            log: {
                version: '1.2',
@@ -1841,13 +1713,11 @@ export class TraceRecorder {
            criticalPaths: []
        };
        
-       // Count events by type
        for (const event of events) {
            analysis.eventsByType.set(event.type, 
                (analysis.eventsByType.get(event.type) || 0) + 1
            );
            
-           // Track errors and warnings
            if (event.type === 'error' || 
                (event.type === 'console' && event.data?.level === 'error')) {
                analysis.errorEvents.push(event);
@@ -1856,7 +1726,6 @@ export class TraceRecorder {
            }
        }
        
-       // Calculate event frequency over time
        const timeSlots = new Map<number, number>();
        for (const event of events) {
            const minute = Math.floor(new Date(event.timestamp).getTime() / 60000);
@@ -1865,15 +1734,14 @@ export class TraceRecorder {
        
        analysis.eventFrequency = timeSlots;
        
-       // Identify critical paths (sequences of events leading to errors)
        for (const errorEvent of analysis.errorEvents) {
            const errorTime = new Date(errorEvent.timestamp).getTime();
            const precedingEvents = events
                .filter(e => {
                    const eventTime = new Date(e.timestamp).getTime();
-                   return eventTime < errorTime && eventTime > errorTime - 5000; // Within 5 seconds
+                   return eventTime < errorTime && eventTime > errorTime - 5000;
                })
-               .slice(-5); // Last 5 events before error
+               .slice(-5);
                
            if (precedingEvents.length > 0) {
                analysis.criticalPaths.push({
@@ -1899,7 +1767,6 @@ export class TraceRecorder {
            memoryPeakUsage: 0
        };
        
-       // Find page load events
        const pageLoadEvent = events.find(e => e.type === 'pageLoad');
        const domReadyEvent = events.find(e => e.type === 'domReady');
        
@@ -1908,13 +1775,11 @@ export class TraceRecorder {
                                      new Date(pageLoadEvent.timestamp).getTime();
        }
        
-       // Analyze network requests
        const networkRequests = events.filter(e => e.type === 'network' && e.data?.type === 'request');
        const networkResponses = events.filter(e => e.type === 'network' && e.data?.type === 'response');
        
        metrics.totalRequests = networkRequests.length;
        
-       // Calculate response times
        const responseTimes: number[] = [];
        let slowestTime = 0;
        
@@ -1942,11 +1807,9 @@ export class TraceRecorder {
            metrics.avgResponseTime = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
        }
        
-       // Count failed requests
        const failedRequests = events.filter(e => e.type === 'network' && e.data?.type === 'requestfailed');
        metrics.failedRequests = failedRequests.length;
        
-       // Find memory peak
        const performanceEvents = events.filter(e => e.type === 'performance');
        for (const perfEvent of performanceEvents) {
            const memoryUsage = perfEvent.data?.memory?.usedJSHeapSize || 0;
@@ -1961,7 +1824,6 @@ export class TraceRecorder {
    private identifyIssues(events: TraceEvent[]): TraceIssue[] {
        const issues: TraceIssue[] = [];
        
-       // Check for JavaScript errors
        const errorEvents = events.filter(e => 
            e.type === 'error' || 
            (e.type === 'console' && e.data?.level === 'error')
@@ -1980,7 +1842,6 @@ export class TraceRecorder {
            });
        }
        
-       // Check for failed network requests
        const failedRequests = events.filter(e => 
            e.type === 'network' && e.data?.type === 'requestfailed'
        );
@@ -1998,7 +1859,6 @@ export class TraceRecorder {
            });
        }
        
-       // Check for slow network requests (> 3 seconds)
        const networkPairs = this.findNetworkRequestPairs(events);
        
        for (const pair of networkPairs) {
@@ -2020,7 +1880,6 @@ export class TraceRecorder {
            }
        }
        
-       // Check for console warnings
        const warnings = events.filter(e => 
            e.type === 'console' && e.data?.level === 'warning'
        );
@@ -2037,14 +1896,12 @@ export class TraceRecorder {
            });
        }
        
-       // Check for memory issues
        const performanceEvents = events.filter(e => e.type === 'performance');
        let previousMemory = 0;
        
        for (const perfEvent of performanceEvents) {
            const currentMemory = perfEvent.data?.memory?.usedJSHeapSize || 0;
            
-           // Check for memory leak (continuous growth)
            if (previousMemory > 0 && currentMemory > previousMemory * 1.5) {
                issues.push({
                    type: 'memory-growth',
@@ -2059,7 +1916,6 @@ export class TraceRecorder {
                });
            }
            
-           // Check for high memory usage (> 100MB)
            if (currentMemory > 100 * 1024 * 1024) {
                issues.push({
                    type: 'high-memory',
@@ -2076,7 +1932,6 @@ export class TraceRecorder {
            previousMemory = currentMemory;
        }
        
-       // Check for mixed content (HTTPS page loading HTTP resources)
        const pageUrl = events.find(e => e.type === 'pageLoad')?.data?.url;
        if (pageUrl && pageUrl.startsWith('https://')) {
            const httpRequests = events.filter(e => 
@@ -2100,7 +1955,6 @@ export class TraceRecorder {
            }
        }
        
-       // Check for blocked by CORS
        const corsErrors = events.filter(e => 
            e.type === 'console' && 
            e.data?.text?.includes('CORS') ||
@@ -2119,7 +1973,6 @@ export class TraceRecorder {
            });
        }
        
-       // Sort issues by timestamp
        issues.sort((a, b) => 
            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
        );
@@ -2238,10 +2091,8 @@ export class TraceRecorder {
            `checkpoint-${session.id}-${Date.now()}.zip`
        );
        
-       // Stop tracing temporarily
        await session.context.tracing.stop({ path: checkpointPath });
        
-       // Resume tracing immediately
        const startOptions: any = {
            screenshots: session.options.screenshots,
            snapshots: session.options.snapshots,
@@ -2272,9 +2123,9 @@ export class TraceRecorder {
    private async checkTraceSizeLimits(): Promise<void> {
        const stats = await this.getTraceStatistics();
        
-       if (stats.totalSize > this.maxTraceSize * 10) { // 10x max size overall
+       if (stats.totalSize > this.maxTraceSize * 10) {
            this.logger.warn('Trace storage exceeding limits, cleaning old traces');
-           await this.cleanOldTraces(3); // Keep only 3 days
+           await this.cleanOldTraces(3);
        }
    }
    
@@ -2301,7 +2152,6 @@ export class TraceRecorder {
            return undefined;
        }
        
-       // Get the most recently started session
        let latest: InternalTraceSession | undefined;
        let latestTime = 0;
        
@@ -2324,7 +2174,6 @@ export class TraceRecorder {
        const endTime = session.endTime || new Date();
        const duration = endTime.getTime() - session.startTime.getTime();
        
-       // Subtract pause duration if any
        if (session.totalPauseDuration) {
            return duration - session.totalPauseDuration;
        }
@@ -2376,17 +2225,12 @@ export class TraceRecorder {
            .filter(c => c && c !== '-default');
    }
    
-   /**
-    * Cleanup on shutdown
-    */
    async cleanup(): Promise<void> {
        try {
-           // Stop auto-save interval
            if (this.autoSaveInterval) {
                clearInterval(this.autoSaveInterval);
            }
            
-           // Stop all active traces
            const activeIds = Array.from(this.activeTraces.keys());
            for (const id of activeIds) {
                try {
@@ -2404,10 +2248,8 @@ export class TraceRecorder {
    }
 }
 
-// Export singleton instance
 export const traceRecorder = TraceRecorder.getInstance();
 
-// Type definitions for internal use
 interface TraceStatistics {
    activeTraces: number;
    totalTraces: number;

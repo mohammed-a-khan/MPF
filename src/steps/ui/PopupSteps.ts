@@ -30,7 +30,6 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
                await element.click();
            });
            
-           // Store popup reference
            this.context.store('lastPopup', popup, 'scenario');
            
            ActionLogger.logInfo('Clicked element and popup opened', { 
@@ -59,10 +58,8 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
                throw new Error('No popup windows found');
            }
            
-           // Switch to the most recent popup
            const popup = await handler.switchToPopup(popups.length - 1);
            
-           // Update page reference
            this.context.setCurrentPage(popup);
            this.context.store('currentPage', popup, 'scenario');
            
@@ -84,9 +81,8 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
        
        try {
            const handler = this.getPopupHandler();
-           const popup = await handler.switchToPopup(popupIndex - 1); // Convert to 0-based
+           const popup = await handler.switchToPopup(popupIndex - 1);
            
-           // Update page reference
            this.context.setCurrentPage(popup);
            this.context.store('currentPage', popup, 'scenario');
            
@@ -112,7 +108,6 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
            const handler = this.getPopupHandler();
            const mainWindow = await handler.switchToMainWindow();
            
-           // Update page reference
            this.context.setCurrentPage(mainWindow);
            this.context.store('currentPage', mainWindow, 'scenario');
            
@@ -139,7 +134,6 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
            
            await handler.closePopup(currentPage);
            
-           // Switch back to main window
            const mainWindow = await handler.switchToMainWindow();
            this.context.setCurrentPage(mainWindow);
            this.context.store('currentPage', mainWindow, 'scenario');
@@ -165,7 +159,6 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
            
            await handler.closeAllPopups();
            
-           // Ensure we're on main window
            const currentPage = handler.getCurrentPage();
            this.context.setCurrentPage(currentPage);
            this.context.store('currentPage', currentPage, 'scenario');
@@ -191,7 +184,6 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
            
            await handler.handleDialog('alert', dialogAction);
            
-           // Trigger action that will show alert
            this.context.store('dialogHandled', true, 'scenario');
            
            ActionLogger.logInfo('Alert handler registered', { action: dialogAction, type: 'popup_success' });
@@ -330,7 +322,6 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
            const popupPromise = this.page.context().waitForEvent('page', { timeout });
            const popup = await popupPromise;
            
-           // Store popup reference
            this.context.store('lastPopup', popup, 'scenario');
            
            ActionLogger.logInfo('Popup opened', { 
@@ -352,17 +343,14 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
        try {
            const element = await this.findElement(elementDescription);
            
-           // Get href attribute
            const href = await element.getAttribute('href');
            if (!href) {
                throw new Error('Element does not have href attribute');
            }
            
-           // Open in new window
            const newPage = await this.context.getCurrentBrowserContext().newPage();
            await newPage.goto(href);
            
-           // Register with popup handler
            const handler = this.getPopupHandler();
            handler.getPopups().push(newPage);
            
@@ -400,7 +388,6 @@ export class PopupSteps extends CSBDDBaseStepDefinition {
        return element;
    }
 
-   // Cleanup method to be called after scenarios
    async cleanup(): Promise<void> {
        if (this.popupHandler) {
            try {

@@ -55,11 +55,9 @@ export class MongoDBAdapter extends DatabaseAdapter {
                 dbName: config.database
             });
 
-            // Build connection URL
             this.connectionUrl = this.buildConnectionUrl(config);
             this.dbName = config.database;
 
-            // Configure connection options
             this.connectionOptions = {
                 maxPoolSize: config.connectionPoolSize || 10,
                 minPoolSize: 2,
@@ -79,26 +77,20 @@ export class MongoDBAdapter extends DatabaseAdapter {
                 ...this.buildSSLOptions(config)
             };
 
-            // Connect to MongoDB
             this.client = new mongodb.MongoClient(this.connectionUrl, this.connectionOptions);
             await this.client.connect();
 
-            // Select database
             this.db = this.client.db(this.dbName);
 
-            // Test connection
             await this.db.admin().ping();
 
-            // Start health monitoring
             this.startHealthMonitoring();
 
-            // Cache commonly used collections
             await this.cacheCollections();
 
             logger.info(`Successfully connected to MongoDB: ${config.host}/${config.database}`);
             ActionLogger.logInfo('Database connected successfully', { database: 'mongodb' });
             
-            // Create and return DatabaseConnection
             const connection: DatabaseConnection = {
                 id: `mongodb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 type: 'mongodb',
@@ -124,22 +116,18 @@ export class MongoDBAdapter extends DatabaseAdapter {
         try {
             ActionLogger.logInfo('Database disconnection initiated', { database: 'mongodb' });
 
-            // Stop health monitoring
             if (this.healthCheckInterval) {
                 clearInterval(this.healthCheckInterval as unknown as number);
                 this.healthCheckInterval = null;
             }
 
-            // Close active session
             if (this.session && !this.session.hasEnded) {
                 await this.session.endSession();
             }
 
-            // Clear collections cache
             this.collections.clear();
             this.aggregationPipelines.clear();
 
-            // Close connection
             if (this.client) {
                 await this.client.close();
                 this.client = null;
@@ -163,7 +151,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
             this.validateConnectionInternal();
             ActionLogger.logInfo('Executing database query', { database: 'mongodb', query, params });
 
-            // MongoDB uses a different query structure - parse the command
             const command = this.parseMongoCommand(query);
             let result: any;
             
@@ -217,10 +204,8 @@ export class MongoDBAdapter extends DatabaseAdapter {
                 throw new Error('Transaction already in progress');
             }
 
-            // Start a client session
             this.session = this.client!.startSession();
 
-            // Configure transaction options
             const transactionOptions: mongodb.TransactionOptions = {
                 readConcern: { level: 'snapshot' as ReadConcernLevel },
                 writeConcern: { w: 'majority', j: true },
@@ -228,7 +213,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
                 maxCommitTimeMS: options?.timeout || 60000
             };
 
-            // Start transaction
             this.session.startTransaction(transactionOptions);
 
             logger.debug('MongoDB transaction started');
@@ -287,10 +271,8 @@ export class MongoDBAdapter extends DatabaseAdapter {
     }
 
     async prepare(connection: DatabaseConnection, query: string): Promise<PreparedStatement> {
-        // MongoDB doesn't support traditional prepared statements
-        // We'll simulate it by pre-parsing and validating the query
         try {
-            this.parseMongoCommand(query); // Validate the query
+            this.parseMongoCommand(query);
             const id = `ps_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
             const preparedStatement: PreparedStatement = {
@@ -301,7 +283,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
                     return await this.query(connection, query, params);
                 },
                 close: async () => {
-                    // No-op for MongoDB
                     logger.debug(`Closed prepared statement: ${id}`);
                 }
             };
@@ -341,7 +322,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
                 return doc;
             });
 
-            // Configure bulk write options
             const bulkOptions: any = {
                 ordered: options?.ordered !== false
             };
@@ -354,7 +334,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
                 bulkOptions.bypassDocumentValidation = options.skipValidation;
             }
 
-            // Use insertMany for bulk insert
             const result = await collection.insertMany(documents, bulkOptions);
 
             const duration = Date.now() - startTime;
@@ -397,15 +376,12 @@ export class MongoDBAdapter extends DatabaseAdapter {
             await adminDb.ping();
             const latency = Date.now() - startTime;
 
-            // Get server status
             const serverStatus = await adminDb.serverStatus();
             
-            // Get replica set status if applicable
             let replicaSetStatus = null;
             try {
                 replicaSetStatus = await adminDb.replSetGetStatus();
             } catch {
-                // Not a replica set
             }
 
             const health: ConnectionHealth = {
@@ -459,15 +435,12 @@ export class MongoDBAdapter extends DatabaseAdapter {
     }
 
     async executeStoredProcedure(_connection: DatabaseConnection, name: string, params?: any[], _options?: QueryOptions): Promise<QueryResult> {
-        // MongoDB doesn't have traditional stored procedures
-        // We can execute server-side JavaScript functions
         const startTime = Date.now();
         
         try {
             this.validateConnectionInternal();
             ActionLogger.logInfo('Executing stored procedure', { database: 'mongodb', name, params });
 
-            // Check if it's a system function
             const systemFunctions: Record<string, any> = {
                 'compact': async () => await this.db!.command({ compact: params?.[0] }),
                 'reIndex': async () => await this.db!.collection(params?.[0]).indexes(),
@@ -481,7 +454,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
             if (systemFunctions[name]) {
                 result = await systemFunctions[name]();
             } else {
-                // Execute as a database command
                 const command: any = { [name]: 1 };
                 if (params && params.length > 0) {
                     Object.assign(command, params[0]);
@@ -512,15 +484,12 @@ export class MongoDBAdapter extends DatabaseAdapter {
     }
 
     async executeFunction(_connection: DatabaseConnection, name: string, params?: any[], _options?: QueryOptions): Promise<any> {
-        // MongoDB doesn't have traditional functions
-        // We'll use aggregation pipeline functions
         const startTime = Date.now();
         
         try {
             this.validateConnectionInternal();
             ActionLogger.logInfo('Executing function', { database: 'mongodb', name, params });
 
-            // Map common function names to MongoDB operations
             const functionMap: Record<string, any> = {
                 'count': async () => {
                     const collection = params?.[0] || 'test';
@@ -551,7 +520,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
             if (functionMap[name]) {
                 result = await functionMap[name]();
             } else {
-                // Try to execute as a database function
                 const evalCommand = {
                     eval: name,
                     args: params || []
@@ -586,32 +554,26 @@ export class MongoDBAdapter extends DatabaseAdapter {
         };
     }
 
-    // Private helper methods
 
     private buildConnectionUrl(config: DatabaseConfig): string {
         const protocol = config.ssl ? 'mongodb+srv' : 'mongodb';
         const auth = config.username ? `${config.username}:${encodeURIComponent(config.password || '')}@` : '';
         const port = config.port || 27017;
         
-        // Handle replica set or single host
         let hosts = config.host;
         if (config.additionalOptions?.['replicaSet']) {
-            // Parse comma-separated hosts for replica set
             const hostList = config.host.split(',').map(h => h.trim());
             hosts = hostList.join(',');
         }
 
         let url = `${protocol}://${auth}${hosts}`;
         
-        // Add port only if not using SRV
         if (protocol === 'mongodb' && !hosts.includes(':')) {
             url += `:${port}`;
         }
 
-        // Add database name
         url += `/${config.database}`;
 
-        // Add connection options
         const options: string[] = [];
         if (config.additionalOptions?.['replicaSet']) {
             options.push(`replicaSet=${config.additionalOptions['replicaSet']}`);
@@ -691,7 +653,7 @@ export class MongoDBAdapter extends DatabaseAdapter {
                 logger.error('Health check failed:', error as Error | Record<string, any>);
                 this.isHealthy = false;
             }
-        }, 30000); // Check every 30 seconds
+        }, 30000);
     }
 
     private validateConnectionInternal(): void {
@@ -710,31 +672,22 @@ export class MongoDBAdapter extends DatabaseAdapter {
     }
 
     private parseMongoCommand(query: string): any {
-        // Parse MongoDB-style commands
-        // Examples:
-        // db.collection.find({name: "test"})
-        // db.collection.insertOne({name: "test"})
-        // db.collection.updateMany({}, {$set: {status: "active"}})
         
         const trimmedQuery = query.trim();
         
-        // Check for direct JSON commands
         if (trimmedQuery.startsWith('{')) {
             try {
                 return JSON.parse(trimmedQuery);
             } catch {
-                // Fall through to other parsing
             }
         }
 
-        // Parse db.collection.method() syntax
         const dbPattern = /^db\.(\w+)\.(\w+)\(([\s\S]*)\)$/;
         const match = trimmedQuery.match(dbPattern);
         
         if (match) {
             const [, collection, method, args] = match;
             try {
-                // Parse arguments - handle both JSON and JavaScript object notation
                 const parsedArgs = this.parseArguments(args || '');
                 return {
                     operation: this.mapMethodToOperation(method || ''),
@@ -747,7 +700,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
             }
         }
 
-        // Try to infer operation from keywords
         const upperQuery = trimmedQuery.toUpperCase();
         if (upperQuery.includes('FIND') || upperQuery.includes('SELECT')) {
             return { operation: 'find', query: trimmedQuery };
@@ -800,15 +752,12 @@ export class MongoDBAdapter extends DatabaseAdapter {
         }
 
         try {
-            // Use Function constructor to safely evaluate JavaScript-style object notation
             const func = new Function('return [' + argsString + ']');
             return func();
         } catch {
-            // Try JSON parsing
             try {
                 return JSON.parse('[' + argsString + ']');
             } catch {
-                // Return as string if parsing fails
                 return [argsString];
             }
         }
@@ -820,7 +769,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
         const filter = args[0] || {};
         const projection = args[1];
         
-        // Apply parameters if provided
         const processedFilter = this.applyParameters(filter, params);
 
         const findOptions: mongodb.FindOptions = {};
@@ -833,7 +781,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
         
         let cursor = collection.find(processedFilter, findOptions);
 
-        // Apply options
         if (options?.limit) {
             cursor = cursor.limit(options.limit);
         }
@@ -862,10 +809,8 @@ export class MongoDBAdapter extends DatabaseAdapter {
         const args = command.args || [];
         let documents = args[0];
 
-        // Apply parameters if provided
         documents = this.applyParameters(documents, params);
 
-        // Ensure documents is an array
         if (!Array.isArray(documents)) {
             documents = [documents];
         }
@@ -1046,10 +991,8 @@ export class MongoDBAdapter extends DatabaseAdapter {
             return obj;
         }
 
-        // Convert string representation to actual object with parameter substitution
         let str = JSON.stringify(obj);
         
-        // Replace $1, $2, etc. with actual parameter values
         params.forEach((param, index) => {
             const placeholder = `$${index + 1}`;
             const value = JSON.stringify(param);
@@ -1068,14 +1011,12 @@ export class MongoDBAdapter extends DatabaseAdapter {
         const enhancedError = new Error(`MongoDB ${operation} failed: ${error.message}`);
         enhancedError.name = 'MongoDBError';
         
-        // Add context
         (enhancedError as any).context = {
             operation,
             database: this.dbName,
             ...context
         };
 
-        // Add specific error codes and solutions
         if (error.message.includes('connection')) {
             (enhancedError as any).code = 'CONNECTION_ERROR';
             (enhancedError as any).solution = 'Check MongoDB connection settings and ensure the server is running';
@@ -1093,46 +1034,29 @@ export class MongoDBAdapter extends DatabaseAdapter {
         return enhancedError;
     }
 
-    /**
-     * Create savepoint (not supported in MongoDB)
-     */
     async createSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
         logger.warn('Savepoints are not supported in MongoDB');
-        // MongoDB doesn't support savepoints, but we can track them for compatibility
         if (!connection.savepoints.includes(name)) {
             connection.savepoints.push(name);
         }
     }
 
-    /**
-     * Release savepoint (not supported in MongoDB)
-     */
     async releaseSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
         logger.warn('Savepoints are not supported in MongoDB');
-        // Remove from tracking
         const index = connection.savepoints.indexOf(name);
         if (index > -1) {
             connection.savepoints.splice(index, 1);
         }
     }
 
-    /**
-     * Rollback to savepoint (not supported in MongoDB)
-     */
     async rollbackToSavepoint(_connection: DatabaseConnection, _name: string): Promise<void> {
         throw new Error('Savepoints are not supported in MongoDB. Use transactions instead.');
     }
 
-    /**
-     * Execute prepared statement
-     */
     async executePrepared(statement: PreparedStatement, params?: any[]): Promise<QueryResult> {
         return statement.execute(params);
     }
 
-    /**
-     * Ping connection
-     */
     async ping(connection: DatabaseConnection): Promise<void> {
         if (!this.client || !this.db) {
             throw new Error('Not connected to MongoDB');
@@ -1142,9 +1066,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
         connection.lastActivity = new Date();
     }
 
-    /**
-     * Get database metadata
-     */
     async getMetadata(connection: DatabaseConnection): Promise<DatabaseMetadata> {
         if (!this.client || !this.db) {
             throw new Error('Not connected to MongoDB');
@@ -1169,23 +1090,18 @@ export class MongoDBAdapter extends DatabaseAdapter {
         };
     }
 
-    /**
-     * Get table (collection) information
-     */
     async getTableInfo(_connection: DatabaseConnection, tableName: string): Promise<TableInfo> {
         if (!this.db) {
             throw new Error('Not connected to MongoDB');
         }
 
         const collection = this.db.collection(tableName);
-        // Get collection statistics using aggregation
         const statsResult = await collection.aggregate([
             { $collStats: { storageStats: {} } }
         ]).toArray();
         const stats = statsResult[0] || { storageStats: { count: 0, size: 0 } };
         const indexes = await collection.indexes();
         
-        // Get sample document to infer schema
         const sampleDoc = await collection.findOne();
         const columns: ColumnInfo[] = [];
 
@@ -1230,9 +1146,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
         };
     }
 
-    /**
-     * Bulk insert (simplified version)
-     */
     async bulkInsert(
         _connection: DatabaseConnection,
         table: string,
@@ -1253,9 +1166,6 @@ export class MongoDBAdapter extends DatabaseAdapter {
         return result.insertedCount;
     }
 
-    /**
-     * Get MongoDB data type name
-     */
     private getMongoDataType(value: any): string {
         if (value === null) return 'null';
         if (value instanceof Date) return 'Date';

@@ -12,9 +12,6 @@ import {
 import { HookType } from '../../bdd/types/bdd.types';
 import { Logger } from '../../core/utils/Logger';
 
-/**
- * Aggregates test execution results for reporting
- */
 export class ReportAggregator {
     private logger: Logger;
     private aggregationCache: Map<string, any> = new Map();
@@ -23,32 +20,22 @@ export class ReportAggregator {
         this.logger = Logger.getInstance('ReportAggregator');
     }
 
-    /**
-     * Initialize the aggregator
-     */
     public async initialize(): Promise<void> {
         this.aggregationCache.clear();
         this.logger.info('Report aggregator initialized');
     }
 
-    /**
-     * Aggregate execution results and evidence
-     */
     public async aggregate(executionResult: ExecutionResult, evidence: EvidenceCollection): Promise<AggregatedData> {
         try {
             this.logger.info('Starting result aggregation');
             const startTime = Date.now();
 
-            // Create execution summary
             const executionSummary = await this.createExecutionSummary(executionResult);
             
-            // Create report metrics
             const reportMetrics = await this.createReportMetrics(executionResult, evidence);
 
-            // Calculate trends if historical data available
             const trends = await this.calculateTrends(executionResult);
 
-            // Build aggregated data according to the interface
             const aggregatedData: AggregatedData = {
                 executionResult,
                 evidence,
@@ -61,7 +48,6 @@ export class ReportAggregator {
                 }
             };
 
-            // Cache the aggregated data
             this.aggregationCache.set(executionResult.executionId, aggregatedData);
 
             this.logger.info(`Aggregation completed in ${Date.now() - startTime}ms`);
@@ -73,11 +59,7 @@ export class ReportAggregator {
         }
     }
 
-    /**
-     * Create execution summary
-     */
     private async createExecutionSummary(executionResult: ExecutionResult): Promise<ExecutionSummary> {
-        // Count scenarios from the executionResult directly
         const totalScenarios = executionResult.totalScenarios;
         const passedScenarios = executionResult.passedScenarios;
         const failedScenarios = executionResult.failedScenarios;
@@ -88,7 +70,6 @@ export class ReportAggregator {
         const skippedSteps = executionResult.skippedSteps;
         const totalDuration = executionResult.duration;
         
-        // Calculate metrics from scenarios
         let pendingSteps = 0;
         let totalRetries = 0;
         let scenariosWithRetries = 0;
@@ -96,18 +77,15 @@ export class ReportAggregator {
         let teardownDuration = 0;
         
         for (const scenario of executionResult.scenarios) {
-            // Count pending steps
             for (const step of scenario.steps) {
                 if (step.status === TestStatus.PENDING) pendingSteps++;
             }
             
-            // Count retries
             if (scenario.retryCount > 0) {
                 totalRetries += scenario.retryCount;
                 scenariosWithRetries++;
             }
             
-            // Calculate hook durations
             if (scenario.hooks) {
                 for (const hook of scenario.hooks) {
                     if (hook.type === HookType.Before || hook.type === HookType.BeforeStep) {
@@ -122,7 +100,6 @@ export class ReportAggregator {
         const passRate = totalScenarios > 0 ? (passedScenarios / totalScenarios) * 100 : 0;
         const failureRate = totalScenarios > 0 ? (failedScenarios / totalScenarios) * 100 : 0;
 
-        // Create execution statistics
         const statistics: ExecutionStatistics = {
             avgScenarioDuration: totalScenarios > 0 ? totalDuration / totalScenarios : 0,
             avgStepDuration: totalSteps > 0 ? totalDuration / totalSteps : 0,
@@ -133,7 +110,6 @@ export class ReportAggregator {
             flakyTests: []
         };
 
-        // Find fastest and slowest scenarios
         let fastestDuration = Infinity;
         let slowestDuration = 0;
         for (const scenario of executionResult.scenarios) {
@@ -157,7 +133,6 @@ export class ReportAggregator {
             }
         }
 
-        // Find most failed and most stable features
         const featureStats = new Map<string, { passed: number; failed: number; total: number }>();
         for (const scenario of executionResult.scenarios) {
             const stats = featureStats.get(scenario.feature) || { passed: 0, failed: 0, total: 0 };
@@ -201,7 +176,7 @@ export class ReportAggregator {
             passRate,
             failureRate,
             status: executionResult.status,
-            trends: { // Will be filled by calculateTrends
+            trends: {
                 passRateTrend: 0,
                 executionTimeTrend: 0,
                 failureRateTrend: 0,
@@ -225,11 +200,7 @@ export class ReportAggregator {
         };
     }
 
-    /**
-     * Create report metrics
-     */
     private async createReportMetrics(executionResult: ExecutionResult, evidence: EvidenceCollection): Promise<ReportMetrics> {
-        // Calculate hook durations and other metrics
         let setupDuration = 0;
         let teardownDuration = 0;
         let totalRetries = 0;
@@ -238,7 +209,6 @@ export class ReportAggregator {
         let firstFailureFound = false;
         
         for (const scenario of executionResult.scenarios) {
-            // Calculate hook durations
             if (scenario.hooks) {
                 for (const hook of scenario.hooks) {
                     if (hook.type === HookType.Before || hook.type === HookType.BeforeStep) {
@@ -249,13 +219,11 @@ export class ReportAggregator {
                 }
             }
             
-            // Count retries
             if (scenario.retryCount > 0) {
                 totalRetries += scenario.retryCount;
                 scenariosWithRetries++;
             }
             
-            // Find time to first failure
             if (!firstFailureFound && scenario.status === TestStatus.FAILED) {
                 firstFailureFound = true;
                 const scenarioElapsedTime = scenario.endTime.getTime() - executionResult.startTime.getTime();
@@ -263,7 +231,6 @@ export class ReportAggregator {
             }
         }
         
-        // Calculate parallel efficiency based on execution time vs theoretical sequential time
         const theoreticalSequentialTime = executionResult.scenarios.reduce((sum, s) => sum + s.duration, 0);
         const parallelWorkers = executionResult.metadata?.['workers'] || 1;
         const theoreticalParallelTime = theoreticalSequentialTime / parallelWorkers;
@@ -273,7 +240,6 @@ export class ReportAggregator {
         const retryRate = executionResult.totalScenarios > 0 ? 
             (scenariosWithRetries / executionResult.totalScenarios) * 100 : 0;
         
-        // Calculate execution metrics
         const executionMetrics = {
             totalDuration: executionResult.duration,
             setupDuration,
@@ -287,7 +253,6 @@ export class ReportAggregator {
             timeToFirstFailure: firstFailureTime
         };
 
-        // Calculate browser metrics
         const browserMetrics = {
             pageLoadTime: 0,
             domContentLoaded: 0,
@@ -307,7 +272,6 @@ export class ReportAggregator {
             consoleWarnings: 0
         };
 
-        // Calculate network metrics from evidence
         let totalRequests = 0;
         let failedRequests = 0;
         let totalDataTransferred = 0;
@@ -357,7 +321,6 @@ export class ReportAggregator {
             cacheHitRate: 0,
             requestsByType: {},
             requestsByDomain: {},
-            // Additional required properties
             successfulRequests: totalRequests - failedRequests,
             totalBytesTransferred: totalDataTransferred,
             totalTime: avgResponseTime * totalRequests,
@@ -370,7 +333,6 @@ export class ReportAggregator {
             pageUrl: ''
         };
 
-        // Calculate system metrics
         const systemMetrics = {
             cpuUsage: 0,
             memoryUsage: 0,
@@ -403,16 +365,11 @@ export class ReportAggregator {
         };
     }
 
-    /**
-     * Calculate trends from historical data
-     */
     private async calculateTrends(executionResult: ExecutionResult): Promise<TrendData | undefined> {
         try {
-            // Get historical data from cache or storage
             const historicalData = await this.getHistoricalData(executionResult.executionId);
             
             if (!historicalData || historicalData.length < 2) {
-                // Not enough data for trends
                 return {
                     passRateTrend: 0,
                     executionTimeTrend: 0,
@@ -421,25 +378,21 @@ export class ReportAggregator {
                 };
             }
             
-            // Get current metrics
             const currentPassRate = executionResult.totalScenarios > 0 ? 
                 (executionResult.passedScenarios / executionResult.totalScenarios) * 100 : 0;
             const currentFailureRate = executionResult.totalScenarios > 0 ? 
                 (executionResult.failedScenarios / executionResult.totalScenarios) * 100 : 0;
             const currentExecutionTime = executionResult.duration;
             
-            // Calculate trends from last n executions
-            const recentExecutions = historicalData.slice(-5); // Last 5 executions
+            const recentExecutions = historicalData.slice(-5);
             const avgPassRate = recentExecutions.reduce((sum, exec) => sum + exec.passRate, 0) / recentExecutions.length;
             const avgFailureRate = recentExecutions.reduce((sum, exec) => sum + exec.failureRate, 0) / recentExecutions.length;
             const avgExecutionTime = recentExecutions.reduce((sum, exec) => sum + exec.duration, 0) / recentExecutions.length;
             
-            // Calculate percentage changes
             const passRateTrend = avgPassRate > 0 ? ((currentPassRate - avgPassRate) / avgPassRate) * 100 : 0;
             const failureRateTrend = avgFailureRate > 0 ? ((currentFailureRate - avgFailureRate) / avgFailureRate) * 100 : 0;
             const executionTimeTrend = avgExecutionTime > 0 ? ((currentExecutionTime - avgExecutionTime) / avgExecutionTime) * 100 : 0;
             
-            // Add current execution to history
             const currentExecution: ExecutionHistory = {
                 executionId: executionResult.executionId,
                 date: executionResult.endTime,
@@ -466,10 +419,10 @@ export class ReportAggregator {
                     change: failureRateTrend,
                     direction: failureRateTrend > 0 ? 'up' : failureRateTrend < 0 ? 'down' : 'stable'
                 },
-                lastExecutions: [...historicalData, currentExecution].slice(-10), // Keep last 10
+                lastExecutions: [...historicalData, currentExecution].slice(-10),
                 stabilityTrend: {
                     data: recentExecutions.map(e => 100 - e.failureRate).concat(100 - currentFailureRate),
-                    change: -failureRateTrend, // Inverse of failure rate trend
+                    change: -failureRateTrend,
                     direction: failureRateTrend < 0 ? 'up' : failureRateTrend > 0 ? 'down' : 'stable'
                 },
                 historicalComparison: this.createHistoricalComparison(currentExecution, recentExecutions[recentExecutions.length - 1])
@@ -485,30 +438,20 @@ export class ReportAggregator {
         }
     }
     
-    /**
-     * Get historical execution data
-     */
     private async getHistoricalData(currentExecutionId: string): Promise<ExecutionHistory[]> {
-        // Check cache first
         const cacheKey = `historical_data_${currentExecutionId}`;
         const cached = this.aggregationCache.get(cacheKey);
         if (cached) {
             return cached as ExecutionHistory[];
         }
         
-        // In a real implementation, this would fetch from a database or file storage
-        // For now, we'll simulate with some data
         const historicalData: ExecutionHistory[] = [];
         
-        // Store in cache
         this.aggregationCache.set(cacheKey, historicalData);
         
         return historicalData;
     }
     
-    /**
-     * Create historical comparison data
-     */
     private createHistoricalComparison(current: ExecutionHistory, previous?: ExecutionHistory): Array<{
         metric: string;
         current: string;
@@ -547,9 +490,6 @@ export class ReportAggregator {
         ];
     }
     
-    /**
-     * Format duration for display
-     */
     private formatDuration(ms: number): string {
         const seconds = Math.floor(ms / 1000);
         const minutes = Math.floor(seconds / 60);
@@ -564,16 +504,10 @@ export class ReportAggregator {
         }
     }
 
-    /**
-     * Get cached aggregation
-     */
     public getCachedAggregation(executionId: string): AggregatedData | undefined {
         return this.aggregationCache.get(executionId);
     }
 
-    /**
-     * Clear cache
-     */
     public clearCache(): void {
         this.aggregationCache.clear();
         this.logger.info('Aggregation cache cleared');

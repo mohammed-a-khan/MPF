@@ -2,7 +2,6 @@
 
 import { Locator, ElementHandle, Page } from 'playwright';
 
-// Core AI Types
 export interface AIConfig {
   enabled: boolean;
   confidenceThreshold: number;
@@ -24,7 +23,6 @@ export interface AIIdentificationResult {
   }>;
 }
 
-// Element Features
 export interface ElementFeatures {
   text: TextFeatures;
   visual: VisualFeatures;
@@ -130,7 +128,6 @@ export interface ContextFeatures {
   followingText?: string;
 }
 
-// DOM Analysis
 export interface DOMAnalysis {
   hierarchy: ElementInfo;
   forms: FormInfo[];
@@ -222,7 +219,6 @@ export interface DOMMetrics {
   averageDepth: number;
 }
 
-// Element Candidates
 export interface ElementCandidate {
   element: ElementHandle;
   locator: Locator;
@@ -261,7 +257,6 @@ export interface ScoreBreakdown {
   trainingBoost?: number;
 }
 
-// NLP Types
 export type IntentType = 'action' | 'navigation' | 'assertion' | 'extraction' | 'modification' | 'interaction' | 'validation' | 'wait' | 'data' | 'unknown';
 export type ActionType = 'click' | 'type' | 'select' | 'check' | 'uncheck' | 'hover' | 'focus' | 'blur' | 'clear' | 'upload' | 'download' | 'drag' | 'drop' | 'scroll' | 'wait' | 'press' | 'navigate' | 'submit' | 'cancel' | 'open' | 'close' | 'toggle' | 'refresh' | 'rightclick' | 'doubleclick' | 'assert' | 'assertExists' | 'assertNotExists' | 'assertVisible' | 'assertNotVisible' | 'assertEnabled' | 'assertDisabled' | 'assertSelected' | 'assertText' | 'assertValue' | 'assertTitle' | 'assertContains' | 'assertCount' | 'get' | 'set' | 'read' | 'write' | 'extract' | 'waitUntil' | 'waitTime' | 'waitVisible' | 'waitHidden' | 'waitEnabled' | 'waitReady' | 'waitCondition' | 'go' | 'back' | 'forward' | 'reload' | 'capture' | 'switch' | 'store' | 'use' | 'unknown';
 export type TargetType = 'button' | 'link' | 'input' | 'select' | 'checkbox' | 'radio' | 'text' | 'image' | 'element' | 'page' | 'frame' | 'window' | 'tab' | 'time';
@@ -332,7 +327,6 @@ export interface NLPResult {
   pattern?: UIPattern | undefined;
 }
 
-// Pattern Types
 export interface UIPattern {
   name: string;
   tags: string[];
@@ -344,7 +338,6 @@ export interface UIPattern {
   };
 }
 
-// Semantic Map
 export interface SemanticMap {
   structure: any;
   landmarks: Array<{
@@ -355,7 +348,6 @@ export interface SemanticMap {
   }>;
 }
 
-// Training and Cache
 export interface TrainingData {
   id: string;
   description: string;
@@ -373,7 +365,6 @@ export interface IdentificationCache {
   timestamp: number;
 }
 
-// Self-Healing Types
 export interface HealingResult {
   success: boolean;
   newLocator?: Locator;
@@ -424,7 +415,6 @@ export interface HealingStats {
   }>;
 }
 
-// Visual Recognition Types
 export interface VisualData {
   pixels: Uint8Array;
   width: number;
@@ -443,7 +433,6 @@ export interface EdgeMap {
   vertical: number[][];
 }
 
-// Similarity Types
 export interface SimilarityWeights {
   text: number;
   structure: number;
@@ -452,7 +441,6 @@ export interface SimilarityWeights {
   context: number;
 }
 
-// Error Types
 export interface AIError extends Error {
   code: 'AI_IDENTIFICATION_FAILED' | 'AI_CONFIDENCE_TOO_LOW' | 'AI_NO_CANDIDATES' | 'AI_HEALING_FAILED';
   details?: any;

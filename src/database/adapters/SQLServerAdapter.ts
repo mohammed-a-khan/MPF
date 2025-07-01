@@ -14,9 +14,6 @@ import { DatabaseAdapter } from './DatabaseAdapter';
 import { logger } from '../../core/utils/Logger';
 import * as mssql from 'mssql';
 
-/**
- * SQL Server database adapter implementation
- */
 export class SQLServerAdapter extends DatabaseAdapter {
   private mssql!: typeof mssql;
   private connectionCounter: number = 0;
@@ -25,9 +22,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     super();
   }
 
-  /**
-   * Load mssql module dynamically
-   */
   private async loadDriver(): Promise<void> {
     if (!this.mssql) {
       try {
@@ -38,9 +32,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Wrap connection
-   */
   private wrapConnection(pool: any, config: DatabaseConfig): DatabaseConnection {
     return {
       id: `sqlserver-${++this.connectionCounter}`,
@@ -55,9 +46,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Parse fields from recordset
-   */
   private parseFields(recordset: any): Array<{ name: string; dataType: string }> {
     if (!recordset || !recordset.columns) return [];
     return Object.entries(recordset.columns).map(([name, info]: [string, any]) => ({
@@ -66,9 +54,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }));
   }
 
-  /**
-   * Map SQL Server type to generic type
-   */
   private mapSqlServerType(type: any): string {
     if (!type || !type.name) return 'unknown';
     const typeName = type.name.toLowerCase();
@@ -114,9 +99,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Connect to SQL Server
-   */
   async connect(config: DatabaseConfig): Promise<DatabaseConnection> {
     await this.loadDriver();
     this.config = config;
@@ -142,7 +124,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
         }
       };
 
-      // Handle connection string override
       if (config.additionalOptions?.['connectionString']) {
         const pool = new this.mssql.ConnectionPool(config.additionalOptions['connectionString']);
         await pool.connect();
@@ -158,9 +139,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Disconnect from SQL Server
-   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const pool = connection as any;
@@ -171,9 +149,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute query
-   */
   async query(
     connection: DatabaseConnection, 
     sql: string, 
@@ -183,12 +158,10 @@ export class SQLServerAdapter extends DatabaseAdapter {
     const pool = connection as any;
     const request = pool.request();
 
-    // Set timeout
     if (options?.timeout) {
       request.timeout = options.timeout;
     }
 
-    // Add parameters
     if (params && params.length > 0) {
       params.forEach((param, index) => {
         const paramName = `p${index}`;
@@ -211,7 +184,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
         }
       });
 
-      // Replace ? with @p0, @p1, etc.
       sql = sql.replace(/\?/g, (_match, offset, string) => {
         const index = string.substring(0, offset).split('?').length - 1;
         return `@p${index}`;
@@ -236,9 +208,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute stored procedure
-   */
   async executeStoredProcedure(
     connection: DatabaseConnection,
     procedureName: string,
@@ -248,19 +217,15 @@ export class SQLServerAdapter extends DatabaseAdapter {
     const pool = connection as any;
     const request = pool.request();
 
-    // Set timeout
     if (options?.timeout) {
       request.timeout = options.timeout;
     }
 
-    // Add parameters
     if (params && params.length > 0) {
       params.forEach((param, index) => {
         if (param && typeof param === 'object' && param.name) {
-          // Named parameter
           this.addParameter(request, param.name, param.value, param.output);
         } else {
-          // Positional parameter
           this.addParameter(request, `param${index}`, param);
         }
       });
@@ -286,9 +251,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute function
-   */
   async executeFunction(
     connection: DatabaseConnection,
     functionName: string,
@@ -302,9 +264,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     return result.rows[0]?.result;
   }
 
-  /**
-   * Begin transaction
-   */
   async beginTransaction(
     connection: DatabaseConnection,
     options?: TransactionOptions
@@ -320,9 +279,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     (connection as any)._transaction = transaction;
   }
 
-  /**
-   * Commit transaction
-   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     const transaction = (connection as any)._transaction;
     if (!transaction) {
@@ -333,9 +289,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     delete (connection as any)._transaction;
   }
 
-  /**
-   * Rollback transaction
-   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     const transaction = (connection as any)._transaction;
     if (!transaction) {
@@ -346,36 +299,21 @@ export class SQLServerAdapter extends DatabaseAdapter {
     delete (connection as any)._transaction;
   }
 
-  /**
-   * Create savepoint
-   */
   async createSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `SAVE TRANSACTION ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Release savepoint
-   */
   override async releaseSavepoint(_connection: DatabaseConnection, _name: string): Promise<void> {
-    // SQL Server doesn't support explicit savepoint release
-    // Savepoints are automatically released on commit
   }
 
-  /**
-   * Rollback to savepoint
-   */
   async rollbackToSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `ROLLBACK TRANSACTION ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Prepare statement
-   */
   async prepare(connection: DatabaseConnection, sql: string): Promise<PreparedStatement> {
     const pool = connection as any;
     const ps = new this.mssql.PreparedStatement(pool);
     
-    // Parse parameters from SQL
     const paramMatches = sql.match(/@\w+/g);
     if (paramMatches) {
       paramMatches.forEach(param => {
@@ -416,9 +354,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     return preparedStatement;
   }
 
-  /**
-   * Execute prepared statement
-   */
   async executePrepared(
     statement: PreparedStatement,
     params?: any[]
@@ -426,26 +361,14 @@ export class SQLServerAdapter extends DatabaseAdapter {
     return statement.execute(params);
   }
 
-  /**
-   * Ping connection
-   */
   async ping(connection: DatabaseConnection): Promise<void> {
     await this.query(connection, 'SELECT 1');
   }
 
-  /**
-   * Get database metadata
-   */
   async getMetadata(connection: DatabaseConnection): Promise<DatabaseMetadata> {
     const versionResult = await this.query(connection, 'SELECT @@VERSION AS version');
     const dbNameResult = await this.query(connection, 'SELECT DB_NAME() AS dbname');
     
-    // Query for table count if needed in the future
-    // const tablesResult = await this.query(connection, `
-    //   SELECT COUNT(*) as count 
-    //   FROM INFORMATION_SCHEMA.TABLES 
-    //   WHERE TABLE_TYPE = 'BASE TABLE'
-    // `);
 
     return {
       databaseName: dbNameResult.rows[0].dbname,
@@ -470,9 +393,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Get table information
-   */
   async getTableInfo(connection: DatabaseConnection, tableName: string): Promise<TableInfo> {
     const columnsResult = await this.query(connection, `
       SELECT 
@@ -542,9 +462,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Bulk insert
-   */
   async bulkInsert(
     connection: DatabaseConnection,
     table: string,
@@ -555,10 +472,8 @@ export class SQLServerAdapter extends DatabaseAdapter {
     const pool = connection as any;
     const tableObj = new this.mssql.Table(table);
     
-    // Get columns from first row
     const columns = Object.keys(data[0]);
     
-    // Add columns to table
     columns.forEach(col => {
       const sampleValue = data[0][col];
       
@@ -579,7 +494,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
       }
     });
 
-    // Add rows
     data.forEach(row => {
       const values = columns.map(col => row[col]);
       tableObj.rows.add(...values);
@@ -591,9 +505,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     return result.rowsAffected;
   }
 
-  /**
-   * Get isolation level constant
-   */
   private getIsolationLevel(level: string): any {
     switch (level.toUpperCase()) {
       case 'READ_UNCOMMITTED':
@@ -611,9 +522,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Add parameter to request
-   */
   private addParameter(request: any, name: string, value: any, output: boolean = false): void {
     const method = output ? 'output' : 'input';
     
@@ -636,9 +544,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Get table row count
-   */
   private async getTableRowCount(connection: DatabaseConnection, tableName: string): Promise<number> {
     const result = await this.query(
       connection, 
@@ -647,9 +552,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     return result.rows[0].count;
   }
 
-  /**
-   * Parse query error
-   */
   private parseQueryError(error: any, sql: string): Error {
     const message = `SQL Server Error: ${error.message}\nSQL: ${sql.substring(0, 200)}${sql.length > 200 ? '...' : ''}`;
     const enhancedError = new Error(message);
@@ -668,9 +570,6 @@ export class SQLServerAdapter extends DatabaseAdapter {
     return enhancedError;
   }
 
-  /**
-   * Escape identifier
-   */
   override escapeIdentifier(identifier: string): string {
     return `[${identifier.replace(/]/g, ']]')}]`;
   }

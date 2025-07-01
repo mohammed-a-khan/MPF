@@ -28,9 +28,6 @@ export class AuthenticationHandler {
     this.certificateManager = CertificateManager.getInstance();
   }
   
-  /**
-   * Get singleton instance
-   */
   static getInstance(): AuthenticationHandler {
     if (!AuthenticationHandler.instance) {
       AuthenticationHandler.instance = new AuthenticationHandler();
@@ -168,7 +165,7 @@ export class AuthenticationHandler {
     }
 
     const expiresIn = tokenData.expires_in || 3600;
-    const expiresAt = Date.now() + (expiresIn * 1000) - 60000; // Subtract 1 minute for safety
+    const expiresAt = Date.now() + (expiresIn * 1000) - 60000;
     
     this.oauthTokenCache.set(cacheKey, { token, expiresAt });
     
@@ -244,7 +241,6 @@ export class AuthenticationHandler {
   }
 
   private async applyNTLMAuth(request: RequestOptions, credentials: NTLMCredentials): Promise<RequestOptions> {
-    // NTLM requires a multi-step handshake process
     const handshakeKey = `${request.url}:${credentials.username}`;
     let handshake = this.ntlmHandshakeCache.get(handshakeKey);
     
@@ -260,12 +256,10 @@ export class AuthenticationHandler {
       request.headers = {};
     }
 
-    // For initial request, send Type 1 message
     if (!handshake.type3) {
       request.headers['Authorization'] = `NTLM ${handshake.type1}`;
       ActionLogger.getInstance().debug('NTLM Type 1 message sent');
     } else {
-      // For subsequent requests, use Type 3 message
       request.headers['Authorization'] = `NTLM ${handshake.type3}`;
       ActionLogger.getInstance().debug('NTLM Type 3 message sent');
     }
@@ -274,7 +268,6 @@ export class AuthenticationHandler {
   }
 
   private createNTLMType1Message(credentials: NTLMCredentials): string {
-    // NTLM Type 1 message structure
     const NTLMSSP_NEGOTIATE = 0x00000001;
     const NTLM_NEGOTIATE_OEM = 0x00000002;
     const NTLM_NEGOTIATE_UNICODE = 0x00000001;
@@ -290,29 +283,22 @@ export class AuthenticationHandler {
     const domain = credentials.domain.toUpperCase();
     const workstation = credentials.workstation || 'WORKSTATION';
     
-    // Build Type 1 message
     const type1 = Buffer.alloc(32 + domain.length + workstation.length);
     
-    // Signature
     type1.write('NTLMSSP\0', 0, 'ascii');
     
-    // Type
     type1.writeUInt32LE(1, 8);
     
-    // Flags
     type1.writeUInt32LE(flags, 12);
     
-    // Domain
     type1.writeUInt16LE(domain.length, 16);
     type1.writeUInt16LE(domain.length, 18);
     type1.writeUInt32LE(32, 20);
     
-    // Workstation
     type1.writeUInt16LE(workstation.length, 24);
     type1.writeUInt16LE(workstation.length, 26);
     type1.writeUInt32LE(32 + domain.length, 28);
     
-    // Write domain and workstation
     type1.write(domain, 32, 'ascii');
     type1.write(workstation, 32 + domain.length, 'ascii');
     
@@ -335,7 +321,6 @@ export class AuthenticationHandler {
     const handshake = this.ntlmHandshakeCache.get(handshakeKey)!;
     const type2 = Buffer.from(challenge, 'base64');
     
-    // Parse Type 2 message and create Type 3 response
     const type3 = this.createNTLMType3Message(type2, handshake.credentials);
     handshake.type3 = type3;
     
@@ -346,7 +331,6 @@ export class AuthenticationHandler {
   }
 
   private createNTLMType3Message(type2: Buffer, credentials: NTLMCredentials): string {
-    // Parse Type 2 message
     if (type2.toString('ascii', 0, 8) !== 'NTLMSSP\0' || type2.readUInt32LE(8) !== 2) {
       throw new Error('Invalid NTLM Type 2 message');
     }
@@ -356,7 +340,6 @@ export class AuthenticationHandler {
     const flags = type2.readUInt32LE(20);
     const challenge = type2.slice(24, 32);
     
-    // Generate responses
     const timestamp = this.getNTLMTimestamp();
     const clientChallenge = crypto.randomBytes(8);
     
@@ -371,7 +354,6 @@ export class AuthenticationHandler {
       type2.slice(targetNameOffset, targetNameOffset + targetNameLen)
     );
 
-    // Build Type 3 message
     const domain = credentials.domain.toUpperCase();
     const username = credentials.username;
     const workstation = credentials.workstation || 'WORKSTATION';
@@ -384,46 +366,36 @@ export class AuthenticationHandler {
                        workstationBytes.length + ntlmV2Response.length;
     const type3 = Buffer.alloc(type3Length);
     
-    // Signature
     type3.write('NTLMSSP\0', 0, 'ascii');
     
-    // Type
     type3.writeUInt32LE(3, 8);
     
-    // LM Response (not used in NTLMv2)
     type3.writeUInt16LE(0, 12);
     type3.writeUInt16LE(0, 14);
     type3.writeUInt32LE(64, 16);
     
-    // NTLM Response
     type3.writeUInt16LE(ntlmV2Response.length, 20);
     type3.writeUInt16LE(ntlmV2Response.length, 22);
     type3.writeUInt32LE(64, 24);
     
-    // Domain
     type3.writeUInt16LE(domainBytes.length, 28);
     type3.writeUInt16LE(domainBytes.length, 30);
     type3.writeUInt32LE(64 + ntlmV2Response.length, 32);
     
-    // Username
     type3.writeUInt16LE(usernameBytes.length, 36);
     type3.writeUInt16LE(usernameBytes.length, 38);
     type3.writeUInt32LE(64 + ntlmV2Response.length + domainBytes.length, 40);
     
-    // Workstation
     type3.writeUInt16LE(workstationBytes.length, 44);
     type3.writeUInt16LE(workstationBytes.length, 46);
     type3.writeUInt32LE(64 + ntlmV2Response.length + domainBytes.length + usernameBytes.length, 48);
     
-    // Session Key (not used)
     type3.writeUInt16LE(0, 52);
     type3.writeUInt16LE(0, 54);
     type3.writeUInt32LE(64 + ntlmV2Response.length + domainBytes.length + usernameBytes.length + workstationBytes.length, 56);
     
-    // Flags
     type3.writeUInt32LE(flags, 60);
     
-    // Write data
     let offset = 64;
     ntlmV2Response.copy(type3, offset);
     offset += ntlmV2Response.length;
@@ -457,13 +429,13 @@ export class AuthenticationHandler {
     targetInfo: Buffer
   ): Buffer {
     const temp = Buffer.concat([
-      Buffer.from([0x01, 0x01, 0x00, 0x00]), // Signature
-      Buffer.from([0x00, 0x00, 0x00, 0x00]), // Reserved
+      Buffer.from([0x01, 0x01, 0x00, 0x00]),
+      Buffer.from([0x00, 0x00, 0x00, 0x00]),
       timestamp,
       clientChallenge,
-      Buffer.from([0x00, 0x00, 0x00, 0x00]), // Reserved
+      Buffer.from([0x00, 0x00, 0x00, 0x00]),
       targetInfo,
-      Buffer.from([0x00, 0x00, 0x00, 0x00]) // Reserved
+      Buffer.from([0x00, 0x00, 0x00, 0x00])
     ]);
     
     const ntProofStr = crypto.createHmac('md5', hash)
@@ -474,7 +446,6 @@ export class AuthenticationHandler {
   }
 
   private getNTLMTimestamp(): Buffer {
-    // Windows FILETIME: 100-nanosecond intervals since January 1, 1601
     const EPOCH_DIFFERENCE = 11644473600000;
     const timestamp = Date.now() + EPOCH_DIFFERENCE;
     const filetime = timestamp * 10000;
@@ -495,13 +466,11 @@ export class AuthenticationHandler {
       request.headers = {};
     }
 
-    // Add required headers
     request.headers['X-Amz-Date'] = timestamp;
     if (credentials.sessionToken) {
       request.headers['X-Amz-Security-Token'] = credentials.sessionToken;
     }
 
-    // Create canonical request
     const parsedUrl = new URL(request.url);
     const canonicalUri = parsedUrl.pathname || '/';
     const canonicalQueryString = this.createCanonicalQueryString(parsedUrl.searchParams);
@@ -524,7 +493,6 @@ export class AuthenticationHandler {
       payloadHash
     ].join('\n');
 
-    // Create string to sign
     const canonicalRequestHash = crypto.createHash('sha256')
       .update(canonicalRequest)
       .digest('hex');
@@ -536,7 +504,6 @@ export class AuthenticationHandler {
       canonicalRequestHash
     ].join('\n');
 
-    // Calculate signature
     const signingKey = this.getAWSSignatureKey(
       credentials.secretAccessKey,
       dateStamp,
@@ -548,7 +515,6 @@ export class AuthenticationHandler {
       .update(stringToSign)
       .digest('hex');
 
-    // Add authorization header
     request.headers['Authorization'] = [
       'AWS4-HMAC-SHA256',
       `Credential=${credentials.accessKeyId}/${credentialScope}`,
@@ -610,12 +576,10 @@ export class AuthenticationHandler {
   }
 
   private async applyDigestAuth(request: RequestOptions, credentials: DigestAuthCredentials): Promise<RequestOptions> {
-    // Check if we have a cached challenge for this URL
     const cacheKey = `${request.url}:${credentials.username}`;
     const cachedChallenge = this.digestAuthCache.get(cacheKey);
     
     if (cachedChallenge && cachedChallenge.nc < 99999999) {
-      // Use cached challenge
       const authHeader = this.createDigestAuthHeader(
         request,
         credentials,
@@ -627,12 +591,10 @@ export class AuthenticationHandler {
       }
       request.headers['Authorization'] = authHeader;
       
-      // Increment nonce counter
       cachedChallenge.nc++;
       
       ActionLogger.getInstance().debug('Digest authentication applied (cached)', { username: credentials.username });
     } else {
-      // Need to get challenge first
       ActionLogger.getInstance().debug('Digest authentication requires challenge', { username: credentials.username });
     }
     
@@ -652,11 +614,9 @@ export class AuthenticationHandler {
       throw new Error('Digest credentials not found');
     }
 
-    // Cache the challenge
     const cacheKey = `${request.url}:${credentials.username}`;
     this.digestAuthCache.set(cacheKey, { ...challenge, nc: 1 });
     
-    // Create authorization header
     const authHeaderValue = this.createDigestAuthHeader(request, credentials, challenge);
     
     if (!request.headers) {
@@ -754,8 +714,6 @@ export class AuthenticationHandler {
   }
 
   private findDigestCredentials(_request: RequestOptions): DigestAuthCredentials | null {
-    // This would need to be passed in the request somehow
-    // For now, returning null
     return null;
   }
 
@@ -777,13 +735,11 @@ export class AuthenticationHandler {
       dlg: ''
     };
     
-    // Calculate payload hash if body exists
     if (request.body) {
       const payload = typeof request.body === 'string' ? request.body : JSON.stringify(request.body);
       artifacts.hash = crypto.createHash('sha256').update(payload).digest('base64');
     }
     
-    // Create auth string
     const authString = [
       'hawk.1.header',
       artifacts.ts,
@@ -796,12 +752,10 @@ export class AuthenticationHandler {
       artifacts.ext
     ].join('\n') + '\n';
     
-    // Calculate MAC
     const mac = crypto.createHmac(credentials.algorithm || 'sha256', credentials.key)
       .update(authString)
       .digest('base64');
     
-    // Build authorization header
     const authHeader = [
       `id="${credentials.id}"`,
       `ts="${artifacts.ts}"`,
@@ -837,15 +791,11 @@ export class AuthenticationHandler {
     ActionLogger.getInstance().info('Authentication cache cleared');
   }
   
-  /**
-   * REAL IMPLEMENTATION: Clear expired tokens to prevent memory leaks
-   */
   clearExpiredTokens(): void {
     const now = Date.now();
     let expiredOAuthTokens = 0;
     let expiredDigestTokens = 0;
     
-    // Clear expired OAuth tokens
     for (const [key, tokenData] of this.oauthTokenCache.entries()) {
       if (tokenData.expiresAt <= now) {
         this.oauthTokenCache.delete(key);
@@ -853,16 +803,13 @@ export class AuthenticationHandler {
       }
     }
     
-    // Clear old digest auth challenges (using nc count heuristic)
     for (const [key, challenge] of this.digestAuthCache.entries()) {
-      // Use a heuristic - if nc is very high, it's probably old
       if (challenge.nc > 1000) {
         this.digestAuthCache.delete(key);
         expiredDigestTokens++;
       }
     }
     
-    // Clear old NTLM handshakes (no expiration logic, just limit count)
     const MAX_NTLM_HANDSHAKES = 100;
     if (this.ntlmHandshakeCache.size > MAX_NTLM_HANDSHAKES) {
       const toDelete = this.ntlmHandshakeCache.size - MAX_NTLM_HANDSHAKES;

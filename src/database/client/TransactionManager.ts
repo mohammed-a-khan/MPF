@@ -5,9 +5,6 @@ import { DatabaseAdapter } from '../adapters/DatabaseAdapter';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Manages database transactions with savepoint support
- */
 export class TransactionManager {
   private adapter: DatabaseAdapter;
   private transactionStack: Map<DatabaseConnection, TransactionState[]> = new Map();
@@ -17,21 +14,15 @@ export class TransactionManager {
     this.adapter = adapter;
   }
 
-  /**
-   * Begin transaction
-   */
   async begin(connection: DatabaseConnection, options?: TransactionOptions): Promise<void> {
     try {
-      // Get current transaction stack
       let stack = this.transactionStack.get(connection);
       if (!stack) {
         stack = [];
         this.transactionStack.set(connection, stack);
       }
 
-      // Check if already in transaction
       if (stack.length > 0) {
-        // Create savepoint for nested transaction
         const savepointName = this.generateSavepointName();
         await this.savepoint(connection, savepointName);
         
@@ -41,7 +32,6 @@ export class TransactionManager {
           startTime: Date.now()
         });
       } else {
-        // Start new transaction
         await this.adapter.beginTransaction(connection, options);
         
         const transactionState: TransactionState = {
@@ -67,9 +57,6 @@ export class TransactionManager {
     }
   }
 
-  /**
-   * Commit transaction
-   */
   async commit(connection: DatabaseConnection): Promise<void> {
     try {
       const stack = this.transactionStack.get(connection);
@@ -81,7 +68,6 @@ export class TransactionManager {
       const duration = Date.now() - current.startTime;
 
       if (stack.length === 0) {
-        // Commit main transaction
         await this.adapter.commitTransaction(connection);
         this.transactionStack.delete(connection);
         
@@ -90,7 +76,6 @@ export class TransactionManager {
           level: current.level
         });
       } else {
-        // Release savepoint for nested transaction
         if (current.savepoint) {
           await this.releaseSavepoint(connection, current.savepoint);
         }
@@ -109,9 +94,6 @@ export class TransactionManager {
     }
   }
 
-  /**
-   * Rollback transaction
-   */
   async rollback(connection: DatabaseConnection, savepoint?: string): Promise<void> {
     try {
       const stack = this.transactionStack.get(connection);
@@ -121,10 +103,8 @@ export class TransactionManager {
       }
 
       if (savepoint) {
-        // Rollback to specific savepoint
         await this.rollbackToSavepoint(connection, savepoint);
         
-        // Remove all states after this savepoint
         const index = stack.findIndex(state => state.savepoint === savepoint);
         if (index !== -1) {
           stack.splice(index);
@@ -136,14 +116,12 @@ export class TransactionManager {
           remainingLevels: stack.length
         });
       } else {
-        // Rollback entire transaction
         const current = stack[stack.length - 1];
         if (!current) {
           throw new Error('Invalid transaction state');
         }
         
         if (stack.length === 1) {
-          // Rollback main transaction
           await this.adapter.rollbackTransaction(connection);
           this.transactionStack.delete(connection);
           
@@ -152,7 +130,6 @@ export class TransactionManager {
             level: current.level
           });
         } else {
-          // Rollback to previous savepoint
           stack.pop();
           const previous = stack[stack.length - 1];
           
@@ -178,14 +155,10 @@ export class TransactionManager {
     }
   }
 
-  /**
-   * Create savepoint
-   */
   async savepoint(connection: DatabaseConnection, name: string): Promise<void> {
     try {
       await this.adapter.createSavepoint(connection, name);
       
-      // Track savepoint in current transaction
       const stack = this.transactionStack.get(connection);
       if (stack && stack.length > 0) {
         const current = stack[stack.length - 1];
@@ -210,52 +183,33 @@ export class TransactionManager {
     }
   }
 
-  /**
-   * Release savepoint
-   */
   private async releaseSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     try {
       await this.adapter.releaseSavepoint(connection, name);
     } catch (error) {
-      // Some databases don't support explicit savepoint release
       const logger = Logger.getInstance();
       logger.debug('Savepoint release not supported or failed:', error as Error);
     }
   }
 
-  /**
-   * Rollback to savepoint
-   */
   private async rollbackToSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.adapter.rollbackToSavepoint(connection, name);
   }
 
-  /**
-   * Check if in transaction
-   */
   isInTransaction(connection: DatabaseConnection): boolean {
     const stack = this.transactionStack.get(connection);
     return stack !== undefined && stack.length > 0;
   }
 
-  /**
-   * Get transaction level
-   */
   getTransactionLevel(connection: DatabaseConnection): number {
     const stack = this.transactionStack.get(connection);
     return stack ? stack.length : 0;
   }
 
-  /**
-   * Get active transactions info
-   */
   getActiveTransactions(): Map<DatabaseConnection, TransactionState[]> {
     return new Map(this.transactionStack);
   }
 
-  /**
-   * Execute in transaction
-   */
   async executeInTransaction<T>(
     connection: DatabaseConnection,
     operation: () => Promise<T>,
@@ -283,23 +237,14 @@ export class TransactionManager {
     }
   }
 
-  /**
-   * Clear transaction state (for cleanup)
-   */
   clearTransactionState(connection: DatabaseConnection): void {
     this.transactionStack.delete(connection);
   }
 
-  /**
-   * Generate unique savepoint name
-   */
   private generateSavepointName(): string {
     return `sp_${Date.now()}_${++this.savepointCounter}`;
   }
 
-  /**
-   * Get transaction statistics
-   */
   getTransactionStats(): {
     activeTransactions: number;
     totalSavepoints: number;

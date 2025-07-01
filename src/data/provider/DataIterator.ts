@@ -4,10 +4,6 @@ import { TestData, IteratorOptions, IteratorState } from '../types/data.types';
 import { logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Iterator for test data
- * Supports various iteration patterns for data-driven testing
- */
 export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
     private data: TestData[];
     private currentIndex: number = 0;
@@ -42,22 +38,16 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         this.initialize();
     }
 
-    /**
-     * Initialize iterator
-     */
     private initialize(): void {
-        // Apply filter if specified
         if (this.options.filter) {
             this.data = this.data.filter(this.options.filter);
             this.state.totalItems = this.data.length;
         }
         
-        // Apply shuffle if specified
         if (this.options.shuffle) {
             this.shuffleData();
         }
         
-        // Apply skip
         if (this.options.skip && this.options.skip > 0) {
             this.currentIndex = Math.min(this.options.skip, this.data.length);
         }
@@ -65,11 +55,7 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         logger.debug(`DataIterator initialized with ${this.state.totalItems} items`);
     }
 
-    /**
-     * Iterator protocol implementation
-     */
     next(): IteratorResult<TestData> {
-        // Check if we've reached the end
         if (this.isComplete()) {
             if (this.options.loop) {
                 this.reset();
@@ -78,7 +64,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
             }
         }
         
-        // Get next item
         const item = this.getNextItem();
         if (!item) {
             return { done: true, value: undefined };
@@ -87,18 +72,11 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return { done: false, value: item };
     }
 
-    /**
-     * Make iterator iterable
-     */
     [Symbol.iterator](): Iterator<TestData> {
         return this;
     }
 
-    /**
-     * Get next item with hooks
-     */
     private getNextItem(): TestData | null {
-        // Skip if index is in skip set
         while (this.skipIndices.has(this.currentIndex) && this.currentIndex < this.data.length) {
             this.currentIndex++;
         }
@@ -107,7 +85,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
             return null;
         }
         
-        // Check take limit
         if (this.options.take && this.state.iterationCount >= this.options.take) {
             return null;
         }
@@ -117,7 +94,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
             return null;
         }
         
-        // Execute before hook
         if (this.options.onBeforeIteration && item) {
             try {
                 this.options.onBeforeIteration(item, this.currentIndex, this.state);
@@ -126,13 +102,11 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
             }
         }
         
-        // Mark as processed
         this.processedIndices.add(this.currentIndex);
         this.currentIndex++;
         this.state.currentIndex = this.currentIndex;
         this.state.iterationCount++;
         
-        // Execute after hook
         if (this.options.onAfterIteration && item) {
             try {
                 this.options.onAfterIteration(item, this.currentIndex - 1, this.state);
@@ -151,9 +125,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return item || null;
     }
 
-    /**
-     * Get next batch of items
-     */
     nextBatch(): TestData[] {
         const batch: TestData[] = [];
         const batchSize = this.options.batchSize || 1;
@@ -176,9 +147,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return batch;
     }
 
-    /**
-     * Get all remaining items
-     */
     remaining(): TestData[] {
         const remaining: TestData[] = [];
         let result = this.next();
@@ -191,9 +159,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return remaining;
     }
 
-    /**
-     * Peek at next item without advancing
-     */
     peek(): TestData | null {
         if (this.isComplete()) return null;
         
@@ -209,9 +174,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return null;
     }
 
-    /**
-     * Skip current item
-     */
     skip(): void {
         if (this.currentIndex < this.data.length) {
             this.skipIndices.add(this.currentIndex);
@@ -220,18 +182,12 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         }
     }
 
-    /**
-     * Skip multiple items
-     */
     skipMany(count: number): void {
         for (let i = 0; i < count; i++) {
             this.skip();
         }
     }
 
-    /**
-     * Reset iterator
-     */
     reset(): void {
         this.currentIndex = this.options.skip !== undefined ? this.options.skip : 0;
         this.state.currentIndex = this.currentIndex;
@@ -239,7 +195,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         this.state.batchCount = 0;
         this.processedIndices.clear();
         
-        // Re-shuffle if needed
         if (this.options.shuffle) {
             this.shuffleData();
         }
@@ -247,15 +202,11 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         logger.debug('DataIterator reset');
     }
 
-    /**
-     * Check if iteration is complete
-     */
     isComplete(): boolean {
         if (this.options.take && this.state.iterationCount >= this.options.take) {
             return true;
         }
         
-        // Check if all non-skipped items have been processed
         for (let i = this.currentIndex; i < this.data.length; i++) {
             if (!this.skipIndices.has(i)) {
                 return false;
@@ -265,9 +216,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return true;
     }
 
-    /**
-     * Get current state
-     */
     getState(): IteratorState {
         return {
             ...this.state,
@@ -279,9 +227,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         };
     }
 
-    /**
-     * Get remaining count
-     */
     getRemainingCount(): number {
         let remaining = 0;
         for (let i = this.currentIndex; i < this.data.length; i++) {
@@ -297,9 +242,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return remaining;
     }
 
-    /**
-     * Process all items in parallel
-     */
     async processParallel<T>(
         processor: (item: TestData, index: number) => Promise<T>,
         maxConcurrency: number = 5
@@ -325,7 +267,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         for (let i = 0; i < this.data.length; i++) {
             if (this.skipIndices.has(i)) continue;
             
-            // Wait if we've reached max concurrency
             while (activeCount >= maxConcurrency) {
                 await Promise.race(promises);
                 activeCount--;
@@ -338,15 +279,11 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
             activeCount++;
         }
         
-        // Wait for all remaining promises
         await Promise.all(promises);
         
         return results;
     }
 
-    /**
-     * Convert to array
-     */
     toArray(): TestData[] {
         const results: TestData[] = [];
         let current = this.next();
@@ -357,9 +294,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return results;
     }
 
-    /**
-     * Apply transformation to all items
-     */
     map<T>(transform: (item: TestData, index: number) => T): T[] {
         const results: T[] = [];
         let index = 0;
@@ -373,9 +307,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return results;
     }
 
-    /**
-     * Filter items
-     */
     filter(predicate: (item: TestData, index: number) => boolean): TestData[] {
         const results: TestData[] = [];
         let index = 0;
@@ -391,9 +322,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return results;
     }
 
-    /**
-     * Find first matching item
-     */
     find(predicate: (item: TestData, index: number) => boolean): TestData | undefined {
         let index = 0;
         
@@ -408,9 +336,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         return undefined;
     }
 
-    /**
-     * Execute function for each item
-     */
     forEach(callback: (item: TestData, index: number) => void): void {
         let index = 0;
         
@@ -421,9 +346,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         }
     }
 
-    /**
-     * Shuffle data
-     */
     private shuffleData(): void {
         for (let i = this.data.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -438,9 +360,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         logger.debug('Data shuffled');
     }
 
-    /**
-     * Handle iteration error
-     */
     private handleError(error: any, item: TestData): void {
         const errorInfo = {
             message: error.message,
@@ -458,9 +377,6 @@ export class DataIterator implements Iterator<TestData>, Iterable<TestData> {
         }
     }
 
-    /**
-     * Get statistics
-     */
     getStatistics(): Record<string, any> {
         return {
             totalItems: this.state.totalItems,

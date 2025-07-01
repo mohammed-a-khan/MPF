@@ -41,7 +41,6 @@ export class ElementFeatureExtractor {
   async quickExtract(
     element: Element
   ): Promise<ElementFeatures> {
-    // Quick extraction for confidence scoring
     const rect = element.getBoundingClientRect();
     const styles = window.getComputedStyle(element);
     
@@ -104,14 +103,12 @@ export class ElementFeatureExtractor {
       const content = el.textContent?.trim() || '';
       const visibleText = this.getVisibleText(el as Element);
       
-      // Extract different text sources
       const ariaLabel = (el as Element).getAttribute('aria-label') || '';
       const title = (el as Element).getAttribute('title') || '';
       const placeholder = (el as HTMLInputElement).placeholder || '';
       const value = (el as HTMLInputElement).value || '';
       const alt = (el as HTMLImageElement).alt || '';
       
-      // Analyze text patterns
       const hasNumbers = /\d/.test(content);
       const hasUppercase = /[A-Z]/.test(content);
       const hasSpecialChars = /[^a-zA-Z0-9\s]/.test(content);
@@ -140,7 +137,6 @@ export class ElementFeatureExtractor {
       const rect = (el as Element).getBoundingClientRect();
       const styles = window.getComputedStyle(el as Element);
       
-      // Check visibility
       const isVisible = !!(
         rect.width > 0 &&
         rect.height > 0 &&
@@ -149,7 +145,6 @@ export class ElementFeatureExtractor {
         parseFloat(styles.opacity) > 0
       );
       
-      // Check if in viewport
       const inViewport = (
         rect.top >= 0 &&
         rect.left >= 0 &&
@@ -157,19 +152,16 @@ export class ElementFeatureExtractor {
         rect.right <= window.innerWidth
       );
       
-      // Calculate contrast ratio
       const hasHighContrast = this.calculateContrast(
         styles.color,
         styles.backgroundColor
       ) > 4.5;
       
-      // Check for animations
       const hasAnimation = !!(
         styles.animation !== 'none' ||
         styles.transition !== 'none 0s ease 0s'
       );
       
-      // Extract visual hierarchy indicators
       const visualWeight = this.calculateVisualWeight(styles);
       
       return {
@@ -206,20 +198,16 @@ export class ElementFeatureExtractor {
 
   private async extractStructuralFeatures(element: ElementHandle): Promise<StructuralFeatures> {
     return element.evaluate(el => {
-      // Collect attributes
       const attributes: Record<string, string> = {};
       Array.from((el as Element).attributes).forEach((attr: Attr) => {
         attributes[attr.name] = attr.value;
       });
       
-      // Check if interactive
       const isInteractive = this.isInteractiveElement(el as Element);
       
-      // Get structural hierarchy
       const path = this.getElementPath(el as Element);
       const depth = path.length;
       
-      // Check form relationship
       const form = (el as Element).closest('form');
       const formElement = !!(form && (
         (el as Element).tagName === 'INPUT' ||
@@ -228,7 +216,6 @@ export class ElementFeatureExtractor {
         (el as Element).tagName === 'BUTTON'
       ));
       
-      // Get sibling information
       const parent = el.parentElement;
       const siblings = parent ? Array.from(parent.children) : [];
       const siblingIndex = siblings.indexOf(el as Element);
@@ -262,7 +249,6 @@ export class ElementFeatureExtractor {
 
   private async extractSemanticFeatures(element: ElementHandle): Promise<SemanticFeatures> {
     return element.evaluate(el => {
-      // Define inferRole locally
       const inferRole = (element: Element): string => {
         const tagName = element.tagName.toLowerCase();
         
@@ -295,25 +281,20 @@ export class ElementFeatureExtractor {
       const ariaDescribedBy = (el as Element).getAttribute('aria-describedby');
       const ariaLabelledBy = (el as Element).getAttribute('aria-labelledby');
       
-      // Check if landmark
       const landmarkRoles = ['banner', 'complementary', 'contentinfo', 'form', 
                            'main', 'navigation', 'region', 'search'];
       const isLandmark = landmarkRoles.includes(role);
       
-      // Get heading level
       const headingMatch = (el as Element).tagName.match(/^H(\d)$/);
       const headingLevel = headingMatch ? parseInt(headingMatch[1] || '0') : 0;
       
-      // Check list context
       const listItem = !!((el as Element).closest('li') || (el as Element).tagName === 'LI');
       const listContainer = (el as Element).closest('ul, ol, dl');
       
-      // Check table context
       const tableCell = !!((el as Element).closest('td, th') || ['TD', 'TH'].includes((el as Element).tagName));
       const tableRow = (el as Element).closest('tr');
       const table = (el as Element).closest('table');
       
-      // Get semantic meaning
       const semanticType = this.getSemanticType(el as Element);
       
       return {
@@ -343,18 +324,15 @@ export class ElementFeatureExtractor {
     return element.evaluate(el => {
       const parent = el.parentElement;
       
-      // Get parent context
       const parentTag = parent?.tagName.toLowerCase() || '';
       const parentText = parent?.textContent?.trim().substring(0, 100) || '';
       
-      // Get sibling texts
       const siblings = parent ? Array.from(parent.children) : [];
       const siblingTexts = siblings
         .filter(sibling => sibling !== el)
         .map(sibling => sibling.textContent?.trim().substring(0, 50))
         .filter(Boolean) as string[];
       
-      // Find nearby heading
       let nearbyHeading = '';
       let currentEl = el as Element | null;
       while (currentEl && !nearbyHeading) {
@@ -366,7 +344,6 @@ export class ElementFeatureExtractor {
         currentEl = currentEl.parentElement;
       }
       
-      // Get label text
       let labelText = '';
       if ((el as Element).id) {
         const label = document.querySelector(`label[for="${(el as Element).id}"]`);
@@ -377,11 +354,9 @@ export class ElementFeatureExtractor {
         labelText = parentLabel?.textContent?.trim() || '';
       }
       
-      // Get form context
       const form = (el as Element).closest('form');
       const formId = form?.id || '';
       
-      // Get table headers if in table
       const tableHeaders: string[] = [];
       if ((el as Element).tagName === 'TD') {
         const cell = el as HTMLTableCellElement;
@@ -396,7 +371,6 @@ export class ElementFeatureExtractor {
         }
       }
       
-      // Get position relative to landmarks
       const landmarks = document.querySelectorAll('[role="banner"], [role="main"], [role="navigation"], nav, main, header');
       const nearestLandmark = Array.from(landmarks).find(landmark => 
         landmark.contains(el as Node)
@@ -421,7 +395,6 @@ export class ElementFeatureExtractor {
   }
 
   private getVisibleText(element: Element): string {
-    // Get only visible text, excluding hidden elements
     const walker = document.createTreeWalker(
       element,
       NodeFilter.SHOW_TEXT,
@@ -454,7 +427,6 @@ export class ElementFeatureExtractor {
   }
 
   private calculateContrast(color: string, backgroundColor: string): number {
-    // Simple contrast calculation
     const rgb1 = this.parseColor(color);
     const rgb2 = this.parseColor(backgroundColor);
     
@@ -470,7 +442,6 @@ export class ElementFeatureExtractor {
   }
 
   private parseColor(color: string): { r: number; g: number; b: number } | null {
-    // Parse rgb/rgba colors
     const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
     if (match) {
       return {
@@ -495,26 +466,21 @@ export class ElementFeatureExtractor {
   private calculateVisualWeight(styles: CSSStyleDeclaration): number {
     let weight = 0;
     
-    // Font size
     const fontSize = parseInt(styles.fontSize);
     if (fontSize > 20) weight += 0.3;
     else if (fontSize > 16) weight += 0.2;
     else if (fontSize > 14) weight += 0.1;
     
-    // Font weight
     const fontWeight = styles.fontWeight;
     if (fontWeight === 'bold' || parseInt(fontWeight) >= 600) weight += 0.2;
     
-    // Colors
     if (styles.color !== 'rgb(0, 0, 0)' && styles.color !== 'inherit') weight += 0.1;
     if (styles.backgroundColor !== 'rgba(0, 0, 0, 0)' && 
         styles.backgroundColor !== 'transparent') weight += 0.1;
     
-    // Borders and shadows
     if (styles.borderStyle !== 'none') weight += 0.1;
     if (styles.boxShadow !== 'none') weight += 0.1;
     
-    // Position
     if (styles.position === 'fixed' || styles.position === 'sticky') weight += 0.1;
     
     return Math.min(weight, 1);
@@ -565,26 +531,21 @@ export class ElementFeatureExtractor {
     return path;
   }
 
-  // Removed unused inferRole method - now defined inline where needed
-  // This method was previously defined here but is now defined inside evaluate context
 
   private getSemanticType(element: Element): string {
     const tagName = element.tagName.toLowerCase();
     const role = element.getAttribute('role');
     const type = (element as HTMLInputElement).type;
     
-    // Input types
     if (tagName === 'input') {
       return `input-${type || 'text'}`;
     }
     
-    // Buttons
     if (tagName === 'button' || role === 'button') {
       const buttonType = (element as HTMLButtonElement).type;
       return `button-${buttonType || 'button'}`;
     }
     
-    // Links
     if (tagName === 'a') {
       const href = (element as HTMLAnchorElement).href;
       if (href.startsWith('mailto:')) return 'link-email';
@@ -593,15 +554,12 @@ export class ElementFeatureExtractor {
       return 'link-navigation';
     }
     
-    // Lists
     if (tagName === 'ul') return 'list-unordered';
     if (tagName === 'ol') return 'list-ordered';
     if (tagName === 'dl') return 'list-definition';
     
-    // Headings
     if (/^h[1-6]$/.test(tagName)) return `heading-${tagName.slice(1)}`;
     
-    // Default to tag name
     return tagName;
   }
 
@@ -613,7 +571,6 @@ export class ElementFeatureExtractor {
     const fragment = range.cloneContents();
     const text = fragment.textContent?.trim() || '';
     
-    // Get last 50 characters
     return text.slice(-50);
   }
 
@@ -625,7 +582,6 @@ export class ElementFeatureExtractor {
     const fragment = range.cloneContents();
     const text = fragment.textContent?.trim() || '';
     
-    // Get first 50 characters
     return text.slice(0, 50);
   }
 

@@ -1,9 +1,3 @@
-/**
- * CS Test Automation Framework - Production Logging Utility
- * 
- * Enterprise-grade logging with structured output, multiple transports,
- * log rotation, and performance tracking.
- */
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -106,7 +100,6 @@ export class Logger extends EventEmitter {
     this.metadata = { ...this.config.metadata };
     this.transports = [...this.config.transports];
 
-    // Defer exception handling to avoid accessing other singletons during construction
     setImmediate(() => {
       if (this.config.handleExceptions) {
         this.handleExceptions();
@@ -129,7 +122,6 @@ export class Logger extends EventEmitter {
     Logger.defaultConfig = { ...Logger.defaultConfig, ...config };
   }
 
-  // Core logging methods
   public trace(message: string, metadata?: Record<string, any>): void {
     this.log(LogLevel.TRACE, message, metadata);
   }
@@ -166,7 +158,6 @@ export class Logger extends EventEmitter {
     }
   }
 
-  // Performance logging
   public time(label: string): void {
     this.timers.set(label, performance.now());
   }
@@ -180,7 +171,6 @@ export class Logger extends EventEmitter {
     }
   }
 
-  // Structured logging
   public child(metadata: Record<string, any>): Logger {
     const childConfig = {
       ...this.config,
@@ -189,7 +179,6 @@ export class Logger extends EventEmitter {
     return new Logger(childConfig);
   }
 
-  // Profile method
   public profile(id: string, metadata?: Record<string, any>): void {
     const time = this.timers.get(id);
     if (time) {
@@ -199,7 +188,6 @@ export class Logger extends EventEmitter {
     }
   }
 
-  // Configuration methods
   public setLevel(level: LogLevel): void {
     this.config.level = level;
   }
@@ -228,7 +216,6 @@ export class Logger extends EventEmitter {
     this.isSilent = silent;
   }
 
-  // Core logging implementation
   private log(level: LogLevel, message: string, metadata?: Record<string, any>): void {
     if (this.isSilent || level < this.config.level) {
       return;
@@ -246,13 +233,11 @@ export class Logger extends EventEmitter {
       correlationId: metadata?.['correlationId'] || this.metadata['correlationId']
     };
 
-    // Handle error objects
     if (metadata?.['error'] instanceof Error) {
       info.error = metadata['error'];
       info.stack = this.formatStack(metadata['error']);
     }
 
-    // Emit to transports
     this.transports.forEach(transport => {
       if (!transport.level || level >= transport.level) {
         try {
@@ -268,7 +253,6 @@ export class Logger extends EventEmitter {
       }
     });
 
-    // Emit event
     this.emit('logged', info);
   }
 
@@ -279,7 +263,6 @@ export class Logger extends EventEmitter {
       stack: this.formatStack(error)
     };
 
-    // Include additional error properties
     Object.getOwnPropertyNames(error).forEach(key => {
       if (!['name', 'message', 'stack'].includes(key)) {
         serialized[key] = (error as any)[key];
@@ -308,7 +291,6 @@ export class Logger extends EventEmitter {
         const defaultLogger = Logger.instances.get('default');
         if (defaultLogger) {
           defaultLogger.error('Uncaught Exception', error);
-          // Only exit on critical errors, not network or resource loading errors
           if (defaultLogger.config.exitOnError && !this.isNetworkError(error)) {
             process.exit(1);
           } else {
@@ -340,8 +322,6 @@ export class Logger extends EventEmitter {
         const defaultLogger = Logger.instances.get('default');
         if (defaultLogger) {
           defaultLogger.error('Unhandled Rejection', new Error(String(reason)), { promise });
-          // Don't exit process on unhandled rejections - just log and continue
-          // This prevents framework crashes due to network errors or resource loading failures
           defaultLogger.warn('Continuing execution despite unhandled rejection');
         }
       });
@@ -359,7 +339,6 @@ export class Logger extends EventEmitter {
   }
 }
 
-// Default format function
 const defaultFormat: LogFormat = (info: LogInfo): string => {
   const timestamp = info.timestamp.toISOString();
   const level = info.levelName.padEnd(5);
@@ -377,7 +356,6 @@ const defaultFormat: LogFormat = (info: LogInfo): string => {
   return message;
 };
 
-// Console Transport
 export class ConsoleTransport implements LogTransport {
   public name = 'console';
   public level?: LogLevel;
@@ -412,7 +390,6 @@ export class ConsoleTransport implements LogTransport {
   }
 }
 
-// File Transport with rotation
 export class FileTransport implements LogTransport {
   public name = 'file';
   public level?: LogLevel;
@@ -459,7 +436,6 @@ export class FileTransport implements LogTransport {
       console.error('FileTransport stream error:', error);
     });
 
-    // Get current file size
     try {
       const stats = fs.statSync(this.filename);
       this.currentSize = stats.size;
@@ -521,34 +497,28 @@ export class FileTransport implements LogTransport {
   private async rotate(): Promise<void> {
     if (!this.stream) return;
 
-    // Close current stream
     this.stream.end();
 
-    // Generate new filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const ext = path.extname(this.filename);
     const base = path.basename(this.filename, ext);
     const dir = path.dirname(this.filename);
     const rotatedFilename = path.join(dir, `${base}-${timestamp}${ext}`);
 
-    // Rename current file
     try {
       await fs.promises.rename(this.filename, rotatedFilename);
     } catch (error) {
       console.error('Failed to rotate log file:', error);
     }
 
-    // Compress if enabled
     if (this.rotationOptions.compress || this.rotationOptions.zippedArchive) {
       this.compressFile(rotatedFilename);
     }
 
-    // Clean up old files
     if (this.rotationOptions.maxFiles) {
       this.cleanupOldFiles();
     }
 
-    // Open new stream
     this.currentSize = 0;
     this.openStream();
   }
@@ -583,14 +553,12 @@ export class FileTransport implements LogTransport {
       }))
       .sort((a, b) => b.time - a.time);
 
-    // Remove old files
     const maxFiles = this.rotationOptions.maxFiles!;
     if (logFiles.length > maxFiles) {
       const toDelete = logFiles.slice(maxFiles);
       await Promise.all(toDelete.map(f => fs.promises.unlink(f.path)));
     }
 
-    // Remove files older than maxAge
     if (this.rotationOptions.maxAge) {
       const maxAge = Date.now() - this.rotationOptions.maxAge;
       const oldFiles = logFiles.filter(f => f.time < maxAge);
@@ -599,11 +567,10 @@ export class FileTransport implements LogTransport {
   }
 
   private startRotationWorker(): void {
-    // Time-based rotation implementation
     if (this.rotationOptions.maxAge) {
       setInterval(() => {
         this.checkRotation();
-      }, 60000); // Check every minute
+      }, 60000);
     }
   }
 
@@ -620,7 +587,6 @@ export class FileTransport implements LogTransport {
   }
 }
 
-// JSON format
 export const jsonFormat: LogFormat = (info: LogInfo): string => {
   return JSON.stringify({
     timestamp: info.timestamp.toISOString(),
@@ -636,15 +602,14 @@ export const jsonFormat: LogFormat = (info: LogInfo): string => {
   });
 };
 
-// Pretty format with colors
 export const prettyFormat: LogFormat = (info: LogInfo): string => {
   const colors = {
-    TRACE: '\x1b[37m',    // White
-    DEBUG: '\x1b[36m',    // Cyan
-    INFO: '\x1b[32m',     // Green
-    WARN: '\x1b[33m',     // Yellow
-    ERROR: '\x1b[31m',    // Red
-    FATAL: '\x1b[35m',    // Magenta
+    TRACE: '\x1b[37m',
+    DEBUG: '\x1b[36m',
+    INFO: '\x1b[32m',
+    WARN: '\x1b[33m',
+    ERROR: '\x1b[31m',
+    FATAL: '\x1b[35m',
     RESET: '\x1b[0m'
   };
 
@@ -667,17 +632,15 @@ export const prettyFormat: LogFormat = (info: LogInfo): string => {
   return message;
 };
 
-// Syslog levels mapping
 export const syslogLevels = {
-  [LogLevel.TRACE]: 7,  // Debug
-  [LogLevel.DEBUG]: 7,  // Debug
-  [LogLevel.INFO]: 6,   // Informational
+  [LogLevel.TRACE]: 7,
+  [LogLevel.DEBUG]: 7,
+  [LogLevel.INFO]: 6,
   [LogLevel.WARN]: 4,   // Warning
-  [LogLevel.ERROR]: 3,  // Error
+  [LogLevel.ERROR]: 3,
   [LogLevel.FATAL]: 2   // Critical
 };
 
-// Export singleton instance using lazy initialization
 let _logger: Logger | null = null;
 
 export const logger = {
@@ -688,7 +651,6 @@ export const logger = {
     return _logger;
   },
   
-  // Proxy methods for backward compatibility
   trace(message: string, metadata?: Record<string, any>): void {
     this.getInstance().trace(message, metadata);
   },

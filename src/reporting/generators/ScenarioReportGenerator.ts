@@ -26,20 +26,6 @@ import {
 import { Logger } from '../../core/utils/Logger';
 import { HookType } from '../../bdd/types/bdd.types';
 
-/**
- * Scenario Report Generator - Creates Detailed Scenario-Level Reports
- * 
- * Generates comprehensive scenario reports with:
- * - Step-by-step execution details
- * - Rich action timeline
- * - Visual evidence gallery
- * - Network activity analysis
- * - Performance metrics
- * - Error diagnostics
- * - AI healing insights
- * 
- * Production-ready implementation with zero dependencies.
- */
 
 interface ScenarioPerformanceMetrics {
   totalDuration: number;
@@ -52,9 +38,6 @@ interface ScenarioPerformanceMetrics {
 export class ScenarioReportGenerator {
   private readonly logger = Logger.getInstance();
   
-  /**
-   * Generate scenario reports HTML
-   */
   async generateScenarioReports(scenarios: ScenarioReport[], theme: ReportTheme): Promise<string> {
     this.logger.info(`Generating scenario reports for ${scenarios.length} scenarios`);
     
@@ -71,9 +54,6 @@ ${this.generateScenarioStyles(theme)}
 ${this.generateScenarioScripts()}`;
   }
 
-  /**
-   * Generate scenario filters
-   */
   private generateScenarioFilters(scenarios: ScenarioReport[]): string {
     const features = [...new Set(scenarios.map((s: ScenarioReport) => s.feature))];
     const tags = [...new Set(scenarios.flatMap((s: ScenarioReport) => s.tags))];
@@ -159,9 +139,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate detailed scenario report
-   */
   private generateDetailedScenarioReport(scenario: ScenarioReport, index: number, theme: ReportTheme): string {
     const hasDataSet = scenario.dataSet !== undefined;
     const hasRetries = scenario.retryCount > 0;
@@ -199,9 +176,6 @@ ${this.generateScenarioScripts()}`;
 </article>`;
   }
 
-  /**
-   * Generate scenario header
-   */
   private generateScenarioHeader(scenario: ScenarioReport, theme: ReportTheme): string {
     const statusColor = STATUS_COLORS[scenario.status] || theme.primaryColor;
     
@@ -246,9 +220,6 @@ ${this.generateScenarioScripts()}`;
 </header>`;
   }
 
-  /**
-   * Generate scenario metadata
-   */
   private generateScenarioMetadata(scenario: ScenarioReport): string {
     return `
 <section class="scenario-metadata">
@@ -299,9 +270,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate data set information
-   */
   private generateDataSetInfo(dataSet: DataSetInfo): string {
     return `
 <section class="data-set-info">
@@ -329,9 +297,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate retry information
-   */
   private generateRetryInfo(scenario: ScenarioReport): string {
     return `
 <section class="retry-info">
@@ -345,9 +310,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate execution timeline
-   */
   private generateExecutionTimeline(scenario: ScenarioReport): string {
     const totalDuration = scenario.endTime.getTime() - scenario.startTime.getTime();
     const steps = scenario.steps;
@@ -399,9 +361,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate timeline segment
-   */
   private generateTimelineSegment(item: any, type: string, startTime: Date, totalDuration: number): string {
     const itemStart = item.startTime ? new Date(item.startTime).getTime() : 0;
     const itemEnd = item.endTime ? new Date(item.endTime).getTime() : itemStart + item.duration;
@@ -416,9 +375,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate steps section
-   */
   private generateStepsSection(scenario: ScenarioReport): string {
     return `
 <section class="steps-section">
@@ -450,9 +406,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate hook
-   */
   private generateHook(hook: HookReport): string {
     return `
 <div class="hook ${hook.status}">
@@ -475,9 +428,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate detailed step
-   */
   private generateDetailedStep(step: StepReport, index: number): string {
     const hasAttachments = step.embeddings.length > 0 || 
                           step.rows || 
@@ -553,9 +503,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate step data table
-   */
   private generateStepDataTable(rows: DataTableRow[]): string {
     return `
 <div class="step-data-table">
@@ -572,9 +519,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate step doc string
-   */
   private generateStepDocString(docString: DocString): string {
     return `
 <div class="step-doc-string">
@@ -583,9 +527,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate step actions
-   */
   private generateStepActions(actions: ActionLog[]): string {
     return `
 <div class="step-actions">
@@ -638,9 +579,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate element info
-   */
   private generateElementInfo(elementInfo: ElementInfo): string {
     return `
 <div class="element-info">
@@ -689,9 +627,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate step embeddings
-   */
   private generateStepEmbeddings(embeddings: Embedding[]): string {
     return `
 <div class="step-embeddings">
@@ -733,9 +668,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate step error
-   */
   private generateStepError(error: ErrorDetails): string {
     return `
 <div class="step-error-details">
@@ -765,9 +697,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate step screenshot
-   */
   private generateStepScreenshot(screenshot: string): string {
     return `
 <div class="step-screenshot">
@@ -778,9 +707,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate action timeline
-   */
   private generateActionTimeline(scenario: ScenarioReport): string {
     const allActions = scenario.steps.flatMap(step => step.actions);
     if (allActions.length === 0) return '';
@@ -818,9 +744,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate action type breakdown
-   */
   private generateActionTypeBreakdown(actions: ActionLog[]): string {
     const typeCount: Record<string, number> = {};
     actions.forEach((action: ActionLog) => {
@@ -845,9 +768,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate action timeline visualization
-   */
   private generateActionTimelineVisualization(actions: ActionLog[], scenario: ScenarioReport): string {
     if (actions.length === 0) return '';
     
@@ -873,9 +793,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate performance metrics
-   */
   private generatePerformanceMetrics(scenario: ScenarioReport): string {
     const metrics = this.calculatePerformanceMetrics(scenario);
     
@@ -966,9 +883,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate network activity section
-   */
   private generateNetworkActivity(scenario: ScenarioReport): string {
     const networkLogs = scenario.networkLogs || [];
     if (networkLogs.length === 0) return '';
@@ -1016,9 +930,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate network log entry
-   */
   private generateNetworkLogEntry(log: NetworkLog, index: number, scenario: ScenarioReport): string {
     const startOffset = log.startTime ? log.startTime.getTime() - scenario.startTime.getTime() : 0;
     const duration = log.endTime && log.startTime ? log.endTime.getTime() - log.startTime.getTime() : 0;
@@ -1087,15 +998,11 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate network breakdown
-   */
   private generateNetworkBreakdown(networkLogs: NetworkLog[]): string {
     const byType: Record<string, { count: number; size: number }> = {};
     const byStatus: Record<string, number> = {};
     
     networkLogs.forEach((log: NetworkLog) => {
-      // By type
       const resourceType = log.resourceType || 'unknown';
       if (!byType[resourceType]) {
         byType[resourceType] = { count: 0, size: 0 };
@@ -1103,7 +1010,6 @@ ${this.generateScenarioScripts()}`;
       byType[resourceType].count++;
       byType[resourceType].size += log.size || 0;
       
-      // By status
       const statusGroup = `${Math.floor(log.status / 100)}xx`;
       byStatus[statusGroup] = (byStatus[statusGroup] || 0) + 1;
     });
@@ -1150,9 +1056,6 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  /**
-   * Generate evidence gallery
-   */
   private generateEvidenceGallery(scenario: ScenarioReport): string {
     const screenshots = this.collectAllScreenshots(scenario);
     const videos = scenario.videos || [];
@@ -1199,9 +1102,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate error diagnostics
-   */
   private generateErrorDiagnostics(error: ErrorDetails): string {
     return `
 <section class="error-diagnostics">
@@ -1254,9 +1154,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate AI healing section
-   */
   private generateAIHealingSection(healingAttempts: AIHealingAttempt[]): string {
     return `
 <section class="ai-healing-section">
@@ -1337,9 +1234,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate console logs section
-   */
   private generateConsoleLogs(scenario: ScenarioReport): string {
     const consoleLogs = scenario.consoleLogs || [];
     if (consoleLogs.length === 0) return '';
@@ -1400,9 +1294,6 @@ ${this.generateScenarioScripts()}`;
 </section>`;
   }
 
-  /**
-   * Generate scenario actions
-   */
   private generateScenarioActions(scenario: ScenarioReport): string {
     return `
 <div class="scenario-actions">
@@ -1436,11 +1327,7 @@ ${this.generateScenarioScripts()}`;
 </div>`;
   }
 
-  // ========== Helper Methods ==========
 
-  /**
-   * Format duration
-   */
   private formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
     if (ms < 60000) return `${(ms / 1000).toFixed(2)}s`;
@@ -1449,9 +1336,6 @@ ${this.generateScenarioScripts()}`;
     return `${minutes}m ${seconds}s`;
   }
 
-  /**
-   * Format date time
-   */
   private formatDateTime(date: Date): string {
     const dateStr = date.toLocaleString('en-US', {
       year: 'numeric',
@@ -1465,9 +1349,6 @@ ${this.generateScenarioScripts()}`;
     return `${dateStr}.${milliseconds}`;
   }
 
-  /**
-   * Format time only
-   */
   private formatTime(date: Date): string {
     const timeStr = date.toLocaleTimeString('en-US', {
       hour: '2-digit',
@@ -1478,30 +1359,20 @@ ${this.generateScenarioScripts()}`;
     return `${timeStr}.${milliseconds}`;
   }
 
-  /**
-   * Format total duration
-   */
   private formatTotalDuration(scenarios: ScenarioReport[]): string {
     const total = scenarios.reduce((sum, s) => sum + s.duration, 0);
     return this.formatDuration(total);
   }
 
-  /**
-   * Format average duration
-   */
   private formatAvgDuration(scenarios: ScenarioReport[]): string {
     if (scenarios.length === 0) return '0ms';
     const avg = scenarios.reduce((sum, s) => sum + s.duration, 0) / scenarios.length;
     return this.formatDuration(Math.round(avg));
   }
 
-  /**
-   * Get evidence count
-   */
   private getEvidenceCount(scenario: ScenarioReport): number {
     let count = 0;
     
-    // Screenshots
     scenario.steps.forEach(step => {
       if (step.result.screenshot) count++;
       step.actions.forEach(action => {
@@ -1510,18 +1381,13 @@ ${this.generateScenarioScripts()}`;
       count += step.embeddings.filter(e => e.mimeType.startsWith('image/')).length;
     });
     
-    // Videos
     count += (scenario.videos || []).length;
     
-    // Network logs
     count += (scenario.networkLogs || []).length;
     
     return count;
   }
 
-  /**
-   * Format parameter value
-   */
   private formatParameterValue(value: any): string {
     if (value === null) return 'null';
     if (value === undefined) return 'undefined';
@@ -1530,9 +1396,6 @@ ${this.generateScenarioScripts()}`;
     return String(value);
   }
 
-  /**
-   * Highlight step parameters
-   */
   private highlightStepParameters(text: string, match?: any): string {
     if (!match || !match.arguments) return this.escapeHtml(text);
     
@@ -1549,9 +1412,6 @@ ${this.generateScenarioScripts()}`;
     return highlightedText;
   }
 
-  /**
-   * Format step location
-   */
   private formatStepLocation(location: string | undefined): string {
     if (!location) return '';
     const parts = location.split(':');
@@ -1562,9 +1422,6 @@ ${this.generateScenarioScripts()}`;
     return location;
   }
 
-  /**
-   * Get action type label
-   */
   private getActionTypeLabel(type: ActionType): string {
     const labels: Record<ActionType, string> = {
       [ActionType.NAVIGATION]: 'Navigation',
@@ -1581,9 +1438,6 @@ ${this.generateScenarioScripts()}`;
     return labels[type] || type;
   }
 
-  /**
-   * Get action type color
-   */
   private getActionTypeColor(type: ActionType): string {
     const colors: Record<ActionType, string> = {
       [ActionType.NAVIGATION]: '#4CAF50',
@@ -1600,18 +1454,12 @@ ${this.generateScenarioScripts()}`;
     return colors[type] || '#757575';
   }
 
-  /**
-   * Calculate average action duration
-   */
   private calculateAvgActionDuration(actions: ActionLog[]): number {
     if (actions.length === 0) return 0;
     const total = actions.reduce((sum, action) => sum + action.duration, 0);
     return Math.round(total / actions.length);
   }
 
-  /**
-   * Calculate performance metrics
-   */
   private calculatePerformanceMetrics(scenario: ScenarioReport): ScenarioPerformanceMetrics {
     const allActions = scenario.steps.flatMap(step => step.actions);
     
@@ -1625,36 +1473,28 @@ ${this.generateScenarioScripts()}`;
     };
   }
 
-  /**
-   * Generate performance insights
-   */
   private generatePerformanceInsights(metrics: ScenarioPerformanceMetrics, scenario: ScenarioReport): string {
     const insights: string[] = [];
     
-    // Duration insights
     if (metrics.totalDuration > 60000) {
       insights.push(`<li class="insight warning">Scenario took ${this.formatDuration(metrics.totalDuration)}, consider optimization</li>`);
     } else if (metrics.totalDuration < 5000) {
       insights.push(`<li class="insight success">Excellent performance - completed in ${this.formatDuration(metrics.totalDuration)}</li>`);
     }
     
-    // Step insights
     if (metrics.avgStepDuration > 5000) {
       insights.push(`<li class="insight warning">Average step duration is high (${metrics.avgStepDuration}ms)</li>`);
     }
     
-    // Network insights
     if (metrics.networkRequests > 50) {
       insights.push(`<li class="insight info">High network activity detected (${metrics.networkRequests} requests)</li>`);
     }
     
-    // Find slowest step
     const slowestStep = scenario.steps.reduce((prev, current) => 
       prev.duration > current.duration ? prev : current
     );
     insights.push(`<li class="insight info">Slowest step: "${slowestStep.text}" (${slowestStep.duration}ms)</li>`);
     
-    // Success rate
     if (metrics.successRate === 100) {
       insights.push(`<li class="insight success">All steps passed successfully</li>`);
     } else if (metrics.successRate < 50) {
@@ -1664,17 +1504,11 @@ ${this.generateScenarioScripts()}`;
     return insights.join('');
   }
 
-  /**
-   * Calculate total data transferred
-   */
   private calculateTotalDataTransferred(networkLogs: NetworkLog[]): string {
     const total = networkLogs.reduce((sum, log) => sum + (log.size || 0), 0);
     return this.formatBytes(total);
   }
 
-  /**
-   * Calculate average response time
-   */
   private calculateAvgResponseTime(networkLogs: NetworkLog[]): number {
     if (networkLogs.length === 0) return 0;
     const total = networkLogs.reduce((sum, log) => {
@@ -1684,9 +1518,6 @@ ${this.generateScenarioScripts()}`;
     return Math.round(total / networkLogs.length);
   }
 
-  /**
-   * Format bytes
-   */
   private formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -1695,9 +1526,6 @@ ${this.generateScenarioScripts()}`;
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
-  /**
-   * Truncate URL
-   */
   private truncateUrl(url: string): string {
     if (url.length <= 50) return url;
     const urlObj = new URL(url);
@@ -1708,9 +1536,6 @@ ${this.generateScenarioScripts()}`;
     return urlObj.hostname + path;
   }
 
-  /**
-   * Format request body
-   */
   private formatRequestBody(body: any): string {
     if (typeof body === 'string') {
       try {
@@ -1723,9 +1548,6 @@ ${this.generateScenarioScripts()}`;
     return JSON.stringify(body, null, 2);
   }
 
-  /**
-   * Format response body
-   */
   private formatResponseBody(body: any, contentType?: string): string {
     if (!contentType) return String(body);
     
@@ -1745,14 +1567,10 @@ ${this.generateScenarioScripts()}`;
     return String(body);
   }
 
-  /**
-   * Collect all screenshots
-   */
   private collectAllScreenshots(scenario: ScenarioReport): Screenshot[] {
     const screenshots: Screenshot[] = [];
     
     scenario.steps.forEach((step: StepReport, stepIndex: number) => {
-      // Step screenshots
       if (step.result.screenshot) {
         screenshots.push({
           id: `step-${stepIndex}`,
@@ -1768,7 +1586,6 @@ ${this.generateScenarioScripts()}`;
         } as Screenshot);
       }
       
-      // Action screenshots
       step.actions.forEach((action: ActionLog, actionIndex: number) => {
         if (action.screenshot) {
           screenshots.push({
@@ -1786,7 +1603,6 @@ ${this.generateScenarioScripts()}`;
         }
       });
       
-      // Embedded screenshots
       step.embeddings.forEach((embed: Embedding, embedIndex: number) => {
         if (embed.mimeType.startsWith('image/')) {
           screenshots.push({
@@ -1809,22 +1625,15 @@ ${this.generateScenarioScripts()}`;
     return screenshots;
   }
 
-  /**
-   * Format stack trace
-   */
   private formatStackTrace(stack: string): string {
     return stack
       .split('\n')
       .map((line: string) => {
-        // Highlight file paths
         return line.replace(/(\S+\.(ts|js):\d+:\d+)/g, '<span class="stack-file">$1</span>');
       })
       .join('\n');
   }
 
-  /**
-   * Analyze stack trace
-   */
   private analyzeStackTrace(stack: string): string {
     const lines = stack.split('\n');
     const userCode = lines.find(line => 
@@ -1847,9 +1656,6 @@ ${this.generateScenarioScripts()}`;
     return '<div class="stack-analysis-result">Unable to determine exact error location</div>';
   }
 
-  /**
-   * Format context value
-   */
   private formatContextValue(value: any): string {
     if (typeof value === 'object') {
       return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
@@ -1857,13 +1663,9 @@ ${this.generateScenarioScripts()}`;
     return String(value);
   }
 
-  /**
-   * Generate error suggestions
-   */
   private generateErrorSuggestions(error: ErrorDetails): string {
     const suggestions: string[] = [];
     
-    // Element not found errors
     if (error.message.toLowerCase().includes('element not found') || 
         error.message.toLowerCase().includes('no element')) {
       suggestions.push('Verify the element selector is correct');
@@ -1872,7 +1674,6 @@ ${this.generateScenarioScripts()}`;
       suggestions.push('Enable AI healing for automatic element recovery');
     }
     
-    // Timeout errors
     if (error.message.toLowerCase().includes('timeout')) {
       suggestions.push('Increase the timeout value in configuration');
       suggestions.push('Check if the page is loading correctly');
@@ -1880,7 +1681,6 @@ ${this.generateScenarioScripts()}`;
       suggestions.push('Check for JavaScript errors blocking page load');
     }
     
-    // Click interception errors
     if (error.message.toLowerCase().includes('intercept')) {
       suggestions.push('Wait for overlapping elements to disappear');
       suggestions.push('Scroll element into view before clicking');
@@ -1888,7 +1688,6 @@ ${this.generateScenarioScripts()}`;
       suggestions.push('Check for modal dialogs or overlays');
     }
     
-    // Network errors
     if (error.message.toLowerCase().includes('network') || 
         error.message.toLowerCase().includes('fetch')) {
       suggestions.push('Verify API endpoint is correct');
@@ -1900,28 +1699,20 @@ ${this.generateScenarioScripts()}`;
     return suggestions.map(s => `<li>${s}</li>`).join('');
   }
 
-  /**
-   * Calculate average confidence
-   */
   private calculateAvgConfidence(attempts: AIHealingAttempt[]): number {
     if (attempts.length === 0) return 0;
     const total = attempts.reduce((sum: number, attempt: AIHealingAttempt) => sum + attempt.confidence, 0);
     return Math.round((total / attempts.length) * 100);
   }
 
-  /**
-   * Generate healing recommendations
-   */
   private generateHealingRecommendations(attempts: AIHealingAttempt[]): string {
     const recommendations: string[] = [];
     
-    // Low confidence healing
     const lowConfidence = attempts.filter(a => a.confidence < 0.7);
     if (lowConfidence.length > 0) {
       recommendations.push('Some elements were healed with low confidence - consider updating locators manually');
     }
     
-    // Frequently healed elements
     const elementCounts: Record<string, number> = {};
     attempts.forEach(attempt => {
       elementCounts[attempt.elementDescription] = (elementCounts[attempt.elementDescription] || 0) + 1;
@@ -1933,7 +1724,6 @@ ${this.generateScenarioScripts()}`;
       }
     });
     
-    // Strategy effectiveness
     const strategySuccess: Record<string, { total: number; success: number }> = {};
     attempts.forEach(attempt => {
       const strategy = attempt.strategy;
@@ -1960,11 +1750,7 @@ ${this.generateScenarioScripts()}`;
     return recommendations.map(r => `<li>${r}</li>`).join('');
   }
 
-  /**
-   * Format log message
-   */
   private formatLogMessage(message: string): string {
-    // Format JSON in log messages
     const jsonMatch = message.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
@@ -1972,34 +1758,25 @@ ${this.generateScenarioScripts()}`;
         const formatted = JSON.stringify(json, null, 2);
         return message.replace(jsonMatch[0], `<pre class="log-json">${formatted}</pre>`);
       } catch {
-        // Not valid JSON, continue
       }
     }
     
-    // Highlight URLs
     return message.replace(
       /(https?:\/\/[^\s]+)/g,
       '<a href="$1" target="_blank" class="log-url">$1</a>'
     );
   }
 
-  /**
-   * Escape HTML
-   */
   private escapeHtml(text: string): string {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
   }
 
-  /**
-   * Generate scenario styles
-   */
   private generateScenarioStyles(theme: ReportTheme): string {
     const primaryDark = theme.colors?.primaryDark || theme.primaryColor;
     return `
 <style>
-/* Scenario Reports Styles */
 .scenario-reports {
     display: flex;
     gap: 30px;
@@ -2132,7 +1909,6 @@ ${this.generateScenarioScripts()}`;
     gap: 20px;
 }
 
-/* Scenario Report Card */
 .scenario-report {
     background: white;
     border-radius: 12px;
@@ -2149,7 +1925,6 @@ ${this.generateScenarioScripts()}`;
     box-shadow: 0 4px 16px rgba(0,0,0,0.15);
 }
 
-/* Scenario Header */
 .scenario-header {
     display: flex;
     align-items: center;
@@ -2249,7 +2024,6 @@ ${this.generateScenarioScripts()}`;
     fill: currentColor;
 }
 
-/* Scenario Body */
 .scenario-body {
     padding: 0;
 }
@@ -2270,7 +2044,6 @@ ${this.generateScenarioScripts()}`;
     color: #1a1a1a;
 }
 
-/* Metadata Grid */
 .metadata-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -2309,7 +2082,6 @@ ${this.generateScenarioScripts()}`;
     margin-right: 4px;
 }
 
-/* Data Set Info */
 .data-set-info {
     background: #f9fafb;
 }
@@ -2369,7 +2141,6 @@ ${this.generateScenarioScripts()}`;
     font-size: 13px;
 }
 
-/* Retry Info */
 .retry-info {
     background: #fef3c7;
     display: flex;
@@ -2400,7 +2171,6 @@ ${this.generateScenarioScripts()}`;
     font-size: 14px;
 }
 
-/* Execution Timeline */
 .timeline-visualization {
     background: #f9fafb;
     border-radius: 8px;
@@ -2491,7 +2261,6 @@ ${this.generateScenarioScripts()}`;
     background: #6366f1;
 }
 
-/* Steps Section */
 .hooks-container {
     margin-bottom: 16px;
 }
@@ -2546,7 +2315,6 @@ ${this.generateScenarioScripts()}`;
     border-radius: 4px;
 }
 
-/* Step Container */
 .step-container {
     background: white;
     border: 1px solid #e5e7eb;
@@ -2681,7 +2449,6 @@ ${this.generateScenarioScripts()}`;
     transform: rotate(180deg);
 }
 
-/* Step Details */
 .step-details {
     display: none;
     padding: 0 16px 16px 64px;
@@ -2734,7 +2501,6 @@ ${this.generateScenarioScripts()}`;
     overflow-x: auto;
 }
 
-/* Actions Timeline */
 .actions-timeline {
     position: relative;
     padding-left: 20px;
@@ -2916,7 +2682,6 @@ ${this.generateScenarioScripts()}`;
     transform: scale(1.05);
 }
 
-/* Element Info */
 .element-info {
     margin-top: 8px;
 }
@@ -2968,7 +2733,6 @@ ${this.generateScenarioScripts()}`;
     gap: 4px;
 }
 
-/* Embeddings */
 .embeddings-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -3014,7 +2778,6 @@ ${this.generateScenarioScripts()}`;
     color: #666;
 }
 
-/* Step Error */
 .step-error-details {
     background: #fef2f2;
     border: 1px solid #fecaca;
@@ -3079,7 +2842,6 @@ ${this.generateScenarioScripts()}`;
     color: #333;
 }
 
-/* Step Screenshot */
 .step-screenshot img {
     max-width: 100%;
     border: 1px solid #e5e7eb;
@@ -3087,7 +2849,6 @@ ${this.generateScenarioScripts()}`;
     cursor: pointer;
 }
 
-/* Inline Error */
 .step-inline-error {
     padding: 8px 16px 8px 64px;
     background: #fef2f2;
@@ -3096,7 +2857,6 @@ ${this.generateScenarioScripts()}`;
     border-top: 1px solid #fecaca;
 }
 
-/* Action Timeline Section */
 .action-timeline-section {
     background: #f9fafb;
 }
@@ -3199,7 +2959,6 @@ ${this.generateScenarioScripts()}`;
     opacity: 1;
 }
 
-/* Performance Metrics */
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -3322,7 +3081,6 @@ ${this.generateScenarioScripts()}`;
     background: #3b82f6;
 }
 
-/* Network Activity */
 .network-summary {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -3596,7 +3354,6 @@ ${this.generateScenarioScripts()}`;
     background: #ef4444;
 }
 
-/* Evidence Gallery */
 .screenshots-section,
 .videos-section {
     margin-bottom: 20px;
@@ -3685,7 +3442,6 @@ ${this.generateScenarioScripts()}`;
     text-align: center;
 }
 
-/* Error Diagnostics */
 .error-summary {
     display: flex;
     gap: 16px;
@@ -3830,7 +3586,6 @@ ${this.generateScenarioScripts()}`;
     flex-shrink: 0;
 }
 
-/* AI Healing Section */
 .healing-summary {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -3998,7 +3753,6 @@ ${this.generateScenarioScripts()}`;
     flex-shrink: 0;
 }
 
-/* Console Logs Section */
 .logs-filter {
     display: flex;
     gap: 12px;
@@ -4158,7 +3912,6 @@ ${this.generateScenarioScripts()}`;
     overflow-x: auto;
 }
 
-/* Scenario Footer */
 .scenario-footer {
     display: flex;
     justify-content: flex-end;
@@ -4206,7 +3959,6 @@ ${this.generateScenarioScripts()}`;
     transform: rotate(180deg);
 }
 
-/* Responsive Design */
 @media (max-width: 1200px) {
     .scenario-reports {
         flex-direction: column;
@@ -4258,7 +4010,6 @@ ${this.generateScenarioScripts()}`;
     }
 }
 
-/* Print Styles */
 @media print {
     .scenario-filters,
     .scenario-actions,
@@ -4282,17 +4033,12 @@ ${this.generateScenarioScripts()}`;
 </style>`;
   }
 
-  /**
-   * Generate scenario scripts
-   */
   private generateScenarioScripts(): string {
     return `
 <script>
-// Scenario report interactions
 (function() {
     'use strict';
     
-    // Toggle step details
     window.toggleStepDetails = function(stepIndex) {
         const details = document.getElementById('step-details-' + stepIndex);
         const button = event.currentTarget;
@@ -4304,7 +4050,6 @@ ${this.generateScenarioScripts()}`;
         }
     };
     
-    // Toggle network details
     window.toggleNetworkDetails = function(index) {
         const details = document.getElementById('network-details-' + index);
         if (details) {
@@ -4312,7 +4057,6 @@ ${this.generateScenarioScripts()}`;
         }
     };
     
-    // Toggle all scenario details
     window.toggleAllScenarioDetails = function(button) {
         const allDetails = document.querySelectorAll('.step-details, .network-details');
         const isExpanded = button.classList.contains('expanded');
@@ -4330,7 +4074,6 @@ ${this.generateScenarioScripts()}`;
         button.lastChild.textContent = isExpanded ? ' Collapse All' : ' Expand All';
     };
     
-    // Image modal
     window.openImageModal = function(src) {
         const modal = document.createElement('div');
         modal.className = 'image-modal';
@@ -4354,7 +4097,6 @@ ${this.generateScenarioScripts()}`;
         }
     };
     
-    // Scenario filtering
     function initializeFiltering() {
         const applyButton = document.querySelector('.btn-apply-filters');
         const resetButton = document.querySelector('.btn-reset-filters');
@@ -4367,7 +4109,6 @@ ${this.generateScenarioScripts()}`;
             resetButton.addEventListener('click', resetFilters);
         }
         
-        // Initialize duration sliders
         const durationMin = document.getElementById('duration-min');
         const durationMax = document.getElementById('duration-max');
         const durationMinLabel = document.getElementById('duration-min-label');
@@ -4385,7 +4126,6 @@ ${this.generateScenarioScripts()}`;
             });
         }
         
-        // Initialize multi-select
         const selects = document.querySelectorAll('.filter-select');
         selects.forEach(select => {
             select.addEventListener('change', function() {
@@ -4417,22 +4157,18 @@ ${this.generateScenarioScripts()}`;
             
             let show = true;
             
-            // Status filter
             if (statusFilters.length > 0 && !statusFilters.includes('all')) {
                 show = show && statusFilters.includes(status);
             }
             
-            // Feature filter
             if (featureFilter && feature !== featureFilter) {
                 show = false;
             }
             
-            // Tag filter
             if (tagFilter && !tags.includes(tagFilter)) {
                 show = false;
             }
             
-            // Duration filter
             if (duration < durationMin || duration > durationMax) {
                 show = false;
             }
@@ -4445,7 +4181,6 @@ ${this.generateScenarioScripts()}`;
             }
         });
         
-        // Update stats
         document.getElementById('visible-scenarios').textContent = visibleCount;
         document.getElementById('total-duration').textContent = formatDuration(totalDuration);
         document.getElementById('avg-duration').textContent = 
@@ -4453,27 +4188,22 @@ ${this.generateScenarioScripts()}`;
     }
     
     function resetFilters() {
-        // Reset checkboxes
         document.querySelectorAll('input[name="status"]').forEach(cb => {
             cb.checked = cb.value === 'all';
         });
         
-        // Reset selects
         document.getElementById('feature-filter').value = '';
         document.getElementById('tag-filter').value = '';
         
-        // Reset sliders
         document.getElementById('duration-min').value = '0';
         document.getElementById('duration-max').value = '60000';
         document.getElementById('duration-min-label').textContent = '0s';
         document.getElementById('duration-max-label').textContent = '60s';
         
-        // Show all scenarios
         document.querySelectorAll('.scenario-report').forEach(scenario => {
             scenario.classList.remove('hidden');
         });
         
-        // Reset stats
         const totalScenarios = document.querySelectorAll('.scenario-report').length;
         document.getElementById('visible-scenarios').textContent = totalScenarios;
     }
@@ -4486,7 +4216,6 @@ ${this.generateScenarioScripts()}`;
         return minutes + 'm ' + seconds + 's';
     }
     
-    // Console log filtering
     function initializeLogFiltering() {
         const logFilters = document.querySelectorAll('input[name="log-level"]');
         
@@ -4502,17 +4231,14 @@ ${this.generateScenarioScripts()}`;
         });
     }
     
-    // Scenario actions
     window.rerunScenario = function(scenarioId) {
         console.log('Rerun scenario:', scenarioId);
-        // Implement rerun logic
         alert('Rerun functionality would be implemented here');
     };
     
     window.exportScenario = function(scenarioId) {
         const scenario = document.querySelector(\`[data-scenario-id="\${scenarioId}"]\`);
         if (scenario) {
-            // Create a temporary container
             const container = document.createElement('div');
             container.innerHTML = \`
                 <html>
@@ -4526,7 +4252,6 @@ ${this.generateScenarioScripts()}`;
                 </html>
             \`;
             
-            // Create blob and download
             const blob = new Blob([container.innerHTML], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -4555,7 +4280,6 @@ ${this.generateScenarioScripts()}`;
         }
     };
     
-    // Smooth scroll to scenario
     function scrollToScenario() {
         const hash = window.location.hash.substring(1);
         if (hash) {
@@ -4567,32 +4291,26 @@ ${this.generateScenarioScripts()}`;
         }
     }
     
-    // Initialize on load
     document.addEventListener('DOMContentLoaded', function() {
         initializeFiltering();
         initializeLogFiltering();
         scrollToScenario();
     });
     
-    // Handle hash changes
     window.addEventListener('hashchange', scrollToScenario);
     
-    // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        // Ctrl/Cmd + F to focus filter
         if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
             e.preventDefault();
             document.querySelector('.filter-section input')?.focus();
         }
         
-        // Escape to close image modal
         if (e.key === 'Escape') {
             closeImageModal();
         }
     });
 })();
 
-// Add highlight animation
 const style = document.createElement('style');
 style.textContent = \`
 @keyframes highlight {

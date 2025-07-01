@@ -13,7 +13,7 @@ export class FeatureFileParser {
   private readonly lexer: GherkinLexer;
   private readonly parser: GherkinParser;
   private readonly featureCache: Map<string, { feature: Feature; timestamp: number }> = new Map();
-  private readonly cacheTimeout: number = 5000; // 5 seconds
+  private readonly cacheTimeout: number = 5000;
   private readonly encoding: BufferEncoding = 'utf-8';
   private readonly featureFileExtension: string = '.feature';
   
@@ -35,23 +35,18 @@ export class FeatureFileParser {
     ActionLogger.logInfo('[PARSER] Starting file parse', { operation: 'parseFile', filePath });
     
     try {
-      // Validate file exists and is a feature file
       await this.validateFilePath(filePath);
       
-      // Check cache first
       const cached = this.getCachedFeature(filePath);
       if (cached) {
         logger.debug(`Using cached feature for: ${filePath}`);
         return cached;
       }
       
-      // Read file content
       const content = await this.readFeatureFile(filePath);
       
-      // Parse the feature
       const feature = await this.parseContent(content, filePath);
       
-      // Cache the result
       this.cacheFeature(filePath, feature);
       
       const duration = Date.now() - startTime;
@@ -66,7 +61,6 @@ export class FeatureFileParser {
       
       const parseError = new ParseError(message, line, column, filePath);
       
-      // Preserve stack trace if available
       if (error instanceof Error && error.stack) {
         parseError.stack = error.stack;
       }
@@ -82,10 +76,8 @@ export class FeatureFileParser {
     ActionLogger.logInfo('[PARSER] Starting pattern parse', { operation: 'parseAll', pattern });
     
     try {
-      // Handle both string and array patterns
       const patternString = Array.isArray(pattern) ? pattern.join(',') : pattern;
       
-      // Find all matching feature files
       const files = await this.findFeatureFiles(patternString);
       
       if (files.length === 0) {
@@ -95,20 +87,17 @@ export class FeatureFileParser {
       
       logger.info(`Found ${files.length} feature files to parse`);
       
-      // Parse all files in parallel with error handling
       const parsePromises = files.map(async (file) => {
         try {
           return await this.parseFile(file);
         } catch (error) {
           logger.error(`Failed to parse ${file}: ${error instanceof Error ? error.message : String(error)}`);
-          // Return null for failed parses, filter out later
           return null;
         }
       });
       
       const results = await Promise.all(parsePromises);
       
-      // Filter out failed parses
       const features = results.filter(feature => feature !== null) as Feature[];
       
       const duration = Date.now() - startTime;
@@ -135,21 +124,16 @@ export class FeatureFileParser {
   
   async parseContent(content: string, filePath: string): Promise<Feature> {
     try {
-      // Normalize line endings
       const normalizedContent = this.normalizeLineEndings(content);
       
-      // Tokenize the content
       const tokens = this.lexer.tokenize(normalizedContent, filePath);
       
-      // Parse tokens into feature
       const feature = this.parser.parse(tokens, filePath);
       
       
-      // Set file information
       feature.uri = filePath;
       feature.name = feature.name || path.basename(filePath, this.featureFileExtension);
       
-      // Validate the parsed feature
       const validation = await this.validate(feature);
       if (!validation.valid) {
         throw new Error(`Feature validation failed: ${validation.errors.map(e => e.message).join(', ')}`);
@@ -159,10 +143,9 @@ export class FeatureFileParser {
       
     } catch (error) {
       if (error instanceof Error && 'line' in error) {
-        throw error; // Already a parse error
+        throw error;
       }
       
-      // Convert the error to a proper Error object instead of throwing a plain object
       const errorMessage = error instanceof Error ? error.message : String(error);
       const parseError = new ParseError(errorMessage, 0, 0, filePath);
       
@@ -177,7 +160,6 @@ export class FeatureFileParser {
   async validate(feature: Feature): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
     
-    // Validate feature structure
     if (!feature.name || feature.name.trim() === '') {
       errors.push({ type: 'validation', message: 'Feature must have a name', stepText: '', severity: 'error' });
     }
@@ -186,7 +168,6 @@ export class FeatureFileParser {
       errors.push({ type: 'validation', message: 'Feature must have at least one scenario', stepText: '', severity: 'error' });
     }
     
-    // Validate scenarios
     feature.scenarios.forEach((scenario, index) => {
       if (!scenario.name || scenario.name.trim() === '') {
         errors.push({ type: 'validation', message: `Scenario at index ${index} must have a name`, stepText: '', severity: 'error' });
@@ -196,7 +177,6 @@ export class FeatureFileParser {
         errors.push({ type: 'validation', message: `Scenario "${scenario.name}" must have at least one step`, stepText: scenario.name, severity: 'error' });
       }
       
-      // Validate steps
       scenario.steps.forEach((step, stepIndex) => {
         if (!step.text || step.text.trim() === '') {
           errors.push({ type: 'validation', message: `Step at index ${stepIndex} in scenario "${scenario.name}" must have text`, stepText: scenario.name, severity: 'error' });
@@ -207,19 +187,15 @@ export class FeatureFileParser {
         }
       });
       
-      // Validate scenario outline
       if (scenario.type === 'scenario_outline') {
-        // Check if scenario has @DataProvider tag
         const hasDataProvider = scenario.tags.some(tag => 
           tag.startsWith('@DataProvider') || tag.includes('DataProvider(')
         );
         
-        // Only require examples if there's no @DataProvider
         if ((!scenario.examples || scenario.examples.length === 0) && !hasDataProvider) {
           errors.push({ type: 'validation', message: `Scenario Outline "${scenario.name}" must have examples or @DataProvider tag`, stepText: scenario.name, severity: 'error' });
         }
         
-        // Check if all placeholders in steps exist in examples (only if not using @DataProvider)
         if (!hasDataProvider && scenario.examples && scenario.examples.length > 0) {
           const placeholders = this.extractPlaceholders(scenario);
           const exampleHeaders = scenario.examples[0]?.header || [];
@@ -233,10 +209,8 @@ export class FeatureFileParser {
       }
     });
     
-    // Validate tags
     this.validateTags(feature, errors);
     
-    // Validate unique scenario names
     const scenarioNames = new Set<string>();
     feature.scenarios.forEach(scenario => {
       if (scenarioNames.has(scenario.name)) {
@@ -253,18 +227,15 @@ export class FeatureFileParser {
   }
   
   private async validateFilePath(filePath: string): Promise<void> {
-    // Check if file exists
     const exists = await FileUtils.exists(filePath);
     if (!exists) {
       throw new Error(`Feature file not found: ${filePath}`);
     }
     
-    // Check if it's a feature file
     if (!filePath.endsWith(this.featureFileExtension)) {
       throw new Error(`Invalid file extension. Expected ${this.featureFileExtension}: ${filePath}`);
     }
     
-    // Check if it's a file (not directory)
     const stats = await fs.stat(filePath);
     if (!stats.isFile()) {
       throw new Error(`Path is not a file: ${filePath}`);
@@ -275,10 +246,8 @@ export class FeatureFileParser {
     try {
       const content = await fs.readFile(filePath, { encoding: this.encoding });
       
-      // Check for BOM and remove if present
       const bomRemoved = this.removeBOM(content);
       
-      // Validate content is not empty
       if (!bomRemoved || bomRemoved.trim() === '') {
         throw new Error('Feature file is empty');
       }
@@ -304,13 +273,11 @@ export class FeatureFileParser {
 
   private async findFeatureFiles(pattern: string): Promise<string[]> {
     try {
-      // Support multiple patterns separated by comma
       const patterns = pattern.split(',').map(p => p.trim());
       
       const allFiles = new Set<string>();
       
       for (const singlePattern of patterns) {
-        // Handle direct file paths
         if (singlePattern.endsWith(this.featureFileExtension) && !singlePattern.includes('*')) {
           const exists = await FileUtils.exists(singlePattern);
           if (exists) {
@@ -319,17 +286,15 @@ export class FeatureFileParser {
           continue;
         }
         
-        // Handle glob patterns with timeout
         const globPattern = singlePattern.includes('*') 
           ? singlePattern 
           : `${singlePattern}/**/*${this.featureFileExtension}`;
           
-        // Add timeout to prevent hanging
         const globPromise = glob(globPattern, {
           absolute: true,
           nodir: true,
           ignore: ['**/node_modules/**', '**/dist/**', '**/build/**'],
-          maxDepth: 10 // Limit search depth
+          maxDepth: 10
         });
         
         const timeoutPromise = new Promise<string[]>((_, reject) => {
@@ -352,12 +317,10 @@ export class FeatureFileParser {
   }
   
   private normalizeLineEndings(content: string): string {
-    // Normalize to LF
     return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   }
   
   private removeBOM(content: string): string {
-    // Remove UTF-8 BOM if present
     if (content.charCodeAt(0) === 0xFEFF) {
       return content.slice(1);
     }
@@ -371,7 +334,6 @@ export class FeatureFileParser {
       return null;
     }
     
-    // Check if cache is still valid
     const age = Date.now() - cached.timestamp;
     if (age > this.cacheTimeout) {
       this.featureCache.delete(filePath);
@@ -387,13 +349,10 @@ export class FeatureFileParser {
       timestamp: Date.now()
     });
     
-    // Limit cache size
     if (this.featureCache.size > 100) {
-      // Remove oldest entries
       const entries = Array.from(this.featureCache.entries());
       entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
       
-      // Remove oldest 20 entries
       for (let i = 0; i < 20; i++) {
         const entry = entries[i];
         if (entry) {
@@ -407,16 +366,14 @@ export class FeatureFileParser {
     const placeholders = new Set<string>();
     
     scenario.steps.forEach((step: any) => {
-      // Extract placeholders from step text
       const matches = step.text.match(/<([^>]+)>/g);
       if (matches) {
         matches.forEach((match: string) => {
-          const placeholder = match.slice(1, -1); // Remove < and >
+          const placeholder = match.slice(1, -1);
           placeholders.add(placeholder);
         });
       }
       
-      // Check data table cells
       if (step.dataTable) {
         step.dataTable.rows.forEach((row: any) => {
           row.cells.forEach((cell: any) => {
@@ -431,7 +388,6 @@ export class FeatureFileParser {
         });
       }
       
-      // Check doc string
       if (step.docString) {
         const docMatches = step.docString.content.match(/<([^>]+)>/g);
         if (docMatches) {
@@ -447,21 +403,18 @@ export class FeatureFileParser {
   }
   
   private validateTags(feature: Feature, errors: ValidationError[]): void {
-    // Validate feature tags
     if (feature.tags) {
       feature.tags.forEach(tag => {
         if (!tag.startsWith('@')) {
           errors.push({ type: 'validation', message: `Invalid tag format: "${tag}". Tags must start with @`, stepText: tag, severity: 'error' });
         }
         
-        // Allow more flexible tag format for special tags like @DataProvider
         if (!/^@[a-zA-Z0-9_:\-]+(\([^)]*\))?$/.test(tag)) {
           errors.push({ type: 'validation', message: `Invalid tag format: "${tag}". Tags must follow the pattern @tagname or @tagname(parameters)`, stepText: tag, severity: 'error' });
         }
       });
     }
     
-    // Validate scenario tags
     feature.scenarios.forEach(scenario => {
       if (scenario.tags) {
         scenario.tags.forEach(tag => {
@@ -469,7 +422,6 @@ export class FeatureFileParser {
             errors.push({ type: 'validation', message: `Invalid tag format in scenario "${scenario.name}": "${tag}"`, stepText: tag, severity: 'error' });
           }
           
-          // Allow more flexible tag format for special tags like @DataProvider
           if (!/^@[a-zA-Z0-9_:\-]+(\([^)]*\))?$/.test(tag)) {
             errors.push({ type: 'validation', message: `Invalid tag format in scenario "${scenario.name}": "${tag}"`, stepText: tag, severity: 'error' });
           }
@@ -492,5 +444,4 @@ export class FeatureFileParser {
   }
 }
 
-// Export singleton instance
 export const featureFileParser = FeatureFileParser.getInstance();

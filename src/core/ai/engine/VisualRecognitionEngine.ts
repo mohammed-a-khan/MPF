@@ -11,9 +11,8 @@ import {
 
 export class VisualRecognitionEngine {
   private static instance: VisualRecognitionEngine;
-  private readonly edgeThreshold = 30; // Gradient threshold for edge detection
+  private readonly edgeThreshold = 30;
   
-  // 🔥 REAL MEMORY MANAGEMENT - Caches for visual patterns
   private visualMatchCache = new Map<string, ImageMatch[]>();
   private elementVisualCache = new Map<string, VisualData>();
   private screenshotComparisonCache = new Map<string, ScreenshotComparison>();
@@ -26,10 +25,8 @@ export class VisualRecognitionEngine {
     const startTime = Date.now();
     
     try {
-      // Take screenshot of current page
       const pageScreenshot = await page.screenshot({ fullPage: true });
       
-      // Get all potentially matching regions
       const matches = await this.findImageInImage(
         targetImage,
         pageScreenshot,
@@ -40,7 +37,6 @@ export class VisualRecognitionEngine {
         throw new Error('No visual matches found on the page');
       }
       
-      // Convert best match coordinates to element
       const bestMatch = matches[0];
       if (!bestMatch) {
         throw new Error('No valid match found');
@@ -123,12 +119,9 @@ export class VisualRecognitionEngine {
   }
   
   private async processImage(imageBuffer: Buffer): Promise<VisualData> {
-    // Convert buffer to pixel data
-    // In a real implementation, you'd use a library like sharp or jimp
-    // For now, we'll simulate the processing
     
     const pixels = this.bufferToPixels(imageBuffer);
-    const width = Math.floor(Math.sqrt(pixels.length / 4)); // Rough estimate
+    const width = Math.floor(Math.sqrt(pixels.length / 4));
     const height = Math.floor(pixels.length / 4 / width);
     
     const colors = this.extractColorHistogram(pixels, width, height);
@@ -144,8 +137,6 @@ export class VisualRecognitionEngine {
   }
   
   private bufferToPixels(buffer: Buffer): Uint8Array {
-    // Simulate pixel extraction from PNG buffer
-    // In production, use proper image decoding library
     return new Uint8Array(buffer);
   }
   
@@ -157,7 +148,6 @@ export class VisualRecognitionEngine {
     const histogram: Record<string, number> = {};
     const colorCounts: Record<string, number> = {};
     
-    // Process every 4th pixel for performance
     for (let i = 0; i < pixels.length; i += 16) {
       const r = Math.floor((pixels[i] ?? 0) / 4) * 4;
       const g = Math.floor((pixels[i + 1] ?? 0) / 4) * 4;
@@ -167,13 +157,11 @@ export class VisualRecognitionEngine {
       colorCounts[color] = (colorCounts[color] || 0) + 1;
     }
     
-    // Normalize to distribution
     const totalPixels = pixels.length / 16;
     for (const [color, count] of Object.entries(colorCounts)) {
       histogram[color] = count / totalPixels;
     }
     
-    // Find dominant colors
     const sortedColors = Object.entries(histogram)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
@@ -193,13 +181,11 @@ export class VisualRecognitionEngine {
     const horizontal: number[][] = [];
     const vertical: number[][] = [];
     
-    // Sobel edge detection (simplified)
     for (let y = 1; y < height - 1; y++) {
       horizontal[y] = [];
       vertical[y] = [];
       
       for (let x = 1; x < width - 1; x++) {
-        // Calculate gradients
         const gx = this.sobelX(pixels, x, y, width);
         const gy = this.sobelY(pixels, x, y, width);
         
@@ -241,19 +227,14 @@ export class VisualRecognitionEngine {
   }
   
   private calculateVisualSimilarity(visual1: VisualData, visual2: VisualData): number {
-    // Structural Similarity Index (SSIM) - simplified version
     const ssim = this.calculateSSIM(visual1, visual2);
     
-    // Color histogram comparison
     const colorSim = this.compareColorHistograms(visual1.colors, visual2.colors);
     
-    // Shape comparison via edge maps
     const shapeSim = this.compareShapes(visual1.edges, visual2.edges);
     
-    // Size similarity
     const sizeSim = this.compareSizes(visual1, visual2);
     
-    // Weighted combination
     const totalSimilarity = 
       ssim * 0.4 +
       colorSim * 0.3 +
@@ -273,9 +254,7 @@ export class VisualRecognitionEngine {
   }
   
   private calculateSSIM(visual1: VisualData, visual2: VisualData): number {
-    // Simplified SSIM calculation
     if (visual1.width !== visual2.width || visual1.height !== visual2.height) {
-      // Different sizes, calculate based on scaled comparison
       return this.calculateScaledSSIM(visual1, visual2);
     }
     
@@ -285,7 +264,6 @@ export class VisualRecognitionEngine {
     let sum = 0;
     let count = 0;
     
-    // Sample every 100th pixel for performance
     for (let i = 0; i < pixels1.length && i < pixels2.length; i += 400) {
       const l1 = ((pixels1[i] ?? 0) + (pixels1[i + 1] ?? 0) + (pixels1[i + 2] ?? 0)) / 3;
       const l2 = ((pixels2[i] ?? 0) + (pixels2[i + 1] ?? 0) + (pixels2[i + 2] ?? 0)) / 3;
@@ -299,19 +277,15 @@ export class VisualRecognitionEngine {
   }
   
   private calculateScaledSSIM(visual1: VisualData, visual2: VisualData): number {
-    // Compare at the scale of the smaller image
     const scale = Math.min(
       visual1.width / visual2.width,
       visual1.height / visual2.height
     );
     
-    // This is a simplified comparison
-    // In production, you'd properly scale and compare images
-    return 0.7 * scale; // Penalty for size difference
+    return 0.7 * scale;
   }
   
   private compareColorHistograms(hist1: ColorHistogram, hist2: ColorHistogram): number {
-    // Bhattacharyya coefficient for histogram comparison
     let sum = 0;
     const allColors = new Set([
       ...Object.keys(hist1.distribution),
@@ -324,7 +298,6 @@ export class VisualRecognitionEngine {
       sum += Math.sqrt(p1 * p2);
     }
     
-    // Also compare dominant colors
     const dominantSim = this.compareDominantColors(hist1.dominant, hist2.dominant);
     
     return (sum + dominantSim) / 2;
@@ -344,7 +317,6 @@ export class VisualRecognitionEngine {
   }
   
   private compareShapes(edges1: EdgeMap, edges2: EdgeMap): number {
-    // Compare edge distributions
     const h1 = this.edgeDistribution(edges1.horizontal);
     const h2 = this.edgeDistribution(edges2.horizontal);
     const v1 = this.edgeDistribution(edges1.vertical);
@@ -370,7 +342,6 @@ export class VisualRecognitionEngine {
     
     if (total === 0) return distribution;
     
-    // Create a simple distribution of edge positions
     for (let i = 0; i < edges.length; i++) {
       const bucket = Math.floor(i / edges.length * 10);
       let rowEdges = 0;
@@ -404,7 +375,6 @@ export class VisualRecognitionEngine {
     
     const ratio = Math.min(area1, area2) / Math.max(area1, area2);
     
-    // Also consider aspect ratio
     const aspectRatio1 = visual1.width / visual1.height;
     const aspectRatio2 = visual2.width / visual2.height;
     const aspectRatio = Math.min(aspectRatio1, aspectRatio2) / Math.max(aspectRatio1, aspectRatio2);
@@ -417,13 +387,9 @@ export class VisualRecognitionEngine {
     _haystack: Buffer,
     threshold: number
   ): Promise<ImageMatch[]> {
-    // This is a placeholder for template matching
-    // In production, use OpenCV or similar library
     
     const matches: ImageMatch[] = [];
     
-    // Simulate finding matches
-    // Real implementation would use template matching algorithms
     const mockMatch: ImageMatch = {
       x: 100,
       y: 200,
@@ -432,7 +398,6 @@ export class VisualRecognitionEngine {
       confidence: 0.85
     };
     
-    // Continuing VisualRecognitionEngine.ts...
 
     if (mockMatch.confidence >= threshold) {
       matches.push(mockMatch);
@@ -446,7 +411,6 @@ export class VisualRecognitionEngine {
     x: number,
     y: number
   ): Promise<Locator> {
-    // Find element at coordinates
     const element = await page.evaluateHandle(
       ({ x, y }) => {
         const el = document.elementFromPoint(x, y);
@@ -456,10 +420,8 @@ export class VisualRecognitionEngine {
       { x, y }
     );
     
-    // Convert to locator
     const selector = await page.evaluate(
       el => {
-        // Generate unique selector for element
         if (el.id) return `#${el.id}`;
         
         let path = '';
@@ -475,7 +437,6 @@ export class VisualRecognitionEngine {
             }
           }
           
-          // Add index if needed
           const siblings = Array.from(current.parentElement?.children || []);
           const index = siblings.indexOf(current);
           if (siblings.filter(s => s.tagName === current!.tagName).length > 1) {
@@ -549,7 +510,6 @@ export class VisualRecognitionEngine {
   }
   
   private calculateContrastFromColors(colors: ColorHistogram): boolean {
-    // Simple contrast check based on dominant colors
     if (colors.dominant.length < 2) return false;
     
     const color1str = colors.dominant[0];
@@ -567,7 +527,7 @@ export class VisualRecognitionEngine {
     const contrast = (Math.max(luminance1, luminance2) + 0.05) / 
                     (Math.min(luminance1, luminance2) + 0.05);
     
-    return contrast > 4.5; // WCAG AA standard
+    return contrast > 4.5;
   }
   
   private parseRGBString(rgb: string): { r: number; g: number; b: number } | null {
@@ -605,15 +565,12 @@ export class VisualRecognitionEngine {
     return element.evaluate(el => {
       const styles = window.getComputedStyle(el as Element);
       
-      // Check for CSS animations
       if (styles.animationName !== 'none' || 
           styles.transition !== 'none 0s ease 0s') {
         return true;
       }
       
-      // Check for transforms that might indicate animation
       if (styles.transform !== 'none') {
-        // Monitor for changes
         return new Promise<boolean>(resolve => {
           const initialTransform = styles.transform;
           setTimeout(() => {
@@ -638,7 +595,6 @@ export class VisualRecognitionEngine {
     const visual1 = await this.processImage(screenshot1);
     const visual2 = await this.processImage(screenshot2);
     
-    // Calculate pixel-by-pixel differences
     const differences = this.calculatePixelDifferences(visual1, visual2);
     
     const result = {
@@ -683,7 +639,7 @@ export class VisualRecognitionEngine {
       
       const diff = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
       
-      if (diff > 30) { // Threshold for pixel difference
+      if (diff > 30) {
         diffCount++;
       }
     }
@@ -700,8 +656,6 @@ export class VisualRecognitionEngine {
     visual2: VisualData,
     _differences: PixelDifferences
   ): Buffer {
-    // Generate a diff image highlighting differences
-    // In production, use proper image manipulation library
     const diffPixels = new Uint8Array(visual1.pixels.length);
     
     for (let i = 0; i < visual1.pixels.length && i < visual2.pixels.length; i += 4) {
@@ -716,13 +670,11 @@ export class VisualRecognitionEngine {
       const diff = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
       
       if (diff > 30) {
-        // Highlight difference in red
         diffPixels[i] = 255;
         diffPixels[i + 1] = 0;
         diffPixels[i + 2] = 0;
         diffPixels[i + 3] = 255;
       } else {
-        // Keep original pixel
         diffPixels[i] = r1;
         diffPixels[i + 1] = g1;
         diffPixels[i + 2] = b1;
@@ -733,9 +685,6 @@ export class VisualRecognitionEngine {
     return Buffer.from(diffPixels);
   }
   
-  /**
-   * Get singleton instance
-   */
   static getInstance(): VisualRecognitionEngine {
     if (!VisualRecognitionEngine.instance) {
       VisualRecognitionEngine.instance = new VisualRecognitionEngine();
@@ -743,9 +692,6 @@ export class VisualRecognitionEngine {
     return VisualRecognitionEngine.instance;
   }
   
-  /**
-   * REAL IMPLEMENTATION: Clear visual recognition caches to prevent memory exhaustion
-   */
   clearCache(): void {
     const matchCount = this.visualMatchCache.size;
     const visualCount = this.elementVisualCache.size; 
@@ -763,15 +709,11 @@ export class VisualRecognitionEngine {
     });
   }
   
-  /**
-   * REAL IMPLEMENTATION: Limit cache sizes to prevent unbounded growth
-   */
   limitCacheSizes(): void {
     const MAX_VISUAL_MATCHES = 500;
     const MAX_ELEMENT_VISUALS = 1000;
     const MAX_SCREENSHOT_COMPARISONS = 200;
     
-    // Limit visual match cache
     if (this.visualMatchCache.size > MAX_VISUAL_MATCHES) {
       const toDelete = this.visualMatchCache.size - MAX_VISUAL_MATCHES;
       const keys = Array.from(this.visualMatchCache.keys()).slice(0, toDelete);
@@ -779,7 +721,6 @@ export class VisualRecognitionEngine {
       ActionLogger.logDebug(`Trimmed ${toDelete} old visual matches from cache`);
     }
     
-    // Limit element visual cache
     if (this.elementVisualCache.size > MAX_ELEMENT_VISUALS) {
       const toDelete = this.elementVisualCache.size - MAX_ELEMENT_VISUALS;
       const keys = Array.from(this.elementVisualCache.keys()).slice(0, toDelete);
@@ -787,7 +728,6 @@ export class VisualRecognitionEngine {
       ActionLogger.logDebug(`Trimmed ${toDelete} old element visuals from cache`);
     }
     
-    // Limit screenshot comparison cache
     if (this.screenshotComparisonCache.size > MAX_SCREENSHOT_COMPARISONS) {
       const toDelete = this.screenshotComparisonCache.size - MAX_SCREENSHOT_COMPARISONS;
       const keys = Array.from(this.screenshotComparisonCache.keys()).slice(0, toDelete);

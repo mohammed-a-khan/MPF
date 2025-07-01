@@ -22,7 +22,6 @@ import {
 } from '../types/reporting.types';
 import { Logger } from '../../core/utils/Logger';
 
-// Status color constants
 const STATUS_COLORS: Record<TestStatus, string> = {
   [TestStatus.PASSED]: '#28A745',
   [TestStatus.FAILED]: '#DC3545',
@@ -32,24 +31,9 @@ const STATUS_COLORS: Record<TestStatus, string> = {
   [TestStatus.AMBIGUOUS]: '#E83E8C'
 };
 
-/**
- * Dashboard Generator - Creates Interactive Executive Dashboard
- * 
- * Generates a comprehensive dashboard with:
- * - Executive summary with KPIs
- * - Real-time animated charts
- * - Interactive filters
- * - Drill-down capabilities
- * - Custom visualizations
- * 
- * All implemented from scratch without external dependencies.
- */
 export class DashboardGenerator {
   private readonly logger = Logger.getInstance();
   
-  /**
-   * Generate complete dashboard HTML
-   */
   async generateDashboard(report: CSReport): Promise<string> {
     this.logger.info('Generating interactive dashboard');
     
@@ -82,17 +66,10 @@ export class DashboardGenerator {
 </html>`;
   }
 
-  /**
-   * Generate dashboard-specific styles
-   */
   private generateDashboardStyles(theme: ReportTheme): string {
     return `
 <style>
-/* ========================================
-   DASHBOARD STYLES - PRODUCTION READY
-   ======================================== */
 
-/* Reset and Base */
 * {
     margin: 0;
     padding: 0;
@@ -108,7 +85,6 @@ body {
     overflow-x: hidden;
 }
 
-/* Dashboard Container */
 .dashboard-container {
     max-width: 1920px;
     margin: 0 auto;
@@ -117,7 +93,6 @@ body {
     min-height: 100vh;
 }
 
-/* Header Section */
 .dashboard-header {
     background: linear-gradient(135deg, ${theme.primaryColor} 0%, #1a1a3a 100%);
     padding: 40px;
@@ -184,7 +159,6 @@ body {
     fill: rgba(255,255,255,0.7);
 }
 
-/* KPI Section */
 .kpi-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -285,7 +259,6 @@ body {
     position: relative;
 }
 
-/* Charts Grid */
 .charts-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
@@ -347,7 +320,6 @@ body {
     position: relative;
 }
 
-/* Custom Chart Styles */
 .custom-chart {
     width: 100%;
     height: 100%;
@@ -359,7 +331,6 @@ body {
     height: 100%;
 }
 
-/* Gauge Chart */
 .gauge-chart {
     text-align: center;
 }
@@ -376,7 +347,6 @@ body {
     margin-top: 10px;
 }
 
-/* Progress Rings */
 .progress-ring {
     width: 120px;
     height: 120px;
@@ -389,7 +359,6 @@ body {
     transform-origin: 50% 50%;
 }
 
-/* Sparkline Charts */
 .sparkline {
     width: 100%;
     height: 40px;
@@ -407,7 +376,6 @@ body {
     opacity: 0.2;
 }
 
-/* Metrics Section */
 .metrics-section {
     background: #1a1a2e;
     border: 1px solid #2a2a4a;
@@ -463,7 +431,6 @@ body {
     margin-left: 5px;
 }
 
-/* Trends Section */
 .trends-section {
     margin-bottom: 30px;
 }
@@ -517,7 +484,6 @@ body {
     position: relative;
 }
 
-/* Error Insights */
 .error-insights {
     background: #1a1a2e;
     border: 1px solid #2a2a4a;
@@ -577,7 +543,6 @@ body {
     color: ${theme.failureColor};
 }
 
-/* AI Insights */
 .ai-insights {
     background: #1a1a2e;
     border: 1px solid #2a2a4a;
@@ -606,7 +571,6 @@ body {
     position: relative;
 }
 
-/* Performance Section */
 .performance-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -679,7 +643,6 @@ body {
     100% { transform: translateX(100%); }
 }
 
-/* Quick Actions */
 .quick-actions {
     position: fixed;
     bottom: 30px;
@@ -735,7 +698,6 @@ body {
     opacity: 1;
 }
 
-/* Interactive Elements */
 .interactive {
     cursor: pointer;
     transition: all 0.3s ease;
@@ -746,7 +708,6 @@ body {
     filter: brightness(1.1);
 }
 
-/* Loading Animation */
 .loading {
     position: relative;
     overflow: hidden;
@@ -768,7 +729,6 @@ body {
     100% { left: 100%; }
 }
 
-/* Responsive Design */
 @media (max-width: 1200px) {
     .charts-grid {
         grid-template-columns: 1fr;
@@ -812,7 +772,6 @@ body {
     }
 }
 
-/* Print Styles */
 @media print {
     body {
         background: white;
@@ -832,7 +791,6 @@ body {
     }
 }
 
-/* Animations */
 @keyframes slideInUp {
     from {
         opacity: 0;
@@ -846,9 +804,6 @@ body {
 </style>`;
   }
 
-  /**
-   * Generate dashboard header
-   */
   private generateHeader(report: CSReport): string {
     const metadata = report.metadata;
     const duration = this.formatDuration(metadata.duration);
@@ -888,9 +843,6 @@ body {
 </header>`;
   }
 
-  /**
-   * Extract numeric value from trend data
-   */
   private getTrendNumericValue(trend: number | { data: number[]; change: number; direction: 'up' | 'down' | 'stable' }): number {
     if (typeof trend === 'number') {
       return trend;
@@ -898,9 +850,6 @@ body {
     return trend.change;
   }
 
-  /**
-   * Generate KPI section with animated cards
-   */
   private generateKPISection(summary: ExecutionSummary): string {
     const kpis = [
       {
@@ -972,9 +921,6 @@ body {
 </section>`;
   }
 
-  /**
-   * Generate charts grid with custom visualizations
-   */
   private generateChartsGrid(_charts: ChartDataCollection, _theme: ReportTheme): string {
     return `
 <section class="charts-grid">
@@ -1022,9 +968,6 @@ body {
 </section>`;
   }
 
-  /**
-   * Generate metrics section
-   */
   private generateMetricsSection(report: CSReport): string {
     const metrics = report.metrics;
     
@@ -1068,9 +1011,6 @@ body {
 </section>`;
   }
 
-  /**
-   * Generate trends section
-   */
   private generateTrendsSection(report: CSReport): string {
     const trends = report.summary.trends;
     if (!trends || !trends.lastExecutions || trends.lastExecutions.length === 0) {
@@ -1118,9 +1058,6 @@ body {
 </section>`;
   }
 
-  /**
-   * Generate error insights section
-   */
   private generateErrorInsights(errors: ErrorAnalysis): string {
     if (!errors || errors.summary.totalErrors === 0) {
       return '';
@@ -1160,9 +1097,6 @@ body {
 </section>`;
   }
 
-  /**
-   * Generate AI insights section
-   */
   private generateAIInsights(aiHealing: AIHealingReport): string {
     if (!aiHealing || aiHealing.summary.totalAttempts === 0) {
       return '';
@@ -1195,9 +1129,6 @@ body {
 </section>`;
   }
 
-  /**
-   * Generate performance section with visual bars
-   */
   private generatePerformanceSection(report: CSReport): string {
     const metrics = report.metrics.browser;
     const benchmarks = {
@@ -1261,9 +1192,6 @@ body {
 </section>`;
   }
 
-  /**
-   * Generate quick actions
-   */
   private generateQuickActions(_report: CSReport): string {
     return `
 <div class="quick-actions">
@@ -1297,20 +1225,12 @@ body {
 </div>`;
   }
 
-  /**
-   * Generate dashboard scripts with custom chart implementations
-   */
   private generateDashboardScripts(charts: ChartDataCollection): string {
     return `
 <script>
-// ============================================================================
-// DASHBOARD SCRIPTS - PRODUCTION READY
-// ============================================================================
 
-// Chart data from report
 const chartData = ${JSON.stringify(charts)};
 
-// Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
     initializeCharts();
     animateKPIs();
@@ -1318,39 +1238,23 @@ document.addEventListener('DOMContentLoaded', function() {
     startAutoRefresh();
 });
 
-// ============================================================================
-// CUSTOM CHART IMPLEMENTATIONS
-// ============================================================================
 
-/**
- * Initialize all charts
- */
 function initializeCharts() {
-    // Execution Pie Chart
     createPieChart('execution-pie-chart', chartData.executionPieChart);
     
-    // Pass Rate Trend
     createLineChart('pass-rate-trend-chart', chartData.passRateTrend);
     
-    // Feature Bar Chart
     createBarChart('feature-bar-chart', chartData.featureBarChart);
     
-    // Duration Histogram
     createHistogram('duration-histogram', chartData.durationHistogram);
     
-    // Error Distribution
     createDoughnutChart('error-distribution-chart', chartData.errorDistribution);
     
-    // Execution Timeline
     createTimelineChart('execution-timeline', chartData.timelineGantt);
     
-    // Mini trend charts
     createMiniTrendCharts();
 }
 
-/**
- * Create custom pie chart
- */
 function createPieChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data) return;
@@ -1363,7 +1267,6 @@ function createPieChart(containerId, data) {
     const g = svg.append('g')
         .attr('transform', \`translate(\${width/2},\${height/2})\`);
     
-    // Calculate angles
     const total = data.values.reduce((a, b) => a + b, 0);
     let currentAngle = -Math.PI / 2;
     const slices = [];
@@ -1381,7 +1284,6 @@ function createPieChart(containerId, data) {
         currentAngle += angle;
     });
     
-    // Draw slices
     slices.forEach((slice, i) => {
         const path = g.append('path')
             .attr('d', createArc(slice.startAngle, slice.endAngle, 0, radius))
@@ -1393,7 +1295,6 @@ function createPieChart(containerId, data) {
             .style('transform', 'scale(0)')
             .style('transform-origin', 'center');
         
-        // Animate slice
         setTimeout(() => {
             path.transition()
                 .duration(800)
@@ -1402,7 +1303,6 @@ function createPieChart(containerId, data) {
                 .style('transform', 'scale(1)');
         }, i * 100);
         
-        // Hover effect
         path.on('mouseenter', function(event) {
             d3Select(this)
                 .transition()
@@ -1410,7 +1310,6 @@ function createPieChart(containerId, data) {
                 .style('transform', 'scale(1.05)')
                 .attr('filter', 'brightness(1.2)');
             
-            // Show tooltip
             showTooltip(event, slice.label, slice.value, slice.percentage + '%');
         })
         .on('mouseleave', function() {
@@ -1424,7 +1323,6 @@ function createPieChart(containerId, data) {
         });
     });
     
-    // Draw labels
     slices.forEach((slice, i) => {
         const labelAngle = (slice.startAngle + slice.endAngle) / 2;
         const labelX = Math.cos(labelAngle) * (radius + 20);
@@ -1451,7 +1349,6 @@ function createPieChart(containerId, data) {
             .style('font-weight', 'bold')
             .style('fill', slice.color);
         
-        // Animate label
         setTimeout(() => {
             label.transition()
                 .duration(500)
@@ -1459,7 +1356,6 @@ function createPieChart(containerId, data) {
         }, 800 + i * 100);
     });
     
-    // Center text
     const centerText = g.append('text')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
@@ -1484,9 +1380,6 @@ function createPieChart(containerId, data) {
         .style('opacity', 1);
 }
 
-/**
- * Create custom line chart
- */
 function createLineChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data) return;
@@ -1501,7 +1394,6 @@ function createLineChart(containerId, data) {
     const g = svg.append('g')
         .attr('transform', \`translate(\${margin.left},\${margin.top})\`);
     
-    // Scales
     const xScale = d3ScaleLinear()
         .domain([0, data.labels.length - 1])
         .range([0, innerWidth]);
@@ -1510,7 +1402,6 @@ function createLineChart(containerId, data) {
         .domain([0, 100])
         .range([innerHeight, 0]);
     
-    // Grid lines
     g.append('g')
         .attr('class', 'grid')
         .attr('transform', \`translate(0,\${innerHeight})\`)
@@ -1530,22 +1421,18 @@ function createLineChart(containerId, data) {
         .style('stroke-dasharray', '3,3')
         .style('opacity', 0.3);
     
-    // Draw lines for each dataset
     data.datasets.forEach((dataset, i) => {
-        // Line generator
         const line = d3Line()
             .x((d, i) => xScale(i))
             .y(d => yScale(d))
             .curve(d3CurveCatmullRom);
         
-        // Area generator
         const area = d3Area()
             .x((d, i) => xScale(i))
             .y0(innerHeight)
             .y1(d => yScale(d))
             .curve(d3CurveCatmullRom);
         
-        // Draw area
         if (dataset.fill) {
             const areaPath = g.append('path')
                 .datum(dataset.data)
@@ -1553,7 +1440,6 @@ function createLineChart(containerId, data) {
                 .attr('opacity', 0.2)
                 .attr('d', area);
             
-            // Animate area
             const totalLength = areaPath.node().getTotalLength();
             areaPath
                 .attr('stroke-dasharray', totalLength)
@@ -1564,7 +1450,6 @@ function createLineChart(containerId, data) {
                 .attr('stroke-dashoffset', 0);
         }
         
-        // Draw line
         const linePath = g.append('path')
             .datum(dataset.data)
             .attr('fill', 'none')
@@ -1572,7 +1457,6 @@ function createLineChart(containerId, data) {
             .attr('stroke-width', 3)
             .attr('d', line);
         
-        // Animate line
         const totalLength = linePath.node().getTotalLength();
         linePath
             .attr('stroke-dasharray', totalLength)
@@ -1582,7 +1466,6 @@ function createLineChart(containerId, data) {
             .ease(d3EaseLinear)
             .attr('stroke-dashoffset', 0);
         
-        // Add dots
         dataset.data.forEach((value, j) => {
             const dot = g.append('circle')
                 .attr('cx', xScale(j))
@@ -1593,14 +1476,12 @@ function createLineChart(containerId, data) {
                 .attr('stroke-width', 2)
                 .style('cursor', 'pointer');
             
-            // Animate dot
             dot.transition()
                 .delay(2000 + j * 100)
                 .duration(300)
                 .ease(d3EaseOutBack)
                 .attr('r', 5);
             
-            // Hover effect
             dot.on('mouseenter', function(event) {
                 d3Select(this)
                     .transition()
@@ -1620,7 +1501,6 @@ function createLineChart(containerId, data) {
         });
     });
     
-    // Axes
     g.append('g')
         .attr('transform', \`translate(0,\${innerHeight})\`)
         .call(d3AxisBottom(xScale)
@@ -1635,9 +1515,6 @@ function createLineChart(containerId, data) {
         .style('color', '#a0a0a0');
 }
 
-/**
- * Create custom bar chart
- */
 function createBarChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data) return;
@@ -1652,7 +1529,6 @@ function createBarChart(containerId, data) {
     const g = svg.append('g')
         .attr('transform', \`translate(\${margin.left},\${margin.top})\`);
     
-    // Scales
     const xScale = d3ScaleBand()
         .domain(data.labels)
         .range([0, innerWidth])
@@ -1663,7 +1539,6 @@ function createBarChart(containerId, data) {
         .nice()
         .range([innerHeight, 0]);
     
-    // Bars for each dataset
     data.datasets.forEach((dataset, datasetIndex) => {
         const barWidth = xScale.bandwidth() / data.datasets.length;
         
@@ -1677,7 +1552,6 @@ function createBarChart(containerId, data) {
                 .attr('stroke', dataset.borderColor || 'none')
                 .style('cursor', 'pointer');
             
-            // Animate bar
             bar.transition()
                 .delay(i * 50)
                 .duration(800)
@@ -1685,7 +1559,6 @@ function createBarChart(containerId, data) {
                 .attr('y', yScale(value))
                 .attr('height', innerHeight - yScale(value));
             
-            // Value label
             const label = g.append('text')
                 .attr('x', xScale(data.labels[i]) + datasetIndex * barWidth + barWidth / 2)
                 .attr('y', yScale(value) - 5)
@@ -1700,7 +1573,6 @@ function createBarChart(containerId, data) {
                 .duration(300)
                 .style('opacity', 1);
             
-            // Hover effect
             bar.on('mouseenter', function(event) {
                 d3Select(this)
                     .transition()
@@ -1720,7 +1592,6 @@ function createBarChart(containerId, data) {
         });
     });
     
-    // Axes
     g.append('g')
         .attr('transform', \`translate(0,\${innerHeight})\`)
         .call(d3AxisBottom(xScale))
@@ -1735,7 +1606,6 @@ function createBarChart(containerId, data) {
         .call(d3AxisLeft(yScale))
         .style('color', '#a0a0a0');
     
-    // Legend
     const legend = svg.append('g')
         .attr('transform', \`translate(\${width - 150}, 20)\`);
     
@@ -1758,9 +1628,6 @@ function createBarChart(containerId, data) {
     });
 }
 
-/**
- * Create histogram chart
- */
 function createHistogram(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data) return;
@@ -1775,7 +1642,6 @@ function createHistogram(containerId, data) {
     const g = svg.append('g')
         .attr('transform', \`translate(\${margin.left},\${margin.top})\`);
     
-    // Scales
     const xScale = d3ScaleLinear()
         .domain([Math.min(...data.bins), Math.max(...data.bins)])
         .range([0, innerWidth]);
@@ -1785,7 +1651,6 @@ function createHistogram(containerId, data) {
         .nice()
         .range([innerHeight, 0]);
     
-    // Bars
     data.frequencies.forEach((freq, i) => {
         const bar = g.append('rect')
             .attr('x', xScale(data.bins[i]))
@@ -1795,7 +1660,6 @@ function createHistogram(containerId, data) {
             .attr('fill', \`hsl(\${220 + i * 10}, 70%, 50%)\`)
             .style('cursor', 'pointer');
         
-        // Animate bar
         bar.transition()
             .delay(i * 30)
             .duration(600)
@@ -1803,7 +1667,6 @@ function createHistogram(containerId, data) {
             .attr('y', yScale(freq))
             .attr('height', innerHeight - yScale(freq));
         
-        // Hover effect
         bar.on('mouseenter', function(event) {
             d3Select(this)
                 .transition()
@@ -1824,7 +1687,6 @@ function createHistogram(containerId, data) {
         });
     });
     
-    // Axes
     g.append('g')
         .attr('transform', \`translate(0,\${innerHeight})\`)
         .call(d3AxisBottom(xScale).tickFormat(d => d + 'ms'))
@@ -1834,7 +1696,6 @@ function createHistogram(containerId, data) {
         .call(d3AxisLeft(yScale))
         .style('color', '#a0a0a0');
     
-    // Axis labels
     g.append('text')
         .attr('transform', 'rotate(-90)')
         .attr('y', 0 - margin.left)
@@ -1851,9 +1712,6 @@ function createHistogram(containerId, data) {
         .text('Duration (ms)');
 }
 
-/**
- * Create doughnut chart
- */
 function createDoughnutChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data) return;
@@ -1867,7 +1725,6 @@ function createDoughnutChart(containerId, data) {
     const g = svg.append('g')
         .attr('transform', \`translate(\${width/2},\${height/2})\`);
     
-    // Calculate angles
     const total = data.values.reduce((a, b) => a + b, 0);
     let currentAngle = -Math.PI / 2;
     const slices = [];
@@ -1885,7 +1742,6 @@ function createDoughnutChart(containerId, data) {
         currentAngle += angle;
     });
     
-    // Draw slices
     slices.forEach((slice, i) => {
         const path = g.append('path')
             .attr('d', createArc(slice.startAngle, slice.endAngle, innerRadius, radius))
@@ -1897,7 +1753,6 @@ function createDoughnutChart(containerId, data) {
             .style('transform', 'scale(0) rotate(0deg)')
             .style('transform-origin', 'center');
         
-        // Animate slice
         setTimeout(() => {
             path.transition()
                 .duration(800)
@@ -1906,7 +1761,6 @@ function createDoughnutChart(containerId, data) {
                 .style('transform', 'scale(1) rotate(360deg)');
         }, i * 100);
         
-        // Hover effect
         path.on('mouseenter', function(event) {
             d3Select(this)
                 .transition()
@@ -1925,7 +1779,6 @@ function createDoughnutChart(containerId, data) {
         });
     });
     
-    // Center metrics
     const centerGroup = g.append('g')
         .style('opacity', 0);
     
@@ -1950,9 +1803,6 @@ function createDoughnutChart(containerId, data) {
         .style('opacity', 1);
 }
 
-/**
- * Create timeline chart
- */
 function createTimelineChart(containerId, data) {
     const container = document.getElementById(containerId);
     if (!container || !data) return;
@@ -1967,23 +1817,19 @@ function createTimelineChart(containerId, data) {
     const g = svg.append('g')
         .attr('transform', \`translate(\${margin.left},\${margin.top})\`);
     
-    // Time scale
     const timeScale = d3ScaleTime()
         .domain([new Date(data.startTime), new Date(data.endTime)])
         .range([0, innerWidth]);
     
-    // Task scale
     const taskScale = d3ScaleBand()
         .domain(data.tasks.map(t => t.name))
         .range([0, innerHeight])
         .padding(0.2);
     
-    // Draw tasks
     data.tasks.forEach((task, i) => {
         const taskGroup = g.append('g')
             .attr('transform', \`translate(0, \${taskScale(task.name)})\`);
         
-        // Task bar
         const bar = taskGroup.append('rect')
             .attr('x', timeScale(new Date(task.start)))
             .attr('y', 0)
@@ -1994,13 +1840,11 @@ function createTimelineChart(containerId, data) {
             .style('cursor', 'pointer')
             .style('opacity', 0.8);
         
-        // Animate bar
         bar.transition()
             .delay(i * 50)
             .duration(800)
             .attr('width', timeScale(new Date(task.end)) - timeScale(new Date(task.start)));
         
-        // Progress indicator
         if (task.progress < 100) {
             const progressBar = taskGroup.append('rect')
                 .attr('x', timeScale(new Date(task.start)))
@@ -2016,7 +1860,6 @@ function createTimelineChart(containerId, data) {
                 .attr('width', (timeScale(new Date(task.end)) - timeScale(new Date(task.start))) * (task.progress / 100));
         }
         
-        // Task label
         taskGroup.append('text')
             .attr('x', -10)
             .attr('y', taskScale.bandwidth() / 2)
@@ -2026,7 +1869,6 @@ function createTimelineChart(containerId, data) {
             .style('font-size', '14px')
             .text(task.name);
         
-        // Hover effect
         bar.on('mouseenter', function(event) {
             d3Select(this)
                 .transition()
@@ -2048,7 +1890,6 @@ function createTimelineChart(containerId, data) {
         });
     });
     
-    // Time axis
     g.append('g')
         .attr('transform', \`translate(0,\${innerHeight})\`)
         .call(d3AxisBottom(timeScale)
@@ -2056,7 +1897,6 @@ function createTimelineChart(containerId, data) {
         )
         .style('color', '#a0a0a0');
     
-    // Now line
     const now = new Date();
     if (now >= new Date(data.startTime) && now <= new Date(data.endTime)) {
         g.append('line')
@@ -2071,11 +1911,7 @@ function createTimelineChart(containerId, data) {
     }
 }
 
-/**
- * Create mini trend charts for KPIs
- */
 function createMiniTrendCharts() {
-    // Implementation for sparkline charts in KPI cards
     document.querySelectorAll('.kpi-mini-chart').forEach(container => {
         const width = container.clientWidth;
         const height = 40;
@@ -2105,14 +1941,12 @@ function createMiniTrendCharts() {
             .y1(d => yScale(d))
             .curve(d3CurveCatmullRom);
         
-        // Area
         svg.append('path')
             .datum(data)
             .attr('fill', 'var(--kpi-color)')
             .attr('opacity', 0.2)
             .attr('d', area);
         
-        // Line
         const linePath = svg.append('path')
             .datum(data)
             .attr('fill', 'none')
@@ -2120,7 +1954,6 @@ function createMiniTrendCharts() {
             .attr('stroke-width', 2)
             .attr('d', line);
         
-        // Animate
         const totalLength = linePath.node().getTotalLength();
         linePath
             .attr('stroke-dasharray', totalLength)
@@ -2131,13 +1964,7 @@ function createMiniTrendCharts() {
     });
 }
 
-// ============================================================================
-// HELPER FUNCTIONS - COMPLETE D3.js IMPLEMENTATION
-// ============================================================================
 
-/**
- * Create SVG element with full D3 functionality
- */
 function createSVG(container, width, height) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', width);
@@ -2145,7 +1972,6 @@ function createSVG(container, width, height) {
     svg.setAttribute('class', 'chart-svg');
     container.appendChild(svg);
     
-    // Add D3-like methods to SVG
     svg.append = function(tagName) {
         const element = document.createElementNS('http://www.w3.org/2000/svg', tagName);
         this.appendChild(element);
@@ -2155,9 +1981,6 @@ function createSVG(container, width, height) {
     return addD3Methods(svg);
 }
 
-/**
- * Add D3-like methods to DOM elements
- */
 function addD3Methods(element) {
     element.attr = function(name, value) {
         if (value === undefined) return this.getAttribute(name);
@@ -2219,9 +2042,6 @@ function addD3Methods(element) {
     return element;
 }
 
-/**
- * Transition class for animations
- */
 class Transition {
     constructor(element) {
         this.element = element;
@@ -2268,7 +2088,6 @@ class Transition {
             const startAttrs = {};
             const startStyles = {};
             
-            // Capture starting values
             for (const key in this.attrs) {
                 startAttrs[key] = this.element.getAttribute(key) || 0;
             }
@@ -2281,7 +2100,6 @@ class Transition {
                 const progress = Math.min(elapsed / this.duration_, 1);
                 const eased = this.ease_(progress);
                 
-                // Update attributes
                 for (const key in this.attrs) {
                     const start = parseFloat(startAttrs[key]) || 0;
                     const end = parseFloat(this.attrs[key]) || 0;
@@ -2289,7 +2107,6 @@ class Transition {
                     this.element.setAttribute(key, current);
                 }
                 
-                // Update styles
                 for (const key in this.styles) {
                     const start = parseFloat(startStyles[key]) || 0;
                     const end = parseFloat(this.styles[key]) || 0;
@@ -2308,9 +2125,6 @@ class Transition {
     }
 }
 
-/**
- * Create arc path for pie/doughnut charts
- */
 function createArc(startAngle, endAngle, innerRadius, outerRadius) {
     const x1 = Math.cos(startAngle) * outerRadius;
     const y1 = Math.sin(startAngle) * outerRadius;
@@ -2326,9 +2140,6 @@ function createArc(startAngle, endAngle, innerRadius, outerRadius) {
     return \`M \${x1} \${y1} A \${outerRadius} \${outerRadius} 0 \${largeArc} 1 \${x2} \${y2} L \${x3} \${y3} A \${innerRadius} \${innerRadius} 0 \${largeArc} 0 \${x4} \${y4} Z\`;
 }
 
-/**
- * D3.js style selection wrapper
- */
 function d3Select(element) {
     if (typeof element === 'string') {
         element = document.querySelector(element);
@@ -2336,12 +2147,10 @@ function d3Select(element) {
     return addD3Methods(element);
 }
 
-// Easing functions
 const d3EaseOutBack = t => 1 + (--t) * t * (2.70158 * t + 1.70158);
 const d3EaseLinear = t => t;
 const d3EaseOutQuad = t => t * (2 - t);
 
-// Scale functions
 function d3ScaleLinear() {
     let domain = [0, 1];
     let range = [0, 1];
@@ -2438,13 +2247,11 @@ function d3ScaleTime() {
     return scale;
 }
 
-// Axis generators
 function d3AxisBottom(scale) {
     return function(selection) {
         const range = scale.range();
         const domain = scale.domain();
         
-        // Main axis line
         selection.append('line')
             .attr('x1', range[0])
             .attr('x2', range[1])
@@ -2452,7 +2259,6 @@ function d3AxisBottom(scale) {
             .attr('y2', 0)
             .attr('stroke', 'currentColor');
         
-        // Ticks
         const tickCount = 10;
         const tickSize = 6;
         
@@ -2482,7 +2288,6 @@ function d3AxisLeft(scale) {
         const range = scale.range();
         const domain = scale.domain();
         
-        // Main axis line
         selection.append('line')
             .attr('x1', 0)
             .attr('x2', 0)
@@ -2490,7 +2295,6 @@ function d3AxisLeft(scale) {
             .attr('y2', range[1])
             .attr('stroke', 'currentColor');
         
-        // Ticks
         const tickCount = 10;
         const tickSize = 6;
         
@@ -2516,13 +2320,11 @@ function d3AxisLeft(scale) {
     };
 }
 
-// Enhance axis functions with methods
 d3AxisBottom.tickSize = function(size) { return this; };
 d3AxisBottom.tickFormat = function(format) { return this; };
 d3AxisLeft.tickSize = function(size) { return this; };
 d3AxisLeft.tickFormat = function(format) { return this; };
 
-// Line generator
 function d3Line() {
     let xAccessor = d => d[0];
     let yAccessor = d => d[1];
@@ -2533,7 +2335,6 @@ function d3Line() {
         
         for (let i = 1; i < data.length; i++) {
             if (curveType === d3CurveCatmullRom && i < data.length - 1) {
-                // Catmull-Rom spline implementation
                 const p0 = i > 1 ? data[i - 2] : data[i - 1];
                 const p1 = data[i - 1];
                 const p2 = data[i];
@@ -2581,7 +2382,6 @@ function d3Line() {
     return line;
 }
 
-// Area generator
 function d3Area() {
     let xAccessor = d => d[0];
     let y0Accessor = () => 0;
@@ -2596,7 +2396,6 @@ function d3Area() {
         
         let path = topLine(data);
         
-        // Close the path
         for (let i = data.length - 1; i >= 0; i--) {
             path += \` L \${xAccessor(data[i], i)} \${y0Accessor(data[i], i)}\`;
         }
@@ -2628,10 +2427,8 @@ function d3Area() {
     return area;
 }
 
-// Curve types
 const d3CurveCatmullRom = 'catmullRom';
 
-// Time format
 function d3TimeFormat(format) {
     return function(date) {
         const d = new Date(date);
@@ -2642,9 +2439,6 @@ function d3TimeFormat(format) {
     };
 }
 
-/**
- * Show tooltip with proper positioning
- */
 function showTooltip(event, title, value, subtitle) {
     let tooltip = document.getElementById('chart-tooltip');
     if (!tooltip) {
@@ -2677,7 +2471,6 @@ function showTooltip(event, title, value, subtitle) {
     let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
     let top = rect.top - tooltipRect.height - 10;
     
-    // Ensure tooltip stays within viewport
     if (left < 10) left = 10;
     if (left + tooltipRect.width > window.innerWidth - 10) {
         left = window.innerWidth - tooltipRect.width - 10;
@@ -2691,9 +2484,6 @@ function showTooltip(event, title, value, subtitle) {
     tooltip.style.opacity = '1';
 }
 
-/**
- * Hide tooltip
- */
 function hideTooltip() {
     const tooltip = document.getElementById('chart-tooltip');
     if (tooltip) {
@@ -2701,9 +2491,6 @@ function hideTooltip() {
     }
 }
 
-/**
- * Generate random trend data for demonstration
- */
 function generateRandomTrendData(points) {
     const data = [];
     let value = 50 + Math.random() * 30;
@@ -2717,16 +2504,12 @@ function generateRandomTrendData(points) {
     return data;
 }
 
-/**
- * Animate KPI cards
- */
 function animateKPIs() {
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.style.animation = 'slideInUp 0.6s ease forwards';
                 
-                // Animate value counting
                 const valueElement = entry.target.querySelector('.kpi-value');
                 if (valueElement) {
                     const finalValue = valueElement.textContent;
@@ -2740,14 +2523,13 @@ function animateKPIs() {
                         
                         function updateCounter(currentTime) {
                             const elapsed = currentTime - startTime;
-                            const progress = Math.min(elapsed / 1000, 1); // 1 second animation
+                            const progress = Math.min(elapsed / 1000, 1);
                             
                             currentValue = numericValue * d3EaseOutQuad(progress);
                             
                             if (isPercentage) {
                                 valueElement.textContent = currentValue.toFixed(1) + '%';
                             } else if (finalValue.includes(':')) {
-                                // Duration format - special handling
                                 const totalSeconds = Math.floor(currentValue);
                                 const hours = Math.floor(totalSeconds / 3600);
                                 const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -2785,11 +2567,7 @@ function animateKPIs() {
     });
 }
 
-/**
- * Setup interactive features
- */
 function setupInteractions() {
-    // Chart export functionality
     document.querySelectorAll('.chart-action').forEach(button => {
         button.addEventListener('click', function(e) {
             const action = this.getAttribute('data-action');
@@ -2810,19 +2588,13 @@ function setupInteractions() {
         });
     });
     
-    // Filter functionality
     setupFilters();
     
-    // Search functionality
     setupSearch();
     
-    // Theme switcher
     setupThemeSwitcher();
 }
 
-/**
- * Toggle chart fullscreen
- */
 function toggleChartFullscreen(chartCard) {
     if (!document.fullscreenElement) {
         chartCard.requestFullscreen().then(() => {
@@ -2839,49 +2611,39 @@ function toggleChartFullscreen(chartCard) {
     }
 }
 
-/**
- * Export chart as image
- */
 function exportChart(chartId) {
     const chartContainer = document.getElementById(chartId);
     const svg = chartContainer.querySelector('svg');
     
     if (svg) {
-        // Get SVG dimensions
         const width = svg.getAttribute('width');
         const height = svg.getAttribute('height');
         
-        // Create canvas
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        const scale = 2; // Higher resolution
+        const scale = 2;
         
         canvas.width = width * scale;
         canvas.height = height * scale;
         ctx.scale(scale, scale);
         
-        // Create image from SVG
         const svgData = new XMLSerializer().serializeToString(svg);
         const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(svgBlob);
         
         const img = new Image();
         img.onload = function() {
-            // Draw white background
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, width, height);
             
-            // Draw image
             ctx.drawImage(img, 0, 0, width, height);
             
-            // Convert to PNG and download
             canvas.toBlob(function(blob) {
                 const link = document.createElement('a');
                 link.download = chartId + '_' + new Date().getTime() + '.png';
                 link.href = URL.createObjectURL(blob);
                 link.click();
                 
-                // Cleanup
                 URL.revokeObjectURL(url);
                 URL.revokeObjectURL(link.href);
             }, 'image/png');
@@ -2891,19 +2653,13 @@ function exportChart(chartId) {
     }
 }
 
-/**
- * Refresh specific chart
- */
 function refreshChart(chartId) {
     const container = document.getElementById(chartId);
     
-    // Add loading animation
     container.classList.add('loading');
     
-    // Clear existing chart
     container.innerHTML = '';
     
-    // Redraw chart after delay
     setTimeout(() => {
         switch(chartId) {
             case 'execution-pie-chart':
@@ -2930,9 +2686,6 @@ function refreshChart(chartId) {
     }, 500);
 }
 
-/**
- * Refresh all charts
- */
 function refreshCharts() {
     const charts = [
         'execution-pie-chart',
@@ -2948,49 +2701,24 @@ function refreshCharts() {
     });
 }
 
-/**
- * Setup filters
- */
 function setupFilters() {
-    // Implementation for filter panel
-    // This would integrate with the report data to filter displayed information
 }
 
-/**
- * Setup search functionality
- */
 function setupSearch() {
-    // Implementation for search overlay
-    // This would search through the report data
 }
 
-/**
- * Setup theme switcher
- */
 function setupThemeSwitcher() {
-    // Implementation for theme switching
-    // This would toggle between light and dark themes
 }
 
-/**
- * Start auto-refresh
- */
 function startAutoRefresh() {
-    // Refresh charts every 30 seconds if page is visible
     setInterval(() => {
         if (document.visibilityState === 'visible') {
-            // In a real implementation, this would fetch updated data
-            // For now, just refresh the visual presentation
             console.log('Auto-refresh triggered');
         }
     }, 30000);
 }
 
-/**
- * Export dashboard functionality
- */
 function exportDashboard() {
-    // Create export options modal
     const modal = document.createElement('div');
     modal.className = 'export-modal';
     modal.innerHTML = \`
@@ -3005,7 +2733,6 @@ function exportDashboard() {
         </div>
     \`;
     
-    // Add styles
     modal.style.cssText = \`
         position: fixed;
         top: 0;
@@ -3064,9 +2791,6 @@ function exportDashboard() {
     document.body.appendChild(modal);
 }
 
-/**
- * Toggle fullscreen mode
- */
 function toggleFullscreen() {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => {
@@ -3079,24 +2803,13 @@ function toggleFullscreen() {
     }
 }
 
-/**
- * Export functions (these would integrate with backend services in production)
- */
 function exportAsPDF() {
     console.log('Exporting dashboard as PDF...');
-    // In production, this would:
-    // 1. Capture the current dashboard state
-    // 2. Send to backend PDF generation service
-    // 3. Return downloadable PDF
     alert('PDF export would be handled by backend service in production');
 }
 
 function exportAsExcel() {
     console.log('Exporting dashboard as Excel...');
-    // In production, this would:
-    // 1. Extract all data from charts and tables
-    // 2. Send to backend Excel generation service
-    // 3. Return downloadable Excel file
     alert('Excel export would be handled by backend service in production');
 }
 
@@ -3130,9 +2843,6 @@ function exportAsJSON() {
 </script>`;
   }
 
-  /**
-   * Prepare chart data from report
-   */
   private prepareChartData(report: CSReport): ChartDataCollection {
     const summary = report.summary;
     
@@ -3164,9 +2874,6 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare pass rate trend data
-   */
   private preparePassRateTrend(report: CSReport): LineChartData {
     const trends = report.summary.trends?.lastExecutions || [];
     
@@ -3190,11 +2897,8 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare feature bar chart data
-   */
   private prepareFeatureBarChart(report: CSReport): BarChartData {
-    const features = report.features.slice(0, 10); // Top 10 features
+    const features = report.features.slice(0, 10);
     
     return {
       type: ChartType.BAR,
@@ -3228,9 +2932,6 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare duration histogram data
-   */
   private prepareDurationHistogram(report: CSReport): HistogramData {
     const durations = report.scenarios.map(s => s.duration);
     const min = Math.min(...durations);
@@ -3262,9 +2963,6 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare error distribution data
-   */
   private prepareErrorDistribution(report: CSReport): PieChartData {
     const errorTypes = report.errors.summary.errorsByType;
     
@@ -3281,9 +2979,6 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare performance radar data
-   */
   private preparePerformanceRadar(report: CSReport): RadarChartData {
     const metrics = report.metrics.browser;
     const benchmarks = {
@@ -3316,9 +3011,6 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare network waterfall data
-   */
   private prepareNetworkWaterfall(report: CSReport): WaterfallChartData {
     const entries = report.network.waterfall.entries.slice(0, 20);
     
@@ -3333,9 +3025,6 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare timeline gantt data
-   */
   private prepareTimelineGantt(report: CSReport): GanttChartData {
     const scenarios = report.scenarios.slice(0, 15);
     const startTime = new Date(report.metadata.startTime);
@@ -3359,17 +3048,11 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Prepare heatmap data
-   */
   private prepareHeatmap(_report: CSReport): HeatmapData {
-    // Create a heatmap of test execution by hour and day
     const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + ':00');
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const data: number[][] = Array(7).fill(null).map(() => Array(24).fill(0));
     
-    // This would be populated with actual execution data
-    // For now, using sample data
     for (let i = 0; i < 7; i++) {
       const row = data[i];
       if (row) {
@@ -3392,9 +3075,6 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Generate chart header with actions
-   */
   private generateChartHeader(title: string): string {
     return `
 <div class="chart-header">
@@ -3419,18 +3099,12 @@ function exportAsJSON() {
 </div>`;
   }
 
-  /**
-   * Generate mini sparkline chart
-   */
   private generateMiniSparkline(metric: string, history: ExecutionHistory[]): string {
     if (!history || history.length === 0) return '';
     
     return `<div class="kpi-mini-chart" data-metric="${metric}"></div>`;
   }
 
-  /**
-   * Calculate trend changes
-   */
   private calculateTrendChange(trend: number): { type: 'positive' | 'negative', value: number } | null {
     if (trend === 0) return null;
     return {
@@ -3473,27 +3147,18 @@ function exportAsJSON() {
     };
   }
 
-  /**
-   * Get color based on pass rate
-   */
   private getPassRateColor(passRate: number): string {
     if (passRate >= 95) return STATUS_COLORS.passed;
     if (passRate >= 80) return STATUS_COLORS.pending;
     return STATUS_COLORS.failed;
   }
 
-  /**
-   * Get color based on performance percentage
-   */
   private getPerformanceColor(percentage: number): string {
     if (percentage <= 50) return STATUS_COLORS.passed;
     if (percentage <= 100) return STATUS_COLORS.pending;
     return STATUS_COLORS.failed;
   }
 
-  /**
-   * Format duration for display
-   */
   private formatDuration(milliseconds: number): string {
     const seconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -3508,9 +3173,6 @@ function exportAsJSON() {
     }
   }
 
-  /**
-   * Format date for display
-   */
   private formatDate(date: Date): string {
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
@@ -3521,9 +3183,6 @@ function exportAsJSON() {
     }).format(new Date(date));
   }
 
-  /**
-   * Format bytes for display
-   */
   private formatBytes(bytes: number): string {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     if (bytes === 0) return '0 B';

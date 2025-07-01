@@ -43,13 +43,11 @@ export class DOMAnalyzer {
           const rect = element.getBoundingClientRect();
           const styles = window.getComputedStyle(element);
           
-          // Collect all attributes
           const attributes: Record<string, string> = {};
           Array.from(element.attributes).forEach(attr => {
             attributes[attr.name] = attr.value;
           });
 
-          // Get text content
           const textContent = element.textContent?.trim() || '';
           const childNodes = Array.from(element.childNodes);
           const directText = childNodes
@@ -58,7 +56,6 @@ export class DOMAnalyzer {
             .filter(text => text)
             .join(' ');
 
-          // Determine visibility
           const isVisible = !!(
             rect.width > 0 &&
             rect.height > 0 &&
@@ -67,7 +64,6 @@ export class DOMAnalyzer {
             styles.opacity !== '0'
           );
 
-          // Check if element is in viewport
           const isInViewport = (
             rect.top >= 0 &&
             rect.left >= 0 &&
@@ -75,7 +71,6 @@ export class DOMAnalyzer {
             rect.right <= window.innerWidth
           );
 
-          // Get aria attributes
           const ariaAttributes: Record<string, string> = {};
           Array.from(element.attributes)
             .filter(attr => attr.name.startsWith('aria-'))
@@ -198,7 +193,6 @@ export class DOMAnalyzer {
           return parts.length ? `/${parts.join('/')}` : '';
         };
 
-        // Collect forms
         const forms = Array.from(document.forms).map((form): FormInfo => ({
           name: form.name,
           id: form.id,
@@ -212,7 +206,6 @@ export class DOMAnalyzer {
           })).filter(field => field.name)
         }));
 
-        // Collect tables
         const tables = Array.from(document.querySelectorAll('table')).map((table): TableInfo => ({
           id: table.id,
           className: table.className,
@@ -221,7 +214,6 @@ export class DOMAnalyzer {
           headers: Array.from(table.querySelectorAll('th')).map(th => th.textContent?.trim() || '')
         }));
 
-        // Collect navigation elements
         const navElements = Array.from(document.querySelectorAll('nav, [role="navigation"]'))
           .map((nav): NavigationInfo => ({
             id: nav.id,
@@ -233,7 +225,6 @@ export class DOMAnalyzer {
             }))
           }));
 
-        // Calculate metrics
         const allElements = document.querySelectorAll('*');
         const visibleElements = Array.from(allElements).filter(el => {
           const rect = el.getBoundingClientRect();
@@ -299,7 +290,6 @@ export class DOMAnalyzer {
             const rect = element.getBoundingClientRect();
             const styles = window.getComputedStyle(element);
             
-            // Get all text content
             const textContent = element.textContent?.trim() || '';
             const ariaLabel = element.getAttribute('aria-label') || '';
             const title = element.getAttribute('title') || '';
@@ -311,7 +301,6 @@ export class DOMAnalyzer {
               .join(' ')
               .toLowerCase();
 
-            // Calculate relevance score
             let relevance = 0;
             if (keywords && keywords.length > 0) {
               keywords.forEach(keyword => {
@@ -321,7 +310,6 @@ export class DOMAnalyzer {
               });
             }
 
-            // Build selector path
             let selector = '';
             if (element.id) {
               selector = `#${element.id}`;
@@ -357,7 +345,7 @@ export class DOMAnalyzer {
               isInteractive: this.isInteractiveTag(element.tagName.toLowerCase()),
               relevance,
               allText,
-              page: null // Will be set below
+              page: null
             };
           })
           .filter(candidate => candidate.isVisible)
@@ -366,7 +354,6 @@ export class DOMAnalyzer {
         { selector, keywords }
       );
 
-      // Convert to proper ElementCandidate objects with locators
       const elementCandidates: ElementCandidate[] = [];
       
       for (const candidate of candidates) {
@@ -408,7 +395,6 @@ export class DOMAnalyzer {
         (contextEl: Element, selector: string) => {
           const elements = Array.from(contextEl.querySelectorAll(selector));
           
-          // Define isInteractiveElement locally
           const isInteractiveElement = (element: Element): boolean => {
             const tagName = element.tagName.toLowerCase();
             const interactiveTags = ['a', 'button', 'input', 'select', 'textarea'];
@@ -459,7 +445,6 @@ export class DOMAnalyzer {
         selector
       );
 
-      // Convert to ElementCandidate objects
       const elementCandidates: ElementCandidate[] = [];
       
       for (let i = 0; i < candidates.length; i++) {
@@ -516,7 +501,6 @@ export class DOMAnalyzer {
           }
         }
         
-        // Add index if there are siblings with same selector
         const parent = current.parentElement;
         if (parent) {
           const siblings = Array.from(parent.children).filter(child =>
@@ -542,17 +526,14 @@ export class DOMAnalyzer {
       const siblings = parent ? Array.from(parent.children) : [];
       const index = siblings.indexOf(el as Element);
       
-      // Get surrounding text
       const previousText = index > 0 ? 
         (siblings[index - 1] as Element)?.textContent?.trim() || '' : '';
       const nextText = index < siblings.length - 1 ? 
         (siblings[index + 1] as Element)?.textContent?.trim() || '' : '';
       
-      // Get parent context
       const parentText = parent?.textContent?.trim() || '';
       const parentTag = parent?.tagName.toLowerCase() || '';
       
-      // Get form context if in a form
       const form = (el as Element).closest('form');
       const formContext = form ? {
         id: form.id,
@@ -560,14 +541,12 @@ export class DOMAnalyzer {
         action: (form as HTMLFormElement).action
       } : null;
       
-      // Get table context if in a table
       const table = (el as Element).closest('table');
       const tableContext = table ? {
         id: table.id,
         className: table.className
       } : null;
       
-      // Get section context
       const section = (el as Element).closest('section, article, main, aside, nav, header, footer');
       const sectionContext = section ? {
         tag: section.tagName.toLowerCase(),
@@ -594,28 +573,22 @@ export class DOMAnalyzer {
     return element.evaluate(el => {
       let importance = 0;
       
-      // Position scoring
       const rect = (el as Element).getBoundingClientRect();
-      if (rect.y < 200) importance += 0.2; // Near top
-      if (rect.x < 400) importance += 0.1; // Near left
+      if (rect.y < 200) importance += 0.2;
+      if (rect.x < 400) importance += 0.1;
       
-      // Size scoring
       const area = rect.width * rect.height;
       if (area > 10000) importance += 0.2;
       else if (area > 5000) importance += 0.1;
       
-      // Visibility scoring
       const styles = window.getComputedStyle(el as Element);
       if (styles.fontSize && parseInt(styles.fontSize) > 16) importance += 0.1;
       if (styles.fontWeight === 'bold' || parseInt(styles.fontWeight) >= 600) importance += 0.1;
       
-      // Interactive element
       if (this.isInteractiveTag((el as Element).tagName.toLowerCase())) importance += 0.2;
       
-      // Has ARIA labels
       if ((el as Element).getAttribute('aria-label')) importance += 0.1;
       
-      // In main content area
       if ((el as Element).closest('main, [role="main"]')) importance += 0.1;
       
       return Math.min(importance, 1.0);
@@ -626,11 +599,9 @@ export class DOMAnalyzer {
     page: Page,
     pattern: string
   ): Promise<ElementCandidate[]> {
-    // Pattern can be CSS selector, XPath, or text pattern
     let candidates: ElementCandidate[] = [];
     
     try {
-      // Try as CSS selector
       if (pattern.match(/^[.#\[][^\/]*$/)) {
         const elements = await page.$$(pattern);
         for (const element of elements) {
@@ -639,7 +610,6 @@ export class DOMAnalyzer {
         }
       }
       
-      // Try as XPath
       else if (pattern.startsWith('/') || pattern.startsWith('//')) {
         const elements = await page.$$(pattern);
         for (const element of elements) {
@@ -648,7 +618,6 @@ export class DOMAnalyzer {
         }
       }
       
-      // Try as text pattern
       else {
         const elements = await page.$$(`text="${pattern}"`);
         for (const element of elements) {
@@ -668,11 +637,9 @@ export class DOMAnalyzer {
   async getSemanticStructure(page: Page): Promise<SemanticMap> {
     return page.evaluate(() => {
       const getSemanticRole = (element: Element): string => {
-        // Check explicit role
         const role = element.getAttribute('role');
         if (role) return role;
         
-        // Infer from tag
         const tagName = element.tagName.toLowerCase();
         const semanticTags: Record<string, string> = {
           nav: 'navigation',
@@ -857,7 +824,6 @@ export class DOMAnalyzer {
       const formElement = formEl as HTMLFormElement;
       const fields: FormField[] = [];
       
-      // Analyze all form fields
       const inputs = Array.from(formElement.elements);
       
       inputs.forEach(input => {
@@ -866,7 +832,6 @@ export class DOMAnalyzer {
             input.tagName === 'TEXTAREA') {
           
           const field = input as HTMLInputElement;
-          // Continuing DOMAnalyzer.ts...
 
           const label = this.findLabelForField(field);
           
@@ -891,7 +856,6 @@ export class DOMAnalyzer {
         }
       });
       
-      // Group fields by their visual proximity
       const fieldGroups = this.groupFieldsByProximity(fields, formElement);
       
       return {
@@ -913,17 +877,14 @@ export class DOMAnalyzer {
   }
 
   private findLabelForField(field: HTMLElement): HTMLLabelElement | null {
-    // Check for explicit label
     if (field.id) {
       const label = document.querySelector(`label[for="${field.id}"]`);
       if (label) return label as HTMLLabelElement;
     }
     
-    // Check if field is inside a label
     const parentLabel = field.closest('label');
     if (parentLabel) return parentLabel as HTMLLabelElement;
     
-    // Check for aria-labelledby
     const labelledBy = field.getAttribute('aria-labelledby');
     if (labelledBy) {
       const label = document.getElementById(labelledBy);
@@ -956,7 +917,7 @@ export class DOMAnalyzer {
           Math.pow(rect.y - otherRect.y, 2)
         );
         
-        return distance < 100; // Within 100px
+        return distance < 100;
       });
       
       const group = {
@@ -976,7 +937,6 @@ export class DOMAnalyzer {
     page: Page,
     meaning: string
   ): Promise<ElementCandidate[]> {
-    // Map semantic meanings to selectors
     const semanticMap: Record<string, string[]> = {
       'submit': ['button[type="submit"]', 'input[type="submit"]', 'button:contains("submit")', 'button:contains("save")'],
       'cancel': ['button:contains("cancel")', 'a:contains("cancel")', '[aria-label*="cancel"]'],
@@ -993,17 +953,14 @@ export class DOMAnalyzer {
     const selectors = semanticMap[meaning.toLowerCase()] || [];
     const candidates: ElementCandidate[] = [];
     
-    // Remove unused selector variable
     for (const _ of selectors) {
       try {
         const elements = await this.getCandidateElements(page, undefined, [meaning]);
         candidates.push(...elements);
       } catch (error) {
-        // Continue with other selectors
       }
     }
     
-    // Remove duplicates
     const uniqueCandidates = candidates.filter((candidate, index, self) =>
       index === self.findIndex(c => c.selector === candidate.selector)
     );
@@ -1021,7 +978,6 @@ export class DOMAnalyzer {
         selector: string;
       }> = [];
       
-      // Find elements with landmark roles
       landmarkRoles.forEach(role => {
         const elements = document.querySelectorAll(`[role="${role}"]`);
         elements.forEach((el, index) => {
@@ -1035,7 +991,6 @@ export class DOMAnalyzer {
         });
       });
       
-      // Find semantic HTML5 elements
       const semanticTags = ['nav', 'main', 'header', 'footer', 'aside', 'article', 'section'];
       semanticTags.forEach(tag => {
         const elements = document.querySelectorAll(tag);

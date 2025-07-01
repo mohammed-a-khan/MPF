@@ -111,9 +111,6 @@ export class TestSuiteManager {
     this.logger.info('TestSuiteManager initialized');
   }
 
-  /**
-   * Get test suites for a plan
-   */
   async getTestSuites(
     planId: number,
     options?: {
@@ -153,9 +150,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Get test suite by ID
-   */
   async getTestSuite(
     planId: number,
     suiteId: number,
@@ -194,9 +188,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Create test suite
-   */
   async createTestSuite(
     planId: number,
     request: TestSuiteCreateRequest
@@ -229,9 +220,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Update test suite
-   */
   async updateTestSuite(
     planId: number,
     suiteId: number,
@@ -265,9 +253,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Delete test suite
-   */
   async deleteTestSuite(planId: number, suiteId: number): Promise<void> {
     try {
       this.logger.info(`Deleting test suite: ${suiteId}`);
@@ -288,9 +273,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Get test cases in suite
-   */
   async getTestCases(
     planId: number,
     suiteId: number,
@@ -324,9 +306,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Add test cases to suite
-   */
   async addTestCases(
     planId: number,
     suiteId: number,
@@ -350,9 +329,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Remove test cases from suite
-   */
   async removeTestCases(
     planId: number,
     suiteId: number,
@@ -373,9 +349,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Get test points
-   */
   async getTestPoints(
     planId: number,
     suiteId: number,
@@ -444,9 +417,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Update test points
-   */
   async updateTestPoints(
     planId: number,
     suiteId: number,
@@ -476,9 +446,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Clone test suite
-   */
   async cloneTestSuite(
     sourcePlanId: number,
     sourceSuiteId: number,
@@ -518,9 +485,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Move test suite
-   */
   async moveTestSuite(
     planId: number,
     suiteId: number,
@@ -550,9 +514,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Reorder test suites
-   */
   async reorderTestSuites(
     planId: number,
     parentSuiteId: number,
@@ -578,9 +539,6 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Get suite test case count
-   */
   async getSuiteTestCaseCount(
     planId: number,
     suiteId: number,
@@ -600,27 +558,18 @@ export class TestSuiteManager {
     }
   }
 
-  /**
-   * Clear suite cache
-   */
   private clearSuiteCache(planId: number, suiteId: number): void {
     const cacheKey = `${planId}_${suiteId}`;
     this.suiteCache.delete(cacheKey);
     this.testPointCache.delete(cacheKey);
   }
 
-  /**
-   * Clear all cache
-   */
   clearCache(): void {
     this.suiteCache.clear();
     this.testPointCache.clear();
     this.logger.debug('Test suite cache cleared');
   }
 
-  /**
-   * Get cache statistics
-   */
   getCacheStats(): { suites: number; testPoints: number } {
     return {
       suites: this.suiteCache.size,

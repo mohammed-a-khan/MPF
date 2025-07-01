@@ -3,11 +3,7 @@
 import { DatabaseConnection, QueryOptions, PreparedStatement, QueryResult } from '../types/database.types';
 import { DatabaseAdapter } from '../adapters/DatabaseAdapter';
 import { Logger } from '../../core/utils/Logger';
-// import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Executes database queries with retry and timeout handling
- */
 export class QueryExecutor {
   private adapter: DatabaseAdapter;
   private defaultTimeout: number = 30000;
@@ -18,9 +14,6 @@ export class QueryExecutor {
     this.adapter = adapter;
   }
 
-  /**
-   * Execute query with parameters
-   */
   async execute(
     connection: DatabaseConnection,
     sql: string,
@@ -31,7 +24,6 @@ export class QueryExecutor {
     const startTime = Date.now();
     
     try {
-      // Execute with retry logic
       return await this.executeWithRetry(
         () => this.executeQuery(connection, sql, params, queryOptions),
         queryOptions
@@ -45,9 +37,6 @@ export class QueryExecutor {
     }
   }
 
-  /**
-   * Execute stored procedure
-   */
   async executeStoredProcedure(
     connection: DatabaseConnection,
     procedureName: string,
@@ -62,9 +51,6 @@ export class QueryExecutor {
     );
   }
 
-  /**
-   * Execute function
-   */
   async executeFunction(
     connection: DatabaseConnection,
     functionName: string,
@@ -79,9 +65,6 @@ export class QueryExecutor {
     );
   }
 
-  /**
-   * Execute prepared statement
-   */
   async executePrepared(
     statement: PreparedStatement,
     params?: any[],
@@ -95,9 +78,6 @@ export class QueryExecutor {
     );
   }
 
-  /**
-   * Execute batch of queries
-   */
   async executeBatch(
     connection: DatabaseConnection,
     queries: Array<{ sql: string; params?: any[] }>,
@@ -114,9 +94,6 @@ export class QueryExecutor {
     return results;
   }
 
-  /**
-   * Stream query results
-   */
   async *stream(
     connection: DatabaseConnection,
     sql: string,
@@ -125,11 +102,9 @@ export class QueryExecutor {
   ): AsyncGenerator<any, void, unknown> {
     const queryOptions = this.mergeOptions(options);
     
-    // Use adapter's streaming if available
     if (this.adapter.stream) {
       yield* this.adapter.stream(connection, sql, params, queryOptions);
     } else {
-      // Fallback to regular query
       const result = await this.execute(connection, sql, params, queryOptions);
       for (const row of result.rows) {
         yield row;
@@ -137,9 +112,6 @@ export class QueryExecutor {
     }
   }
 
-  /**
-   * Execute query and return scalar value
-   */
   async scalar<T = any>(
     connection: DatabaseConnection,
     sql: string,
@@ -159,9 +131,6 @@ export class QueryExecutor {
     return null;
   }
 
-  /**
-   * Execute query and return single row
-   */
   async single<T = any>(
     connection: DatabaseConnection,
     sql: string,
@@ -172,9 +141,6 @@ export class QueryExecutor {
     return result.rows.length > 0 ? result.rows[0] as T : null;
   }
 
-  /**
-   * Execute query and return first column of all rows
-   */
   async column<T = any>(
     connection: DatabaseConnection,
     sql: string,
@@ -191,9 +157,6 @@ export class QueryExecutor {
     });
   }
 
-  /**
-   * Execute query with timeout
-   */
   private async executeQuery(
     connection: DatabaseConnection,
     sql: string,
@@ -202,14 +165,12 @@ export class QueryExecutor {
   ): Promise<QueryResult> {
     const timeout = options?.timeout || this.defaultTimeout;
     
-    // Create timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         reject(new Error(`Query timeout after ${timeout}ms`));
       }, timeout);
     });
     
-    // Race query against timeout
     try {
       return await Promise.race([
         this.adapter.query(connection, sql, params, options),
@@ -217,7 +178,6 @@ export class QueryExecutor {
       ]);
     } catch (error) {
       if ((error as Error).message.includes('timeout')) {
-        // Try to cancel query if possible
         if (this.adapter.cancelQuery) {
           try {
             await this.adapter.cancelQuery(connection);
@@ -231,9 +191,6 @@ export class QueryExecutor {
     }
   }
 
-  /**
-   * Execute with retry logic
-   */
   private async executeWithRetry<T>(
     operation: () => Promise<T>,
     options: QueryOptions
@@ -256,7 +213,6 @@ export class QueryExecutor {
       } catch (error) {
         lastError = error as Error;
         
-        // Check if error is retryable
         const isRetryable = retryableErrors.some((code: string) => 
           lastError.message.includes(code) || 
           (lastError as any).code === code
@@ -269,7 +225,6 @@ export class QueryExecutor {
         const logger = Logger.getInstance();
         logger.warn(`Query failed (attempt ${attempt + 1}/${maxRetries + 1}): ${lastError.message}`);
         
-        // Wait before retry
         await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
       }
     }
@@ -277,9 +232,6 @@ export class QueryExecutor {
     throw lastError!;
   }
 
-  /**
-   * Merge query options with defaults
-   */
   private mergeOptions(options?: QueryOptions): QueryOptions {
     const mergedOptions: QueryOptions = {
       timeout: options?.timeout || this.defaultTimeout,
@@ -304,16 +256,10 @@ export class QueryExecutor {
     return mergedOptions;
   }
 
-  /**
-   * Set default timeout
-   */
   setDefaultTimeout(timeout: number): void {
     this.defaultTimeout = timeout;
   }
 
-  /**
-   * Set default retry options
-   */
   setDefaultRetry(count: number, delay: number): void {
     this.defaultRetryCount = count;
     this.defaultRetryDelay = delay;

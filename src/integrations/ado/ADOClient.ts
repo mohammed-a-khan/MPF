@@ -50,9 +50,6 @@ export class ADOClient {
     ADOClient.logger.info('ADO client initialized');
   }
 
-  /**
-   * Get singleton instance
-   */
   static getInstance(): ADOClient {
     if (!this.instance) {
       this.instance = new ADOClient();
@@ -60,9 +57,6 @@ export class ADOClient {
     return this.instance;
   }
 
-  /**
-   * Make HTTP request to ADO
-   */
   async request<T = any>(options: ADORequestOptions): Promise<ADOResponse<T>> {
     const requestId = `req_${++this.requestCount}`;
     const startTime = Date.now();
@@ -91,9 +85,6 @@ export class ADOClient {
     }
   }
 
-  /**
-   * GET request
-   */
   async get<T = any>(url: string, options?: Partial<ADORequestOptions>): Promise<ADOResponse<T>> {
     return this.request<T>({
       method: 'GET',
@@ -102,9 +93,6 @@ export class ADOClient {
     });
   }
 
-  /**
-   * POST request
-   */
   async post<T = any>(url: string, body?: any, options?: Partial<ADORequestOptions>): Promise<ADOResponse<T>> {
     return this.request<T>({
       method: 'POST',
@@ -114,9 +102,6 @@ export class ADOClient {
     });
   }
 
-  /**
-   * PUT request
-   */
   async put<T = any>(url: string, body?: any, options?: Partial<ADORequestOptions>): Promise<ADOResponse<T>> {
     return this.request<T>({
       method: 'PUT',
@@ -126,9 +111,6 @@ export class ADOClient {
     });
   }
 
-  /**
-   * PATCH request
-   */
   async patch<T = any>(url: string, body?: any, options?: Partial<ADORequestOptions>): Promise<ADOResponse<T>> {
     return this.request<T>({
       method: 'PATCH',
@@ -138,9 +120,6 @@ export class ADOClient {
     });
   }
 
-  /**
-   * DELETE request
-   */
   async delete<T = any>(url: string, options?: Partial<ADORequestOptions>): Promise<ADOResponse<T>> {
     return this.request<T>({
       method: 'DELETE',
@@ -149,9 +128,6 @@ export class ADOClient {
     });
   }
 
-  /**
-   * Prepare request options
-   */
   private async prepareRequest(options: ADORequestOptions): Promise<ADORequestOptions> {
     const prepared: ADORequestOptions = {
       ...options,
@@ -172,9 +148,6 @@ export class ADOClient {
     return prepared;
   }
 
-  /**
-   * Execute request with retry logic
-   */
   private async executeWithRetry<T>(
     requestId: string,
     options: ADORequestOptions,
@@ -194,9 +167,6 @@ export class ADOClient {
     }
   }
 
-  /**
-   * Execute HTTP request
-   */
   private executeRequest<T>(requestId: string, options: ADORequestOptions): Promise<ADOResponse<T>> {
     return new Promise((resolve, reject) => {
       const urlObj = new URL(options.url);
@@ -314,9 +284,6 @@ export class ADOClient {
     });
   }
 
-  /**
-   * Configure proxy settings
-   */
   private configureProxy(
     options: https.RequestOptions,
     url: URL,
@@ -341,9 +308,6 @@ export class ADOClient {
     }
   }
 
-  /**
-   * Check if error is retryable
-   */
   private isRetryableError(error: any): boolean {
     if (error.code && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENETUNREACH'].includes(error.code)) {
       return true;
@@ -356,9 +320,6 @@ export class ADOClient {
     return false;
   }
 
-  /**
-   * Enhance error with additional context
-   */
   private enhanceError(error: any, request: ADORequestOptions): ADOError {
     const enhancedError: ADOError = error;
     enhancedError.request = request;
@@ -370,16 +331,10 @@ export class ADOClient {
     return enhancedError;
   }
 
-  /**
-   * Delay execution
-   */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Cancel all active requests
-   */
   cancelAllRequests(): void {
     ADOClient.logger.info(`Cancelling ${this.activeRequests.size} active requests`);
     
@@ -391,9 +346,6 @@ export class ADOClient {
     this.activeRequests.clear();
   }
 
-  /**
-   * Get request statistics
-   */
   getStatistics(): { totalRequests: number; activeRequests: number } {
     return {
       totalRequests: this.requestCount,
@@ -401,17 +353,11 @@ export class ADOClient {
     };
   }
 
-  /**
-   * Get list response
-   */
   async getList<T>(url: string, options?: Partial<ADORequestOptions>): Promise<ADOListResponse<T>> {
     const response = await this.get<ADOListResponse<T>>(url, options);
     return response.data;
   }
 
-  /**
-   * Get all items with pagination
-   */
   async *getAllPaginated<T>(
     url: string,
     pageSize: number = 100
@@ -437,9 +383,6 @@ export class ADOClient {
     }
   }
 
-  /**
-   * Get all items (non-paginated)
-   */
   async getAll<T>(url: string, pageSize: number = 100): Promise<T[]> {
     const allItems: T[] = [];
 
@@ -450,9 +393,6 @@ export class ADOClient {
     return allItems;
   }
 
-  /**
-   * Add query parameters to URL
-   */
   private addQueryParams(url: string, params: Record<string, any>): string {
     const urlObj = new URL(url);
 
@@ -465,9 +405,6 @@ export class ADOClient {
     return urlObj.toString();
   }
 
-  /**
-   * Upload file attachment
-   */
   async uploadAttachment(
     fileContent: Buffer,
     contentType: string = 'application/octet-stream'
@@ -488,9 +425,6 @@ export class ADOClient {
     return response.data;
   }
 
-  /**
-   * Execute batch request
-   */
   async executeBatch(requests: Array<{
     method: string;
     uri: string;

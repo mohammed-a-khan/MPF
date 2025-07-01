@@ -71,7 +71,6 @@ export class ConnectionPool {
     const Agent = isHttps ? https.Agent : http.Agent;
     const agent = new Agent(options) as PooledAgent;
     
-    // Ensure required properties are properly initialized
     if (!agent.freeSockets) {
       agent.freeSockets = {};
     }
@@ -82,14 +81,12 @@ export class ConnectionPool {
       agent.requests = {};
     }
 
-    // Add connection event listeners
     this.attachAgentListeners(agent, isHttps);
 
     return agent;
   }
 
   private attachAgentListeners(agent: PooledAgent, isHttps: boolean): void {
-    // Store the original createConnection method
     const originalCreateConnection = agent.createConnection;
     const protocol = isHttps ? 'HTTPS' : 'HTTP';
 
@@ -108,7 +105,6 @@ export class ConnectionPool {
           const connectionTime = Date.now() - startTime;
           this.recordConnectionSuccess(host, connectionTime);
 
-          // Monitor socket events
           socket.on('timeout', () => {
             ActionLogger.getInstance().warn(`${protocol} socket timeout for ${host}`);
             this.recordSocketTimeout(host);
@@ -130,7 +126,6 @@ export class ConnectionPool {
       if (originalCreateConnection) {
         return originalCreateConnection.call(agent, options, wrappedCallback);
       } else {
-        // Default connection creation
         const socket = net.createConnection(options, () => wrappedCallback(null, socket));
         socket.on('error', (err) => wrappedCallback(err, socket));
         return socket;
@@ -206,7 +201,6 @@ export class ConnectionPool {
   public updateConnectionOptions(options: Partial<ConnectionOptions>): void {
     Object.assign(this.connectionOptions, options);
     
-    // Clear existing agents to apply new options
     this.clearAllAgents();
     
     ActionLogger.getInstance().info('Connection pool options updated', options);
@@ -241,7 +235,7 @@ export class ConnectionPool {
   }
 
   private startCleanupInterval(): void {
-    const interval = ConfigurationManager.getInt('API_POOL_CLEANUP_INTERVAL', 300000); // 5 minutes
+    const interval = ConfigurationManager.getInt('API_POOL_CLEANUP_INTERVAL', 300000);
     
     this.cleanupInterval = setInterval(() => {
       this.performCleanup();
@@ -249,7 +243,7 @@ export class ConnectionPool {
   }
 
   private performCleanup(): void {
-    const maxIdleTime = ConfigurationManager.getInt('API_MAX_SOCKET_IDLE_TIME', 120000); // 2 minutes
+    const maxIdleTime = ConfigurationManager.getInt('API_MAX_SOCKET_IDLE_TIME', 120000);
     const now = Date.now();
 
     [this.httpAgents, this.httpsAgents].forEach((agents) => {
@@ -272,7 +266,6 @@ export class ConnectionPool {
           });
         }
 
-        // Clean up idle free sockets
         if (agent.freeSockets) {
           Object.entries(agent.freeSockets).forEach(([name, sockets]) => {
             const activeFreeSockets = sockets.filter(socket => {
@@ -293,7 +286,6 @@ export class ConnectionPool {
           });
         }
 
-        // Remove agent if no active connections
         if (!hasActiveSockets) {
           const agentData = (agent as any);
           const lastActivity = agentData._lastActivity || 0;
@@ -309,7 +301,7 @@ export class ConnectionPool {
   }
 
   private startMetricsCollection(): void {
-    const interval = ConfigurationManager.getInt('API_METRICS_INTERVAL', 60000); // 1 minute
+    const interval = ConfigurationManager.getInt('API_METRICS_INTERVAL', 60000);
     
     this.metricsInterval = setInterval(() => {
       this.logMetrics();
@@ -326,7 +318,6 @@ export class ConnectionPool {
       freeSockets: stats.total.freeSockets
     });
 
-    // Log per-host metrics if there are issues
     stats.metrics.forEach(metric => {
       if (metric.errors > 0 || metric.timeouts > 0) {
         ActionLogger.getInstance().warn(`Connection issues for ${metric.host}`, {
@@ -408,7 +399,6 @@ export class ConnectionPool {
   public setMaxSockets(maxSockets: number): void {
     this.connectionOptions.maxSockets = maxSockets;
     
-    // Update existing agents
     [this.httpAgents, this.httpsAgents].forEach((agents) => {
       agents.forEach((agent) => {
         agent.maxSockets = maxSockets;
@@ -421,7 +411,6 @@ export class ConnectionPool {
   public setKeepAlive(keepAlive: boolean): void {
     this.connectionOptions.keepAlive = keepAlive;
     
-    // Need to recreate agents for this change
     this.clearAllAgents();
     
     ActionLogger.getInstance().info(`Keep-alive ${keepAlive ? 'enabled' : 'disabled'}`);

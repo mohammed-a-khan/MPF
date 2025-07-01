@@ -44,10 +44,8 @@ export class AuthenticationManager {
     try {
       const credentials: HTTPCredentials = { username, password };
       
-      // Apply to context
       await context.setHTTPCredentials(credentials);
       
-      // Store for reuse
       const key = this.generateCredentialKey(username);
       this.credentialStore.set(key, credentials);
       
@@ -71,9 +69,7 @@ export class AuthenticationManager {
         certificates.map(cert => this.processCertificate(cert))
       );
 
-      // Apply certificates to context
       // Note: Client certificates need to be set during context creation
-      // Store processed certificates for later use
       (context as any)._clientCertificates = processedCerts;
       
       ActionLogger.logInfo('Client certificates set', {
@@ -88,31 +84,25 @@ export class AuthenticationManager {
   }
 
   private async processCertificate(cert: Certificate): Promise<Certificate> {
-    // Check cache
     const cacheKey = this.generateCertificateKey(cert);
     const cached = this.certificateCache.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    // Process certificate
     const processed: Certificate = { ...cert };
 
-    // Load certificate file if path provided
     if (cert.certPath) {
       const certData = await fs.readFile(cert.certPath);
       processed.cert = certData;
     }
 
-    // Load key file if path provided
     if (cert.keyPath) {
       const keyData = await fs.readFile(cert.keyPath);
       processed.key = keyData;
     }
 
-    // Decrypt passphrase if encrypted
     if (cert.passphrase && cert.passphrase.startsWith('encrypted:')) {
-      // Extract encrypted data
       const encryptedParts = cert.passphrase.substring(10).split(':');
       if (encryptedParts.length >= 3) {
         const encrypted = encryptedParts[0];
@@ -121,20 +111,17 @@ export class AuthenticationManager {
         const tag = encryptedParts[3] || '';
         
         if (encrypted && salt && iv) {
-          // Use a default password or get from environment
           const password = process.env['CRYPTO_PASSWORD'] || 'default-password';
           processed.passphrase = await CryptoUtils.decrypt(encrypted, password, salt, iv, tag);
         }
       }
     }
 
-    // Load CA certificate if provided
     if (cert.caPath) {
       const caData = await fs.readFile(cert.caPath);
       processed.ca = caData;
     }
 
-    // Cache processed certificate
     this.certificateCache.set(cacheKey, processed);
     
     return processed;
@@ -146,16 +133,13 @@ export class AuthenticationManager {
   ): Promise<void> {
     try {
       if (proxy.username && proxy.password) {
-        // Decrypt password if encrypted
         let decryptedPassword = proxy.password;
                   if (decryptedPassword.startsWith('ENCRYPTED:')) {
-            // Use EncryptionConfigurationManager for consistent decryption
             const testResult = await EncryptionConfigurationManager.testDecryption(decryptedPassword);
             if (testResult.success && testResult.decrypted) {
               decryptedPassword = testResult.decrypted;
             }
         } else if (decryptedPassword.startsWith('encrypted:')) {
-          // Handle legacy format
           const encryptedParts = decryptedPassword.substring(10).split(':');
           if (encryptedParts.length >= 3) {
             const encrypted = encryptedParts[0];
@@ -172,11 +156,9 @@ export class AuthenticationManager {
           }
         }
 
-        // Store decrypted proxy credentials for later use
         (proxy as any)._decryptedPassword = decryptedPassword;
 
         // Note: Proxy is set during context creation
-        // This method stores credentials for later use
         ActionLogger.logInfo('Proxy credentials stored', {
           type: 'authentication',
           action: 'proxy_credentials_stored',
@@ -196,13 +178,10 @@ export class AuthenticationManager {
     try {
       const statePath = path.join(this.authStateDir, `${name}.json`);
       
-      // Get storage state from context
       const state = await context.storageState();
       
-      // Encrypt sensitive data
       const encryptedState = await this.encryptStorageState(state);
       
-      // Save to file
       await fs.writeFile(statePath, JSON.stringify(encryptedState, null, 2));
       
       ActionLogger.logInfo('Auth state saved', {
@@ -223,27 +202,21 @@ export class AuthenticationManager {
     try {
       const statePath = path.join(this.authStateDir, `${name}.json`);
       
-      // Check if file exists
       if (!await FileUtils.exists(statePath)) {
         throw new Error(`Auth state '${name}' not found`);
       }
       
-      // Read state
       const encryptedData = await fs.readFile(statePath, 'utf-8');
       const encryptedState = JSON.parse(encryptedData);
       
-      // Decrypt sensitive data
       const state = await this.decryptStorageState(encryptedState);
       
-      // Apply to context - this needs to be done during context creation
-      // Store for later use
       ActionLogger.logInfo('Auth state loaded', {
         type: 'authentication',
         action: 'auth_state_loaded',
         name
       });
       
-      // Return the state for context creation
       return state as any;
     } catch (error) {
       ActionLogger.logError('Failed to load auth state', error as Error);
@@ -253,13 +226,10 @@ export class AuthenticationManager {
 
   async clearAuthState(context: BrowserContext): Promise<void> {
     try {
-      // Clear cookies
       await context.clearCookies();
       
-      // Clear permissions
       await context.clearPermissions();
       
-      // Clear storage for all pages
       const pages = context.pages();
       for (const page of pages) {
         if (!page.isClosed()) {
@@ -297,13 +267,10 @@ export class AuthenticationManager {
         waitForNavigation = true
       } = options;
 
-      // Wait for MFA input to be visible
       await page.waitForSelector(codeInputSelector, { state: 'visible' });
       
-      // Fill MFA code
       await page.fill(codeInputSelector, mfaCode);
       
-      // Submit if button exists
       const submitButton = await page.$(submitButtonSelector);
       if (submitButton) {
         if (waitForNavigation) {
@@ -348,7 +315,6 @@ export class AuthenticationManager {
         responseType = 'code'
       } = options;
 
-      // Build authorization URL
       const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: redirectUri,
@@ -359,17 +325,14 @@ export class AuthenticationManager {
 
       const authUrl = `${authorizeUrl}?${params.toString()}`;
       
-      // Navigate to authorization URL
       await page.goto(authUrl);
       
-      // Wait for redirect
       await page.waitForFunction(
         (uri) => window.location.href.startsWith(uri),
         redirectUri,
         { timeout: 60000 }
       );
       
-      // Extract authorization code or token from URL
       const url = new URL(page.url());
       const code = url.searchParams.get('code') || url.hash.match(/access_token=([^&]+)/)?.[1];
       
@@ -403,7 +366,6 @@ export class AuthenticationManager {
     }
   ): Promise<void> {
     try {
-      // Add SSO session cookies
       await context.addCookies(ssoConfig.sessionCookies);
       
       ActionLogger.logInfo('SSO applied', {
@@ -420,7 +382,6 @@ export class AuthenticationManager {
   private async encryptStorageState(state: StorageState): Promise<any> {
     const encrypted = { ...state };
     
-    // Encrypt cookie values
     if (encrypted.cookies) {
       encrypted.cookies = await Promise.all(
         encrypted.cookies.map(async (cookie) => ({
@@ -430,7 +391,6 @@ export class AuthenticationManager {
       );
     }
     
-    // Encrypt localStorage values
     if (encrypted.origins) {
       encrypted.origins = await Promise.all(
         encrypted.origins.map(async (origin) => ({
@@ -451,7 +411,6 @@ export class AuthenticationManager {
   private async decryptStorageState(encryptedState: any): Promise<StorageState> {
     const decrypted = { ...encryptedState };
     
-    // Decrypt cookie values
     if (decrypted.cookies) {
       decrypted.cookies = await Promise.all(
         decrypted.cookies.map(async (cookie: any) => ({
@@ -461,7 +420,6 @@ export class AuthenticationManager {
       );
     }
     
-    // Decrypt localStorage values
     if (decrypted.origins) {
       decrypted.origins = await Promise.all(
         decrypted.origins.map(async (origin: any) => ({
@@ -531,7 +489,6 @@ export class AuthenticationManager {
       iterations: 10000
     });
     
-    // Return simplified format without salt
     return {
       encrypted: result.encrypted,
       iv: result.iv,
@@ -541,7 +498,6 @@ export class AuthenticationManager {
 
   private async decryptValue(encryptedData: any): Promise<string> {
     if (typeof encryptedData === 'string') {
-      // Handle legacy format
       return encryptedData;
     }
     

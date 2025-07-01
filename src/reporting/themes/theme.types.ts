@@ -1,7 +1,3 @@
-/**
- * Theme Types
- * Shared type definitions for the theme system
- */
 
 export interface ThemeConfig {
   id?: string;

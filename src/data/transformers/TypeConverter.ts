@@ -3,10 +3,6 @@ import { TypeConversionOptions } from '../types/data.types';
 import { DataType, ConversionResult, ExtendedTypeConversionOptions } from './type-converter.types';
 import { logger } from '../../core/utils/Logger';
 
-/**
- * Convert values between different data types
- * Handles automatic type detection and conversion
- */
 export class TypeConverter {
     private readonly defaultOptions: ExtendedTypeConversionOptions = {
         dateFormat: 'YYYY-MM-DD',
@@ -26,29 +22,22 @@ export class TypeConverter {
     };
 
     private readonly datePatterns = [
-        // ISO formats
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/,
         /^\d{4}-\d{2}-\d{2}$/,
-        // US formats
         /^\d{1,2}\/\d{1,2}\/\d{4}$/,
         /^\d{1,2}-\d{1,2}-\d{4}$/,
-        // European formats
         /^\d{1,2}\.\d{1,2}\.\d{4}$/,
-        // Timestamp
         /^\d{10,13}$/
     ];
 
     private readonly numberPatterns = [
-        /^-?\d+$/,                              // Integer
-        /^-?\d+\.\d+$/,                         // Decimal
-        /^-?\d+\.?\d*[eE][+-]?\d+$/,           // Scientific
-        /^-?\$?\d{1,3}(,\d{3})*(\.\d+)?$/,    // Currency
-        /^-?\d+\.?\d*%$/                        // Percentage
+        /^-?\d+$/,
+        /^-?\d+\.\d+$/,
+        /^-?\d+\.?\d*[eE][+-]?\d+$/,
+        /^-?\$?\d{1,3}(,\d{3})*(\.\d+)?$/,
+        /^-?\d+\.?\d*%$/
     ];
 
-    /**
-     * Convert value to specified type
-     */
     async convert(
         value: any,
         targetType: DataType,
@@ -57,7 +46,6 @@ export class TypeConverter {
         const opts = { ...this.defaultOptions, ...options };
 
         try {
-            // Handle null/undefined
             if (this.isNull(value, opts)) {
                 return {
                     success: true,
@@ -68,10 +56,8 @@ export class TypeConverter {
                 };
             }
 
-            // Detect source type if auto
             const sourceType = this.detectType(value);
 
-            // Perform conversion
             let convertedValue: any;
             switch (targetType) {
                 case 'string':
@@ -130,9 +116,6 @@ export class TypeConverter {
         }
     }
 
-    /**
-     * Convert multiple values
-     */
     async convertBatch(
         values: any[],
         targetType: DataType,
@@ -143,9 +126,6 @@ export class TypeConverter {
         );
     }
 
-    /**
-     * Convert object properties based on schema
-     */
     async convertObject(
         obj: Record<string, any>,
         schema: Record<string, DataType>,
@@ -163,16 +143,12 @@ export class TypeConverter {
         return result;
     }
 
-    /**
-     * Detect data type from value
-     */
     detectType(value: any): DataType {
         if (value === null || value === undefined) {
             return 'null';
         }
 
         if (typeof value === 'string') {
-            // Check if string represents other types
             if (this.isDateString(value)) return 'date';
             if (this.isNumberString(value)) return 'number';
             if (this.isBooleanString(value)) return 'boolean';
@@ -189,18 +165,13 @@ export class TypeConverter {
         return 'unknown';
     }
 
-    /**
-     * Auto convert value based on detection
-     */
     private async autoConvert(value: any, options: TypeConversionOptions): Promise<any> {
         const type = this.detectType(value);
 
-        // If already a complex type, return as is
         if (['array', 'object', 'date'].includes(type)) {
             return value;
         }
 
-        // Try conversions in order
         if (options.parseBooleans && this.isBooleanString(value)) {
             return this.toBoolean(value, options);
         }
@@ -220,9 +191,6 @@ export class TypeConverter {
         return value;
     }
 
-    /**
-     * Convert to string
-     */
     private async toString(value: any, options: TypeConversionOptions): Promise<string> {
         if (value === null || value === undefined) {
             return '';
@@ -243,9 +211,6 @@ export class TypeConverter {
         return String(value);
     }
 
-    /**
-     * Convert to number
-     */
     private async toNumber(value: any): Promise<number> {
         if (typeof value === 'number') {
             return value;
@@ -254,23 +219,19 @@ export class TypeConverter {
         if (typeof value === 'string') {
             const cleaned = value.trim();
 
-            // Handle percentage
             if (cleaned.endsWith('%')) {
                 return parseFloat(cleaned.slice(0, -1)) / 100;
             }
 
-            // Handle currency
             const currencyMatch = cleaned.match(/^\$?([\d,]+\.?\d*)$/);
             if (currencyMatch && currencyMatch[1]) {
                 return parseFloat(currencyMatch[1].replace(/,/g, ''));
             }
 
-            // Handle scientific notation
             if (/[eE]/.test(cleaned)) {
                 return parseFloat(cleaned);
             }
 
-            // Handle regular numbers
             const num = parseFloat(cleaned);
             if (!isNaN(num)) {
                 return num;
@@ -288,9 +249,6 @@ export class TypeConverter {
         throw new Error(`Cannot convert ${typeof value} to number`);
     }
 
-    /**
-     * Convert to boolean
-     */
     private async toBoolean(value: any, options: TypeConversionOptions): Promise<boolean> {
         if (typeof value === 'boolean') {
             return value;
@@ -317,9 +275,6 @@ export class TypeConverter {
         throw new Error(`Cannot convert ${typeof value} "${value}" to boolean`);
     }
 
-    /**
-     * Convert to date
-     */
     private async toDate(value: any, options: TypeConversionOptions): Promise<Date> {
         if (value instanceof Date) {
             return value;
@@ -328,33 +283,26 @@ export class TypeConverter {
         if (typeof value === 'string') {
             const cleaned = value.trim();
 
-            // Try timestamp
             if (/^\d{10,13}$/.test(cleaned)) {
                 const timestamp = parseInt(cleaned);
                 return new Date(cleaned.length === 10 ? timestamp * 1000 : timestamp);
             }
 
-            // Try various date formats
             const date = new Date(cleaned);
             if (!isNaN(date.getTime())) {
                 return date;
             }
 
-            // Try custom parsing for common formats
             return this.parseCustomDateFormat(cleaned, (options as ExtendedTypeConversionOptions).dateFormat || this.defaultOptions.dateFormat || 'YYYY-MM-DD');
         }
 
         if (typeof value === 'number') {
-            // Assume timestamp
             return new Date(value > 9999999999 ? value : value * 1000);
         }
 
         throw new Error(`Cannot convert ${typeof value} to date`);
     }
 
-    /**
-     * Convert to array
-     */
     private async toArray(value: any): Promise<any[]> {
         if (Array.isArray(value)) {
             return value;
@@ -363,17 +311,13 @@ export class TypeConverter {
         if (typeof value === 'string') {
             const cleaned = value.trim();
 
-            // Try JSON parse
             if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
                 try {
                     return JSON.parse(cleaned);
                 } catch (error) {
-                    // JSON parsing failed, try other methods
-                    // Continue with delimiter-based parsing
                 }
             }
 
-            // Split by common delimiters
             if (cleaned.includes(',')) {
                 return cleaned.split(',').map(v => v.trim());
             }
@@ -386,17 +330,12 @@ export class TypeConverter {
                 return cleaned.split('|').map(v => v.trim());
             }
 
-            // Single value array
             return [cleaned];
         }
 
-        // Convert single value to array
         return [value];
     }
 
-    /**
-     * Convert to object
-     */
     private async toObject(value: any): Promise<Record<string, any>> {
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
             return value;
@@ -405,7 +344,6 @@ export class TypeConverter {
         if (typeof value === 'string') {
             const cleaned = value.trim();
 
-            // Try JSON parse
             if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
                 try {
                     const parsed = JSON.parse(cleaned);
@@ -413,12 +351,9 @@ export class TypeConverter {
                         return parsed;
                     }
                 } catch (error) {
-                    // JSON parsing failed, try key=value parsing
-                    // Continue with alternative parsing methods
                 }
             }
 
-            // Try key=value pairs
             if (cleaned.includes('=')) {
                 const obj: Record<string, any> = {};
                 const pairs = cleaned.split(/[,;&]/).map(p => p.trim());
@@ -435,7 +370,6 @@ export class TypeConverter {
         }
 
         if (Array.isArray(value)) {
-            // Convert array to object with indices as keys
             return value.reduce((obj, val, index) => {
                 obj[index.toString()] = val;
                 return obj;
@@ -445,17 +379,12 @@ export class TypeConverter {
         throw new Error(`Cannot convert ${typeof value} to object`);
     }
 
-    /**
-     * Convert to JSON string
-     */
     private async toJSON(value: any): Promise<string> {
         if (typeof value === 'string') {
-            // Validate it's valid JSON
             try {
                 JSON.parse(value);
                 return value;
             } catch {
-                // Convert to JSON
                 return JSON.stringify(value);
             }
         }
@@ -463,9 +392,6 @@ export class TypeConverter {
         return JSON.stringify(value, null, 2);
     }
 
-    /**
-     * Check if value is null based on options
-     */
     private isNull(value: any, options: TypeConversionOptions): boolean {
         if (value === null || value === undefined) {
             return true;
@@ -485,35 +411,26 @@ export class TypeConverter {
         return false;
     }
 
-    /**
-     * Check if string represents a date
-     */
     private isDateString(value: any): boolean {
         if (typeof value !== 'string') return false;
         
         const cleaned = value.trim();
         
-        // Check common date patterns
         for (const pattern of this.datePatterns) {
             if (pattern.test(cleaned)) {
                 return true;
             }
         }
 
-        // Try parsing
         const date = new Date(cleaned);
         return !isNaN(date.getTime());
     }
 
-    /**
-     * Check if string represents a number
-     */
     private isNumberString(value: any): boolean {
         if (typeof value !== 'string') return false;
         
         const cleaned = value.trim();
         
-        // Check number patterns
         for (const pattern of this.numberPatterns) {
             if (pattern.test(cleaned)) {
                 return true;
@@ -523,9 +440,6 @@ export class TypeConverter {
         return false;
     }
 
-    /**
-     * Check if string represents a boolean
-     */
     private isBooleanString(value: any): boolean {
         if (typeof value !== 'string') return false;
         
@@ -535,9 +449,6 @@ export class TypeConverter {
         return [...trueValues, ...falseValues].includes(normalized);
     }
 
-    /**
-     * Check if string is JSON
-     */
     private isJSONString(value: any): boolean {
         if (typeof value !== 'string') return false;
         
@@ -556,9 +467,6 @@ export class TypeConverter {
         }
     }
 
-    /**
-     * Parse custom date formats
-     */
     private parseCustomDateFormat(dateStr: string, format: string): Date {
         return this.parseFormattedDate(dateStr, format);
     }
@@ -566,19 +474,16 @@ export class TypeConverter {
     private parseFormattedDate(dateStr: string, _format: string): Date {
         const cleaned = dateStr.trim();
 
-        // US format MM/DD/YYYY
         const usMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
         if (usMatch) {
             return new Date(parseInt(usMatch[3] || '0'), parseInt(usMatch[1] || '0') - 1, parseInt(usMatch[2] || '0'));
         }
 
-        // European format DD.MM.YYYY
         const euMatch = cleaned.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
         if (euMatch) {
             return new Date(parseInt(euMatch[3] || '0'), parseInt(euMatch[2] || '0') - 1, parseInt(euMatch[1] || '0'));
         }
 
-        // ISO format variations
         const isoMatch = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2}))?/);
         if (isoMatch) {
             return new Date(
@@ -594,9 +499,6 @@ export class TypeConverter {
         throw new Error(`Cannot parse date format: ${dateStr}`);
     }
 
-    /**
-     * Format a date according to the specified format
-     */
     private formatDate(date: Date, format: string): string {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -617,15 +519,11 @@ export class TypeConverter {
         return formatted;
     }
 
-    /**
-     * Create custom type converter
-     */
     static createCustomConverter(
         customTypes: Record<string, (value: any) => any>
     ): TypeConverter {
         const converter = new TypeConverter();
         
-        // Add custom type handlers
         for (const [type, handler] of Object.entries(customTypes)) {
             (converter as any)[`to${type.charAt(0).toUpperCase() + type.slice(1)}`] = handler;
         }

@@ -1,13 +1,7 @@
-/**
- * Theme Presets
- * Pre-configured themes for the CS Test Automation Framework
- * Includes brand theme, dark mode, accessibility themes, and custom variations
- */
 
 import { ThemeConfig } from './theme.types';
 
 export class ThemePresets {
-  // CS Brand Theme - Default
   static readonly CS_BRAND: ThemeConfig = {
     id: 'cs-brand',
     name: 'CS Brand Theme',
@@ -41,7 +35,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Dark Theme
   static readonly DARK: ThemeConfig = {
     id: 'cs-dark',
     name: 'CS Dark Theme',
@@ -52,7 +45,6 @@ export class ThemePresets {
       mono: 'Consolas, "Courier New", monospace',
     },
     customColors: {
-      // Override some dark theme colors for better CS branding
       primary: '#D13A9C',
       primaryLight: '#E95BAB',
       primaryDark: '#B91C84',
@@ -74,7 +66,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Light Theme
   static readonly LIGHT: ThemeConfig = {
     id: 'cs-light',
     name: 'CS Light Theme',
@@ -94,7 +85,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // High Contrast Theme (WCAG AAA Compliant)
   static readonly HIGH_CONTRAST: ThemeConfig = {
     id: 'cs-high-contrast',
     name: 'CS High Contrast Theme',
@@ -105,14 +95,13 @@ export class ThemePresets {
       mono: 'Consolas, monospace',
     },
     animations: {
-      duration: '0ms', // No animations for accessibility
+      duration: '0ms',
       easing: 'none',
       custom: '',
     },
     minify: true,
   };
 
-  // Print Theme
   static readonly PRINT: ThemeConfig = {
     id: 'cs-print',
     name: 'CS Print Theme',
@@ -130,23 +119,19 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Executive Dashboard Theme
   static readonly EXECUTIVE: ThemeConfig = {
     id: 'cs-executive',
     name: 'CS Executive Dashboard',
     preset: 'cs-brand',
     customColors: {
-      // Sophisticated color adjustments
       primary: '#7B1450',
       primaryLight: '#93186C',
       primaryDark: '#5A0F3A',
 
-      // Muted backgrounds
       bgPrimary: '#FAFAFA',
       bgSecondary: '#F5F5F5',
       bgCard: '#FFFFFF',
 
-      // Professional text colors
       textPrimary: '#1A1A1A',
       textSecondary: '#4A4A4A',
       textHeading: '#0A0A0A',
@@ -173,13 +158,11 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Developer Theme
   static readonly DEVELOPER: ThemeConfig = {
     id: 'cs-developer',
     name: 'CS Developer Theme',
     preset: 'dark',
     customColors: {
-      // Terminal-inspired colors
       primary: '#00FF00',
       primaryLight: '#33FF33',
       primaryDark: '#00CC00',
@@ -231,7 +214,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Minimal Theme
   static readonly MINIMAL: ThemeConfig = {
     id: 'cs-minimal',
     name: 'CS Minimal Theme',
@@ -273,7 +255,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Colorful Theme
   static readonly VIBRANT: ThemeConfig = {
     id: 'cs-vibrant',
     name: 'CS Vibrant Theme',
@@ -337,7 +318,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Retro Theme
   static readonly RETRO: ThemeConfig = {
     id: 'cs-retro',
     name: 'CS Retro Theme',
@@ -393,7 +373,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Ocean Theme
   static readonly OCEAN: ThemeConfig = {
     id: 'cs-ocean',
     name: 'CS Ocean Theme',
@@ -451,7 +430,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  // Forest Theme
   static readonly FOREST: ThemeConfig = {
     id: 'cs-forest',
     name: 'CS Forest Theme',
@@ -509,9 +487,6 @@ export class ThemePresets {
     minify: true,
   };
 
-  /**
-   * Get all available presets
-   */
   static getAllPresets(): ThemeConfig[] {
     return [
       this.CS_BRAND,
@@ -529,16 +504,10 @@ export class ThemePresets {
     ];
   }
 
-  /**
-   * Get preset by ID
-   */
   static getPresetById(id: string): ThemeConfig | undefined {
     return this.getAllPresets().find(preset => preset.id === id);
   }
 
-  /**
-   * Get preset names for UI selection
-   */
   static getPresetOptions(): Array<{ id: string; name: string; description: string }> {
     return [
       { id: 'cs-brand', name: 'CS Brand', description: 'Default CS brand theme with primary color #93186C' },
@@ -556,9 +525,6 @@ export class ThemePresets {
     ];
   }
 
-  /**
-   * Create custom theme by merging with base preset
-   */
   static createCustomTheme(basePreset: string, customizations: Partial<ThemeConfig>): ThemeConfig {
     const base = this.getPresetById(basePreset) ?? this.CS_BRAND;
 
@@ -586,9 +552,6 @@ export class ThemePresets {
     };
   }
 
-  /**
-   * Validate theme configuration
-   */
   static validateTheme(theme: ThemeConfig): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
@@ -603,7 +566,6 @@ export class ThemePresets {
     }
 
     if (theme.customColors) {
-      // Validate color format
       Object.entries(theme.customColors).forEach(([key, value]) => {
         if (typeof value === 'string' && !this.isValidColor(value)) {
           errors.push(`Invalid color format for ${key}: ${value}`);
@@ -614,38 +576,25 @@ export class ThemePresets {
     return { valid: errors.length === 0, errors };
   }
 
-  /**
-   * Check if a color value is valid
-   */
   private static isValidColor(color: string): boolean {
-    // Check hex colors
     if (/^#[0-9A-F]{3}$/i.test(color)) return true;
     if (/^#[0-9A-F]{6}$/i.test(color)) return true;
     if (/^#[0-9A-F]{8}$/i.test(color)) return true;
 
-    // Check rgb/rgba
     if (/^rgba?\([\d\s,%.]+\)$/i.test(color)) return true;
 
-    // Check hsl/hsla
     if (/^hsla?\([\d\s,%]+\)$/i.test(color)) return true;
 
-    // Check CSS color names
     const cssColors = ['transparent', 'currentColor', 'inherit', 'initial', 'unset'];
     if (cssColors.includes(color.toLowerCase())) return true;
 
     return false;
   }
 
-  /**
-   * Export theme as JSON
-   */
   static exportTheme(theme: ThemeConfig): string {
     return JSON.stringify(theme, null, 2);
   }
 
-  /**
-   * Import theme from JSON
-   */
   static importTheme(json: string): ThemeConfig {
     const theme = JSON.parse(json) as ThemeConfig;
     const validation = this.validateTheme(theme);

@@ -111,13 +111,11 @@ export class StatusCodeValidator {
 
   public getStatusMessage(statusCode: number): string {
     const statusMessages: Record<number, string> = {
-      // 1xx Informational
       100: 'Continue',
       101: 'Switching Protocols',
       102: 'Processing',
       103: 'Early Hints',
       
-      // 2xx Success
       200: 'OK',
       201: 'Created',
       202: 'Accepted',
@@ -129,7 +127,6 @@ export class StatusCodeValidator {
       208: 'Already Reported',
       226: 'IM Used',
       
-      // 3xx Redirection
       300: 'Multiple Choices',
       301: 'Moved Permanently',
       302: 'Found',
@@ -139,7 +136,6 @@ export class StatusCodeValidator {
       307: 'Temporary Redirect',
       308: 'Permanent Redirect',
       
-      // 4xx Client Error
       400: 'Bad Request',
       401: 'Unauthorized',
       402: 'Payment Required',
@@ -170,7 +166,6 @@ export class StatusCodeValidator {
       431: 'Request Header Fields Too Large',
       451: 'Unavailable For Legal Reasons',
       
-      // 5xx Server Error
       500: 'Internal Server Error',
       501: 'Not Implemented',
       502: 'Bad Gateway',

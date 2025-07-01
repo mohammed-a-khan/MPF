@@ -3,10 +3,6 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 
-/**
- * Runner configuration management
- * Handles all execution-related configuration options
- */
 export class RunnerConfig {
   private static instance: RunnerConfig;
   private config: RunnerConfiguration;
@@ -25,35 +21,24 @@ export class RunnerConfig {
     return RunnerConfig.instance;
   }
 
-  /**
-   * Load configuration from file and command line
-   */
   async loadConfiguration(options: RunnerOptions): Promise<void> {
     ActionLogger.logDebug('RunnerConfig', 'Loading runner configuration');
 
-    // Load from config file if specified
     if (options.configFile) {
       await this.loadFromFile(options.configFile);
     }
 
-    // Apply command line overrides
     this.applyCommandLineOptions(options);
 
-    // Validate configuration
     this.validateConfiguration();
 
-    // Apply to ConfigurationManager
     this.applyToConfigurationManager();
 
     ActionLogger.logInfo('RunnerConfig', 'Runner configuration loaded successfully');
   }
 
-  /**
-   * Load default configuration
-   */
   private loadDefaultConfiguration(): RunnerConfiguration {
     return {
-      // Execution settings
       execution: {
         parallel: ConfigurationManager.getBoolean('PARALLEL_EXECUTION', false),
         maxWorkers: ConfigurationManager.getInt('MAX_PARALLEL_WORKERS', 0),
@@ -65,7 +50,6 @@ export class RunnerConfig {
         seed: ConfigurationManager.get('RANDOM_SEED', Date.now().toString())
       },
 
-      // Test selection
       selection: {
         features: [] as string[],
         scenarios: [] as string[],
@@ -73,14 +57,12 @@ export class RunnerConfig {
         lineNumbers: [] as number[]
       },
 
-      // Environment
       environment: {
         name: ConfigurationManager.getEnvironmentName(),
         baseUrl: ConfigurationManager.get('BASE_URL', ''),
         variables: {}
       },
 
-      // Browser settings
       browser: {
         type: ConfigurationManager.get('DEFAULT_BROWSER', 'chromium') as any,
         headless: ConfigurationManager.getBoolean('HEADLESS', false),
@@ -94,7 +76,6 @@ export class RunnerConfig {
         devtools: ConfigurationManager.getBoolean('BROWSER_DEVTOOLS', false)
       },
 
-      // Reporting
       reporting: {
         outputPath: ConfigurationManager.get('REPORT_PATH', './reports'),
         formats: ConfigurationManager.getArray('REPORT_FORMATS', ','),
@@ -108,7 +89,6 @@ export class RunnerConfig {
         }
       },
 
-      // Debugging
       debugging: {
         enabled: ConfigurationManager.getBoolean('DEBUG_MODE', false),
         pauseOnFailure: ConfigurationManager.getBoolean('PAUSE_ON_FAILURE', false),
@@ -119,7 +99,6 @@ export class RunnerConfig {
         highlightElements: ConfigurationManager.getBoolean('HIGHLIGHT_ELEMENTS', false)
       },
 
-      // Logging
       logging: {
         level: ConfigurationManager.get('LOG_LEVEL', 'info') as any,
         console: ConfigurationManager.getBoolean('LOG_TO_CONSOLE', true),
@@ -129,7 +108,6 @@ export class RunnerConfig {
         includeSource: ConfigurationManager.getBoolean('LOG_INCLUDE_SOURCE', true)
       },
 
-      // Performance
       performance: {
         collectMetrics: ConfigurationManager.getBoolean('COLLECT_PERFORMANCE_METRICS', true),
         slowTestThreshold: ConfigurationManager.getInt('SLOW_TEST_THRESHOLD', 10000),
@@ -137,7 +115,6 @@ export class RunnerConfig {
         cpuThreshold: ConfigurationManager.getInt('CPU_THRESHOLD_PERCENT', 80)
       },
 
-      // Network
       network: {
         timeout: ConfigurationManager.getInt('NETWORK_TIMEOUT', 30000),
         proxy: {
@@ -155,7 +132,6 @@ export class RunnerConfig {
         }
       },
 
-      // AI/Self-healing
       ai: {
         enabled: ConfigurationManager.getBoolean('AI_ENABLED', true),
         selfHealing: ConfigurationManager.getBoolean('AI_SELF_HEALING_ENABLED', true),
@@ -164,7 +140,6 @@ export class RunnerConfig {
         collectTrainingData: ConfigurationManager.getBoolean('AI_COLLECT_TRAINING_DATA', true)
       },
 
-      // Integration
       integration: {
         ado: {
           enabled: ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false),
@@ -176,7 +151,6 @@ export class RunnerConfig {
         }
       },
 
-      // Advanced
       advanced: {
         maxContexts: ConfigurationManager.getInt('MAX_BROWSER_CONTEXTS', 10),
         maxPages: ConfigurationManager.getInt('MAX_PAGES_PER_CONTEXT', 5),
@@ -189,9 +163,6 @@ export class RunnerConfig {
     };
   }
 
-  /**
-   * Load configuration from file
-   */
   private async loadFromFile(filePath: string): Promise<void> {
     try {
       const absolutePath = path.resolve(filePath);
@@ -203,7 +174,6 @@ export class RunnerConfig {
       const content = await fs.promises.readFile(absolutePath, 'utf-8');
       const fileConfig = JSON.parse(content);
 
-      // Merge with default configuration
       this.config = this.mergeConfigurations(this.config, fileConfig);
       this.configFile = absolutePath;
 
@@ -214,11 +184,7 @@ export class RunnerConfig {
     }
   }
 
-  /**
-   * Apply command line options
-   */
   private applyCommandLineOptions(options: RunnerOptions): void {
-    // Execution options
     if (options.parallel !== undefined) {
       this.config.execution.parallel = options.parallel;
       this.commandLineOverrides.set('execution.parallel', options.parallel);
@@ -239,7 +205,6 @@ export class RunnerConfig {
       this.commandLineOverrides.set('execution.dryRun', options.dryRun);
     }
 
-    // Selection options
     if (options.features && options.features.length > 0) {
       this.config.selection.features = options.features;
       this.commandLineOverrides.set('selection.features', options.features);
@@ -255,13 +220,11 @@ export class RunnerConfig {
       this.commandLineOverrides.set('selection.tags', options.tags);
     }
 
-    // Environment
     if (options.env) {
       this.config.environment.name = options.env;
       this.commandLineOverrides.set('environment.name', options.env);
     }
 
-    // Browser options
     if (options.browser) {
       const validBrowsers = ['chromium', 'firefox', 'webkit'] as const;
       if (validBrowsers.includes(options.browser as any)) {
@@ -282,7 +245,6 @@ export class RunnerConfig {
       this.commandLineOverrides.set('browser.timeout', options.timeout);
     }
 
-    // Debugging options
     if (options.debug !== undefined) {
       this.config.debugging.enabled = options.debug;
       this.commandLineOverrides.set('debugging.enabled', options.debug);
@@ -298,7 +260,6 @@ export class RunnerConfig {
       this.commandLineOverrides.set('debugging.traces', options.trace);
     }
 
-    // Reporting options
     if (options.reportName) {
       this.config.reporting.name = options.reportName;
       this.commandLineOverrides.set('reporting.name', options.reportName);
@@ -310,9 +271,6 @@ export class RunnerConfig {
     }
   }
 
-  /**
-   * Merge configurations
-   */
   private mergeConfigurations(base: any, override: any): any {
     const result = { ...base };
 
@@ -329,13 +287,9 @@ export class RunnerConfig {
     return result;
   }
 
-  /**
-   * Validate configuration
-   */
   private validateConfiguration(): void {
     const errors: string[] = [];
 
-    // Validate execution settings
     if (this.config.execution.maxWorkers < 0) {
       errors.push('maxWorkers must be >= 0');
     }
@@ -344,7 +298,6 @@ export class RunnerConfig {
       errors.push('retryCount must be >= 0');
     }
 
-    // Validate browser settings
     const validBrowsers = ['chromium', 'firefox', 'webkit'];
     if (!validBrowsers.includes(this.config.browser.type)) {
       errors.push(`Invalid browser type: ${this.config.browser.type}`);
@@ -354,17 +307,14 @@ export class RunnerConfig {
       errors.push('Browser timeout must be >= 0');
     }
 
-    // Validate viewport
     if (this.config.browser.viewport.width < 1 || this.config.browser.viewport.height < 1) {
       errors.push('Viewport dimensions must be >= 1');
     }
 
-    // Validate AI settings
     if (this.config.ai.confidenceThreshold < 0 || this.config.ai.confidenceThreshold > 1) {
       errors.push('AI confidence threshold must be between 0 and 1');
     }
 
-    // Validate performance settings
     if (this.config.performance.memoryLimit < 128) {
       errors.push('Memory limit must be >= 128 MB');
     }
@@ -374,21 +324,14 @@ export class RunnerConfig {
     }
   }
 
-  /**
-   * Apply configuration to ConfigurationManager
-   */
   private applyToConfigurationManager(): void {
-    // Apply all configuration values to ConfigurationManager
-    // This ensures all components can access the configuration
 
-    // Execution settings
     ConfigurationManager.set('PARALLEL_EXECUTION', String(this.config.execution.parallel));
     ConfigurationManager.set('MAX_PARALLEL_WORKERS', String(this.config.execution.maxWorkers));
     ConfigurationManager.set('RETRY_COUNT', String(this.config.execution.retryCount));
     ConfigurationManager.set('RETRY_DELAY', String(this.config.execution.retryDelay));
     ConfigurationManager.set('STOP_ON_FAILURE', String(this.config.execution.stopOnFailure));
 
-    // Browser settings
     ConfigurationManager.set('DEFAULT_BROWSER', this.config.browser.type);
     ConfigurationManager.set('HEADLESS', String(this.config.browser.headless));
     ConfigurationManager.set('BROWSER_SLOWMO', String(this.config.browser.slowMo));
@@ -396,20 +339,13 @@ export class RunnerConfig {
     ConfigurationManager.set('VIEWPORT_WIDTH', String(this.config.browser.viewport.width));
     ConfigurationManager.set('VIEWPORT_HEIGHT', String(this.config.browser.viewport.height));
 
-    // Continue for all other settings...
     ActionLogger.logDebug('RunnerConfig', 'Configuration applied to ConfigurationManager');
   }
 
-  /**
-   * Get configuration
-   */
   getConfiguration(): RunnerConfiguration {
     return { ...this.config };
   }
 
-  /**
-   * Get specific configuration value
-   */
   get<T>(path: string, defaultValue?: T): T {
     const parts = path.split('.');
     let value: any = this.config;
@@ -425,9 +361,6 @@ export class RunnerConfig {
     return value as T;
   }
 
-  /**
-   * Set configuration value
-   */
   set(path: string, value: any): void {
     const parts = path.split('.');
     if (parts.length === 0) {
@@ -456,16 +389,10 @@ export class RunnerConfig {
     target[lastKey] = value;
   }
 
-  /**
-   * Check if value was overridden by command line
-   */
   isOverridden(path: string): boolean {
     return this.commandLineOverrides.has(path);
   }
 
-  /**
-   * Export configuration
-   */
   exportConfiguration(): any {
     return {
       config: this.config,
@@ -474,9 +401,6 @@ export class RunnerConfig {
     };
   }
 
-  /**
-   * Generate configuration report
-   */
   generateConfigurationReport(): string {
     const report: string[] = [];
 
@@ -516,37 +440,29 @@ export class RunnerConfig {
   }
 }
 
-// Interfaces
 interface RunnerOptions {
-  // Execution
   parallel?: boolean;
   workers?: number;
   retry?: number;
   dryRun?: boolean;
   
-  // Selection
   features?: string[];
   scenarios?: string[];
   tags?: string[];
   
-  // Environment
   env?: string;
   
-  // Browser
   browser?: string;
   headless?: boolean;
   timeout?: number;
   
-  // Debugging
   debug?: boolean;
   video?: boolean;
   trace?: boolean;
   
-  // Reporting
   reportName?: string;
   reportFormat?: string[];
   
-  // Configuration
   configFile?: string;
 }
 

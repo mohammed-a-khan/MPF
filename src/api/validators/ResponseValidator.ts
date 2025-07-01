@@ -181,7 +181,6 @@ export class ResponseValidator {
 
   private async validateSchema(response: Response, config: any): Promise<ValidationResult> {
     if (typeof config === 'string') {
-      // Use config directly as schema
       return await this.schemaValidator.validateSchema(response.body, config);
     }
     
@@ -194,7 +193,6 @@ export class ResponseValidator {
     }
     
     if (config.path && config.exists !== undefined) {
-      // Use extractValue to check existence
       const extracted = this.jsonPathValidator.extractValue(response.body, config.path);
       const exists = extracted !== undefined;
       const valid = exists === config.exists;
@@ -211,7 +209,6 @@ export class ResponseValidator {
     }
     
     if (config.path && config.count !== undefined) {
-      // Use query to get count
       const result = this.jsonPathValidator.query(response.body, config.path);
       const count = result.values.length;
       const valid = count === config.count;
@@ -228,7 +225,6 @@ export class ResponseValidator {
     }
     
     if (config.path && config.type) {
-      // Use extractValue to check type
       const extracted = this.jsonPathValidator.extractValue(response.body, config.path);
       const actualType = typeof extracted;
       const valid = actualType === config.type;
@@ -259,11 +255,8 @@ export class ResponseValidator {
     }
     
     if (config.xpath && config.exists !== undefined) {
-      // Check XPath existence by evaluating the XPath expression
       try {
-        // Use a dummy value to check if XPath returns any results
         const result = await this.xmlValidator.validateXPath(xmlString, config.xpath, '');
-        // If the XPath is valid but doesn't match the empty string, it means elements exist
         const exists = !result.valid || result.errors?.some(error => 
           error.message?.includes('Expected') && !error.message?.includes('No matches found')
         ) || false;
@@ -294,7 +287,6 @@ export class ResponseValidator {
     }
     
     if (config.xpath && config.count !== undefined) {
-      // Implement count logic using validateXPath
       return {
         valid: false,
         errors: [{
@@ -402,7 +394,6 @@ export class ResponseValidator {
       if (pathConfig.value !== undefined) {
         result = await this.jsonPathValidator.validatePath(data, pathConfig.path, pathConfig.value);
       } else if (pathConfig.exists !== undefined) {
-        // Use extractValue to check existence
         const extracted = this.jsonPathValidator.extractValue(data, pathConfig.path);
         const exists = extracted !== undefined;
         const valid = exists === pathConfig.exists;

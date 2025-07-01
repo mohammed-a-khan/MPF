@@ -1,12 +1,3 @@
-/**
- * CS Test Automation Framework - Log Exporter
- * 
- * Utility for exporting and accessing framework logs including
- * initialization messages.
- * 
- * @author CS Test Automation Team
- * @version 1.0.0
- */
 
 import { ActionLogger } from './ActionLogger';
 import { consoleCapture, ConsoleMessage } from './ConsoleCapture';
@@ -33,17 +24,12 @@ export class LogExporter {
     return LogExporter.instance;
   }
 
-  /**
-   * Get all framework initialization logs
-   */
   getInitializationLogs(): {
     console: ConsoleMessage[];
     framework: string[];
   } {
-    // Get console messages related to initialization
     const consoleMessages = consoleCapture.getInitializationLogs();
     
-    // Get framework messages from ActionLogger
     const actionLogger = ActionLogger.getInstance();
     const frameworkLogs = actionLogger.getAllBufferedLogs()
       .filter(log => {
@@ -66,9 +52,6 @@ export class LogExporter {
     };
   }
 
-  /**
-   * Export all logs with options
-   */
   async exportLogs(options: ExportOptions = {}): Promise<string> {
     const {
       includeConsole = true,
@@ -133,11 +116,7 @@ export class LogExporter {
     return content;
   }
 
-  /**
-   * Get real-time log stream
-   */
   streamLogs(callback: (log: any) => void): () => void {
-    // Listen to ActionLogger events
     const actionLogger = ActionLogger.getInstance();
     const logHandler = (entry: any) => {
       callback({
@@ -148,15 +127,11 @@ export class LogExporter {
 
     actionLogger.on('log', logHandler);
 
-    // Return cleanup function
     return () => {
       actionLogger.off('log', logHandler);
     };
   }
 
-  /**
-   * Save content to file
-   */
   private async saveToFile(filePath: string, content: string): Promise<void> {
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) {
@@ -165,9 +140,6 @@ export class LogExporter {
     fs.writeFileSync(filePath, content, 'utf8');
   }
 
-  /**
-   * Generate HTML report
-   */
   private generateHtmlReport(logs: any[]): string {
     return `
 <!DOCTYPE html>
@@ -368,9 +340,6 @@ export class LogExporter {
 </html>`;
   }
 
-  /**
-   * Quick method to dump initialization logs to console
-   */
   dumpInitializationLogs(): void {
     const logs = this.getInitializationLogs();
     
@@ -390,5 +359,4 @@ export class LogExporter {
   }
 }
 
-// Export singleton instance
 export const logExporter = LogExporter.getInstance();

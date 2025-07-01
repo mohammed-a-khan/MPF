@@ -116,9 +116,6 @@ export class TestResultUploader {
     this.logger.info('TestResultUploader initialized');
   }
 
-  /**
-   * Upload test result
-   */
   async uploadTestResult(
     runId: number,
     result: TestResultCreateRequest | ADOTestResult
@@ -167,9 +164,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Upload test results in batch
-   */
   async uploadTestResultsBatch(
     runId: number,
     results: Array<TestResultCreateRequest | ADOTestResult>
@@ -194,9 +188,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Upload single batch
-   */
   private async uploadBatch(
     runId: number,
     batch: Array<TestResultCreateRequest | ADOTestResult>
@@ -217,9 +208,6 @@ export class TestResultUploader {
     return response.data;
   }
 
-  /**
-   * Get test results for run
-   */
   async getTestResults(
     runId: number,
     options?: {
@@ -253,9 +241,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Get test result by ID
-   */
   async getTestResult(
     runId: number,
     resultId: number,
@@ -293,9 +278,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Update test result
-   */
   async updateTestResult(
     runId: number,
     resultId: number,
@@ -322,9 +304,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Add test result attachment
-   */
   async addTestResultAttachment(
     runId: number,
     resultId: number,
@@ -373,9 +352,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Add test iteration result
-   */
   async addTestIterationResult(
     runId: number,
     resultId: number,
@@ -415,9 +391,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Add test sub result
-   */
   async addTestSubResult(
     runId: number,
     resultId: number,
@@ -452,9 +425,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Associate work items with test result
-   */
   async associateWorkItems(
     runId: number,
     resultId: number,
@@ -484,9 +454,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Get test result history
-   */
   async getTestResultHistory(
     testCaseId: number,
     options?: {
@@ -534,9 +501,6 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Prepare result request
-   */
   private prepareResultRequest(result: TestResultCreateRequest | ADOTestResult): TestResultCreateRequest {
     if ('id' in result) {
       const request: TestResultCreateRequest = {
@@ -579,17 +543,11 @@ export class TestResultUploader {
     };
   }
 
-  /**
-   * Queue upload operation
-   */
   queueUpload(uploadFn: () => Promise<void>): void {
     this.uploadQueue.push(uploadFn);
     this.processQueue();
   }
 
-  /**
-   * Process upload queue
-   */
   private async processQueue(): Promise<void> {
     if (this.isProcessingQueue || this.uploadQueue.length === 0) {
       return;
@@ -609,17 +567,11 @@ export class TestResultUploader {
     }
   }
 
-  /**
-   * Clear cache
-   */
   clearCache(): void {
     this.resultCache.clear();
     this.logger.debug('Test result cache cleared');
   }
 
-  /**
-   * Get cache statistics
-   */
   getCacheStats(): { results: number; queueSize: number } {
     return {
       results: this.resultCache.size,

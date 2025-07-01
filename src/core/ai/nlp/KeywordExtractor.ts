@@ -20,12 +20,9 @@ interface KeywordDatabase {
 export class KeywordExtractor {
   private static instance: KeywordExtractor;
   private keywordDatabase: KeywordDatabase;
-  // TF-IDF scores for future implementation
-  // private tfIdfScores: Map<string, number> = new Map();
   private documentFrequency: Map<string, number>;
   private totalDocuments: number = 0;
   
-  // Domain-specific keyword patterns
   private readonly elementPatterns = new Map<string, RegExp>([
     ['button', /\b(button|btn|click|submit|save|cancel|close|ok)\b/i],
     ['input', /\b(input|field|text|textbox|search|email|password|username)\b/i],
@@ -123,7 +120,6 @@ export class KeywordExtractor {
       ])
     };
 
-    // Initialize document frequency for TF-IDF
     this.documentFrequency = new Map();
     this.initializeFrequencies();
   }
@@ -136,7 +132,6 @@ export class KeywordExtractor {
   }
 
   private initializeFrequencies(): void {
-    // Initialize with common UI testing corpus frequencies
     const commonTerms = [
       'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at',
       'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'are',
@@ -146,10 +141,9 @@ export class KeywordExtractor {
     ];
 
     commonTerms.forEach(term => {
-      this.documentFrequency.set(term, 0.9); // High frequency for stop words
+      this.documentFrequency.set(term, 0.9);
     });
 
-    // UI-specific terms with lower frequencies (more important)
     this.keywordDatabase.elementTypes.forEach(type => {
       this.documentFrequency.set(type, 0.3);
     });
@@ -162,7 +156,7 @@ export class KeywordExtractor {
       this.documentFrequency.set(attr, 0.35);
     });
 
-    this.totalDocuments = 1000; // Baseline corpus size
+    this.totalDocuments = 1000;
   }
 
   public async extractKeywords(text: string): Promise<Keyword[]> {
@@ -170,19 +164,14 @@ export class KeywordExtractor {
     ActionLogger.logAIOperation('keyword-extraction start', { textLength: text.length });
 
     try {
-      // Normalize text
       const normalizedText = this.normalizeText(text);
       
-      // Extract all potential keywords
       const candidates = this.extractCandidates(normalizedText);
       
-      // Calculate weights for each candidate
       const weightedKeywords = this.calculateKeywordWeights(candidates, normalizedText);
       
-      // Convert to Keyword objects
       const keywords = this.createKeywords(weightedKeywords, text);
       
-      // Rank keywords
       const rankedKeywords = this.rankKeywords(keywords);
       
       ActionLogger.logAIOperation('keyword-extraction complete', {
@@ -200,8 +189,8 @@ export class KeywordExtractor {
   private normalizeText(text: string): string {
     return text
       .toLowerCase()
-      .replace(/[^\w\s-]/g, ' ') // Remove special chars except hyphens
-      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
@@ -209,14 +198,12 @@ export class KeywordExtractor {
     const candidates = new Map<string, number>();
     const words = text.split(/\s+/);
     
-    // Single word candidates
     words.forEach((word, _index) => {
       if (this.isValidCandidate(word)) {
         candidates.set(word, (candidates.get(word) || 0) + 1);
       }
     });
 
-    // Bi-gram candidates
     for (let i = 0; i < words.length - 1; i++) {
       const bigram = `${words[i]} ${words[i + 1]}`;
       const word1 = words[i];
@@ -226,7 +213,6 @@ export class KeywordExtractor {
       }
     }
 
-    // Tri-gram candidates for specific patterns
     for (let i = 0; i < words.length - 2; i++) {
       const trigram = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
       const word1 = words[i];
@@ -241,10 +227,8 @@ export class KeywordExtractor {
   }
 
   private isValidCandidate(word: string): boolean {
-    // Skip very short words
     if (word.length < 3) return false;
     
-    // Skip common stop words
     const stopWords = new Set([
       'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at',
       'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'are'
@@ -252,20 +236,16 @@ export class KeywordExtractor {
     
     if (stopWords.has(word)) return false;
     
-    // Include if it's in our domain database
     if (this.isDomainKeyword(word)) return true;
     
-    // Include if it matches a pattern
     if (this.matchesAnyPattern(word)) return true;
     
-    // Include if it's a potential identifier (contains numbers or specific patterns)
     if (/\d/.test(word) || /^[a-z]+[-_][a-z]+$/i.test(word)) return true;
     
-    return true; // Default include
+    return true;
   }
 
   private isValidBigram(word1: string, word2: string): boolean {
-    // Common UI bigrams
     const validBigrams = new Set([
       'sign in', 'sign up', 'log in', 'log out',
       'save button', 'cancel button', 'submit button',
@@ -280,13 +260,11 @@ export class KeywordExtractor {
     const bigram = `${word1} ${word2}`;
     if (validBigrams.has(bigram)) return true;
 
-    // Check if it forms a meaningful UI element
     if (this.keywordDatabase.elementTypes.has(word2) && 
         (this.keywordDatabase.modifiers.has(word1) || this.keywordDatabase.positions.has(word1))) {
       return true;
     }
 
-    // Action + element combinations
     if (this.keywordDatabase.actions.has(word1) && this.keywordDatabase.elementTypes.has(word2)) {
       return true;
     }
@@ -295,7 +273,6 @@ export class KeywordExtractor {
   }
 
   private isValidTrigram(word1: string, word2: string, word3: string): boolean {
-    // Common UI trigrams
     const validTrigrams = new Set([
       'create new account', 'forgot your password',
       'remember my credentials', 'terms and conditions',
@@ -359,16 +336,13 @@ export class KeywordExtractor {
     words: string[],
     text: string
   ): KeywordWeight {
-    // TF-IDF calculation
     const tf = frequency / words.length;
     const idf = Math.log(this.totalDocuments / (1 + (this.documentFrequency.get(keyword) || 0.1)));
     const tfidf = tf * idf;
 
-    // Position weight (keywords at the beginning are more important)
     const firstOccurrence = text.indexOf(keyword);
     const positionWeight = 1 - (firstOccurrence / text.length) * 0.3;
 
-    // Domain weight
     let domainWeight = 1;
     if (this.keywordDatabase.elementTypes.has(keyword)) domainWeight = 2.5;
     else if (this.keywordDatabase.actions.has(keyword)) domainWeight = 2.3;
@@ -376,20 +350,16 @@ export class KeywordExtractor {
     else if (this.keywordDatabase.positions.has(keyword)) domainWeight = 1.8;
     else if (this.keywordDatabase.modifiers.has(keyword)) domainWeight = 1.5;
 
-    // Pattern match weight
     const patternWeight = this.getPatternWeight(keyword);
 
-    // Length weight (prefer meaningful length keywords)
     const lengthWeight = keyword.split(' ').length > 1 ? 1.3 : 1;
 
-    // Calculate final weight
     const finalWeight = (tfidf * 0.3 + 
                         positionWeight * 0.2 + 
                         domainWeight * 0.3 + 
                         patternWeight * 0.15 + 
                         lengthWeight * 0.05) * frequency;
 
-    // Extract context
     const context = this.extractContext(keyword, text);
 
     return {
@@ -427,7 +397,6 @@ export class KeywordExtractor {
     
     if (keywordIndex === -1) return context;
 
-    // Extract words before and after
     const words = text.split(/\s+/);
     const keywordWords = keyword.split(/\s+/);
     
@@ -440,7 +409,6 @@ export class KeywordExtractor {
     }
 
     if (wordIndex !== -1) {
-      // Get 2 words before and after
       const start = Math.max(0, wordIndex - 2);
       const end = Math.min(words.length, wordIndex + keywordWords.length + 2);
       
@@ -479,7 +447,7 @@ export class KeywordExtractor {
         frequency: weightInfo.frequency,
         position: weightInfo.position,
         context: weightInfo.context,
-        confidence: Math.min(weightInfo.weight / 10, 1), // Normalize to 0-1
+        confidence: Math.min(weightInfo.weight / 10, 1),
         source: 'extracted'
       });
     });
@@ -513,7 +481,6 @@ export class KeywordExtractor {
       return 'modifier';
     }
 
-    // Check if it looks like an identifier
     if (/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(keyword) && keyword.length > 3) {
       return 'identifier';
     }
@@ -562,17 +529,14 @@ export class KeywordExtractor {
   }
 
   public rankKeywords(keywords: Keyword[]): Keyword[] {
-    // Sort by weight descending, handling undefined weights
     const ranked = keywords.sort((a, b) => {
       const weightA = a.weight ?? a.score ?? 0;
       const weightB = b.weight ?? b.score ?? 0;
       return weightB - weightA;
     });
     
-    // Apply diversity - ensure we have different types in top results
     const diversified = this.diversifyKeywords(ranked);
     
-    // Limit to top keywords
     const maxKeywords = Math.min(20, Math.ceil(keywords.length * 0.4));
     
     return diversified.slice(0, maxKeywords);
@@ -583,7 +547,6 @@ export class KeywordExtractor {
     const typeCount = new Map<KeywordType, number>();
     const maxPerType = 3;
 
-    // First pass - add high weight keywords respecting diversity
     for (const keyword of keywords) {
       const count = typeCount.get(keyword.type) || 0;
       const keywordWeight = keyword.weight ?? keyword.score ?? 0;
@@ -596,7 +559,6 @@ export class KeywordExtractor {
       }
     }
 
-    // Second pass - fill remaining slots
     for (const keyword of keywords) {
       if (!diversified.includes(keyword) && diversified.length < 20) {
         diversified.push(keyword);
@@ -621,7 +583,6 @@ export class KeywordExtractor {
   }
 
   private extractKeywordsSync(text: string): Keyword[] {
-    // Synchronous version for quick extraction
     const normalizedText = this.normalizeText(text);
     const candidates = this.extractCandidates(normalizedText);
     const weightedKeywords = this.calculateKeywordWeights(candidates, normalizedText);
@@ -632,14 +593,12 @@ export class KeywordExtractor {
   public getKeywordWeight(keyword: string): number {
     const normalizedKeyword = keyword.toLowerCase();
     
-    // Check domain databases
     if (this.keywordDatabase.elementTypes.has(normalizedKeyword)) return 2.5;
     if (this.keywordDatabase.actions.has(normalizedKeyword)) return 2.3;
     if (this.keywordDatabase.attributes.has(normalizedKeyword)) return 2.0;
     if (this.keywordDatabase.positions.has(normalizedKeyword)) return 1.8;
     if (this.keywordDatabase.modifiers.has(normalizedKeyword)) return 1.5;
     
-    // Check patterns
     return this.getPatternWeight(normalizedKeyword);
   }
 
@@ -670,7 +629,6 @@ export class KeywordExtractor {
         break;
     }
     
-    // Set initial frequency
     this.documentFrequency.set(normalizedKeyword, 0.3);
   }
 

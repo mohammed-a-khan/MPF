@@ -42,17 +42,14 @@ export class FileHandler {
     try {
       ActionLogger.logInfo(`Starting file upload: ${element.description}`, { filePath });
       
-      // Resolve absolute path
       const absolutePath = path.isAbsolute(filePath) 
         ? filePath 
         : path.join(this.uploadPath, filePath);
       
-      // Validate file exists
       if (!await FileUtils.exists(absolutePath)) {
         throw new Error(`File not found: ${absolutePath}`);
       }
       
-      // Validate file type if specified
       if (options?.acceptTypes) {
         const ext = path.extname(absolutePath).toLowerCase();
         const mimeType = this.getMimeType(ext);
@@ -70,7 +67,6 @@ export class FileHandler {
         }
       }
       
-      // Validate file size if specified
       if (options?.maxSize) {
         const stats = await fs.stat(absolutePath);
         if (stats.size > options.maxSize) {
@@ -78,12 +74,10 @@ export class FileHandler {
         }
       }
       
-      // Validate content if requested
       if (options?.validateContent) {
         await this.validateFileContent(absolutePath);
       }
       
-      // Perform upload
       if (options?.simulateDragDrop) {
         await this.simulateDragDropUpload(element, absolutePath);
       } else {
@@ -113,7 +107,6 @@ export class FileHandler {
         fileCount: filePaths.length 
       });
       
-      // Resolve and validate all paths
       const absolutePaths: string[] = [];
       
       for (const filePath of filePaths) {
@@ -128,14 +121,12 @@ export class FileHandler {
         absolutePaths.push(absolutePath);
       }
       
-      // Validate all files if options specified
       if (options) {
         for (const absolutePath of absolutePaths) {
           await this.validateUploadFile(absolutePath, options);
         }
       }
       
-      // Upload all files
       await element.upload(absolutePaths);
       
       ActionLogger.logInfo(`Multiple file upload completed: ${element.description}`, {
@@ -191,7 +182,6 @@ export class FileHandler {
     try {
       ActionLogger.logInfo('Waiting for download', { starting: true });
       
-      // Set up download promise before triggering action
       const page = (global as any).currentPage as Page;
       if (!page) {
         throw new Error('No active page context for download');
@@ -201,24 +191,19 @@ export class FileHandler {
         timeout: options?.timeout || 30000
       });
       
-      // Trigger the download action
       await action();
       
-      // Wait for download to start
       const download = await downloadPromise;
       this.activeDownloads.set(downloadId, download);
       
-      // Wait for download to complete if requested
       if (options?.waitForComplete !== false) {
         await this.waitForDownloadComplete(download, options?.timeout);
       }
       
-      // Save to specified path if provided
       if (options?.savePath) {
         await this.saveDownload(download, options.savePath);
       }
       
-      // Validate size if specified
       if (options?.validateSize) {
         const size = await this.getDownloadedFileSize(download);
         if (size !== options.validateSize) {
@@ -249,10 +234,8 @@ export class FileHandler {
         ? savePath
         : path.join(this.downloadPath, savePath);
       
-      // Ensure directory exists
       await FileUtils.ensureDir(path.dirname(absolutePath));
       
-      // Save the download
       await download.saveAs(absolutePath);
       
       ActionLogger.logInfo('Download saved', {
@@ -360,7 +343,6 @@ export class FileHandler {
           throw new Error('Drop zone element not found');
         }
         
-        // Simulate drag enter
         const dragEnterEvent = new DragEvent('dragenter', {
           bubbles: true,
           cancelable: true,
@@ -368,7 +350,6 @@ export class FileHandler {
         });
         dropZoneEl.dispatchEvent(dragEnterEvent);
         
-        // Simulate drag over
         const dragOverEvent = new DragEvent('dragover', {
           bubbles: true,
           cancelable: true,
@@ -376,7 +357,6 @@ export class FileHandler {
         });
         dropZoneEl.dispatchEvent(dragOverEvent);
         
-        // Simulate drop
         const dropEvent = new DragEvent('drop', {
           bubbles: true,
           cancelable: true,
@@ -396,7 +376,6 @@ export class FileHandler {
   }
 
   private async getElementSelector(element: CSWebElement): Promise<string> {
-    // Get a selector for the element
     const { locatorType, locatorValue } = element.options;
     
     switch (locatorType) {
@@ -405,11 +384,8 @@ export class FileHandler {
       case 'testid':
         return `[data-testid="${locatorValue}"]`;
       default:
-        // For other types, we need to get a unique selector
-        // Create a locator to get the element
         const locator = await this.createLocatorForElement(element);
         return await locator.evaluate((el: Element) => {
-          // Try to generate a unique selector
           if (el.id) return `#${el.id}`;
           if (el.className) return `.${el.className.split(' ').join('.')}`;
           return el.tagName.toLowerCase();
@@ -446,14 +422,12 @@ export class FileHandler {
   }
 
   private async validateFileContent(filePath: string): Promise<void> {
-    // Basic content validation - can be extended
     const stats = await fs.stat(filePath);
     
     if (stats.size === 0) {
       throw new Error('File is empty');
     }
     
-    // Check if file is readable
     await fs.access(filePath, fs.constants.R_OK);
   }
 
@@ -516,7 +490,6 @@ export class FileHandler {
       
       const path = await download.path();
       if (path) {
-        // Download is complete
         return;
       }
       

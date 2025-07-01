@@ -10,7 +10,6 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Define missing types locally
 type LogSource = 'framework' | 'browser' | 'console' | 'network' | 'test';
 
 interface LogEntry {
@@ -38,9 +37,6 @@ interface CollectionOptions {
   includeStackTraces?: boolean;
 }
 
-/**
- * Collects and manages log evidence from multiple sources
- */
 export class LogCollector {
   private static instance: LogCollector;
   private readonly logger = Logger.getInstance(LogCollector.name);
@@ -63,7 +59,6 @@ export class LogCollector {
     this.logPath = ConfigurationManager.get('LOG_PATH', './evidence/logs');
     this.rotateLogSize = ConfigurationManager.getInt('ROTATE_LOG_SIZE_MB', 5) * 1024 * 1024;
     
-    // Configure which log sources to collect
     this.logSources = new Set<LogSource>([
       'framework',
       'browser',
@@ -80,30 +75,23 @@ export class LogCollector {
     return LogCollector.instance;
   }
 
-  /**
-   * Initialize collector for execution
-   */
   async initialize(executionId: string, options: CollectionOptions = {}): Promise<void> {
     this.executionId = executionId;
     this.logs.clear();
     this.logBuffers.clear();
     
-    // Close any existing streams
     this.logStreams.forEach((stream) => {
       stream.end();
     });
     this.logStreams.clear();
     
-    // Create log directory
     const execLogPath = path.join(this.logPath, executionId);
     if (!fs.existsSync(execLogPath)) {
       fs.mkdirSync(execLogPath, { recursive: true });
     }
     
-    // Determine which sources to use
     const sources = options.sources || Array.from(this.logSources);
     
-    // Initialize log streams for each source
     sources.forEach(source => {
       const logFile = path.join(execLogPath, `${source}.log`);
       const stream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -113,9 +101,6 @@ export class LogCollector {
     ActionLogger.logCollectorInitialization('log', executionId);
   }
 
-  /**
-   * Log an entry
-   */
   async log(
     source: LogSource,
     level: LogLevel,
@@ -123,7 +108,6 @@ export class LogCollector {
     metadata?: any,
     scenarioId?: string
   ): Promise<void> {
-    // Check if we should log this level
     if (!this.shouldLog(level)) {
       return;
     }
@@ -140,27 +124,21 @@ export class LogCollector {
       entry.scenarioId = scenarioId;
     }
     
-    // Add to buffer
     const bufferId = scenarioId || 'global';
     if (!this.logBuffers.has(bufferId)) {
       this.logBuffers.set(bufferId, []);
     }
     this.logBuffers.get(bufferId)!.push(entry);
     
-    // Write to stream
     const stream = this.logStreams.get(source);
     if (stream && !stream.destroyed) {
       const logLine = this.formatLogEntry(entry);
       stream.write(logLine + '\n');
       
-      // Check rotation
       await this.checkRotation(source, stream);
     }
   }
 
-  /**
-   * Log browser console message
-   */
   async logBrowserConsole(
     scenarioId: string,
     type: string,
@@ -171,9 +149,6 @@ export class LogCollector {
     await this.log('console', level, message, { type, location }, scenarioId);
   }
 
-  /**
-   * Log network activity
-   */
   async logNetworkActivity(
     scenarioId: string,
     method: string,
@@ -194,9 +169,6 @@ export class LogCollector {
     }, scenarioId);
   }
 
-  /**
-   * Log framework event
-   */
   async logFrameworkEvent(
     event: string,
     details: any,
@@ -205,9 +177,6 @@ export class LogCollector {
     await this.log('framework', LogLevel.INFO, event, details, scenarioId);
   }
 
-  /**
-   * Log application message
-   */
   async logApplicationMessage(
     message: string,
     level: LogLevel = LogLevel.INFO,
@@ -217,9 +186,6 @@ export class LogCollector {
     await this.log('test', level, message, metadata, scenarioId);
   }
 
-  /**
-   * Log error with stack trace
-   */
   async logError(
     error: Error,
     source: LogSource = 'framework',
@@ -237,25 +203,19 @@ export class LogCollector {
     await this.log(source, LogLevel.ERROR, error.message, metadata, scenarioId);
   }
 
-  /**
-   * Collect logs for scenario
-   */
   async collectForScenario(
     scenarioId: string,
     _scenarioName: string
   ): Promise<LogEvidence[]> {
     const logs: LogEvidence[] = [];
     
-    // Get buffered logs for scenario
     const scenarioLogs = this.logBuffers.get(scenarioId) || [];
     const globalLogs = this.logBuffers.get('global') || [];
     
-    // Combine and sort logs
     const allLogs = [...scenarioLogs, ...globalLogs]
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
     
     if (allLogs.length > 0) {
-      // Create log evidence
       const evidence: LogEvidence = {
         scenarioId,
         logs: allLogs,
@@ -266,25 +226,19 @@ export class LogCollector {
       
       logs.push(evidence);
       
-      // Also save as formatted text file
       const textEvidence = await this.createTextLogEvidence(scenarioId, allLogs);
       if (textEvidence) {
         logs.push(textEvidence);
       }
     }
     
-    // Store for retrieval
     this.logs.set(scenarioId, logs);
     
-    // Clear scenario buffer to save memory
     this.logBuffers.delete(scenarioId);
     
     return logs;
   }
 
-  /**
-   * Collect logs for failed step
-   */
   async collectForStep(
     scenarioId: string,
     _stepId: string,
@@ -295,9 +249,8 @@ export class LogCollector {
       return [];
     }
     
-    // Get recent logs around the failure
     const buffer = this.logBuffers.get(scenarioId) || [];
-    const recentLogs = buffer.slice(-50); // Last 50 log entries
+    const recentLogs = buffer.slice(-50);
     
     if (recentLogs.length === 0) {
       return [];
@@ -314,9 +267,6 @@ export class LogCollector {
     return [evidence];
   }
 
-  /**
-   * Format log entry
-   */
   private formatLogEntry(entry: LogEntry): string {
     const timestamp = entry.timestamp.toISOString();
     const level = entry.level.padEnd(5);
@@ -325,7 +275,6 @@ export class LogCollector {
     let line = `${timestamp} ${level} ${source} ${entry.message}`;
     
     if (entry.metadata) {
-      // Add metadata on new lines for readability
       const metadataStr = JSON.stringify(entry.metadata, null, 2);
       const indentedMetadata = metadataStr.split('\n')
         .map(line => '  ' + line)
@@ -336,9 +285,6 @@ export class LogCollector {
     return line;
   }
 
-  /**
-   * Create text log evidence
-   */
   private async createTextLogEvidence(
     scenarioId: string,
     entries: LogEntry[]
@@ -370,9 +316,6 @@ export class LogCollector {
     }
   }
 
-  /**
-   * Check if log level should be logged
-   */
   private shouldLog(level: LogLevel): boolean {
     const levels: LogLevel[] = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
     const configuredIndex = levels.indexOf(this.logLevel);
@@ -381,9 +324,6 @@ export class LogCollector {
     return messageIndex >= configuredIndex;
   }
 
-  /**
-   * Map console type to log level
-   */
   private mapConsoleTypeToLevel(type: string): LogLevel {
     switch (type.toLowerCase()) {
       case 'error':
@@ -403,9 +343,6 @@ export class LogCollector {
     }
   }
 
-  /**
-   * Calculate log size
-   */
   private calculateLogSize(entries: LogEntry[]): number {
     let size = 0;
     entries.forEach(entry => {
@@ -418,25 +355,19 @@ export class LogCollector {
   }
 
 
-  /**
-   * Check and perform log rotation
-   */
   private async checkRotation(source: LogSource, stream: fs.WriteStream): Promise<void> {
     try {
       const logFile = stream.path as string;
       const stats = await fs.promises.stat(logFile);
       
       if (stats.size > this.rotateLogSize) {
-        // Close current stream
         stream.end();
         this.logStreams.delete(source);
         
-        // Rotate log file
         const timestamp = new Date().getTime();
         const rotatedFile = logFile.replace('.log', `.${timestamp}.log`);
         await fs.promises.rename(logFile, rotatedFile);
         
-        // Create new stream
         const newStream = fs.createWriteStream(logFile, { flags: 'a' });
         this.logStreams.set(source, newStream);
         
@@ -447,9 +378,6 @@ export class LogCollector {
     }
   }
 
-  /**
-   * Search logs
-   */
   async searchLogs(
     pattern: string | RegExp,
     options: {
@@ -463,16 +391,13 @@ export class LogCollector {
     const results: LogEntry[] = [];
     const regex = typeof pattern === 'string' ? new RegExp(pattern, 'i') : pattern;
     
-    // Search in buffers
     this.logBuffers.forEach((entries) => {
       entries.forEach(entry => {
-        // Apply filters
         if (options.sources && !options.sources.includes(entry.source)) return;
         if (options.levels && !options.levels.includes(entry.level)) return;
         if (options.startTime && entry.timestamp < options.startTime) return;
         if (options.endTime && entry.timestamp > options.endTime) return;
         
-        // Search in message and metadata
         if (regex.test(entry.message) || 
             (entry.metadata && regex.test(JSON.stringify(entry.metadata)))) {
           results.push(entry);
@@ -487,9 +412,6 @@ export class LogCollector {
     return results;
   }
 
-  /**
-   * Export logs to file
-   */
   async exportLogs(
     scenarioId: string,
     format: 'json' | 'text' | 'csv'
@@ -522,9 +444,6 @@ export class LogCollector {
     return exportFile;
   }
 
-  /**
-   * Convert logs to CSV format
-   */
   private convertToCSV(entries: LogEntry[]): string {
     const headers = ['Timestamp', 'Level', 'Source', 'Message', 'Metadata', 'ScenarioId'];
     const rows = entries.map(entry => [
@@ -539,9 +458,6 @@ export class LogCollector {
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   }
 
-  /**
-   * Get log statistics
-   */
   getStatistics(): {
     totalEntries: number;
     totalSize: number;
@@ -561,7 +477,6 @@ export class LogCollector {
       [LogLevel.ERROR]: 0
     };
     
-    // Count from all buffers
     this.logBuffers.forEach((entries) => {
       totalEntries += entries.length;
       
@@ -583,11 +498,7 @@ export class LogCollector {
     };
   }
 
-  /**
-   * Finalize collection
-   */
   async finalize(executionId: string): Promise<void> {
-    // Flush remaining global logs
     if (this.logBuffers.has('global')) {
       const globalLogs = this.logBuffers.get('global')!;
       if (globalLogs.length > 0) {
@@ -603,12 +514,10 @@ export class LogCollector {
       }
     }
     
-    // Close all streams
     this.logStreams.forEach((stream) => {
       stream.end();
     });
     
-    // Clear buffers
     this.logBuffers.clear();
     this.logStreams.clear();
     

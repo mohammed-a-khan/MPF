@@ -35,8 +35,8 @@ type ProgressCallback = (progress: UploadProgress) => void;
 
 export class EvidenceUploader {
   private readonly logger = Logger.getInstance(EvidenceUploader.name);
-  private readonly defaultChunkSize = 1024 * 1024 * 4; // 4MB chunks
-  private readonly maxFileSize = 1024 * 1024 * 100; // 100MB max
+  private readonly defaultChunkSize = 1024 * 1024 * 4;
+  private readonly maxFileSize = 1024 * 1024 * 100;
   private uploadedAttachments = new Map<string, EvidenceAttachment>();
   private activeUploads = new Map<string, AbortController>();
 
@@ -48,9 +48,6 @@ export class EvidenceUploader {
     return ADOConfig.getEndpoints();
   }
 
-  /**
-   * Upload screenshot
-   */
   async uploadScreenshot(
     runId: number,
     resultId: number,
@@ -60,7 +57,6 @@ export class EvidenceUploader {
     try {
       this.logger.info(`Uploading screenshot: ${path.basename(screenshotPath)}`);
       
-      // Validate file
       if (!await FileUtils.exists(screenshotPath)) {
         throw new Error(`Screenshot file not found: ${screenshotPath}`);
       }
@@ -68,17 +64,14 @@ export class EvidenceUploader {
       const stats = await fs.promises.stat(screenshotPath);
       const fileSize = stats.size;
       
-      // Check if we need to compress
       let finalPath = screenshotPath;
       if (options?.compress || fileSize > (options?.maxSizeBytes || this.maxFileSize)) {
         finalPath = await this.compressImage(screenshotPath);
       }
 
-      // Read file
       const fileBuffer = await fs.promises.readFile(finalPath);
       const fileName = `Screenshot_${Date.now()}_${path.basename(finalPath)}`;
       
-      // Upload
       const attachment = await this.uploadFile(
         runId,
         resultId,
@@ -89,7 +82,6 @@ export class EvidenceUploader {
         options
       );
 
-      // Clean up compressed file if created
       if (finalPath !== screenshotPath) {
         await FileUtils.remove(finalPath);
       }
@@ -102,9 +94,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Upload video
-   */
   async uploadVideo(
     runId: number,
     resultId: number,
@@ -115,7 +104,6 @@ export class EvidenceUploader {
     try {
       this.logger.info(`Uploading video: ${path.basename(videoPath)}`);
       
-      // Validate file
       if (!await FileUtils.exists(videoPath)) {
         throw new Error(`Video file not found: ${videoPath}`);
       }
@@ -129,7 +117,6 @@ export class EvidenceUploader {
 
       const fileName = `Video_${Date.now()}_${path.basename(videoPath)}`;
       
-      // For large videos, use chunked upload
       if (fileSize > this.defaultChunkSize) {
         return await this.uploadLargeFile(
           runId,
@@ -143,7 +130,6 @@ export class EvidenceUploader {
         );
       }
 
-      // Small video, upload directly
       const fileBuffer = await fs.promises.readFile(videoPath);
       
       const attachment = await this.uploadFile(
@@ -164,9 +150,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Upload log file
-   */
   async uploadLog(
     runId: number,
     resultId: number,
@@ -178,7 +161,6 @@ export class EvidenceUploader {
       const fileName = logName || `TestLog_${Date.now()}.txt`;
       this.logger.info(`Uploading log: ${fileName}`);
       
-      // Convert log content to buffer
       const content = Array.isArray(logContent) ? logContent.join('\n') : logContent;
       const fileBuffer = Buffer.from(content, 'utf-8');
       
@@ -200,9 +182,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Upload HAR file
-   */
   async uploadHAR(
     runId: number,
     resultId: number,
@@ -237,9 +216,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Upload trace file
-   */
   async uploadTrace(
     runId: number,
     resultId: number,
@@ -255,7 +231,6 @@ export class EvidenceUploader {
 
       const fileName = `Trace_${Date.now()}_${path.basename(tracePath)}`;
       
-      // Trace files can be large
       const stats = await fs.promises.stat(tracePath);
       if (stats.size > this.defaultChunkSize) {
         return await this.uploadLargeFile(
@@ -289,9 +264,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Upload generic file
-   */
   async uploadFile(
     runId: number,
     resultId: number,
@@ -306,14 +278,12 @@ export class EvidenceUploader {
       const controller = new AbortController();
       this.activeUploads.set(uploadId, controller);
 
-      // Check if already uploaded
       const cacheKey = `${fileName}_${fileBuffer.length}`;
       if (this.uploadedAttachments.has(cacheKey)) {
         this.logger.debug(`File already uploaded: ${fileName}`);
         return this.uploadedAttachments.get(cacheKey)!;
       }
 
-      // Upload attachment to ADO
       const uploadUrl = ADOConfig.buildUrl(this.endpoints.attachments);
       const uploadResponse = await this.client.post<{ id: string; url: string }>(
         uploadUrl,
@@ -327,7 +297,6 @@ export class EvidenceUploader {
         }
       );
 
-      // Create attachment record
       const attachment: EvidenceAttachment = {
         id: uploadResponse.data.id,
         name: fileName,
@@ -337,10 +306,8 @@ export class EvidenceUploader {
         comment: `${attachmentType} evidence for test result ${resultId}`
       };
 
-      // Link attachment to test result
       await this.linkAttachmentToResult(runId, resultId, attachment, attachmentType);
 
-      // Cache the attachment
       this.uploadedAttachments.set(cacheKey, attachment);
       
       this.activeUploads.delete(uploadId);
@@ -352,9 +319,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Upload large file in chunks
-   */
   private async uploadLargeFile(
     runId: number,
     resultId: number,
@@ -375,7 +339,6 @@ export class EvidenceUploader {
     let uploadedBytes = 0;
     const chunks: Buffer[] = [];
     
-    // Read and upload file in chunks
     const stream = fs.createReadStream(filePath, {
       highWaterMark: chunkSize
     });
@@ -398,10 +361,8 @@ export class EvidenceUploader {
 
       stream.on('end', async () => {
         try {
-          // Combine all chunks
           const fileBuffer = Buffer.concat(chunks);
           
-          // Upload the complete file
           const attachment = await this.uploadFile(
             runId,
             resultId,
@@ -422,9 +383,6 @@ export class EvidenceUploader {
     });
   }
 
-  /**
-   * Link attachment to test result
-   */
   private async linkAttachmentToResult(
     runId: number,
     resultId: number,
@@ -448,9 +406,6 @@ export class EvidenceUploader {
     await this.client.post(linkUrl, linkBody);
   }
 
-  /**
-   * Compress image
-   */
   private async compressImage(imagePath: string): Promise<string> {
     try {
       this.logger.warn('Image compression not implemented, using original file');
@@ -461,9 +416,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Upload multiple files
-   */
   async uploadMultipleFiles(
     runId: number,
     resultId: number,
@@ -535,16 +487,12 @@ export class EvidenceUploader {
         }
       } catch (error) {
         this.logger.error(`Failed to upload file ${file.path}:`, error as Error);
-        // Continue with other files
       }
     }
 
     return attachments;
   }
 
-  /**
-   * Cancel active upload
-   */
   cancelUpload(uploadId: string): void {
     const controller = this.activeUploads.get(uploadId);
     if (controller) {
@@ -554,9 +502,6 @@ export class EvidenceUploader {
     }
   }
 
-  /**
-   * Cancel all uploads
-   */
   cancelAllUploads(): void {
     for (const [, controller] of this.activeUploads) {
       controller.abort();
@@ -565,9 +510,6 @@ export class EvidenceUploader {
     this.logger.info('All uploads cancelled');
   }
 
-  /**
-   * Get upload statistics
-   */
   getUploadStats(): {
     cachedAttachments: number;
     activeUploads: number;
@@ -585,9 +527,6 @@ export class EvidenceUploader {
     };
   }
 
-  /**
-   * Clear cache
-   */
   clearCache(): void {
     this.uploadedAttachments.clear();
     this.logger.debug('Evidence cache cleared');

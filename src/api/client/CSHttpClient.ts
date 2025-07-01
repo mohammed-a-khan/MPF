@@ -50,17 +50,14 @@ export class CSHttpClient {
     ActionLogger.getInstance().logAPIRequest(requestId, options);
 
     try {
-      // Apply authentication
       if (options.auth) {
         options = await this.authHandler.applyAuthentication(options, options.auth);
       }
 
-      // Apply proxy if configured
       if (options.proxy || ConfigurationManager.getBoolean('USE_PROXY', false)) {
         options = await this.applyProxy(options);
       }
 
-      // Execute with retry logic
       const response = await this.retryHandler.executeWithRetry(
         () => this.executeRequest(requestId, options),
         {
@@ -85,7 +82,6 @@ export class CSHttpClient {
     }
   }
 
-  // Convenience methods
   public async get(url: string, options?: Partial<RequestOptions>): Promise<Response> {
     return this.request({ ...options, url, method: 'GET' });
   }
@@ -122,29 +118,23 @@ export class CSHttpClient {
       const requestOptions = this.buildNodeRequestOptions(options, parsedUrl);
       const performanceMetrics: PerformanceMetrics = { total: 0 };
       
-      // Get connection from pool
       const agent = this.connectionPool.getAgent(options.url, parsedUrl.protocol === 'https:');
       requestOptions.agent = agent;
 
-      // Create request
       const req = protocol.request(requestOptions, (res) => {
         this.handleResponse(requestId, res, options, performanceMetrics)
           .then(resolve)
           .catch(reject);
       });
 
-      // Store active request
       this.activeRequests.set(requestId, req);
 
-      // Handle request events
       this.setupRequestEventHandlers(req, requestId, options, performanceMetrics, reject);
 
-      // Write body if present
       if (options.body) {
         this.writeRequestBody(req, options);
       }
 
-      // End request
       req.end();
     });
   }
@@ -160,7 +150,6 @@ export class CSHttpClient {
       rejectUnauthorized: options.validateSSL !== false
     };
 
-    // Add certificate options if provided
     if (options.cert) {
       Object.assign(nodeOptions, {
         ...(options.cert.cert && { cert: options.cert.cert }),
@@ -183,7 +172,6 @@ export class CSHttpClient {
       ...options.headers
     };
 
-    // Add content headers for body
     if (options.body) {
       if (!headers['Content-Type']) {
         if (typeof options.body === 'object') {
@@ -223,7 +211,6 @@ export class CSHttpClient {
     );
 
     if (options.body instanceof Readable) {
-      // Handle stream body
       options.body.pipe(req);
     } else {
       req.write(body);
@@ -238,15 +225,12 @@ export class CSHttpClient {
   ): Promise<Response> {
     metrics.firstByte = Date.now();
     
-    // Handle redirects
     if (this.isRedirect(res.statusCode) && options.maxRedirects !== 0) {
       return this.handleRedirect(res, options);
     }
 
-    // Decompress response if needed
     const responseStream = this.decompressResponse(res);
     
-    // Collect response data
     const chunks: Buffer[] = [];
     let totalSize = 0;
 
@@ -347,7 +331,6 @@ export class CSHttpClient {
       reject(this.enhanceError(error, options));
     });
 
-    // Handle abort signal
     if (options.signal) {
       options.signal.addEventListener('abort', () => {
         req.destroy();
@@ -382,22 +365,18 @@ export class CSHttpClient {
   }
 
   private shouldRetry(error: any, response?: Response): boolean {
-    // Don't retry if explicitly told not to
     if (error && error.noRetry) {
       return false;
     }
 
-    // Retry on network errors
     if (error && ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND'].includes(error.code)) {
       return true;
     }
 
-    // Retry on server errors
     if (response && response.status >= 500) {
       return true;
     }
 
-    // Retry on rate limiting with delay
     if (response && response.status === 429) {
       return true;
     }
@@ -406,19 +385,15 @@ export class CSHttpClient {
   }
 
   private async applyProxy(options: RequestOptions): Promise<RequestOptions> {
-    // Handle both API ProxyConfig (simple) and Core ProxyConfig (complex)
     let proxyConfig: APIProxyConfig | null = null;
     
     if (options.proxy) {
-      // If proxy is already in options, use it (it's APIProxyConfig)
       proxyConfig = options.proxy;
     } else {
-      // Get proxy from ProxyManager (returns complex ProxyConfig)
       const coreProxy = ProxyManager.getProxyConfig(options.url);
       if (coreProxy && (coreProxy as any).servers && (coreProxy as any).servers.length > 0) {
         const proxyServer = (coreProxy as any).servers[0];
         if (proxyServer) {
-          // Convert core proxy protocol to API proxy protocol
           let apiProtocol: 'http' | 'https' | 'socks5';
           switch (proxyServer.protocol) {
             case 'http':
@@ -427,7 +402,7 @@ export class CSHttpClient {
               apiProtocol = proxyServer.protocol;
               break;
             case 'socks4':
-              apiProtocol = 'socks5'; // Fallback socks4 to socks5
+              apiProtocol = 'socks5';
               break;
             default:
               apiProtocol = 'http';
@@ -438,7 +413,6 @@ export class CSHttpClient {
             port: proxyServer.port
           };
           
-          // Only assign optional properties if they exist
           if (apiProtocol) {
             config.protocol = apiProtocol;
           }
@@ -458,18 +432,14 @@ export class CSHttpClient {
       return options;
     }
 
-    // Check if URL should bypass proxy
     if (proxyConfig.bypass && this.shouldBypassProxy(options.url, proxyConfig.bypass)) {
       return options;
     }
 
-    // Apply proxy settings based on type
     if (proxyConfig.protocol === 'socks5') {
-      // SOCKS5 proxy requires special handling
       throw new Error('SOCKS5 proxy support requires additional implementation');
     }
 
-    // Modify options for proxy
     return {
       ...options,
       headers: {
@@ -481,7 +451,6 @@ export class CSHttpClient {
           ).toString('base64')
         } : {})
       },
-      // Store proxy info for later use
       proxy: proxyConfig
     };
   }
@@ -492,7 +461,6 @@ export class CSHttpClient {
 
     return bypassList.some(pattern => {
       if (pattern.startsWith('*.')) {
-        // Wildcard domain matching
         return hostname.endsWith(pattern.substring(2));
       }
       return hostname === pattern;
@@ -510,7 +478,6 @@ export class CSHttpClient {
     const enhancedError = error as RequestError;
     enhancedError.request = options;
     
-    // Add more context to error message
     if (enhancedError.code === 'ENOTFOUND') {
       enhancedError.message = `Unable to resolve hostname: ${url.parse(options.url).hostname}`;
     } else if (enhancedError.code === 'ECONNREFUSED') {
@@ -590,7 +557,6 @@ export class CSHttpClient {
     const fileStream = fs.createReadStream(filePath);
     const fileName = path.basename(filePath);
     
-    // Build multipart form data
     const formDataParts: string[] = [];
     formDataParts.push(`--${boundary}`);
     formDataParts.push(`Content-Disposition: form-data; name="${fieldName}"; filename="${fileName}"`);
@@ -603,7 +569,6 @@ export class CSHttpClient {
     const fileSize = fs.statSync(filePath).size;
     const totalSize = prefix.length + fileSize + suffix.length;
 
-    // Create readable stream for the complete form data
     const formDataStream = new Readable({
       read() {}
     });

@@ -3,7 +3,7 @@
 export interface TestPoint {
     id: number;
     url: string;
-    testCaseId: string;  // ADO returns this as a string
+    testCaseId: string;
     testCase: {
         id: string;
     };

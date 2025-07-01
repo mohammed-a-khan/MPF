@@ -9,10 +9,6 @@ import { DateUtils } from '../../core/utils/DateUtils';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 import * as path from 'path';
 
-/**
- * Main reporting orchestrator for CS Test Automation Framework
- * Coordinates all report generation activities
- */
 export class CSReporter {
     private static instance: CSReporter;
     private reportOrchestrator: ReportOrchestrator;
@@ -34,9 +30,6 @@ export class CSReporter {
         this.reportAggregator = new ReportAggregator();
     }
 
-    /**
-     * Get singleton instance
-     */
     public static getInstance(): CSReporter {
         if (!CSReporter.instance) {
             CSReporter.instance = new CSReporter();
@@ -44,29 +37,21 @@ export class CSReporter {
         return CSReporter.instance;
     }
 
-    /**
-     * Initialize the reporting system
-     */
     public async initialize(options?: Partial<ReportOptions>): Promise<void> {
         try {
             this.logger.info('Initializing CS Reporting System');
             this.reportStartTime = new Date();
             
-            // Load configuration
             await this.loadConfiguration(options);
             
-            // Create report directories
             await this.createReportDirectories();
             
-            // Initialize components
             await this.reportOrchestrator.initialize(this.reportConfig);
             await this.reportCollector.initialize();
             await this.reportAggregator.initialize();
             
-            // Generate report ID
             this.currentReportId = this.generateReportId();
             
-            // Start evidence collection
             this.reportCollector.startCollection(this.currentReportId);
             
             this.isInitialized = true;
@@ -78,9 +63,6 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Generate reports based on execution results
-     */
     public async generateReport(executionResult: ExecutionResult): Promise<ReportResult> {
         try {
             if (!this.isInitialized) {
@@ -90,22 +72,16 @@ export class CSReporter {
             this.logger.info(`Generating report for execution: ${executionResult.executionId}`);
             this.reportEndTime = new Date();
 
-            // Collect all evidence
             const evidence = await this.reportCollector.collectAllEvidence(executionResult);
             
-            // Aggregate results
             const aggregatedData = await this.reportAggregator.aggregate(executionResult, evidence);
             
-            // Add metadata
             const reportData = this.enrichWithMetadata(aggregatedData);
             
-            // Generate all report formats
             const reportResult = await this.reportOrchestrator.generateReports(reportData);
             
-            // Store report history
             this.reportHistory.set(this.currentReportId, reportResult);
             
-            // Cleanup if configured
             if (this.reportConfig.get('autoCleanup')) {
                 await this.performCleanup();
             }
@@ -119,9 +95,6 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Generate real-time report during execution
-     */
     public async generateLiveReport(partialResult: Partial<ExecutionResult>): Promise<string> {
         try {
             const liveReportPath = path.join(
@@ -130,16 +103,13 @@ export class CSReporter {
                 `live-report-${this.currentReportId}.html`
             );
 
-            // Collect current evidence
             const currentEvidence = await this.reportCollector.collectLiveEvidence();
             
-            // Generate lightweight live report
             const liveReport = await this.reportOrchestrator.generateLiveReport(
                 partialResult,
                 currentEvidence
             );
 
-            // Write live report
             await FileUtils.writeFile(liveReportPath, liveReport);
             
             return liveReportPath;
@@ -150,9 +120,6 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Update report with additional data
-     */
     public async updateReport(reportId: string, additionalData: any): Promise<void> {
         try {
             const existingReport = this.reportHistory.get(reportId);
@@ -160,10 +127,8 @@ export class CSReporter {
                 throw new Error(`Report not found: ${reportId}`);
             }
 
-            // Merge additional data
             const updatedData = this.mergeReportData(existingReport, additionalData);
             
-            // Regenerate affected report sections
             await this.reportOrchestrator.updateReport(existingReport, updatedData);
             
             this.logger.info(`Report updated: ${reportId}`);
@@ -174,9 +139,6 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Archive report for long-term storage
-     */
     public async archiveReport(reportId: string): Promise<string> {
         try {
             const report = this.reportHistory.get(reportId);
@@ -189,10 +151,8 @@ export class CSReporter {
                 `${reportId}-${DateUtils.format(new Date(), 'YYYYMMDD-HHmmss')}.zip`
             );
 
-            // Create archive
             await FileUtils.createZipArchive(report.reportPath, archivePath);
             
-            // Update report metadata
             if (!report.metadata) {
                 report.metadata = {};
             }
@@ -208,23 +168,14 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Get report by ID
-     */
     public getReport(reportId: string): ReportResult | undefined {
         return this.reportHistory.get(reportId);
     }
 
-    /**
-     * Get all reports
-     */
     public getAllReports(): Map<string, ReportResult> {
         return new Map(this.reportHistory);
     }
 
-    /**
-     * Clean up old reports
-     */
     public async cleanupOldReports(daysToKeep: number = 30): Promise<number> {
         try {
             const cutoffDate = new Date();
@@ -233,7 +184,6 @@ export class CSReporter {
             let cleanedCount = 0;
             const reportPath = this.reportConfig.get('reportPath');
             
-            // Get all report directories
             const entries = await FileUtils.readDirWithStats(reportPath);
             const reportDirs = entries.filter(entry => entry.stats.isDirectory);
             
@@ -255,9 +205,6 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Export report to different format
-     */
     public async exportReport(reportId: string, format: 'pdf' | 'excel' | 'json' | 'xml'): Promise<string> {
         try {
             const report = this.reportHistory.get(reportId);
@@ -273,11 +220,7 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Load configuration
-     */
     private async loadConfiguration(options?: Partial<ReportOptions>): Promise<void> {
-        // Load from ConfigurationManager
         const defaultConfig = {
             reportPath: ConfigurationManager.get('REPORT_PATH', './reports'),
             archivePath: ConfigurationManager.get('REPORT_ARCHIVE_PATH', './reports/archive'),
@@ -305,16 +248,11 @@ export class CSReporter {
             imageQuality: ConfigurationManager.getInt('IMAGE_QUALITY', 85)
         };
 
-        // Merge with provided options
         const finalConfig = { ...defaultConfig, ...options };
         
-        // Set configuration with proper type
         await this.reportConfig.load(finalConfig as any);
     }
 
-    /**
-     * Create report directories
-     */
     private async createReportDirectories(): Promise<void> {
         const directories = [
             this.reportConfig.get('reportPath'),
@@ -338,18 +276,12 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Generate unique report ID
-     */
     private generateReportId(): string {
         const timestamp = DateUtils.format(new Date(), 'YYYYMMDD-HHmmss');
         const random = Math.random().toString(36).substring(2, 8);
         return `CSR-${timestamp}-${random}`;
     }
 
-    /**
-     * Enrich data with metadata
-     */
     private enrichWithMetadata(data: any): any {
         return {
             ...data,
@@ -372,9 +304,6 @@ export class CSReporter {
         };
     }
 
-    /**
-     * Merge report data
-     */
     private mergeReportData(existing: any, additional: any): any {
         return {
             ...existing,
@@ -391,9 +320,6 @@ export class CSReporter {
         };
     }
 
-    /**
-     * Perform cleanup operations
-     */
     private async performCleanup(): Promise<void> {
         try {
             const cleanupDays = this.reportConfig.get('cleanupDays');
@@ -406,20 +332,14 @@ export class CSReporter {
         }
     }
 
-    /**
-     * Shutdown the reporting system
-     */
     public async shutdown(): Promise<void> {
         try {
             this.logger.info('Shutting down CS Reporting System');
             
-            // Stop evidence collection
             await this.reportCollector.stopCollection();
             
-            // Save any pending data
             await this.reportOrchestrator.finalize();
             
-            // Clear history if too large
             if (this.reportHistory.size > 100) {
                 const oldestReports = Array.from(this.reportHistory.entries())
                     .sort((a, b) => a[1].generatedAt.getTime() - b[1].generatedAt.getTime())

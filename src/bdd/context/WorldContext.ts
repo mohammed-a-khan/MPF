@@ -8,10 +8,6 @@ import { DateUtils } from '../../core/utils/DateUtils';
 import { CryptoUtils } from '../../core/utils/CryptoUtils';
 import { ValidationUtils } from '../../core/utils/ValidationUtils';
 
-/**
- * Global test world providing shared utilities and helpers
- * Available across all features and scenarios
- */
 export class WorldContext {
   private static instance: WorldContext;
   private readonly data: Map<string, any>;
@@ -29,9 +25,6 @@ export class WorldContext {
     this.initializeUtilities();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): WorldContext {
     if (!WorldContext.instance) {
       WorldContext.instance = new WorldContext();
@@ -39,18 +32,13 @@ export class WorldContext {
     return WorldContext.instance;
   }
 
-  /**
-   * Initialize utilities
-   */
   private initializeUtilities(): void {
-    // Register utility instances
     this.utilities.set('file', FileUtils);
     this.utilities.set('string', StringUtils);
     this.utilities.set('date', DateUtils);
     this.utilities.set('crypto', CryptoUtils);
     this.utilities.set('validation', ValidationUtils);
 
-    // Register helper functions
     this.utilities.set('random', {
       string: (length: number = 10) => this.generateRandomString(length),
       number: (min: number, max: number) => this.generateRandomNumber(min, max),
@@ -61,7 +49,6 @@ export class WorldContext {
       element: <T>(array: T[]) => array[Math.floor(Math.random() * array.length)]
     });
 
-    // Register formatters
     this.utilities.set('format', {
       currency: (amount: number, currency: string = 'USD') => this.formatCurrency(amount, currency),
       date: (date: Date, format: string) => DateUtils.format(date, format),
@@ -70,7 +57,6 @@ export class WorldContext {
       bytes: (bytes: number) => this.formatBytes(bytes)
     });
 
-    // Register validators
     this.utilities.set('validate', {
       email: (email: string) => ValidationUtils.isValidEmail(email),
       url: (url: string) => ValidationUtils.isValidUrl(url),
@@ -80,39 +66,24 @@ export class WorldContext {
     });
   }
 
-  /**
-   * Get test run ID
-   */
   public getTestRunId(): string {
     return this.testRunId;
   }
 
-  /**
-   * Get start time
-   */
   public getStartTime(): Date {
     return this.startTime;
   }
 
-  /**
-   * Get elapsed time
-   */
   public getElapsedTime(): number {
     return Date.now() - this.startTime.getTime();
   }
 
-  /**
-   * Set value
-   */
   public set(key: string, value: any): void {
     this.data.set(key, value);
     ActionLogger.logContextStorage(`world.${key}`, typeof value);
     this.logger.debug(`Set world data: ${key} = ${JSON.stringify(value)}`);
   }
 
-  /**
-   * Get value
-   */
   public get<T = any>(key: string, defaultValue?: T): T {
     if (this.data.has(key)) {
       return this.data.get(key);
@@ -120,16 +91,10 @@ export class WorldContext {
     return defaultValue as T;
   }
 
-  /**
-   * Check if key exists
-   */
   public has(key: string): boolean {
     return this.data.has(key);
   }
 
-  /**
-   * Delete value
-   */
   public delete(key: string): boolean {
     const result = this.data.delete(key);
     if (result) {
@@ -138,34 +103,22 @@ export class WorldContext {
     return result;
   }
 
-  /**
-   * Clear all data
-   */
   public clear(): void {
     const size = this.data.size;
     this.data.clear();
     this.logger.debug(`Cleared world context (${size} items)`);
   }
 
-  /**
-   * Get utility
-   */
   public getUtility(name: string): any {
     return this.utilities.get(name);
   }
 
-  /**
-   * Generate test run ID
-   */
   private generateTestRunId(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
     return `run_${timestamp}_${random}`;
   }
 
-  /**
-   * Generate random string
-   */
   public generateRandomString(length: number = 10): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -175,32 +128,20 @@ export class WorldContext {
     return result;
   }
 
-  /**
-   * Generate random number
-   */
   public generateRandomNumber(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  /**
-   * Generate random email
-   */
   public generateRandomEmail(domain: string = 'test.com'): string {
     const username = this.generateRandomString(8).toLowerCase();
     const timestamp = Date.now();
     return `${username}_${timestamp}@${domain}`;
   }
 
-  /**
-   * Generate random phone
-   */
   public generateRandomPhone(format: string = '(XXX) XXX-XXXX'): string {
     return format.replace(/X/g, () => Math.floor(Math.random() * 10).toString());
   }
 
-  /**
-   * Generate UUID
-   */
   public generateUUID(): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = Math.random() * 16 | 0;
@@ -209,9 +150,6 @@ export class WorldContext {
     });
   }
 
-  /**
-   * Format currency
-   */
   public formatCurrency(amount: number, currency: string = 'USD'): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -219,9 +157,6 @@ export class WorldContext {
     }).format(amount);
   }
 
-  /**
-   * Format bytes
-   */
   public formatBytes(bytes: number, decimals: number = 2): string {
     if (bytes === 0) return '0 Bytes';
 
@@ -234,9 +169,6 @@ export class WorldContext {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   }
 
-  /**
-   * Validate credit card (Luhn algorithm)
-   */
   public validateCreditCard(cardNumber: string): boolean {
     const digits = cardNumber.replace(/\D/g, '');
     
@@ -264,9 +196,6 @@ export class WorldContext {
     return sum % 10 === 0;
   }
 
-  /**
-   * Check if valid JSON
-   */
   public isValidJSON(json: string): boolean {
     try {
       JSON.parse(json);
@@ -276,16 +205,10 @@ export class WorldContext {
     }
   }
 
-  /**
-   * Create test data builder
-   */
   public createTestDataBuilder(): TestDataBuilder {
     return new TestDataBuilder(this);
   }
 
-  /**
-   * Export context for debugging
-   */
   public export(): any {
     return {
       testRunId: this.testRunId,
@@ -298,9 +221,6 @@ export class WorldContext {
   }
 }
 
-/**
- * Test data builder helper
- */
 class TestDataBuilder {
   private data: any = {};
   private world: WorldContext;
@@ -337,5 +257,4 @@ class TestDataBuilder {
   }
 }
 
-// Export singleton instance
 export const worldContext = WorldContext.getInstance();

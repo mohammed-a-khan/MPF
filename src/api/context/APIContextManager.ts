@@ -2,10 +2,6 @@ import { APIContext } from './APIContext';
 import { APIContextData } from '../types/api.types';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Manages multiple API contexts for parallel API testing
- * Supports context switching, sharing, and lifecycle management
- */
 export class APIContextManager {
     private static instance: APIContextManager;
     private contexts: Map<string, APIContext> = new Map();
@@ -13,7 +9,6 @@ export class APIContextManager {
     private sharedData: Map<string, any> = new Map();
 
     private constructor() {
-        // Create default context
         this.createContext('default');
     }
 
@@ -24,9 +19,6 @@ export class APIContextManager {
         return APIContextManager.instance;
     }
 
-    /**
-     * Create new API context
-     */
     public createContext(name: string, initialData?: Partial<APIContextData>): APIContext {
         if (this.contexts.has(name)) {
             throw new Error(`Context '${name}' already exists`);
@@ -39,9 +31,6 @@ export class APIContextManager {
         return context;
     }
 
-    /**
-     * Get context by name
-     */
     public getContext(name?: string): APIContext {
         const contextName = name || this.currentContextName;
         const context = this.contexts.get(contextName);
@@ -53,16 +42,10 @@ export class APIContextManager {
         return context;
     }
 
-    /**
-     * Get current context
-     */
     public getCurrentContext(): APIContext {
         return this.getContext(this.currentContextName);
     }
 
-    /**
-     * Switch to different context
-     */
     public switchContext(name: string): void {
         if (!this.contexts.has(name)) {
             throw new Error(`Context '${name}' not found`);
@@ -74,9 +57,6 @@ export class APIContextManager {
         ActionLogger.getInstance().info(`Switched from context '${previousContext}' to '${name}'`);
     }
 
-    /**
-     * Delete context
-     */
     public deleteContext(name: string): void {
         if (name === 'default') {
             throw new Error('Cannot delete default context');
@@ -90,23 +70,14 @@ export class APIContextManager {
         ActionLogger.getInstance().info(`API context deleted: ${name}`);
     }
 
-    /**
-     * Check if context exists
-     */
     public hasContext(name: string): boolean {
         return this.contexts.has(name);
     }
 
-    /**
-     * Get all context names
-     */
     public getContextNames(): string[] {
         return Array.from(this.contexts.keys());
     }
 
-    /**
-     * Clone existing context
-     */
     public cloneContext(sourceName: string, targetName: string): APIContext {
         const sourceContext = this.getContext(sourceName);
         const clonedContext = sourceContext.clone(targetName);
@@ -117,9 +88,6 @@ export class APIContextManager {
         return clonedContext;
     }
 
-    /**
-     * Merge contexts
-     */
     public mergeContexts(sourceName: string, targetName: string, overwrite: boolean = false): void {
         const source = this.getContext(sourceName);
         const target = this.getContext(targetName);
@@ -127,14 +95,12 @@ export class APIContextManager {
         const sourceState = source.getCurrentState();
         const targetState = target.getCurrentState();
 
-        // Merge headers
         if (overwrite) {
             target.setHeaders(sourceState.headers);
         } else {
             target.setHeaders({ ...targetState.headers, ...sourceState.headers });
         }
 
-        // Merge variables
         const sourceVars = source.getVariables();
         for (const [name, value] of Object.entries(sourceVars)) {
             if (overwrite || !target.getVariable(name)) {
@@ -142,7 +108,6 @@ export class APIContextManager {
             }
         }
 
-        // Copy auth if target doesn't have one or overwrite is true
         if (overwrite || !target.getAuth()) {
             target.setAuth(sourceState.auth);
         }
@@ -150,9 +115,6 @@ export class APIContextManager {
         ActionLogger.getInstance().info(`Context '${sourceName}' merged into '${targetName}'`);
     }
 
-    /**
-     * Reset all contexts
-     */
     public resetAll(): void {
         for (const context of this.contexts.values()) {
             context.reset();
@@ -161,41 +123,26 @@ export class APIContextManager {
         ActionLogger.getInstance().info('All API contexts reset');
     }
 
-    /**
-     * Reset specific context
-     */
     public resetContext(name: string): void {
         const context = this.getContext(name);
         context.reset();
         ActionLogger.getInstance().info(`API context reset: ${name}`);
     }
 
-    /**
-     * Set shared data accessible by all contexts
-     */
     public setSharedData(key: string, value: any): void {
         this.sharedData.set(key, value);
         ActionLogger.getInstance().debug(`Shared data set: ${key}`);
     }
 
-    /**
-     * Get shared data
-     */
     public getSharedData(key: string): any {
         return this.sharedData.get(key);
     }
 
-    /**
-     * Clear shared data
-     */
     public clearSharedData(): void {
         this.sharedData.clear();
         ActionLogger.getInstance().debug('Shared data cleared');
     }
 
-    /**
-     * Execute with temporary context
-     */
     public async executeWithContext<T>(
         contextName: string,
         action: (context: APIContext) => Promise<T>
@@ -211,9 +158,6 @@ export class APIContextManager {
         }
     }
 
-    /**
-     * Create temporary context for execution
-     */
     public async executeWithTempContext<T>(
         initialData: Partial<APIContextData>,
         action: (context: APIContext) => Promise<T>
@@ -228,9 +172,6 @@ export class APIContextManager {
         }
     }
 
-    /**
-     * Get all contexts summary
-     */
     public getAllContextsSummary(): any[] {
         return Array.from(this.contexts.entries()).map(([name, context]) => ({
             ...context.getSummary(),
@@ -238,9 +179,6 @@ export class APIContextManager {
         }));
     }
 
-    /**
-     * Export all contexts
-     */
     public exportAll(): any {
         const exports: any = {
             currentContext: this.currentContextName,
@@ -259,9 +197,6 @@ export class APIContextManager {
         return exports;
     }
 
-    /**
-     * Import contexts
-     */
     public importAll(data: any): void {
         if (data.contexts) {
             for (const [name, contextData] of Object.entries(data.contexts)) {
@@ -286,9 +221,6 @@ export class APIContextManager {
         ActionLogger.getInstance().info('Contexts imported successfully');
     }
 
-    /**
-     * Clear all contexts except default
-     */
     public clearAll(): void {
         const contextsToDelete = Array.from(this.contexts.keys()).filter(name => name !== 'default');
         
@@ -303,9 +235,6 @@ export class APIContextManager {
         ActionLogger.getInstance().info('All contexts cleared');
     }
 
-    /**
-     * Get metrics
-     */
     public getMetrics(): any {
         const metrics = {
             totalContexts: this.contexts.size,
@@ -324,9 +253,6 @@ export class APIContextManager {
         return metrics;
     }
 
-    /**
-     * Find contexts by criteria
-     */
     public findContexts(predicate: (context: APIContext) => boolean): APIContext[] {
         const results: APIContext[] = [];
         
@@ -339,18 +265,12 @@ export class APIContextManager {
         return results;
     }
 
-    /**
-     * Apply operation to all contexts
-     */
     public applyToAll(operation: (context: APIContext) => void): void {
         for (const context of this.contexts.values()) {
             operation(context);
         }
     }
 
-    /**
-     * Create context from another context's state
-     */
     public createFromContext(sourceName: string, newName: string, modifications?: Partial<APIContextData>): APIContext {
         const source = this.getContext(sourceName);
         const sourceState = source.getCurrentState();

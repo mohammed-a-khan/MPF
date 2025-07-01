@@ -38,7 +38,6 @@ export class ElementResolver {
       locatorValue: options.locatorValue
     });
 
-    // Check cache first
     const cacheKey = this.generateCacheKey(element);
     const cached = this.cache.get(cacheKey);
     if (cached) {
@@ -52,12 +51,10 @@ export class ElementResolver {
     let fallbacksUsed = 0;
 
     try {
-      // Try primary locator
       attempts++;
       locator = await this.tryPrimaryLocator(element);
       
       if (!locator) {
-        // Try advanced selectors
         attempts++;
         locator = await this.tryAdvancedSelectors(element);
         if (locator) {
@@ -65,7 +62,6 @@ export class ElementResolver {
         }
       }
 
-      // Try fallbacks if primary and advanced failed
       if (!locator && options.fallbacks) {
         const fallbackResult = await this.tryFallbacks(element);
         if (fallbackResult) {
@@ -76,7 +72,6 @@ export class ElementResolver {
         }
       }
 
-      // Try AI identification as last resort
       if (!locator && options.aiEnabled && options.aiDescription) {
         attempts++;
         locator = await this.tryAIIdentification(element);
@@ -89,7 +84,6 @@ export class ElementResolver {
         throw new Error(`Unable to locate element: ${element.description}`);
       }
 
-      // Ensure element exists
       if (options.strict !== false) {
         try {
           const count = await locator.count();
@@ -100,13 +94,10 @@ export class ElementResolver {
             throw new Error(`Multiple elements found (${count}): ${element.description}`);
           }
         } catch (error: any) {
-          // Handle context destruction during navigation
           if (error.message?.includes('Execution context was destroyed')) {
-            // Re-create locator with fresh page context
             const freshPage = element.page;
             locator = await element.getLocator();
             
-            // Retry the count operation
             const count = await locator.count();
             if (count === 0) {
               throw new Error(`Element not found: ${element.description}`);
@@ -120,15 +111,12 @@ export class ElementResolver {
         }
       }
 
-      // Apply additional filters
       locator = await this.applyFilters(locator, options);
 
-      // Apply nth selector if specified
       if (options.nth !== undefined) {
         locator = await this.applyNthSelector(locator, options.nth);
       }
 
-      // Cache successful resolution
       this.cache.set(cacheKey, locator);
 
       const result: ElementResolutionResult = {
@@ -155,17 +143,14 @@ export class ElementResolver {
     try {
       let locator = this.buildLocator(page, options);
       
-      // Apply iframe context if specified
       if (options.iframe !== undefined) {
         locator = await this.applyIframeContext(element, options.iframe);
       }
 
-      // Apply shadow DOM context if specified
       if (options.shadowRoot) {
         locator = await this.applyShadowDOMContext(locator);
       }
 
-      // Wait for element if configured
       if (options.waitForVisible) {
         const waitOptions: { state: 'visible'; timeout?: number } = { state: 'visible' };
         if (options.waitTimeout !== undefined) {
@@ -179,7 +164,6 @@ export class ElementResolver {
         }
         await locator.waitFor(waitOptions);
         
-        // Wait for enabled state using custom logic since Playwright doesn't have 'enabled' state
         const waitFunctionOptions: { timeout?: number } = {};
         if (options.waitTimeout !== undefined) {
           waitFunctionOptions.timeout = options.waitTimeout;
@@ -223,7 +207,6 @@ export class ElementResolver {
         return page.getByText(options.locatorValue);
       
       case 'role':
-        // Parse role options from locator value
         const [role, ...roleOptionsStr] = options.locatorValue.split(':');
         const roleOptions = roleOptionsStr.length > 0 
           ? this.parseRoleOptions(roleOptionsStr.join(':'))
@@ -264,14 +247,12 @@ export class ElementResolver {
 
   private parseRoleOptions(optionsStr: string): any {
     try {
-      // Parse options like "name=Submit" or "pressed=true"
       const options: any = {};
       const pairs = optionsStr.split(',');
       
       for (const pair of pairs) {
         const [key, value] = pair.trim().split('=');
         if (key && value) {
-          // Convert boolean strings
           if (value === 'true') options[key] = true;
           else if (value === 'false') options[key] = false;
           else options[key] = value;
@@ -289,7 +270,6 @@ export class ElementResolver {
     const page = element.page;
     
     try {
-      // Try layout selectors
       if (this.hasLayoutSelectors(options)) {
         const baseLocator = this.createBaseLocator(page, options);
         const layoutOptions = {
@@ -299,7 +279,6 @@ export class ElementResolver {
         return this.advancedSelectors.resolveLayoutSelector(page, layoutOptions);
       }
 
-      // Try filter selectors
       if (options.hasText || options.hasNotText || options.has || options.hasNot) {
         const filterOptions: any = {};
         if (options.hasText !== undefined) {
@@ -317,7 +296,6 @@ export class ElementResolver {
         return this.advancedSelectors.resolveFilterSelector(page, filterOptions);
       }
 
-      // Try component selectors
       if (options.react || options.vue) {
         const framework = options.react ? 'react' : 'vue';
         const componentName = (options.react || options.vue) as string;
@@ -403,7 +381,6 @@ export class ElementResolver {
   private async applyFilters(locator: Locator, options: CSGetElementOptions): Promise<Locator> {
     let filtered = locator;
 
-    // Apply text filters
     if (options.hasText !== undefined || options.hasNotText !== undefined) {
       const filterOptions: any = {};
       if (options.hasText !== undefined) {
@@ -415,7 +392,6 @@ export class ElementResolver {
       filtered = filtered.filter(filterOptions);
     }
 
-    // Apply locator filters
     if (options.has) {
       const hasLocator = this.buildLocator(locator.page(), options.has);
       filtered = filtered.filter({ has: hasLocator });
@@ -437,7 +413,6 @@ export class ElementResolver {
     const page = element.page;
     
     if (typeof frameSelector === 'number') {
-      // Use frame index
       const frames = page.frames();
       if (frameSelector >= 0 && frameSelector < frames.length) {
         const frame = frames[frameSelector];
@@ -447,7 +422,6 @@ export class ElementResolver {
       }
       throw new Error(`Frame index ${frameSelector} out of bounds`);
     } else {
-      // Use frame selector
       const frameLocator = page.frameLocator(frameSelector);
       return this.createFrameLocator(frameLocator, element.options);
     }
@@ -455,12 +429,10 @@ export class ElementResolver {
 
   private buildLocatorInFrame(frame: Frame, options: CSGetElementOptions): Locator {
     const page = frame.page();
-    // Build locator using the page context, but it will be resolved within the frame
     return this.buildLocator(page, options);
   }
 
   private createFrameLocator(frameLocator: any, options: CSGetElementOptions): Locator {
-    // Create locator within frame context
     switch (options.locatorType) {
       case 'css':
         return frameLocator.locator(options.locatorValue);
@@ -472,7 +444,6 @@ export class ElementResolver {
   }
 
   private async applyShadowDOMContext(locator: Locator): Promise<Locator> {
-    // Shadow DOM is handled by the locator itself in Playwright
     return locator;
   }
 
@@ -502,7 +473,6 @@ export class ElementResolver {
   }
 
   private createBaseLocator(page: Page, options: CSGetElementOptions): Locator {
-    // Create a base locator for layout selectors
     return page.locator(options.locatorValue);
   }
 
@@ -515,7 +485,6 @@ export class ElementResolver {
   }
 
   clearCache(): void {
-    // Clear all cached entries
     this.cache.invalidateAll();
   }
 

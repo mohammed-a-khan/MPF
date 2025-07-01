@@ -13,10 +13,6 @@ import {
     TimelineEntry
 } from './types/network.types';
 
-/**
- * HARRecorder - Complete HTTP Archive recording and analysis
- * Records all network traffic and provides comprehensive analysis
- */
 export class HARRecorder {
     private context: BrowserContext | null = null;
     private page: Page | null = null;
@@ -29,14 +25,11 @@ export class HARRecorder {
     constructor(options: HAROptions = {}) {
         this.options = {
             content: 'embed',
-            maxSize: 50 * 1024 * 1024, // 50MB default
+            maxSize: 50 * 1024 * 1024,
             ...options
         };
     }
 
-    /**
-     * Start HAR recording
-     */
     async startRecording(page: Page, options?: HAROptions): Promise<void> {
         if (this.isRecording) {
             const logger = Logger.getInstance();
@@ -49,11 +42,9 @@ export class HARRecorder {
             this.context = page.context();
             this.options = { ...this.options, ...options };
             
-            // Generate HAR path
             this.harPath = `./har/recording_${Date.now()}.har`;
             await FileUtils.ensureDir('./har');
 
-            // Start recording with proper options
             const routeOptions: any = {
                 update: true,
                 updateMode: 'full'
@@ -68,7 +59,6 @@ export class HARRecorder {
             this.isRecording = true;
             this.recordingStartTime = Date.now();
             
-            // Set up performance monitoring
             await this.setupPerformanceMonitoring();
             
             ActionLogger.logInfo('HAR recording started', {
@@ -82,9 +72,6 @@ export class HARRecorder {
         }
     }
 
-    /**
-     * Stop HAR recording
-     */
     async stopRecording(): Promise<HAR> {
         if (!this.isRecording) {
             throw new Error('HARRecorder: No recording in progress');
@@ -94,16 +81,12 @@ export class HARRecorder {
             this.isRecording = false;
             const recordingDuration = Date.now() - this.recordingStartTime;
             
-            // Stop routing to allow HAR file to be finalized
             await this.context!.unrouteAll();
             
-            // Wait a bit for file to be written
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Load and parse HAR file
             this.harData = await this.loadHAR(this.harPath!);
             
-            // Enhance HAR with performance metrics
             await this.enhanceHARWithMetrics();
             
             ActionLogger.logInfo('HAR recording stopped', {
@@ -120,15 +103,11 @@ export class HARRecorder {
         }
     }
 
-    /**
-     * Pause recording
-     */
     async pauseRecording(): Promise<void> {
         if (!this.isRecording) {
             throw new Error('HARRecorder: No recording in progress');
         }
 
-        // Temporarily unroute to pause recording
         await this.context!.unrouteAll();
         this.isRecording = false;
         
@@ -137,9 +116,6 @@ export class HARRecorder {
         });
     }
 
-    /**
-     * Resume recording
-     */
     async resumeRecording(): Promise<void> {
         if (this.isRecording || !this.harPath) {
             throw new Error('HARRecorder: Cannot resume - no paused recording');
@@ -163,9 +139,6 @@ export class HARRecorder {
         });
     }
 
-    /**
-     * Save HAR to file
-     */
     async saveHAR(path: string): Promise<void> {
         if (!this.harData) {
             throw new Error('HARRecorder: No HAR data available');
@@ -179,15 +152,11 @@ export class HARRecorder {
         });
     }
 
-    /**
-     * Load HAR from file
-     */
     async loadHAR(path: string): Promise<HAR> {
         try {
             const content = await FileUtils.readFile(path, 'utf8');
             const har = JSON.parse(content as string) as HAR;
             
-            // Validate HAR structure
             if (!har.log || !har.log.entries) {
                 throw new Error('Invalid HAR format');
             }
@@ -200,9 +169,6 @@ export class HARRecorder {
         }
     }
 
-    /**
-     * Analyze HAR data
-     */
     analyzeHAR(har: HAR = this.harData!): HARAnalysis {
         if (!har) {
             throw new Error('HARRecorder: No HAR data to analyze');
@@ -210,7 +176,6 @@ export class HARRecorder {
 
         const entries = har.log.entries;
         
-        // Calculate summary statistics
         const summary = {
             totalRequests: entries.length,
             totalSize: entries.reduce((sum, entry) => sum + (entry.response.bodySize || 0), 0),
@@ -219,14 +184,12 @@ export class HARRecorder {
             cacheHitRate: this.calculateCacheHitRate(entries)
         };
 
-        // Break down by type
         const breakdown = {
             byType: this.breakdownByType(entries),
             byDomain: this.breakdownByDomain(entries),
             byStatus: this.breakdownByStatus(entries)
         };
 
-        // Performance analysis
         const performance = {
             slowestRequests: this.findSlowRequests(har, 1000).slice(0, 10),
             largestRequests: this.findLargeRequests(har, 1024 * 1024).slice(0, 10),
@@ -248,13 +211,9 @@ export class HARRecorder {
         return analysis;
     }
 
-    /**
-     * Filter HAR entries
-     */
     filterEntries(har: HAR, filter: HARFilter): HAREntry[] {
         let entries = [...har.log.entries];
         
-        // Filter by URL pattern
         if (filter.urlPattern) {
             entries = entries.filter(entry => {
                 if (filter.urlPattern instanceof RegExp) {
@@ -264,12 +223,10 @@ export class HARRecorder {
             });
         }
         
-        // Filter by method
         if (filter.method) {
             entries = entries.filter(entry => entry.request.method === filter.method);
         }
         
-        // Filter by status
         if (filter.status) {
             entries = entries.filter(entry => {
                 if (Array.isArray(filter.status)) {
@@ -279,7 +236,6 @@ export class HARRecorder {
             });
         }
         
-        // Filter by content type
         if (filter.contentType) {
             entries = entries.filter(entry => {
                 const contentType = entry.response.headers.find(
@@ -289,12 +245,10 @@ export class HARRecorder {
             });
         }
         
-        // Filter by minimum duration
         if (filter.minDuration !== undefined) {
             entries = entries.filter(entry => entry.time >= filter.minDuration!);
         }
         
-        // Filter by minimum size
         if (filter.minSize !== undefined) {
             entries = entries.filter(entry => 
                 (entry.response.bodySize || 0) >= filter.minSize!
@@ -304,9 +258,6 @@ export class HARRecorder {
         return entries;
     }
 
-    /**
-     * Get performance metrics from HAR
-     */
     getPerformanceMetrics(har: HAR = this.harData!): PerformanceMetrics {
         if (!har) {
             throw new Error('HARRecorder: No HAR data available');
@@ -315,7 +266,6 @@ export class HARRecorder {
         const entries = har.log.entries;
         const pages = har.log.pages || [];
         
-        // Calculate metrics
         const metrics: PerformanceMetrics = {
             pageLoadTime: this.calculatePageLoadTime(entries, pages),
             domContentLoaded: this.calculateDOMContentLoaded(entries, pages),
@@ -324,42 +274,30 @@ export class HARRecorder {
             largestContentfulPaint: this.calculateLargestContentfulPaint(entries),
             timeToInteractive: this.calculateTimeToInteractive(entries),
             totalBlockingTime: this.calculateTotalBlockingTime(entries),
-            cumulativeLayoutShift: 0 // Would need real browser metrics
+            cumulativeLayoutShift: 0
         };
 
         return metrics;
     }
 
-    /**
-     * Find slow requests
-     */
     findSlowRequests(har: HAR, threshold: number = 1000): HAREntry[] {
         return har.log.entries
             .filter(entry => entry.time > threshold)
             .sort((a, b) => b.time - a.time);
     }
 
-    /**
-     * Find large requests
-     */
     findLargeRequests(har: HAR, sizeThreshold: number = 1024 * 1024): HAREntry[] {
         return har.log.entries
             .filter(entry => (entry.response.bodySize || 0) > sizeThreshold)
             .sort((a, b) => (b.response.bodySize || 0) - (a.response.bodySize || 0));
     }
 
-    /**
-     * Find failed requests
-     */
     findFailedRequests(har: HAR): HAREntry[] {
         return har.log.entries.filter(entry => 
             entry.response.status >= 400 || entry.response.status === 0
         );
     }
 
-    /**
-     * Generate waterfall visualization data
-     */
     generateWaterfall(har: HAR = this.harData!): WaterfallData {
         if (!har) {
             throw new Error('HARRecorder: No HAR data available');
@@ -401,9 +339,6 @@ export class HARRecorder {
         return waterfallData;
     }
 
-    /**
-     * Export HAR analysis as HTML report
-     */
     async exportAnalysisHTML(analysis: HARAnalysis, outputPath: string): Promise<void> {
         const html = this.generateAnalysisHTML(analysis);
         await FileUtils.writeFile(outputPath, html);
@@ -413,12 +348,10 @@ export class HARRecorder {
         });
     }
 
-    // Private helper methods
 
     private async setupPerformanceMonitoring(): Promise<void> {
         if (!this.page) return;
 
-        // Inject performance monitoring script
         await this.page.addInitScript(() => {
             (window as any).__harRecorderMetrics = {
                 firstPaint: 0,
@@ -428,7 +361,6 @@ export class HARRecorder {
                 loadComplete: 0
             };
 
-            // Monitor performance events
             const observer = new PerformanceObserver((list) => {
                 for (const entry of list.getEntries()) {
                     if (entry.entryType === 'paint') {
@@ -445,7 +377,6 @@ export class HARRecorder {
             
             observer.observe({ entryTypes: ['paint', 'largest-contentful-paint'] });
 
-            // DOM events
             document.addEventListener('DOMContentLoaded', () => {
                 (window as any).__harRecorderMetrics.domContentLoaded = performance.now();
             });
@@ -460,12 +391,10 @@ export class HARRecorder {
         if (!this.page || !this.harData) return;
 
         try {
-            // Get performance metrics from page
             const metrics = await this.page.evaluate(() => {
                 return (window as any).__harRecorderMetrics || {};
             });
 
-            // Add custom data to HAR
             this.harData.log._performanceMetrics = metrics;
         } catch (error) {
             const logger = Logger.getInstance();
@@ -584,12 +513,10 @@ export class HARRecorder {
     }
 
     private calculateFirstPaint(entries: HAREntry[]): number {
-        // Would need real browser metrics
         return entries.length > 0 ? entries[0]!.time : 0;
     }
 
     private calculateFirstContentfulPaint(entries: HAREntry[]): number {
-        // Find first content response
         const contentEntry = entries.find(entry => 
             entry.response.content.mimeType.includes('html') ||
             entry.response.content.mimeType.includes('image')
@@ -598,7 +525,6 @@ export class HARRecorder {
     }
 
     private calculateLargestContentfulPaint(entries: HAREntry[]): number {
-        // Find largest content response
         const largestEntry = entries
             .filter(entry => entry.response.content.mimeType.includes('image'))
             .sort((a, b) => (b.response.bodySize || 0) - (a.response.bodySize || 0))[0];
@@ -607,7 +533,6 @@ export class HARRecorder {
     }
 
     private calculateTimeToInteractive(entries: HAREntry[]): number {
-        // Simplified: when main JS files are loaded
         const jsEntries = entries.filter(entry => 
             entry.response.content.mimeType.includes('javascript')
         );
@@ -623,7 +548,6 @@ export class HARRecorder {
     }
 
     private calculateTotalBlockingTime(entries: HAREntry[]): number {
-        // Sum of long tasks (>50ms)
         return entries
             .filter(entry => entry.time > 50)
             .reduce((sum, entry) => sum + (entry.time - 50), 0);

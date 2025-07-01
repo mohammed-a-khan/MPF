@@ -5,10 +5,6 @@ import { CSHttpClient } from '../client/CSHttpClient';
 import { JSONPathValidator } from '../validators/JSONPathValidator';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Context for chaining API requests
- * Enables using data from one request in subsequent requests
- */
 export class APIChainContext {
     private chainSteps: ChainStep[] = [];
     private chainResults: ChainResult[] = [];
@@ -27,9 +23,6 @@ export class APIChainContext {
         ActionLogger.getInstance().info(`API chain created: ${chainName}`);
     }
 
-    /**
-     * Add step to chain
-     */
     public addStep(step: ChainStep): APIChainContext {
         this.chainSteps.push({
             ...step,
@@ -41,9 +34,6 @@ export class APIChainContext {
         return this;
     }
 
-    /**
-     * Add request step
-     */
     public request(
         name: string,
         requestOptions: Partial<RequestOptions>,
@@ -62,9 +52,6 @@ export class APIChainContext {
         return this.addStep(step);
     }
 
-    /**
-     * Add validation step
-     */
     public validate(
         name: string,
         validations: Array<{ path: string; expected: any; message?: string }>
@@ -81,9 +68,6 @@ export class APIChainContext {
         return this.addStep(step);
     }
 
-    /**
-     * Add transformation step
-     */
     public transform(
         name: string,
         transformer: (data: any, variables: Map<string, any>) => any
@@ -100,9 +84,6 @@ export class APIChainContext {
         return this.addStep(step);
     }
 
-    /**
-     * Add delay step
-     */
     public delay(milliseconds: number, name?: string): APIChainContext {
         const step: ChainStep = {
             name: name || `Delay ${milliseconds}ms`,
@@ -116,9 +97,6 @@ export class APIChainContext {
         return this.addStep(step);
     }
 
-    /**
-     * Add conditional step
-     */
     public conditional(
         name: string,
         condition: (variables: Map<string, any>) => boolean,
@@ -139,9 +117,6 @@ export class APIChainContext {
         return this.addStep(step);
     }
 
-    /**
-     * Add loop step
-     */
     public loop(
         name: string,
         items: any[] | ((variables: Map<string, any>) => any[]),
@@ -168,9 +143,6 @@ export class APIChainContext {
         return this.addStep(step);
     }
 
-    /**
-     * Execute the chain
-     */
     public async execute(): Promise<ChainResult[]> {
         ActionLogger.getInstance().info(`Executing API chain: ${this.chainName}`);
         this.chainResults = [];
@@ -198,9 +170,6 @@ export class APIChainContext {
         }
     }
 
-    /**
-     * Execute single step
-     */
     private async executeStep(step: ChainStep): Promise<ChainResult> {
         const startTime = Date.now();
         ActionLogger.getInstance().debug(`Executing step: ${step.name} (${step.type})`);
@@ -261,28 +230,20 @@ export class APIChainContext {
         }
     }
 
-    /**
-     * Execute request step
-     */
     private async executeRequestStep(step: ChainStep): Promise<any> {
         if (!step.request) {
             throw new Error('Request step missing request configuration');
         }
 
-        // Process request options with variable substitution
         const processedRequest = this.processRequestWithVariables(step.request);
         
-        // Merge with context
         const finalRequest = this.context.mergeWithRequest(processedRequest);
 
-        // Execute request
         const response = await this.httpClient.request(finalRequest);
 
-        // Store response in context
         const responseAlias = step.responseAlias || step.id!;
         this.context.storeResponse(responseAlias, response, finalRequest);
 
-        // Extract variables if defined
         if (step.extractors) {
             for (const extractor of step.extractors) {
                 try {
@@ -301,9 +262,6 @@ export class APIChainContext {
         return response;
     }
 
-    /**
-     * Execute validation step
-     */
     private async executeValidationStep(step: ChainStep): Promise<any> {
         if (!step.validations) {
             throw new Error('Validation step missing validations');
@@ -312,7 +270,6 @@ export class APIChainContext {
         const results = [];
         let allPassed = true;
 
-        // Get last response data
         const lastResponse = this.getLastResponseData();
 
         for (const validation of step.validations) {
@@ -341,9 +298,6 @@ export class APIChainContext {
         return results;
     }
 
-    /**
-     * Execute transformation step
-     */
     private async executeTransformationStep(step: ChainStep): Promise<any> {
         if (!step.transformer) {
             throw new Error('Transformation step missing transformer function');
@@ -352,7 +306,6 @@ export class APIChainContext {
         const lastResponse = this.getLastResponseData();
         const transformed = await step.transformer(lastResponse, this.variables);
 
-        // Store transformation result
         if (step.resultVariable) {
             this.variables.set(step.resultVariable, transformed);
         }
@@ -360,9 +313,6 @@ export class APIChainContext {
         return transformed;
     }
 
-    /**
-     * Execute delay step
-     */
     private async executeDelayStep(step: ChainStep): Promise<any> {
         if (!step.delay) {
             throw new Error('Delay step missing delay duration');
@@ -375,9 +325,6 @@ export class APIChainContext {
         return { delayed: delay };
     }
 
-    /**
-     * Execute conditional step
-     */
     private async executeConditionalStep(step: ChainStep): Promise<any> {
         if (!step.condition) {
             throw new Error('Conditional step missing condition');
@@ -403,9 +350,6 @@ export class APIChainContext {
         return { condition: conditionResult, executed: results };
     }
 
-    /**
-     * Execute loop step
-     */
     private async executeLoopStep(step: ChainStep): Promise<any> {
         if (!step.loopSteps) {
             throw new Error('Loop step missing loop steps');
@@ -423,7 +367,6 @@ export class APIChainContext {
         const itemVariable = step.itemVariable || 'item';
 
         for (let i = 0; i < items.length; i++) {
-            // Set loop variables
             this.variables.set(itemVariable, items[i]);
             this.variables.set(`${itemVariable}Index`, i);
             this.variables.set(`${itemVariable}Count`, items.length);
@@ -444,13 +387,11 @@ export class APIChainContext {
                 results: iterationResults
             });
 
-            // Check if we should break the loop
             if (iterationResults.some(r => !r.success) && this.abortOnFailure) {
                 break;
             }
         }
 
-        // Clean up loop variables
         this.variables.delete(itemVariable);
         this.variables.delete(`${itemVariable}Index`);
         this.variables.delete(`${itemVariable}Count`);
@@ -458,18 +399,13 @@ export class APIChainContext {
         return results;
     }
 
-    /**
-     * Process request with variable substitution
-     */
     private processRequestWithVariables(request: Partial<RequestOptions>): Partial<RequestOptions> {
         const processed: Partial<RequestOptions> = {};
 
-        // Process URL
         if (request.url) {
             processed.url = this.replaceVariables(request.url);
         }
 
-        // Process headers
         if (request.headers) {
             processed.headers = {};
             for (const [key, value] of Object.entries(request.headers)) {
@@ -477,7 +413,6 @@ export class APIChainContext {
             }
         }
 
-        // Process body
         if (request.body) {
             if (typeof request.body === 'string') {
                 processed.body = this.replaceVariables(request.body);
@@ -486,7 +421,6 @@ export class APIChainContext {
             }
         }
 
-        // Process query parameters
         if (request.query) {
             if (!processed.query) {
                 processed.query = {};
@@ -496,7 +430,6 @@ export class APIChainContext {
             }
         }
 
-        // Copy other properties with conditional assignment
         if (request.method !== undefined) {
             processed.method = request.method;
         }
@@ -510,9 +443,6 @@ export class APIChainContext {
         return processed;
     }
 
-    /**
-     * Replace variables in string
-     */
     private replaceVariables(text: string): string {
         return text.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
             const value = this.variables.get(varName) || this.context.getVariable(varName);
@@ -520,9 +450,6 @@ export class APIChainContext {
         });
     }
 
-    /**
-     * Process object with variables
-     */
     private processObjectWithVariables(obj: any): any {
         if (typeof obj === 'string') {
             return this.replaceVariables(obj);
@@ -543,9 +470,6 @@ export class APIChainContext {
         return obj;
     }
 
-    /**
-     * Resolve variable value
-     */
     private resolveVariableValue(value: any): any {
         if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
             const varName = value.slice(2, -2);
@@ -554,15 +478,11 @@ export class APIChainContext {
         return value;
     }
 
-    /**
-     * Get last response data
-     */
     private getLastResponseData(): any {
         if (this.chainResults.length === 0) {
             return {};
         }
 
-        // Find last request step result
         for (let i = this.chainResults.length - 1; i >= 0; i--) {
             const result = this.chainResults[i];
             if (result?.data && result.data.data !== undefined) {
@@ -573,39 +493,24 @@ export class APIChainContext {
         return {};
     }
 
-    /**
-     * Set abort on failure
-     */
     public setAbortOnFailure(abort: boolean): APIChainContext {
         this.abortOnFailure = abort;
         return this;
     }
 
-    /**
-     * Get chain results
-     */
     public getResults(): ChainResult[] {
         return [...this.chainResults];
     }
 
-    /**
-     * Get variables
-     */
     public getVariables(): Map<string, any> {
         return new Map(this.variables);
     }
 
-    /**
-     * Set variable
-     */
     public setVariable(name: string, value: any): APIChainContext {
         this.variables.set(name, value);
         return this;
     }
 
-    /**
-     * Clear chain
-     */
     public clear(): void {
         this.chainSteps = [];
         this.chainResults = [];
@@ -614,9 +519,6 @@ export class APIChainContext {
         ActionLogger.getInstance().debug(`Chain cleared: ${this.chainName}`);
     }
 
-    /**
-     * Export chain definition
-     */
     public export(): any {
         return {
             name: this.chainName,
@@ -635,9 +537,6 @@ export class APIChainContext {
         };
     }
 
-    /**
-     * Create chain context
-     */
     public static create(contextName?: string): APIChainContext {
         const manager = APIContextManager.getInstance();
         const context = manager.getContext(contextName);

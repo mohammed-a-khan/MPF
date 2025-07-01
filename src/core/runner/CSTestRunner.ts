@@ -100,11 +100,6 @@ export interface FailureHandlingConfig {
 
 export type RunnerState = 'idle' | 'initializing' | 'discovering' | 'planning' | 'running' | 'reporting' | 'cleanup' | 'stopped' | 'error';
 
-/**
- * CSTestRunner - Generic Test Execution Engine
- * Manages test execution flow, retry logic, and failure handling
- * Supports multiple test types beyond just BDD
- */
 export class CSTestRunner {
     private static instance: CSTestRunner;
     
@@ -122,7 +117,6 @@ export class CSTestRunner {
         failFast: false
     };
     
-    // Component instances
     private configManager?: ConfigurationManager;
     private browserManager?: BrowserManager;
     private browserPool?: BrowserPool;
@@ -131,7 +125,6 @@ export class CSTestRunner {
     private reportOrchestrator?: ReportOrchestrator;
     private adoService?: ADOIntegrationService;
     
-    // Execution tracking
     private currentExecution?: ExecutionResult;
     private executionStatistics = {
         totalExecutions: 0,
@@ -142,9 +135,6 @@ export class CSTestRunner {
 
     private constructor() {}
 
-    /**
-     * Get singleton instance
-     */
     static getInstance(): CSTestRunner {
         if (!CSTestRunner.instance) {
             CSTestRunner.instance = new CSTestRunner();
@@ -152,9 +142,6 @@ export class CSTestRunner {
         return CSTestRunner.instance;
     }
 
-    /**
-     * Initialize the test runner
-     */
     async initialize(config: TestRunnerConfig): Promise<void> {
         const startTime = performance.now();
         
@@ -163,31 +150,24 @@ export class CSTestRunner {
             this.state = 'initializing';
             this.config = { ...this.config, ...config };
 
-            // Load configuration
             await this.initializeConfiguration();
             
-            // Initialize browser management
             await this.initializeBrowserManagement();
             
-            // Initialize proxy if needed
             if (this.config.proxy || ConfigurationManager.getBoolean('PROXY_ENABLED', false)) {
                 await this.initializeProxy();
             }
             
-            // Initialize debug mode if requested
             if (this.config.debug) {
                 await this.initializeDebugMode();
             }
             
-            // Initialize logging
             await this.initializeLogging();
             
-            // Initialize reporting
             if (this.config.reporting !== false) {
                 await this.initializeReporting();
             }
             
-            // Initialize ADO integration if enabled
             if (this.config.adoIntegration || ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false)) {
                 await this.initializeADOIntegration();
             }
@@ -203,9 +183,6 @@ export class CSTestRunner {
         }
     }
 
-    /**
-     * Execute tests with execution plan
-     */
     async executeTests(plan: ExecutionPlan): Promise<ExecutionResult> {
         this.validateInitialized();
         
@@ -215,7 +192,6 @@ export class CSTestRunner {
         try {
             logger.info(`Executing ${plan.totalTests} test(s)...`);
             
-            // Initialize execution result
             this.currentExecution = {
                 totalTests: plan.totalTests,
                 passed: 0,
@@ -237,14 +213,12 @@ export class CSTestRunner {
                 metadata: { ...plan.metadata }
             };
 
-            // Execute tests based on configuration
             if (this.config.parallel && plan.parallelGroups) {
                 await this.executeTestsInParallel(plan.parallelGroups);
             } else {
                 await this.executeTestsSequentially(plan.testFiles);
             }
 
-            // Finalize execution result
             const endTime = new Date();
             this.currentExecution.endTime = endTime;
             this.currentExecution.duration = endTime.getTime() - startTime.getTime();
@@ -254,7 +228,6 @@ export class CSTestRunner {
                     ? (this.currentExecution.passed / this.currentExecution.totalTests) * 100 
                     : 0;
 
-            // Update statistics
             this.updateExecutionStatistics(this.currentExecution);
             
             logger.info(`Test execution completed: ${this.currentExecution.passed}/${this.currentExecution.totalTests} passed`);
@@ -269,17 +242,12 @@ export class CSTestRunner {
         }
     }
 
-    /**
-     * Execute single test item
-     */
     async executeTest(testItem: TestItem): Promise<TestItemResult> {
         const startTime = new Date();
         
         try {
             logger.debug(`Executing test: ${testItem.name}`);
             
-            // This is where specific test type execution would be delegated
-            // For now, we'll simulate execution
             const result = await this.delegateTestExecution(testItem);
             
             const endTime = new Date();
@@ -294,17 +262,14 @@ export class CSTestRunner {
                 metadata: { ...testItem.metadata, ...result.metadata }
             };
             
-            // Only add error if it exists
             if (result.error) {
                 testResult.error = result.error;
             }
             
-            // Only add evidence if it exists
             if (result.evidence) {
                 testResult.evidence = result.evidence;
             }
             
-            // Update current execution if available
             if (this.currentExecution) {
                 this.currentExecution.testResults.push(testResult);
                 
@@ -340,26 +305,19 @@ export class CSTestRunner {
         }
     }
 
-    /**
-     * Handle test failure with retry logic
-     */
     async handleTestFailure(testItem: TestItem, error: Error): Promise<TestItemResult> {
         logger.warn(`Test failed: ${testItem.name} - ${error.message}`);
         
-        // Check if we should retry
         if (this.shouldRetryTest(testItem, error)) {
             logger.info(`Retrying test: ${testItem.name}`);
             
-            // Wait before retry
             if (this.retryConfig.retryDelay > 0) {
                 await this.sleep(this.retryConfig.retryDelay);
             }
             
-            // Attempt retry
             return await this.retryTest(testItem);
         }
         
-        // No retry, return failure result
         return {
             testItem,
             status: 'failed',
@@ -371,9 +329,6 @@ export class CSTestRunner {
         };
     }
 
-    /**
-     * Retry test execution
-     */
     async retryTest(testItem: TestItem, maxRetries?: number): Promise<TestItemResult> {
         const retriesToAttempt = maxRetries || this.retryConfig.maxRetries;
         let lastError: Error | undefined;
@@ -396,13 +351,11 @@ export class CSTestRunner {
                 logger.warn(`Retry attempt ${attempt} failed: ${lastError.message}`);
             }
             
-            // Wait between retries (except on last attempt)
             if (attempt < retriesToAttempt && this.retryConfig.retryDelay > 0) {
                 await this.sleep(this.retryConfig.retryDelay);
             }
         }
         
-        // All retries failed
         return {
             testItem,
             status: 'failed',
@@ -414,9 +367,6 @@ export class CSTestRunner {
         };
     }
 
-    /**
-     * Generate execution plan from test files
-     */
     async generateExecutionPlan(testFiles: string[], metadata?: Record<string, any>): Promise<ExecutionPlan> {
         this.state = 'planning';
         
@@ -432,7 +382,6 @@ export class CSTestRunner {
                 metadata: metadata || {}
             };
             
-            // Generate parallel groups if parallel execution is enabled
             if (this.config.parallel) {
                 plan.parallelGroups = this.generateParallelGroups(testItems);
             }
@@ -449,9 +398,6 @@ export class CSTestRunner {
         }
     }
 
-    /**
-     * Validate execution plan
-     */
     validateExecutionPlan(plan: ExecutionPlan): boolean {
         try {
             if (plan.totalTests <= 0) {
@@ -476,9 +422,6 @@ export class CSTestRunner {
         }
     }
 
-    /**
-     * Get real-time execution statistics
-     */
     getExecutionStatistics() {
         return {
             ...this.executionStatistics,
@@ -493,46 +436,29 @@ export class CSTestRunner {
         };
     }
 
-    /**
-     * Configure retry behavior
-     */
     configureRetry(config: Partial<RetryConfig>): void {
         this.retryConfig = { ...this.retryConfig, ...config };
         logger.info(`Retry configuration updated: ${JSON.stringify(this.retryConfig)}`);
     }
 
-    /**
-     * Configure failure handling
-     */
     configureFailureHandling(config: Partial<FailureHandlingConfig>): void {
         this.failureConfig = { ...this.failureConfig, ...config };
         logger.info(`Failure handling configuration updated: ${JSON.stringify(this.failureConfig)}`);
     }
 
-    /**
-     * Get current runner state
-     */
     getState(): RunnerState {
         return this.state;
     }
 
-    /**
-     * Stop execution
-     */
     async stop(): Promise<void> {
         logger.info('Stopping test execution...');
         this.state = 'stopped';
-        // Implementation would handle graceful shutdown
     }
 
-    /**
-     * Cleanup resources
-     */
     async cleanup(): Promise<void> {
         try {
             logger.info('Cleaning up test runner resources...');
             
-            // Cleanup components
             if (this.browserPool) {
                 await this.browserPool.cleanup();
             }
@@ -558,7 +484,6 @@ export class CSTestRunner {
         }
     }
 
-    // Private methods
 
     private async initializeConfiguration(): Promise<void> {
         await ConfigurationManager.loadConfiguration(this.config.environment || 'default');
@@ -576,12 +501,10 @@ export class CSTestRunner {
             await this.browserManager.initialize();
             logger.info('✅ Browser management initialized successfully');
         }
-        // Browser pool disabled to prevent multiple browser instances
     }
 
     private async initializeProxy(): Promise<void> {
         this.proxyManager = ProxyManager.getInstance();
-        // Proxy configuration would be loaded here
     }
 
     private async initializeDebugMode(): Promise<void> {
@@ -621,7 +544,6 @@ export class CSTestRunner {
     }
 
     private async executeTestsInParallel(groups: TestGroup[]): Promise<void> {
-        // Parallel execution implementation
         logger.info(`Executing tests in parallel with ${groups.length} group(s)`);
         
         const promises = groups.map(group => this.executeTestGroup(group));
@@ -629,7 +551,6 @@ export class CSTestRunner {
     }
 
     private async executeTestsSequentially(testFiles: string[]): Promise<void> {
-        // Sequential execution implementation
         logger.info(`Executing tests sequentially: ${testFiles.length} file(s)`);
         
         for (const testFile of testFiles) {
@@ -638,7 +559,6 @@ export class CSTestRunner {
             for (const testItem of testItems) {
                 const result = await this.executeTest(testItem);
                 
-                // Check failure handling configuration
                 if (result.status === 'failed' && this.failureConfig.failFast) {
                     logger.warn('Fail-fast enabled, stopping execution');
                     break;
@@ -668,30 +588,23 @@ export class CSTestRunner {
         evidence?: any[];
         metadata?: Record<string, any>;
     }> {
-        // This is where specific test type execution would be delegated
-        // For now, simulate execution based on test type
         
         switch (testItem.type) {
             case 'bdd':
-                // Delegate to BDD runner
                 return { status: 'passed', metadata: { executedBy: 'CSBDDRunner' } };
             
             case 'api':
-                // Delegate to API test runner
                 return { status: 'passed', metadata: { executedBy: 'APITestRunner' } };
             
             case 'database':
-                // Delegate to database test runner
                 return { status: 'passed', metadata: { executedBy: 'DatabaseTestRunner' } };
             
             default:
-                // Generic test execution
                 return { status: 'passed', metadata: { executedBy: 'GenericTestRunner' } };
         }
     }
 
     private async discoverTestItems(testFiles: string[]): Promise<TestItem[]> {
-        // Test discovery implementation
         return testFiles.map((filePath, index) => ({
             id: `test_${index}`,
             name: `Test ${index + 1}`,
@@ -711,7 +624,6 @@ export class CSTestRunner {
     }
 
     private estimateExecutionDuration(testItems: TestItem[]): number {
-        // Simple estimation: 5 seconds per test
         return testItems.length * 5000;
     }
 
@@ -741,7 +653,6 @@ export class CSTestRunner {
     private shouldRetryTest(_testItem: TestItem, error: Error): boolean {
         if (this.retryConfig.maxRetries <= 0) return false;
         
-        // Check retry conditions
         if (error.name === 'TimeoutError' && this.retryConfig.retryOnError) return true;
         if (error.message.includes('flaky') && this.retryConfig.retryOnFailure) return true;
         
@@ -757,7 +668,6 @@ export class CSTestRunner {
             this.executionStatistics.failedExecutions++;
         }
         
-        // Update average duration
         this.executionStatistics.averageDuration = 
             (this.executionStatistics.averageDuration * (this.executionStatistics.totalExecutions - 1) + result.duration) 
             / this.executionStatistics.totalExecutions;
@@ -774,5 +684,4 @@ export class CSTestRunner {
     }
 }
 
-// Export singleton instance
 export const testRunner = CSTestRunner.getInstance();

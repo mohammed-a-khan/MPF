@@ -3,10 +3,6 @@ import { TestData } from '../types/data.types';
 import { ExecutionFlagValidationResult, ExtendedExecutionFlagOptions } from './execution-flag.types';
 import { logger } from '../../core/utils/Logger';
 
-/**
- * Validate execution flags in test data
- * Determines which test data records should be executed
- */
 export class ExecutionFlagValidator {
     private readonly defaultOptions: ExtendedExecutionFlagOptions = {
         flagColumn: 'ExecutionFlag',
@@ -21,9 +17,6 @@ export class ExecutionFlagValidator {
         groupExecution: true
     };
 
-    /**
-     * Validate execution flags in test data
-     */
     async validateExecutionFlags(
         data: TestData[],
         options?: Partial<ExtendedExecutionFlagOptions>
@@ -41,7 +34,6 @@ export class ExecutionFlagValidator {
         };
 
         try {
-            // First pass: Categorize records by flag
             for (let index = 0; index < data.length; index++) {
                 const record = data[index];
                 if (!record) continue;
@@ -56,7 +48,6 @@ export class ExecutionFlagValidator {
                 } else if (this.isScenarioFlag(normalizedFlag, opts)) {
                     results.scenarioRecords.push(record);
                 } else if (flag !== null && flag !== undefined) {
-                    // Invalid flag
                     results.invalidRecords.push({
                         record,
                         reason: `Invalid execution flag: ${flag}`,
@@ -65,24 +56,20 @@ export class ExecutionFlagValidator {
                 }
             }
 
-            // Process group execution
             if (opts.groupExecution) {
                 this.processGroups(results.executeRecords, results, opts);
             }
 
-            // Validate dependencies
             if (opts.validateDependencies) {
                 await this.validateDependencies(results, opts);
             }
 
-            // Determine execution order
             if (opts.respectPriority) {
                 results.executionOrder = this.determineExecutionOrder(results.executeRecords, opts);
             } else {
                 results.executionOrder = results.executeRecords;
             }
 
-            // Process scenario records
             await this.processScenarioRecords(results, opts);
 
             logger.debug('Execution flag validation completed:', {
@@ -117,11 +104,7 @@ export class ExecutionFlagValidator {
         }
     }
 
-    /**
-     * Get execution flag from record
-     */
     private getExecutionFlag(record: TestData, options: ExtendedExecutionFlagOptions): any {
-        // Check multiple possible flag locations
         const flagLocations = [
             options.flagColumn,
             'executeTest',
@@ -144,7 +127,6 @@ export class ExecutionFlagValidator {
             }
         }
 
-        // Check nested properties
         if (options.flagColumn && options.flagColumn.includes('.')) {
             const value = this.getNestedValue(record, options.flagColumn);
             if (value !== undefined) {
@@ -152,13 +134,9 @@ export class ExecutionFlagValidator {
             }
         }
 
-        // Return default flag if not found
         return options.defaultFlag || 'Y';
     }
 
-    /**
-     * Get nested value from object
-     */
     private getNestedValue(obj: any, path: string): any {
         const parts = path.split('.');
         let current = obj;
@@ -173,9 +151,6 @@ export class ExecutionFlagValidator {
         return current;
     }
 
-    /**
-     * Normalize flag value
-     */
     private normalizeFlag(flag: any, options: ExtendedExecutionFlagOptions): string {
         if (flag === null || flag === undefined) {
             return options.defaultFlag || 'Y';
@@ -194,9 +169,6 @@ export class ExecutionFlagValidator {
         return normalized;
     }
 
-    /**
-     * Check if flag indicates execution
-     */
     private isExecuteFlag(flag: string, options: ExtendedExecutionFlagOptions): boolean {
         const compareFlag = options.caseInsensitive ? flag.toUpperCase() : flag;
         const executeValues = options.caseInsensitive 
@@ -206,9 +178,6 @@ export class ExecutionFlagValidator {
         return executeValues.includes(compareFlag);
     }
 
-    /**
-     * Check if flag indicates skip
-     */
     private isSkipFlag(flag: string, options: ExtendedExecutionFlagOptions): boolean {
         const compareFlag = options.caseInsensitive ? flag.toUpperCase() : flag;
         const skipValues = options.caseInsensitive 
@@ -218,9 +187,6 @@ export class ExecutionFlagValidator {
         return skipValues.includes(compareFlag);
     }
 
-    /**
-     * Check if flag indicates scenario
-     */
     private isScenarioFlag(flag: string, options: ExtendedExecutionFlagOptions): boolean {
         const compareFlag = options.caseInsensitive ? flag.toUpperCase() : flag;
         const scenarioValues = options.caseInsensitive 
@@ -230,21 +196,16 @@ export class ExecutionFlagValidator {
         return scenarioValues.includes(compareFlag);
     }
 
-    /**
-     * Process groups of test data
-     */
     private processGroups(
         records: TestData[],
         results: any,
         options: ExtendedExecutionFlagOptions
     ): void {
-        // Group by common attributes
         const groupFields = ['TestGroup', 'Group', 'Suite', 'Module', 'Category'];
 
         for (const record of records) {
             let groupKey: string | null = null;
 
-            // Find group key
             for (const field of groupFields) {
                 if (record[field]) {
                     groupKey = `${field}:${record[field]}`;
@@ -252,7 +213,6 @@ export class ExecutionFlagValidator {
                 }
             }
 
-            // Custom group key function
             if (!groupKey && options.groupKeyFunction) {
                 groupKey = options.groupKeyFunction(record);
             }
@@ -269,14 +229,10 @@ export class ExecutionFlagValidator {
         }
     }
 
-    /**
-     * Validate dependencies between test data
-     */
     private async validateDependencies(results: any, _options: ExtendedExecutionFlagOptions): Promise<void> {
         const dependencyFields = ['DependsOn', 'Dependency', 'Prerequisites', 'Requires'];
         const idFields = ['TestID', 'ID', 'TestCaseID', 'CaseID', 'Identifier'];
 
-        // Build ID map
         const idMap = new Map<string, TestData>();
         for (const record of [...results.executeRecords, ...results.skipRecords]) {
             for (const idField of idFields) {
@@ -287,11 +243,9 @@ export class ExecutionFlagValidator {
             }
         }
 
-        // Check dependencies
         for (const record of results.executeRecords) {
             const dependencies: string[] = [];
 
-            // Find dependencies
             for (const depField of dependencyFields) {
                 if (record[depField]) {
                     const deps = Array.isArray(record[depField]) 
@@ -303,7 +257,6 @@ export class ExecutionFlagValidator {
                 }
             }
 
-            // Validate each dependency
             for (const dep of dependencies) {
                 if (dep) {
                     const depRecord = idMap.get(dep);
@@ -324,7 +277,6 @@ export class ExecutionFlagValidator {
                 }
             }
 
-            // Store valid dependencies
             if (dependencies.length > 0) {
                 const recordId = this.getRecordId(record, idFields);
                 if (recordId) {
@@ -334,9 +286,6 @@ export class ExecutionFlagValidator {
         }
     }
 
-    /**
-     * Get record ID
-     */
     private getRecordId(record: TestData, idFields: string[]): string | null {
         for (const field of idFields) {
             if (record[field]) {
@@ -346,16 +295,11 @@ export class ExecutionFlagValidator {
         return null;
     }
 
-    /**
-     * Determine execution order based on dependencies and priority
-     */
     private determineExecutionOrder(records: TestData[], options: ExtendedExecutionFlagOptions): TestData[] {
         const priorityFields = ['Priority', 'Order', 'Sequence', 'ExecutionOrder'];
         const idFields = ['TestID', 'ID', 'TestCaseID', 'CaseID', 'Identifier'];
 
-        // Sort by priority first
         const sorted = [...records].sort((a, b) => {
-            // Get priorities
             let priorityA = Infinity;
             let priorityB = Infinity;
 
@@ -376,18 +320,15 @@ export class ExecutionFlagValidator {
             return priorityA - priorityB;
         });
 
-        // If no dependencies, return sorted by priority
         if (!options.validateDependencies) {
             return sorted;
         }
 
-        // Topological sort for dependencies
         const visited = new Set<string>();
         const visiting = new Set<string>();
         const result: TestData[] = [];
         const recordMap = new Map<string, TestData>();
 
-        // Build record map
         for (const record of sorted) {
             const id = this.getRecordId(record, idFields);
             if (id) {
@@ -395,7 +336,6 @@ export class ExecutionFlagValidator {
             }
         }
 
-        // DFS visit function
         const visit = (id: string): void => {
             if (visited.has(id)) return;
             
@@ -406,7 +346,6 @@ export class ExecutionFlagValidator {
 
             visiting.add(id);
 
-            // Visit dependencies first
             const record = recordMap.get(id);
             if (record) {
                 const dependencies = this.getRecordDependencies(record);
@@ -425,12 +364,10 @@ export class ExecutionFlagValidator {
             }
         };
 
-        // Visit all records
         for (const [id] of recordMap) {
             visit(id);
         }
 
-        // Add any records without IDs at the end
         for (const record of sorted) {
             if (!result.includes(record)) {
                 result.push(record);
@@ -440,9 +377,6 @@ export class ExecutionFlagValidator {
         return result;
     }
 
-    /**
-     * Get record dependencies
-     */
     private getRecordDependencies(record: TestData): string[] {
         const dependencyFields = ['DependsOn', 'Dependency', 'Prerequisites', 'Requires'];
         
@@ -459,15 +393,9 @@ export class ExecutionFlagValidator {
         return [];
     }
 
-    /**
-     * Process scenario records
-     */
     private async processScenarioRecords(results: any, _options: ExtendedExecutionFlagOptions): Promise<void> {
-        // Scenario records are special - they define test scenarios
-        // that may include multiple test steps
         
         for (const scenarioRecord of results.scenarioRecords) {
-            // Check if scenario has steps defined
             const stepsField = this.findStepsField(scenarioRecord);
             
             if (stepsField && scenarioRecord[stepsField]) {
@@ -475,7 +403,6 @@ export class ExecutionFlagValidator {
                     ? scenarioRecord[stepsField]
                     : [scenarioRecord[stepsField]];
 
-                // Validate all steps exist
                 const validSteps = steps.every((stepId: any) => {
                     return results.executeRecords.some((record: TestData) => {
                         const id = this.getRecordId(record, ['TestID', 'ID', 'StepID']);
@@ -494,9 +421,6 @@ export class ExecutionFlagValidator {
         }
     }
 
-    /**
-     * Find steps field in record
-     */
     private findStepsField(record: TestData): string | null {
         const stepsFields = ['Steps', 'TestSteps', 'ScenarioSteps', 'StepIDs'];
         
@@ -509,9 +433,6 @@ export class ExecutionFlagValidator {
         return null;
     }
 
-    /**
-     * Filter records by execution flag
-     */
     filterByExecutionFlag(
         data: TestData[],
         flag: 'execute' | 'skip' | 'scenario',
@@ -546,9 +467,6 @@ export class ExecutionFlagValidator {
         return filtered;
     }
 
-    /**
-     * Update execution flags
-     */
     updateExecutionFlags(
         data: TestData[],
         updates: Array<{ condition: (record: TestData) => boolean; flag: string }>,
@@ -569,9 +487,6 @@ export class ExecutionFlagValidator {
         return updated;
     }
 
-    /**
-     * Generate execution report
-     */
     generateExecutionReport(
         result: ExecutionFlagValidationResult,
         format: 'summary' | 'detailed' = 'summary'
@@ -583,9 +498,6 @@ export class ExecutionFlagValidator {
         }
     }
 
-    /**
-     * Generate summary report
-     */
     private generateSummaryReport(result: ExecutionFlagValidationResult): string {
         const lines = [
             '=== Execution Flag Validation Summary ===',
@@ -613,9 +525,6 @@ export class ExecutionFlagValidator {
         return lines.join('\n');
     }
 
-    /**
-     * Generate detailed report
-     */
     private generateDetailedReport(result: ExecutionFlagValidationResult): string {
         const lines = [
             '=== Execution Flag Validation Detailed Report ===',
@@ -631,7 +540,6 @@ export class ExecutionFlagValidator {
             ''
         ];
 
-        // Execution order
         if (result.executionOrder.length > 0) {
             lines.push('## Execution Order');
             for (let i = 0; i < Math.min(10, result.executionOrder.length); i++) {
@@ -646,7 +554,6 @@ export class ExecutionFlagValidator {
             lines.push('');
         }
 
-        // Groups
         if (result.groups.size > 0) {
             lines.push('## Execution Groups');
             for (const [group, records] of result.groups) {
@@ -655,7 +562,6 @@ export class ExecutionFlagValidator {
             lines.push('');
         }
 
-        // Dependencies
         if (result.dependencies.size > 0) {
             lines.push('## Dependencies');
             for (const [id, deps] of result.dependencies) {
@@ -664,7 +570,6 @@ export class ExecutionFlagValidator {
             lines.push('');
         }
 
-        // Invalid records
         if (result.invalidRecords.length > 0) {
             lines.push('## Invalid Records');
             for (const invalid of result.invalidRecords) {

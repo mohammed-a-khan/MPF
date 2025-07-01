@@ -23,8 +23,8 @@ export class BrowserPool {
     minSize: 1,
     maxSize: 4,
     acquisitionTimeout: 30000,
-    idleTimeout: 300000, // 5 minutes
-    evictionInterval: 60000, // 1 minute
+    idleTimeout: 300000,
+    evictionInterval: 60000,
     testOnAcquire: true,
     testOnReturn: true,
     recycleAfterUses: 50
@@ -46,9 +46,6 @@ export class BrowserPool {
     this.browserConfig = this.DEFAULT_BROWSER_CONFIG;
   }
 
-  /**
-   * Get singleton instance - DISABLED TO PREVENT MULTIPLE BROWSER INSTANCES
-   */
   static getInstance(): BrowserPool {
     if (!BrowserPool.instance) {
       BrowserPool.instance = new BrowserPool();
@@ -56,9 +53,6 @@ export class BrowserPool {
     return BrowserPool.instance;
   }
 
-  /**
-   * Initialize browser pool
-   */
   async initialize(poolSize: number, config: BrowserConfig): Promise<void> {
     if (this.isInitialized) {
       ActionLogger.logWarn('Browser pool already initialized');
@@ -72,10 +66,8 @@ export class BrowserPool {
       this.config.maxSize = poolSize;
       this.config.minSize = Math.min(1, poolSize);
       
-      // Create initial browsers
       await this.createInitialBrowsers();
       
-      // Start cleanup interval
       this.startCleanupInterval();
       
       this.isInitialized = true;
@@ -86,23 +78,16 @@ export class BrowserPool {
     }
   }
 
-  /**
-   * Acquire a browser from the pool
-   */
   async acquireBrowser(): Promise<Browser> {
     const startTime = Date.now();
     const timeout = this.config.acquisitionTimeout;
     
     while (Date.now() - startTime < timeout) {
-      // Check if we have available browsers
       if (this.available.length > 0) {
         const pooledBrowser = this.available.shift()!;
         
         // CRITICAL FIX: Disable health check on acquisition to prevent about:blank pages
-        // Health checks were causing brief browser page flashes during test execution
-        // Simple connectivity check without creating pages
         if (pooledBrowser.browser.isConnected()) {
-          // Mark as in use
           pooledBrowser.isAvailable = false;
           pooledBrowser.lastUsedAt = new Date();
           pooledBrowser.usageCount++;
@@ -110,13 +95,11 @@ export class BrowserPool {
           ActionLogger.logInfo(`Browser acquired from pool: ${pooledBrowser.id}`);
           return pooledBrowser.browser;
         } else {
-          // Browser is disconnected, recycle it
           await this.recycleBrowser(pooledBrowser);
           continue;
         }
       }
       
-      // Try to create new browser if under max size
       if (this.pool.length < this.config.maxSize) {
         const newBrowser = await this.createBrowser();
         if (newBrowser) {
@@ -130,21 +113,15 @@ export class BrowserPool {
         }
       }
       
-      // Wait a bit before retrying
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     throw new Error(`Failed to acquire browser within ${timeout}ms`);
   }
 
-  /**
-   * Release browser back to pool
-   */
   releaseBrowser(browser: Browser): void {
-    // Find the pooled browser
     let pooledBrowser: PooledBrowser | undefined;
     
-    // Iterate through the map to find the browser
     this.inUse.forEach((pb, id) => {
       if (!pooledBrowser && pb.browser === browser) {
         pooledBrowser = pb;
@@ -157,7 +134,6 @@ export class BrowserPool {
       return;
     }
     
-    // Check if browser should be recycled
     if (pooledBrowser.usageCount >= this.config.recycleAfterUses) {
       ActionLogger.logInfo(`Browser ${pooledBrowser.id} reached usage limit, recycling`);
       this.recycleBrowser(pooledBrowser).catch(error => {
@@ -167,8 +143,6 @@ export class BrowserPool {
     }
     
     // CRITICAL FIX: Disable health check on return to prevent about:blank pages
-    // Health checks on browser return were causing page flashes during test cleanup
-    // Simple availability check without creating pages
     if (pooledBrowser) {
       pooledBrowser.isAvailable = true;
       this.available.push(pooledBrowser);
@@ -176,37 +150,23 @@ export class BrowserPool {
     }
   }
 
-  /**
-   * Get number of available browsers
-   */
   getAvailableCount(): number {
     return this.available.length;
   }
 
-  /**
-   * Get number of active browsers
-   */
   getActiveCount(): number {
     return this.inUse.size;
   }
 
-  /**
-   * Get total pool size
-   */
   getTotalCount(): number {
     return this.pool.length;
   }
 
-  /**
-   * Drain pool - close all browsers
-   */
   async drainPool(): Promise<void> {
     ActionLogger.logInfo('Draining browser pool');
     
-    // Stop cleanup interval
     this.stopCleanupInterval();
     
-    // Wait for all browsers to be released
     const timeout = 30000;
     const startTime = Date.now();
     
@@ -218,7 +178,6 @@ export class BrowserPool {
       ActionLogger.logWarn(`Force closing ${this.inUse.size} browsers still in use`);
     }
     
-    // Close all browsers
     const closePromises = this.pool.map(async pooledBrowser => {
       try {
         if (pooledBrowser.browser.isConnected()) {
@@ -231,7 +190,6 @@ export class BrowserPool {
     
     await Promise.all(closePromises);
     
-    // Clear pool
     this.pool = [];
     this.available = [];
     this.inUse.clear();
@@ -240,9 +198,6 @@ export class BrowserPool {
     ActionLogger.logInfo('Browser pool drained successfully');
   }
 
-  /**
-   * Perform health check on all browsers
-   */
   async healthCheck(): Promise<BrowserHealth[]> {
     const healthStatuses: BrowserHealth[] = [];
     
@@ -254,9 +209,6 @@ export class BrowserPool {
     return healthStatuses;
   }
 
-  /**
-   * Create initial browsers for pool
-   */
   private async createInitialBrowsers(): Promise<void> {
     const promises: Promise<void>[] = [];
     
@@ -271,9 +223,6 @@ export class BrowserPool {
     await Promise.all(promises);
   }
 
-  /**
-   * Create a new browser
-   */
   private async createBrowser(): Promise<PooledBrowser | null> {
     try {
       if (!this.browserConfig) {
@@ -305,21 +254,15 @@ export class BrowserPool {
     }
   }
 
-  /**
-   * Recycle a browser
-   */
   private async recycleBrowser(pooledBrowser: PooledBrowser): Promise<void> {
     try {
-      // Close the old browser
       if (pooledBrowser.browser.isConnected()) {
         await pooledBrowser.browser.close();
       }
       
-      // Remove from pool
       this.pool = this.pool.filter(pb => pb.id !== pooledBrowser.id);
       this.available = this.available.filter(pb => pb.id !== pooledBrowser.id);
       
-      // Create replacement if pool is below minimum
       if (this.pool.length < this.config.minSize) {
         const newBrowser = await this.createBrowser();
         if (newBrowser) {
@@ -333,9 +276,6 @@ export class BrowserPool {
     }
   }
 
-  /**
-   * Test browser health
-   */
   private async testBrowserHealth(pooledBrowser: PooledBrowser): Promise<boolean> {
     try {
       if (!pooledBrowser.browser.isConnected()) {
@@ -343,15 +283,9 @@ export class BrowserPool {
       }
       
       // CRITICAL FIX: Disable health check page creation to prevent about:blank flashing
-      // Simple connectivity check without creating pages
       pooledBrowser.isHealthy = true;
       return true;
       
-      // OLD CODE THAT CAUSED about:blank PAGES - PERMANENTLY DISABLED
-      // const context = await pooledBrowser.browser.newContext();
-      // const page = await context.newPage();
-      // await page.goto('about:blank');
-      // await context.close();
       
     } catch (error) {
       ActionLogger.logError(`Browser ${pooledBrowser.id} health check failed`, error);
@@ -360,44 +294,30 @@ export class BrowserPool {
     }
   }
 
-  /**
-   * Get browser health status
-   */
   private async getBrowserHealth(pooledBrowser: PooledBrowser): Promise<BrowserHealth> {
     const isHealthy = await this.testBrowserHealth(pooledBrowser);
     
     return {
       isResponsive: isHealthy,
       isHealthy,
-      memoryUsage: 0, // Would need OS-level monitoring
-      cpuUsage: 0, // Would need OS-level monitoring
-      openPages: 0, // Would need to track per browser
+      memoryUsage: 0,
+      cpuUsage: 0,
+      openPages: 0,
       lastCheck: new Date(),
       lastHealthCheck: new Date(),
       errors: [],
-      crashes: 0, // Would need to track this
-      restarts: 0, // Would need to track this
-      responseTime: 0 // Would need to measure
+      crashes: 0,
+      restarts: 0,
+      responseTime: 0
     };
   }
 
-  /**
-   * Start cleanup interval
-   */
   private startCleanupInterval(): void {
     // CRITICAL FIX: Disable periodic cleanup to prevent health check triggering
-    // Periodic cleanup was triggering health checks which caused about:blank pages
     ActionLogger.logInfo('🚫 Browser pool periodic cleanup disabled to prevent page flashing');
     
-    // OLD CODE THAT CAUSED PERIODIC HEALTH CHECKS - PERMANENTLY DISABLED
-    // this.cleanupInterval = setInterval(() => {
-    //   this.performCleanup();
-    // }, this.config.evictionInterval);
   }
 
-  /**
-   * Stop cleanup interval
-   */
   private stopCleanupInterval(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
@@ -405,26 +325,20 @@ export class BrowserPool {
     }
   }
 
-  /**
-   * Perform cleanup of idle browsers
-   */
   private async performCleanup(): Promise<void> {
     const now = Date.now();
     const idleTimeout = this.config.idleTimeout;
     
-    // Check for idle browsers
     const idleBrowsers = this.available.filter(pb => {
       const idleTime = now - pb.lastUsedAt.getTime();
       return idleTime > idleTimeout && this.pool.length > this.config.minSize;
     });
     
-    // Remove idle browsers
     for (const idleBrowser of idleBrowsers) {
       ActionLogger.logInfo(`Removing idle browser: ${idleBrowser.id}`);
       await this.recycleBrowser(idleBrowser);
     }
     
-    // Ensure minimum pool size
     while (this.pool.length < this.config.minSize) {
       const newBrowser = await this.createBrowser();
       if (newBrowser) {
@@ -433,9 +347,6 @@ export class BrowserPool {
     }
   }
 
-  /**
-   * Get pool statistics
-   */
   getStatistics(): any {
     return {
       total: this.pool.length,
@@ -453,17 +364,12 @@ export class BrowserPool {
     };
   }
 
-  /**
-   * Cleanup and shutdown the browser pool
-   */
   async cleanup(): Promise<void> {
     try {
       ActionLogger.logInfo('Cleaning up browser pool...');
       
-      // Stop cleanup interval
       this.stopCleanupInterval();
       
-      // Close all browsers
       const allBrowsers = [...this.pool];
       
       for (const pooledBrowser of allBrowsers) {
@@ -475,7 +381,6 @@ export class BrowserPool {
         }
       }
       
-      // Clear collections
       this.pool.length = 0;
       this.available.length = 0;
       this.inUse.clear();

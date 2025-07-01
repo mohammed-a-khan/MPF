@@ -8,16 +8,6 @@ export interface EncryptionConfig {
   internalKey?: string;
 }
 
-/**
- * Enhanced Configuration Manager with automatic encryption/decryption support
- * 
- * Features:
- * - Automatically detects and decrypts ENCRYPTED: prefixed values
- * - Supports multiple encryption formats
- * - Fallback to environment variables for master password
- * - Caching of decrypted values for performance
- * - Security audit logging
- */
 export class EncryptionConfigurationManager {
   private static encryptionConfig: EncryptionConfig = {
     enabled: true,
@@ -28,9 +18,6 @@ export class EncryptionConfigurationManager {
   private static logger = Logger.getInstance();
   private static readonly ENCRYPTED_PREFIX = 'ENCRYPTED:';
 
-  /**
-   * Initialize encryption configuration
-   */
   static initializeEncryption(config: Partial<EncryptionConfig>): void {
     this.encryptionConfig = { ...this.encryptionConfig, ...config };
     this.logger.info('Encryption configuration initialized', {
@@ -39,17 +26,11 @@ export class EncryptionConfigurationManager {
     });
   }
 
-  /**
-   * Enhanced get method with automatic decryption
-   */
   static get(key: string, defaultValue: string = ''): string {
     const rawValue = ConfigurationManager.get(key, defaultValue);
     return this.processValueSync(key, rawValue);
   }
 
-  /**
-   * Get value and ensure it's decrypted (throws error if decryption fails)
-   */
   static getDecrypted(key: string, defaultValue?: string): string {
     const rawValue = ConfigurationManager.get(key, defaultValue || '');
     if (!rawValue) {
@@ -61,7 +42,6 @@ export class EncryptionConfigurationManager {
 
     const processedValue = this.processValueSync(key, rawValue);
     
-    // If it was encrypted but we got the same value back, decryption may have failed
     if (rawValue.startsWith(this.ENCRYPTED_PREFIX) && processedValue === rawValue) {
       throw new Error(`Failed to decrypt configuration value for key '${key}'`);
     }
@@ -69,34 +49,22 @@ export class EncryptionConfigurationManager {
     return processedValue;
   }
 
-  /**
-   * Get boolean value with decryption support
-   */
   static getBoolean(key: string, defaultValue: boolean = false): boolean {
     const value = this.get(key, defaultValue.toString());
     return this.parseBoolean(value) ?? defaultValue;
   }
 
-  /**
-   * Get number value with decryption support
-   */
   static getNumber(key: string, defaultValue?: number): number | undefined {
     const value = this.get(key, defaultValue?.toString() || '');
     return this.parseNumber(value) ?? defaultValue;
   }
 
-  /**
-   * Get array value with decryption support
-   */
   static getArray(key: string, delimiter: string = ','): string[] {
     const value = this.get(key, '');
     if (!value) return [];
     return value.split(delimiter).map(item => item.trim()).filter(item => item.length > 0);
   }
 
-  /**
-   * Get JSON value with decryption support
-   */
   static getJSON<T = any>(key: string, defaultValue?: T): T {
     const value = this.get(key, defaultValue ? JSON.stringify(defaultValue) : '');
     if (!value) {
@@ -111,20 +79,15 @@ export class EncryptionConfigurationManager {
     }
   }
 
-  /**
-   * Process configuration value - decrypt if encrypted (synchronous version)
-   */
   private static processValueSync(key: string, value: string): string {
     if (!value || !this.encryptionConfig.enabled) {
       return value;
     }
 
-    // Check if value is encrypted
     if (!value.startsWith(this.ENCRYPTED_PREFIX)) {
       return value;
     }
 
-    // Check cache first
     const cacheKey = this.getCacheKey(key, value);
     if (this.decryptionCache.has(cacheKey)) {
       return this.decryptionCache.get(cacheKey)!;
@@ -133,7 +96,6 @@ export class EncryptionConfigurationManager {
     try {
       const decryptedValue = this.decryptValueSync(value);
       
-      // Cache the decrypted value
       this.decryptionCache.set(cacheKey, decryptedValue);
       
       this.logger.debug(`Successfully decrypted configuration value for key: ${key}`);
@@ -143,30 +105,23 @@ export class EncryptionConfigurationManager {
     } catch (error) {
       this.logger.error(`Failed to decrypt configuration value for key '${key}': ${error}`);
       
-      // Return original value as fallback (or throw based on configuration)
       if (this.encryptionConfig.enabled) {
-        // In strict mode, throw the error
         throw new Error(`Decryption failed for key '${key}': ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
       
-      return value; // Fallback to original value
+      return value;
     }
   }
 
-  /**
-   * Process configuration value - decrypt if encrypted (async version)
-   */
   private static async processValueAsync(key: string, value: string): Promise<string> {
     if (!value || !this.encryptionConfig.enabled) {
       return value;
     }
 
-    // Check if value is encrypted
     if (!value.startsWith(this.ENCRYPTED_PREFIX)) {
       return value;
     }
 
-    // Check cache first
     const cacheKey = this.getCacheKey(key, value);
     if (this.decryptionCache.has(cacheKey)) {
       return this.decryptionCache.get(cacheKey)!;
@@ -175,7 +130,6 @@ export class EncryptionConfigurationManager {
     try {
       const decryptedValue = await this.decryptValue(value);
       
-      // Cache the decrypted value
       this.decryptionCache.set(cacheKey, decryptedValue);
       
       this.logger.debug(`Successfully decrypted configuration value for key: ${key}`);
@@ -185,36 +139,26 @@ export class EncryptionConfigurationManager {
     } catch (error) {
       this.logger.error(`Failed to decrypt configuration value for key '${key}': ${error}`);
       
-      // Return original value as fallback (or throw based on configuration)
       if (this.encryptionConfig.enabled) {
-        // In strict mode, throw the error
         throw new Error(`Decryption failed for key '${key}': ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
       
-      return value; // Fallback to original value
+      return value;
     }
   }
 
-  /**
-   * Decrypt a value using the internal key (async)
-   */
   private static async decryptValue(encryptedValue: string): Promise<string> {
     if (!encryptedValue.startsWith(this.ENCRYPTED_PREFIX)) {
       return encryptedValue;
     }
 
-    // Remove the ENCRYPTED: prefix
     const base64Data = encryptedValue.substring(this.ENCRYPTED_PREFIX.length);
     
     try {
-      // Parse the encryption data
       const encryptionData = JSON.parse(atob(base64Data));
       
-      // Get internal key
       const internalKey = this.getInternalKey();
       
-      // For simplified encryption, we need to handle the salt differently
-      // Since we're using a fixed internal key, we'll derive a consistent salt
       const fixedSalt = Buffer.from('CS-Framework-Salt-2024').toString('base64');
       
       return await CryptoUtils.decrypt(
@@ -224,7 +168,7 @@ export class EncryptionConfigurationManager {
         encryptionData.iv,
         encryptionData.tag || '',
         {
-          iterations: 10000 // Match encryption iterations
+          iterations: 10000
         }
       );
       
@@ -233,46 +177,28 @@ export class EncryptionConfigurationManager {
     }
   }
 
-  /**
-   * Decrypt a value using the internal key (sync - simplified)
-   */
   private static decryptValueSync(encryptedValue: string): string {
     if (!encryptedValue.startsWith(this.ENCRYPTED_PREFIX)) {
       return encryptedValue;
     }
 
-    // For sync operations, we'll need to use a different approach
-    // For now, warn and return encrypted value
     this.logger.warn(`Synchronous decryption not supported for: ${encryptedValue.substring(0, 20)}...`);
     throw new Error('Synchronous decryption not implemented. Use async methods for encrypted values.');
   }
 
-  /**
-   * Get internal encryption key
-   */
   private static getInternalKey(): string {
-    // Use configured internal key or default
     return this.encryptionConfig.internalKey || 'CS-Framework-2024-Internal-Encryption-Key-V1';
   }
 
-  /**
-   * Generate cache key for decrypted values
-   */
   private static getCacheKey(configKey: string, encryptedValue: string): string {
-    return `${configKey}:${encryptedValue.substring(0, 50)}`; // Use first 50 chars to identify
+    return `${configKey}:${encryptedValue.substring(0, 50)}`;
   }
 
-  /**
-   * Clear decryption cache (useful for security or testing)
-   */
   static clearDecryptionCache(): void {
     this.decryptionCache.clear();
     this.logger.debug('Decryption cache cleared');
   }
 
-  /**
-   * Get decryption cache statistics
-   */
   static getDecryptionCacheStats(): { size: number; keys: string[] } {
     return {
       size: this.decryptionCache.size,
@@ -280,20 +206,15 @@ export class EncryptionConfigurationManager {
     };
   }
 
-  /**
-   * Encrypt a value for storage in configuration
-   */
   static async encryptValue(plainValue: string): Promise<string> {
     const internalKey = this.getInternalKey();
     
     try {
-      // Use CryptoUtils with fixed salt for consistency
       const encrypted = await CryptoUtils.encrypt(plainValue, internalKey, {
-        saltLength: 16, // Use smaller salt
-        iterations: 10000 // Reduce iterations for performance
+        saltLength: 16,
+        iterations: 10000
       });
       
-      // Create simplified format without salt for consistency
       const encryptedData = {
         encrypted: encrypted.encrypted,
         iv: encrypted.iv,
@@ -307,9 +228,6 @@ export class EncryptionConfigurationManager {
     }
   }
 
-  /**
-   * Test decryption of a value
-   */
   static async testDecryption(encryptedValue: string): Promise<{ success: boolean; error?: string; decrypted?: string }> {
     try {
       const decrypted = await this.decryptValue(encryptedValue);
@@ -322,9 +240,6 @@ export class EncryptionConfigurationManager {
     }
   }
 
-  /**
-   * Get all configuration with decrypted values (for debugging/export)
-   */
   static async getAllDecrypted(): Promise<ConfigMap> {
     const allConfig = ConfigurationManager.getAll();
     const decrypted: ConfigMap = {};
@@ -341,19 +256,14 @@ export class EncryptionConfigurationManager {
     return decrypted;
   }
 
-  /**
-   * Validate encryption configuration
-   */
   static async validateEncryptionConfig(): Promise<{ valid: boolean; errors: string[]; warnings: string[] }> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Check if encryption is enabled
     if (!this.encryptionConfig.enabled) {
       warnings.push('Encryption is disabled');
     }
 
-    // Check internal key availability
     try {
       const key = this.getInternalKey();
       if (!key) {
@@ -363,7 +273,6 @@ export class EncryptionConfigurationManager {
       errors.push(`Internal key error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
-    // Check for encrypted values in configuration
     const allConfig = ConfigurationManager.getAll();
     const encryptedKeys = Object.keys(allConfig).filter(key => 
       allConfig[key] && typeof allConfig[key] === 'string' && allConfig[key].startsWith(this.ENCRYPTED_PREFIX)
@@ -375,7 +284,6 @@ export class EncryptionConfigurationManager {
       this.logger.info(`Found ${encryptedKeys.length} encrypted configuration values: ${encryptedKeys.join(', ')}`);
     }
 
-    // Test decryption of encrypted values
     for (const key of encryptedKeys) {
       const value = allConfig[key];
       if (!value || typeof value !== 'string') continue;
@@ -392,9 +300,6 @@ export class EncryptionConfigurationManager {
     };
   }
 
-  /**
-   * Security audit - log access to encrypted values
-   */
   private static auditConfigAccess(key: string, wasEncrypted: boolean): void {
     if (wasEncrypted) {
       this.logger.info('Encrypted configuration accessed', {
@@ -405,9 +310,6 @@ export class EncryptionConfigurationManager {
     }
   }
 
-  /**
-   * Parse boolean from decrypted value
-   */
   private static parseBoolean(value: string | undefined): boolean | undefined {
     if (value === undefined || value === '') return undefined;
     const lower = value.toLowerCase();
@@ -416,9 +318,6 @@ export class EncryptionConfigurationManager {
     return undefined;
   }
 
-  /**
-   * Parse number from decrypted value
-   */
   private static parseNumber(value: string | undefined): number | undefined {
     if (value === undefined || value === '') return undefined;
     const parsed = Number(value);

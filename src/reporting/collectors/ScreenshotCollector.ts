@@ -10,7 +10,6 @@ import {
   CollectorOptions
 } from '../types/reporting.types';
 
-// Define Screenshot-specific types
 export interface ScreenshotEvidence extends Evidence {
   type: EvidenceType.SCREENSHOT;
   screenshotId?: string;
@@ -58,9 +57,6 @@ export interface ScreenshotMetadata {
   [key: string]: any;
 }
 
-/**
- * Collects and manages screenshot evidence
- */
 export class ScreenshotCollector {
   private static instance: ScreenshotCollector;
   private readonly logger = Logger.getInstance();
@@ -101,9 +97,6 @@ export class ScreenshotCollector {
     return ScreenshotCollector.instance;
   }
 
-  /**
-   * Initialize collector for execution
-   */
   async initialize(executionId: string, _options?: CollectorOptions): Promise<void> {
     this.executionId = executionId;
     this.screenshotCount = 0;
@@ -113,23 +106,14 @@ export class ScreenshotCollector {
     ActionLogger.logCollectorInitialization('screenshot', executionId);
   }
 
-  /**
-   * Register page for screenshot collection
-   */
   registerPage(scenarioId: string, page: Page): void {
     this.pageReferences.set(scenarioId, page);
   }
 
-  /**
-   * Unregister page
-   */
   unregisterPage(scenarioId: string): void {
     this.pageReferences.delete(scenarioId);
   }
 
-  /**
-   * Capture screenshot
-   */
   async captureScreenshot(
     scenarioId: string,
     name: string,
@@ -144,12 +128,10 @@ export class ScreenshotCollector {
         return null;
       }
       
-      // Apply sensitive data masking if enabled
       if (this.maskSensitiveData && options.maskSelectors) {
         await this.maskElements(page, options.maskSelectors);
       }
       
-      // Capture screenshot
       const screenshotOptions: any = {
         fullPage: options.fullPage ?? this.fullPageScreenshots,
         quality: options.quality ?? this.imageQuality,
@@ -163,13 +145,11 @@ export class ScreenshotCollector {
       
       const screenshotBuffer = await page.screenshot(screenshotOptions);
       
-      // Check size limit
       if (screenshotBuffer.length > this.maxScreenshotSize) {
         this.logger.warn(
           `Screenshot exceeds size limit: ${screenshotBuffer.length} > ${this.maxScreenshotSize}`
         );
         
-        // Reduce quality and retry
         const reducedOptions = {
           ...screenshotOptions,
           quality: Math.max(30, this.imageQuality - 30),
@@ -196,7 +176,6 @@ export class ScreenshotCollector {
         Date.now() - startTime
       );
       
-      // Store for collection
       if (!this.screenshots.has(scenarioId)) {
         this.screenshots.set(scenarioId, []);
       }
@@ -219,16 +198,12 @@ export class ScreenshotCollector {
     }
   }
 
-  /**
-   * Collect screenshots for scenario
-   */
   async collectForScenario(
     scenarioId: string,
     scenarioName: string
   ): Promise<ScreenshotEvidence[]> {
     const screenshots = this.screenshots.get(scenarioId) || [];
     
-    // Capture final screenshot if configured
     if (this.captureOnSuccess && this.pageReferences.has(scenarioId)) {
       const finalScreenshot = await this.captureScreenshot(
         scenarioId,
@@ -244,9 +219,6 @@ export class ScreenshotCollector {
     return screenshots;
   }
 
-  /**
-   * Collect screenshots for failed step
-   */
   async collectForStep(
     scenarioId: string,
     stepId: string,
@@ -269,7 +241,6 @@ export class ScreenshotCollector {
       if (errorScreenshot) {
         screenshots.push(errorScreenshot);
         
-        // Capture full page for context
         const contextScreenshot = await this.captureScreenshot(
           scenarioId,
           `error_context_${stepId}`,
@@ -289,9 +260,6 @@ export class ScreenshotCollector {
     return screenshots;
   }
 
-  /**
-   * Compare screenshots using pixel-by-pixel comparison
-   */
   async compareScreenshots(
     baseline: Buffer,
     current: Buffer,
@@ -306,16 +274,13 @@ export class ScreenshotCollector {
     }
     
     try {
-      // Import jimp for image processing
       const Jimp = require('jimp');
       
-      // Load images
       const [baselineImg, currentImg] = await Promise.all([
         Jimp.read(baseline),
         Jimp.read(current)
       ]);
       
-      // Check dimensions
       if (
         baselineImg.bitmap.width !== currentImg.bitmap.width ||
         baselineImg.bitmap.height !== currentImg.bitmap.height
@@ -326,13 +291,11 @@ export class ScreenshotCollector {
         };
       }
       
-      // Create diff image
       const diffImg = new Jimp(baselineImg.bitmap.width, baselineImg.bitmap.height);
       
       let diffPixelCount = 0;
       const totalPixels = baselineImg.bitmap.width * baselineImg.bitmap.height;
       
-      // Compare pixels
       for (let y = 0; y < baselineImg.bitmap.height; y++) {
         for (let x = 0; x < baselineImg.bitmap.width; x++) {
           const baselinePixel = Jimp.intToRGBA(baselineImg.getPixelColor(x, y));
@@ -344,10 +307,8 @@ export class ScreenshotCollector {
           
           if (rDiff > 10 || gDiff > 10 || bDiff > 10) {
             diffPixelCount++;
-            // Highlight difference in red
             diffImg.setPixelColor(Jimp.rgbaToInt(255, 0, 0, 255), x, y);
           } else {
-            // Copy original pixel
             diffImg.setPixelColor(currentImg.getPixelColor(x, y), x, y);
           }
         }
@@ -355,7 +316,6 @@ export class ScreenshotCollector {
       
       const difference = diffPixelCount / totalPixels;
       
-      // Generate diff image buffer
       const diffBuffer = await diffImg.getBufferAsync(Jimp.MIME_PNG);
       
       return {
@@ -367,7 +327,6 @@ export class ScreenshotCollector {
     } catch (error) {
       this.logger.error('Screenshot comparison failed', error as Error);
       
-      // Fallback to simple size comparison
       const sizeDiff = Math.abs(baseline.length - current.length) / baseline.length;
       return { 
         match: sizeDiff < 0.1, 
@@ -376,9 +335,6 @@ export class ScreenshotCollector {
     }
   }
 
-  /**
-   * Create screenshot evidence object
-   */
   private async createScreenshotEvidence(
     scenarioId: string,
     name: string,
@@ -386,10 +342,8 @@ export class ScreenshotCollector {
     options: ScreenshotOptions,
     captureTime: number
   ): Promise<ScreenshotEvidence> {
-    // Generate thumbnail
     const thumbnail = await this.generateThumbnail(data);
     
-    // Extract metadata
     const metadata = await this.extractMetadata(data);
     
     const evidence: ScreenshotEvidence = {
@@ -418,16 +372,12 @@ export class ScreenshotCollector {
     return evidence;
   }
 
-  /**
-   * Generate thumbnail using jimp
-   */
   private async generateThumbnail(imageBuffer: Buffer): Promise<Buffer | null> {
     try {
       const Jimp = require('jimp');
       
       const image = await Jimp.read(imageBuffer);
       
-      // Calculate aspect ratio
       const aspectRatio = image.bitmap.width / image.bitmap.height;
       let width = this.thumbnailSize.width;
       let height = this.thumbnailSize.height;
@@ -438,7 +388,6 @@ export class ScreenshotCollector {
         width = height * aspectRatio;
       }
       
-      // Resize and get buffer
       const thumbnail = await image
         .resize(width, height)
         .quality(70)
@@ -452,9 +401,6 @@ export class ScreenshotCollector {
     }
   }
 
-  /**
-   * Extract image metadata using jimp
-   */
   private async extractMetadata(imageBuffer: Buffer): Promise<Partial<ScreenshotMetadata>> {
     try {
       const Jimp = require('jimp');
@@ -482,9 +428,6 @@ export class ScreenshotCollector {
     }
   }
 
-  /**
-   * Mask sensitive elements
-   */
   private async maskElements(page: Page, selectors: string[]): Promise<void> {
     try {
       await page.evaluate((sels) => {
@@ -498,7 +441,6 @@ export class ScreenshotCollector {
         });
       }, selectors);
       
-      // Wait for style to apply
       await page.waitForTimeout(100);
       
     } catch (error) {
@@ -506,9 +448,6 @@ export class ScreenshotCollector {
     }
   }
 
-  /**
-   * Capture element screenshot
-   */
   async captureElementScreenshot(
     scenarioId: string,
     selector: string,
@@ -546,9 +485,6 @@ export class ScreenshotCollector {
     }
   }
 
-  /**
-   * Batch capture screenshots
-   */
   async batchCapture(
     scenarioId: string,
     captures: Array<{ name: string; options?: ScreenshotOptions }>
@@ -566,16 +502,12 @@ export class ScreenshotCollector {
         results.push(screenshot);
       }
       
-      // Small delay between captures
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     return results;
   }
 
-  /**
-   * Get screenshot statistics
-   */
   getStatistics(): {
     totalCaptured: number;
     totalSize: number;
@@ -600,19 +532,12 @@ export class ScreenshotCollector {
     };
   }
 
-  /**
-   * Clear screenshots for scenario
-   */
   clearScenarioScreenshots(scenarioId: string): void {
     this.screenshots.delete(scenarioId);
     this.pageReferences.delete(scenarioId);
   }
 
-  /**
-   * Finalize collection
-   */
   async finalize(executionId: string): Promise<void> {
-    // Clear all references
     this.screenshots.clear();
     this.pageReferences.clear();
     

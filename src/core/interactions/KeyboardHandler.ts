@@ -67,7 +67,6 @@ export class KeyboardHandler {
     await locator.fill(text);
     
     if (options?.delay) {
-      // Simulate typing with delay
       await locator.clear();
       await locator.type(text, { delay: options.delay });
     }
@@ -160,10 +159,9 @@ export class KeyboardHandler {
     const locator = await element.getLocator();
     await locator.focus();
     
-    // Simulate natural typing with random delays
     for (const char of text) {
       await element.page.keyboard.type(char);
-      const delay = options?.delay || Math.random() * 100 + 50; // Random delay between 50-150ms
+      const delay = options?.delay || Math.random() * 100 + 50;
       await element.page.waitForTimeout(delay);
     }
   }

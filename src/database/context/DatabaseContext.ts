@@ -16,12 +16,9 @@ export class DatabaseContext {
     private storedResults: Map<string, QueryResult> = new Map();
     private preparedStatements: Map<string, PreparedStatement> = new Map();
     private sessionVariables: Map<string, any> = new Map();
-    private queryTimeout: number = 60000; // Default 60 seconds
+    private queryTimeout: number = 60000;
     private maxHistorySize: number = 1000;
 
-    /**
-     * Set active database connection
-     */
     setActiveConnection(name: string, adapter: DatabaseAdapter, connection: DatabaseConnection): void {
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logDatabase('setActiveConnection', 'connection', 0, undefined, { connectionName: name });
@@ -36,9 +33,6 @@ export class DatabaseContext {
         logger.info(`Active database connection set to: ${name} (${connection.type})`);
     }
 
-    /**
-     * Get active adapter
-     */
     getActiveAdapter(): DatabaseAdapter {
         if (!this.activeAdapter) {
             throw new Error('No active database connection. Use "user connects to database" step first.');
@@ -46,9 +40,6 @@ export class DatabaseContext {
         return this.activeAdapter;
     }
 
-    /**
-     * Get adapter by name
-     */
     getAdapter(name: string): DatabaseAdapter {
         const adapter = this.adapters.get(name);
         if (!adapter) {
@@ -57,9 +48,6 @@ export class DatabaseContext {
         return adapter;
     }
 
-    /**
-     * Switch to different connection
-     */
     switchConnection(name: string, connection: DatabaseConnection): void {
         const adapter = this.getAdapter(name);
         this.activeAdapter = adapter;
@@ -73,9 +61,6 @@ export class DatabaseContext {
         logger.info(`Switched to database connection: ${name}`);
     }
 
-    /**
-     * Execute query and store in history
-     */
     async executeQuery(query: string, params?: any[]): Promise<QueryResult> {
         const adapter = this.getActiveAdapter();
         if (!this.activeConnection) {
@@ -84,7 +69,6 @@ export class DatabaseContext {
         const startTime = Date.now();
         
         try {
-            // Apply query timeout
             const timeoutPromise = new Promise<never>((_, reject) => {
                 setTimeout(() => reject(new Error(`Query timeout after ${this.queryTimeout}ms`)), this.queryTimeout);
             });
@@ -96,7 +80,6 @@ export class DatabaseContext {
             
             const result = await Promise.race([queryPromise, timeoutPromise]) as QueryResult;
             
-            // Store in history
             const historyEntry: QueryHistoryEntry = {
                 query,
                 result,
@@ -113,7 +96,6 @@ export class DatabaseContext {
             return result;
             
         } catch (error) {
-            // Store failed query in history
             const historyEntry: QueryHistoryEntry = {
                 query,
                 result: null,
@@ -132,9 +114,6 @@ export class DatabaseContext {
         }
     }
 
-    /**
-     * Store query result with alias
-     */
     storeResult(alias: string, result: QueryResult): void {
         this.storedResults.set(alias, result);
         const actionLogger = ActionLogger.getInstance();
@@ -144,9 +123,6 @@ export class DatabaseContext {
         });
     }
 
-    /**
-     * Retrieve stored result
-     */
     getStoredResult(alias: string): QueryResult {
         const result = this.storedResults.get(alias);
         if (!result) {
@@ -155,18 +131,12 @@ export class DatabaseContext {
         return result;
     }
 
-    /**
-     * Store prepared statement
-     */
     storePreparedStatement(name: string, statement: PreparedStatement): void {
         this.preparedStatements.set(name, statement);
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logDatabase('storePreparedStatement', 'statement', 0, undefined, { name });
     }
 
-    /**
-     * Get prepared statement
-     */
     getPreparedStatement(name: string): PreparedStatement {
         const statement = this.preparedStatements.get(name);
         if (!statement) {
@@ -175,9 +145,6 @@ export class DatabaseContext {
         return statement;
     }
 
-    /**
-     * Begin transaction tracking
-     */
     beginTransactionTracking(name?: string): void {
         const transactionInfo: TransactionInfo = {
             name: name || `transaction_${this.transactionStack.length + 1}`,
@@ -194,9 +161,6 @@ export class DatabaseContext {
         });
     }
 
-    /**
-     * End transaction tracking
-     */
     endTransactionTracking(committed: boolean): TransactionInfo | undefined {
         const transaction = this.transactionStack.pop();
         if (transaction) {
@@ -215,9 +179,6 @@ export class DatabaseContext {
         return transaction;
     }
 
-    /**
-     * Add query to current transaction
-     */
     addQueryToTransaction(query: string, params?: any[]): void {
         const currentTransaction = this.transactionStack[this.transactionStack.length - 1];
         if (currentTransaction) {
@@ -232,60 +193,40 @@ export class DatabaseContext {
         }
     }
 
-    /**
-     * Get transaction stack depth
-     */
     getTransactionDepth(): number {
         return this.transactionStack.length;
     }
 
-    /**
-     * Set session variable
-     */
     setSessionVariable(key: string, value: any): void {
         this.sessionVariables.set(key, value);
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logDatabase('setSessionVariable', 'session', 0, undefined, { key, value });
     }
 
-    /**
-     * Get session variable
-     */
     getSessionVariable(key: string): any {
         return this.sessionVariables.get(key);
     }
 
-    /**
-     * Clear session variables
-     */
     clearSessionVariables(): void {
         this.sessionVariables.clear();
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logDatabase('clearSessionVariables', 'session', 0, undefined, {});
     }
 
-    /**
-     * Set query timeout
-     */
     setQueryTimeout(timeout: number): void {
         this.queryTimeout = timeout;
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logDatabase('setQueryTimeout', 'config', 0, undefined, { timeout });
     }
 
-    /**
-     * Execute query with execution plan
-     */
     async executeWithPlan(query: string, params?: any[]): Promise<QueryResult> {
         const adapter = this.getActiveAdapter();
         const startTime = Date.now();
         
         try {
-            // First, get the execution plan
             let executionPlan: string | undefined;
             let planQuery: string;
             
-            // Different databases have different EXPLAIN syntax
             switch (this.activeConnectionType.toLowerCase()) {
                 case 'mysql':
                     planQuery = `EXPLAIN ${query}`;
@@ -298,7 +239,6 @@ export class DatabaseContext {
                     break;
                 case 'mssql':
                 case 'sqlserver':
-                    // SQL Server uses SET SHOWPLAN_TEXT
                     await adapter.query(this.activeConnection!, 'SET SHOWPLAN_TEXT ON');
                     planQuery = query;
                     break;
@@ -313,7 +253,6 @@ export class DatabaseContext {
                 const planResult = await adapter.query(this.activeConnection!, planQuery, params);
                 
                 if (this.activeConnectionType.toLowerCase() === 'oracle') {
-                    // Oracle stores plan in PLAN_TABLE, need to query it
                     const oraclePlan = await adapter.query(
                         this.activeConnection!,
                         'SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY())'
@@ -322,21 +261,17 @@ export class DatabaseContext {
                 } else if (this.activeConnectionType.toLowerCase() === 'mssql' || 
                            this.activeConnectionType.toLowerCase() === 'sqlserver') {
                     executionPlan = this.formatExecutionPlan(planResult);
-                    // Turn off SHOWPLAN_TEXT
                     await adapter.query(this.activeConnection!, 'SET SHOWPLAN_TEXT OFF');
                 } else {
                     executionPlan = this.formatExecutionPlan(planResult);
                 }
             } catch (planError) {
-                // If execution plan fails, log it but continue with query
                 const logger = Logger.getInstance();
                 logger.warn(`Failed to get execution plan: ${(planError as Error).message}`);
             }
             
-            // Execute the actual query
             const result = await adapter.query(this.activeConnection!, query, params);
             
-            // Store in history with execution plan
             const historyEntry: QueryHistoryEntry = {
                 query,
                 result,
@@ -358,7 +293,6 @@ export class DatabaseContext {
             return result;
             
         } catch (error) {
-            // Store failed query in history
             const historyEntry: QueryHistoryEntry = {
                 query,
                 result: null,
@@ -377,9 +311,6 @@ export class DatabaseContext {
         }
     }
 
-    /**
-     * Get last query execution plan
-     */
     getLastExecutionPlan(): string | undefined {
         const history = this.getQueryHistory();
         for (let i = history.length - 1; i >= 0; i--) {
@@ -391,21 +322,16 @@ export class DatabaseContext {
         return undefined;
     }
 
-    /**
-     * Format execution plan from query result
-     */
     private formatExecutionPlan(result: QueryResult): string {
         if (!result || !result.rows || result.rows.length === 0) {
             return 'No execution plan available';
         }
         
-        // Different databases return execution plans in different formats
         let plan = '';
         
         if (Array.isArray(result.rows)) {
             result.rows.forEach((row, index) => {
                 if (typeof row === 'object') {
-                    // Handle different column names used by different databases
                     const planText = row['QUERY PLAN'] || row['QueryPlan'] || row['Plan'] || 
                                    row['EXPLAIN'] || row['Extra'] || row['StmtText'] ||
                                    row['PLAN_TABLE_OUTPUT'] || JSON.stringify(row, null, 2);
@@ -419,9 +345,6 @@ export class DatabaseContext {
         return plan || 'Execution plan format not recognized';
     }
 
-    /**
-     * Get query history
-     */
     getQueryHistory(filter?: QueryHistoryFilter): QueryHistoryEntry[] {
         let history = [...this.queryHistory];
         
@@ -453,18 +376,12 @@ export class DatabaseContext {
         return history;
     }
 
-    /**
-     * Clear query history
-     */
     clearQueryHistory(): void {
         this.queryHistory = [];
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logDatabase('clearQueryHistory', 'history', 0, undefined, {});
     }
 
-    /**
-     * Get connection statistics
-     */
     getConnectionStatistics(): ConnectionStatistics {
         const stats: ConnectionStatistics = {
             activeConnections: this.adapters.size,
@@ -475,10 +392,8 @@ export class DatabaseContext {
             connectionDetails: {}
         };
         
-        // Add per-connection statistics
         for (const [name, _adapter] of this.adapters) {
             const connectionQueries = this.queryHistory.filter(h => h.connectionName === name);
-            // Get the type from the active connection if this is the active one
             const connectionType = name === this.activeConnectionName ? this.activeConnectionType : 'unknown';
             stats.connectionDetails[name] = {
                 type: connectionType,
@@ -492,9 +407,6 @@ export class DatabaseContext {
         return stats;
     }
 
-    /**
-     * Close all connections
-     */
     async closeAllConnections(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logDatabase('closeAllConnections', 'connection', 0, undefined, {
@@ -507,13 +419,10 @@ export class DatabaseContext {
         // Note: We need to maintain a map of connections to close them properly
         for (const [name, _adapter] of this.adapters) {
             logger.info(`Closing database connection: ${name}`);
-            // In real implementation, we'd need to track connections
-            // For now, we'll just clear the adapters
         }
         
         await Promise.all(closePromises);
         
-        // Clear all state
         this.adapters.clear();
         this.activeAdapter = null;
         this.activeConnection = null;
@@ -527,9 +436,6 @@ export class DatabaseContext {
         logger.info('All database connections closed');
     }
 
-    /**
-     * Get context state for reporting
-     */
     getContextState(): DatabaseContextState {
         return {
             activeConnection: this.activeConnectionName,
@@ -543,17 +449,14 @@ export class DatabaseContext {
         };
     }
 
-    // Private helper methods
 
     private addToHistory(entry: QueryHistoryEntry): void {
         this.queryHistory.push(entry);
         
-        // Add to current transaction if exists
         if (this.transactionStack.length > 0) {
             this.addQueryToTransaction(entry.query, entry.params);
         }
         
-        // Maintain history size limit
         if (this.queryHistory.length > this.maxHistorySize) {
             this.queryHistory.splice(0, this.queryHistory.length - this.maxHistorySize);
         }
@@ -572,7 +475,6 @@ export class DatabaseContext {
     }
 }
 
-// Type definitions for DatabaseContext
 
 interface QueryHistoryEntry {
     query: string;

@@ -1,6 +1,5 @@
 import { Request, Route, WebSocket, APIResponse } from 'playwright';
 
-// URL Pattern matching
 export interface URLPattern {
     url?: string | RegExp;
     method?: string | string[];
@@ -8,7 +7,6 @@ export interface URLPattern {
     priority?: number;
 }
 
-// Network resource types
 export type ResourceType = 
     | 'document' 
     | 'stylesheet' 
@@ -24,7 +22,6 @@ export type ResourceType =
     | 'manifest' 
     | 'other';
 
-// Mock response configuration
 export interface MockResponse {
     status?: number;
     statusText?: string;
@@ -34,15 +31,13 @@ export interface MockResponse {
     text?: string;
     contentType?: string;
     delay?: number;
-    path?: string;  // File path for response
+    path?: string;
 }
 
-// Mock condition function
 export interface MockCondition {
     (request: Request): boolean;
 }
 
-// Mock call tracking
 export interface MockCall {
     url: string;
     method: string;
@@ -54,36 +49,30 @@ export interface MockCall {
     responseTime?: number;
 }
 
-// Mock sequence item
 export interface MockSequenceItem {
     response: MockResponse;
     index: number;
     used: boolean;
 }
 
-// Request handler function
 export interface RequestHandler {
     (route: Route, request: Request): Promise<void>;
 }
 
-// Response handler function
 export interface ResponseHandler {
     (route: Route, response: APIResponse): Promise<void>;
 }
 
-// Body transformer function
 export interface BodyTransformer {
     (body: any): any | Promise<any>;
 }
 
-// Network error types
 export interface NetworkError {
     type: 'abort' | 'timeout' | 'failure' | 'dns' | 'connection';
     message?: string;
     code?: string;
 }
 
-// Network interceptor options
 export interface InterceptorOptions {
     logRequests?: boolean;
     logResponses?: boolean;
@@ -91,7 +80,6 @@ export interface InterceptorOptions {
     maxRecordedRequests?: number;
 }
 
-// Request statistics
 export interface RequestStats {
     url: string;
     method: string;
@@ -101,14 +89,12 @@ export interface RequestStats {
     timestamp: Date;
 }
 
-// Network throttling options
 export interface ThrottleOptions {
-    downloadSpeed: number;  // bytes per second
-    uploadSpeed: number;    // bytes per second
-    latency: number;       // milliseconds
+    downloadSpeed: number;
+    uploadSpeed: number;
+    latency: number;
 }
 
-// Intercept rule configuration
 export interface InterceptRule {
     pattern: URLPattern;
     handler: RequestHandler | ResponseHandler;
@@ -117,7 +103,6 @@ export interface InterceptRule {
     enabled?: boolean;
 }
 
-// Request modification options
 export interface RequestModification {
     url?: string | ((currentUrl: string) => string);
     method?: string;
@@ -125,16 +110,14 @@ export interface RequestModification {
     postData?: string | Buffer | ((currentData: string | null) => string | Buffer);
 }
 
-// Network throttle configuration
 export interface NetworkThrottle {
-    downloadSpeed: number;  // bytes per second
-    uploadSpeed: number;    // bytes per second
-    latency: number;       // milliseconds
+    downloadSpeed: number;
+    uploadSpeed: number;
+    latency: number;
     offline?: boolean;
     connectionType?: 'wifi' | '3g' | '4g' | 'slow-2g' | 'edge';
 }
 
-// Response modification
 export interface ResponseModification {
     url: string;
     type: 'header_injection' | 'header_removal' | 'body_transformation' | 
@@ -144,7 +127,6 @@ export interface ResponseModification {
     timestamp: Date;
 }
 
-// Response modifier rule
 export interface ModifierRule {
     pattern: URLPattern;
     handler: ResponseHandler;
@@ -153,7 +135,6 @@ export interface ModifierRule {
     id: string;
 }
 
-// Response modifier options
 export interface ResponseModifierOptions {
     logModifications?: boolean;
     preserveOriginal?: boolean;
@@ -161,7 +142,6 @@ export interface ResponseModifierOptions {
     enableValidation?: boolean;
 }
 
-// HAR (HTTP Archive) types
 export interface HAROptions {
     content?: 'embed' | 'attach' | 'omit';
     urlFilter?: string | RegExp;
@@ -266,7 +246,6 @@ export interface HAREntry {
     connection?: string;
 }
 
-// HAR analysis types
 export interface HARAnalysis {
     summary: {
         totalRequests: number;
@@ -288,7 +267,6 @@ export interface HARAnalysis {
     };
 }
 
-// Performance metrics
 export interface PerformanceMetrics {
     pageLoadTime: number;
     domContentLoaded: number;
@@ -300,7 +278,6 @@ export interface PerformanceMetrics {
     cumulativeLayoutShift: number;
 }
 
-// HAR filter options
 export interface HARFilter {
     urlPattern?: string | RegExp;
     method?: string;
@@ -310,7 +287,6 @@ export interface HARFilter {
     minSize?: number;
 }
 
-// Waterfall visualization data
 export interface WaterfallData {
     entries: Array<{
         url: string;
@@ -334,7 +310,6 @@ export interface WaterfallData {
     startTime: number;
 }
 
-// Timeline entry
 export interface TimelineEntry {
     timestamp: number;
     type: 'request' | 'response' | 'error';
@@ -344,7 +319,6 @@ export interface TimelineEntry {
     error?: string;
 }
 
-// Resource timing
 export interface ResourceTiming {
     name: string;
     entryType: string;
@@ -369,7 +343,6 @@ export interface ResourceTiming {
     decodedBodySize: number;
 }
 
-// WebSocket types
 export interface WebSocketState {
     readyState: 'connecting' | 'open' | 'closing' | 'closed';
     bufferedAmount: number;
@@ -430,7 +403,6 @@ export interface WebSocketEvent {
     simulated?: boolean;
 }
 
-// Network condition presets
 export interface NetworkConditionPreset {
     name: string;
     downloadSpeed: number;
@@ -442,26 +414,26 @@ export interface NetworkConditionPreset {
 export const NETWORK_PRESETS: Record<string, NetworkConditionPreset> = {
     'GPRS': {
         name: 'GPRS',
-        downloadSpeed: 50 * 1024,      // 50 kb/s
-        uploadSpeed: 20 * 1024,        // 20 kb/s
+        downloadSpeed: 50 * 1024,
+        uploadSpeed: 20 * 1024,
         latency: 500
     },
     '3G': {
         name: 'Regular 3G',
-        downloadSpeed: 750 * 1024,     // 750 kb/s
-        uploadSpeed: 250 * 1024,       // 250 kb/s
+        downloadSpeed: 750 * 1024,
+        uploadSpeed: 250 * 1024,
         latency: 100
     },
     '4G': {
         name: 'Regular 4G',
-        downloadSpeed: 4 * 1024 * 1024,  // 4 Mb/s
-        uploadSpeed: 3 * 1024 * 1024,    // 3 Mb/s
+        downloadSpeed: 4 * 1024 * 1024,
+        uploadSpeed: 3 * 1024 * 1024,
         latency: 20
     },
     'WiFi': {
         name: 'WiFi',
-        downloadSpeed: 30 * 1024 * 1024,  // 30 Mb/s
-        uploadSpeed: 15 * 1024 * 1024,    // 15 Mb/s
+        downloadSpeed: 30 * 1024 * 1024,
+        uploadSpeed: 15 * 1024 * 1024,
         latency: 2
     },
     'offline': {

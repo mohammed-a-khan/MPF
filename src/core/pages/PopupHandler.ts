@@ -9,10 +9,6 @@ import {
     PopupOptions 
 } from './types/page.types';
 
-/**
- * PopupHandler - Complete popup window management
- * Handles popup windows, dialogs, and window switching
- */
 export class PopupHandler {
     private popups: Map<string, PopupInfo> = new Map();
     private mainPage: Page;
@@ -35,9 +31,6 @@ export class PopupHandler {
         this.setupEventHandlers();
     }
 
-    /**
-     * Wait for a popup to open
-     */
     async waitForPopup(
         action: () => Promise<void>,
         options?: { timeout?: number; url?: string | RegExp }
@@ -45,7 +38,6 @@ export class PopupHandler {
         try {
             const timeout = options?.timeout || 30000;
             
-            // Set up popup promise before action
             const popupPromise = new Promise<Page>((resolve, reject) => {
                 const timer = setTimeout(() => {
                     reject(new Error('Timeout waiting for popup'));
@@ -66,16 +58,12 @@ export class PopupHandler {
                 this.mainPage.context().on('page', handler);
             });
             
-            // Perform action that should trigger popup
             await action();
             
-            // Wait for popup
             const popup = await popupPromise;
             
-            // Register popup
             const popupId = this.registerPopup(popup);
             
-            // Auto-switch if enabled
             if (this.options.autoSwitch) {
                 this.currentPage = popup;
                 await popup.bringToFront();
@@ -93,16 +81,12 @@ export class PopupHandler {
         }
     }
 
-    /**
-     * Switch to a specific popup
-     */
     async switchToPopup(identifier: number | string | Page): Promise<Page> {
         try {
             let popup: Page | undefined;
             let popupId: string | undefined;
             
             if (typeof identifier === 'object' && 'url' in identifier) {
-                // Find by page instance
                 const entry = Array.from(this.popups.entries())
                     .find(([_, info]) => info.page === identifier);
                 
@@ -111,7 +95,6 @@ export class PopupHandler {
                     popup = entry[1].page;
                 }
             } else if (typeof identifier === 'number') {
-                // Find by index
                 const popupArray = Array.from(this.popups.values());
                 if (identifier >= 0 && identifier < popupArray.length) {
                     const info = popupArray[identifier];
@@ -120,7 +103,6 @@ export class PopupHandler {
                         .find(([_, i]) => i === info)?.[0];
                 }
             } else {
-                // Find by ID
                 const info = this.popups.get(identifier);
                 if (info) {
                     popup = info.page;
@@ -132,7 +114,6 @@ export class PopupHandler {
                 throw new Error(`Popup '${identifier}' not found`);
             }
             
-            // Check if popup is still open
             if (popup.isClosed()) {
                 this.popups.delete(popupId);
                 throw new Error(`Popup '${identifier}' is closed`);
@@ -152,9 +133,6 @@ export class PopupHandler {
         }
     }
 
-    /**
-     * Switch to main window
-     */
     async switchToMainWindow(): Promise<Page> {
         try {
             this.currentPage = this.mainPage;
@@ -171,9 +149,6 @@ export class PopupHandler {
         }
     }
 
-    /**
-     * Close a popup
-     */
     async closePopup(page: Page): Promise<void> {
         try {
             const popupId = this.getPopupId(page);
@@ -185,7 +160,6 @@ export class PopupHandler {
             await page.close();
             this.popups.delete(popupId);
             
-            // Switch to main if closing current
             if (this.currentPage === page) {
                 await this.switchToMainWindow();
             }
@@ -197,9 +171,6 @@ export class PopupHandler {
         }
     }
 
-    /**
-     * Close all popups
-     */
     async closeAllPopups(): Promise<void> {
         try {
             const popupCount = this.popups.size;
@@ -222,32 +193,20 @@ export class PopupHandler {
         }
     }
 
-    /**
-     * Get current page
-     */
     getCurrentPage(): Page {
         return this.currentPage;
     }
 
-    /**
-     * Get all popups
-     */
     getPopups(): Page[] {
         return Array.from(this.popups.values())
             .filter(info => !info.page.isClosed())
             .map(info => info.page);
     }
 
-    /**
-     * Get popup count
-     */
     getPopupCount(): number {
         return this.popups.size;
     }
 
-    /**
-     * Get popup info
-     */
     getPopupInfo(page: Page): PopupInfo | undefined {
         const entry = Array.from(this.popups.entries())
             .find(([_, info]) => info.page === page);
@@ -255,9 +214,6 @@ export class PopupHandler {
         return entry?.[1];
     }
 
-    /**
-     * Find popup by URL
-     */
     findPopupByUrl(url: string | RegExp): Page | undefined {
         for (const info of this.popups.values()) {
             const pageUrl = info.page.url();
@@ -276,9 +232,6 @@ export class PopupHandler {
         return undefined;
     }
 
-    /**
-     * Find popup by title
-     */
     async findPopupByTitle(title: string | RegExp): Promise<Page | undefined> {
         for (const info of this.popups.values()) {
             try {
@@ -294,16 +247,12 @@ export class PopupHandler {
                     }
                 }
             } catch {
-                // Page might be closed
             }
         }
         
         return undefined;
     }
 
-    /**
-     * Handle dialog (alert, confirm, prompt)
-     */
     async handleDialog(
         type: DialogType,
         action: DialogAction,
@@ -320,7 +269,6 @@ export class PopupHandler {
         
         this.dialogHandlers.set(handlerId, handler);
         
-        // Set up one-time handler
         this.currentPage.once('dialog', async (dialog) => {
             await this.handleDialogEvent(dialog, handler);
             handler.handled = true;
@@ -332,9 +280,6 @@ export class PopupHandler {
         });
     }
 
-    /**
-     * Set up persistent dialog handler
-     */
     setPersistentDialogHandler(
         handler: (dialog: Dialog) => Promise<void>
     ): () => void {
@@ -344,7 +289,6 @@ export class PopupHandler {
             page.on('dialog', handler);
         });
         
-        // Return cleanup function
         return () => {
             pages.forEach(page => {
                 page.off('dialog', handler);
@@ -352,9 +296,6 @@ export class PopupHandler {
         };
     }
 
-    /**
-     * Wait for dialog
-     */
     async waitForDialog(
         options?: { timeout?: number; type?: DialogType }
     ): Promise<Dialog> {
@@ -378,9 +319,6 @@ export class PopupHandler {
         });
     }
 
-    /**
-     * Execute in popup context
-     */
     async executeInPopup<T>(
         identifier: number | string | Page,
         action: (page: Page) => Promise<T>
@@ -391,7 +329,6 @@ export class PopupHandler {
             const popup = await this.switchToPopup(identifier);
             return await action(popup);
         } finally {
-            // Restore previous page
             if (previousPage === this.mainPage) {
                 await this.switchToMainWindow();
             } else {
@@ -400,9 +337,6 @@ export class PopupHandler {
         }
     }
 
-    /**
-     * Get popup statistics
-     */
     getStats(): any {
         return {
             totalPopups: this.popups.size,
@@ -416,18 +350,14 @@ export class PopupHandler {
         };
     }
 
-    // Private methods
 
     private setupEventHandlers(): void {
-        // Monitor popup creation
         this.mainPage.context().on('page', (page: Page) => {
-            // Only register if not already tracked
             if (!this.isPopupRegistered(page)) {
                 this.registerPopup(page);
             }
         });
         
-        // Set up dialog handler if enabled
         if (this.options.trackDialogs) {
             this.mainPage.on('dialog', (dialog) => {
                 this.handleUnexpectedDialog(dialog);
@@ -436,7 +366,6 @@ export class PopupHandler {
     }
 
     private registerPopup(page: Page): string {
-        // Check max popups limit
         if (this.popups.size >= this.options.maxPopups!) {
             logger.warn(`PopupHandler: Maximum popup limit (${this.options.maxPopups}) reached`);
         }
@@ -452,14 +381,12 @@ export class PopupHandler {
         
         this.popups.set(popupId, info);
         
-        // Set up event handlers for popup
         this.setupPopupHandlers(page, popupId);
         
         return popupId;
     }
 
     private setupPopupHandlers(popup: Page, popupId: string): void {
-        // Monitor popup close
         popup.on('close', () => {
             this.popups.delete(popupId);
             
@@ -470,18 +397,15 @@ export class PopupHandler {
             ActionLogger.logPageOperation('popup_auto_closed', popupId);
         });
         
-        // Monitor navigation if closeOnNavigation is enabled
         if (this.options.closeOnNavigation) {
             popup.on('load', () => {
                 const info = this.popups.get(popupId);
                 if (info && info.openedAt.getTime() < Date.now() - 1000) {
-                    // Only close if popup has been open for more than 1 second
                     popup.close().catch(() => {});
                 }
             });
         }
         
-        // Set up dialog handler for popup
         if (this.options.trackDialogs) {
             popup.on('dialog', (dialog) => {
                 this.handleUnexpectedDialog(dialog);
@@ -519,7 +443,6 @@ export class PopupHandler {
     private async handleUnexpectedDialog(dialog: Dialog): Promise<void> {
         logger.warn(`PopupHandler: Unexpected ${dialog.type()} dialog: ${dialog.message()}`);
         
-        // Default action: dismiss
         await dialog.dismiss();
         
         ActionLogger.logPageOperation('popup_unexpected_dialog', 'PopupHandler', {

@@ -399,7 +399,6 @@ export class ValidationSteps extends CSBDDBaseStepDefinition {
                 element: elementDescription,
                 error: (error as Error).message 
             });
-            // Store soft assertion failure but don't throw
             this.context.addSoftAssertionFailure(
                 `Visibility assertion failed for element "${elementDescription}": ${(error as Error).message}`
             );
@@ -420,7 +419,7 @@ export class ValidationSteps extends CSBDDBaseStepDefinition {
             const elementDescription = row[0];
             
             if (!elementDescription) {
-                continue; // Skip empty rows
+                continue;
             }
             
             try {
@@ -457,7 +456,7 @@ export class ValidationSteps extends CSBDDBaseStepDefinition {
             locatorValue: description,
             aiEnabled: ConfigurationManager.getBoolean('AI_ENABLED', true),
             aiDescription: description,
-            waitForVisible: false // Don't auto-wait for assertions
+            waitForVisible: false
         };
 
         const element = new CSWebElement();
@@ -539,7 +538,6 @@ export class ValidationSteps extends CSBDDBaseStepDefinition {
     async assertTestCase(testCase: string, description: string): Promise<void> {
         ActionLogger.logInfo('Assert test case', { testCase, description, type: 'validation_step' });
         
-        // This is just a validation to ensure the correct data was loaded
         console.log(`✅ Test case ${testCase} with description "${description}" is being executed`);
         
         ActionLogger.logInfo('Test case assertion passed', { testCase, description, type: 'validation_success' });

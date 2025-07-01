@@ -26,7 +26,6 @@ export class AdvancedSelectors {
     const { base, options: elementOptions } = options;
     let result = base;
     
-    // Apply layout constraints in order
     if (elementOptions.rightOf) {
       result = await this.applyRightOf(page, result, elementOptions.rightOf, elementOptions.maxDistance);
     }
@@ -58,7 +57,6 @@ export class AdvancedSelectors {
   ): Promise<Locator> {
     const referenceLocator = this.createLocator(page, rightOf);
     
-    // Get all base elements
     const baseElements = await base.all();
     const filteredElements: Locator[] = [];
     
@@ -68,17 +66,14 @@ export class AdvancedSelectors {
       
       if (!refBox || !elementBox) continue;
       
-      // Element should be to the right
       if (elementBox.x <= refBox.x + refBox.width) continue;
       
-      // Check vertical alignment (should overlap vertically)
       const verticalOverlap = 
         elementBox.y < refBox.y + refBox.height &&
         elementBox.y + elementBox.height > refBox.y;
       
       if (!verticalOverlap) continue;
       
-      // Check max distance if specified
       if (maxDistance) {
         const distance = elementBox.x - (refBox.x + refBox.width);
         if (distance > maxDistance) continue;
@@ -87,7 +82,6 @@ export class AdvancedSelectors {
       filteredElements.push(element);
     }
     
-    // Return first matching element as a locator
     if (filteredElements.length > 0) {
       const firstElement = filteredElements[0];
       if (firstElement) {
@@ -95,7 +89,6 @@ export class AdvancedSelectors {
       }
     }
     
-    // Return an empty locator if no matches
     return page.locator('xpath=//no-such-element');
   }
 
@@ -107,7 +100,6 @@ export class AdvancedSelectors {
   ): Promise<Locator> {
     const referenceLocator = this.createLocator(page, leftOf);
     
-    // Get all base elements
     const baseElements = await base.all();
     const filteredElements: Locator[] = [];
     
@@ -117,17 +109,14 @@ export class AdvancedSelectors {
       
       if (!refBox || !elementBox) continue;
       
-      // Element should be to the left
       if (elementBox.x + elementBox.width >= refBox.x) continue;
       
-      // Check vertical alignment
       const verticalOverlap = 
         elementBox.y < refBox.y + refBox.height &&
         elementBox.y + elementBox.height > refBox.y;
       
       if (!verticalOverlap) continue;
       
-      // Check max distance
       if (maxDistance) {
         const distance = refBox.x - (elementBox.x + elementBox.width);
         if (distance > maxDistance) continue;
@@ -136,7 +125,6 @@ export class AdvancedSelectors {
       filteredElements.push(element);
     }
     
-    // Return first matching element as a locator
     if (filteredElements.length > 0) {
       const firstElement = filteredElements[0];
       if (firstElement) {
@@ -144,7 +132,6 @@ export class AdvancedSelectors {
       }
     }
     
-    // Return an empty locator if no matches
     return page.locator('xpath=//no-such-element');
   }
 
@@ -156,7 +143,6 @@ export class AdvancedSelectors {
   ): Promise<Locator> {
     const referenceLocator = this.createLocator(page, above);
     
-    // Get all base elements
     const baseElements = await base.all();
     const filteredElements: Locator[] = [];
     
@@ -166,17 +152,14 @@ export class AdvancedSelectors {
       
       if (!refBox || !elementBox) continue;
       
-      // Element should be above
       if (elementBox.y + elementBox.height >= refBox.y) continue;
       
-      // Check horizontal alignment
       const horizontalOverlap = 
         elementBox.x < refBox.x + refBox.width &&
         elementBox.x + elementBox.width > refBox.x;
       
       if (!horizontalOverlap) continue;
       
-      // Check max distance
       if (maxDistance) {
         const distance = refBox.y - (elementBox.y + elementBox.height);
         if (distance > maxDistance) continue;
@@ -185,7 +168,6 @@ export class AdvancedSelectors {
       filteredElements.push(element);
     }
     
-    // Return first matching element as a locator
     if (filteredElements.length > 0) {
       const firstElement = filteredElements[0];
       if (firstElement) {
@@ -193,7 +175,6 @@ export class AdvancedSelectors {
       }
     }
     
-    // Return an empty locator if no matches
     return page.locator('xpath=//no-such-element');
   }
 
@@ -205,7 +186,6 @@ export class AdvancedSelectors {
   ): Promise<Locator> {
     const referenceLocator = this.createLocator(page, below);
     
-    // Get all base elements
     const baseElements = await base.all();
     const filteredElements: Locator[] = [];
     
@@ -215,17 +195,14 @@ export class AdvancedSelectors {
       
       if (!refBox || !elementBox) continue;
       
-      // Element should be below
       if (elementBox.y <= refBox.y + refBox.height) continue;
       
-      // Check horizontal alignment
       const horizontalOverlap = 
         elementBox.x < refBox.x + refBox.width &&
         elementBox.x + elementBox.width > refBox.x;
       
       if (!horizontalOverlap) continue;
       
-      // Check max distance
       if (maxDistance) {
         const distance = elementBox.y - (refBox.y + refBox.height);
         if (distance > maxDistance) continue;
@@ -234,7 +211,6 @@ export class AdvancedSelectors {
       filteredElements.push(element);
     }
     
-    // Return first matching element as a locator
     if (filteredElements.length > 0) {
       const firstElement = filteredElements[0];
       if (firstElement) {
@@ -242,7 +218,6 @@ export class AdvancedSelectors {
       }
     }
     
-    // Return an empty locator if no matches
     return page.locator('xpath=//no-such-element');
   }
 
@@ -254,7 +229,6 @@ export class AdvancedSelectors {
   ): Promise<Locator> {
     const referenceLocator = this.createLocator(page, near);
     
-    // Get all base elements
     const baseElements = await base.all();
     const filteredElements: Locator[] = [];
     
@@ -264,7 +238,6 @@ export class AdvancedSelectors {
       
       if (!refBox || !elementBox) continue;
       
-      // Calculate distance between centers
       const refCenterX = refBox.x + refBox.width / 2;
       const refCenterY = refBox.y + refBox.height / 2;
       const elementCenterX = elementBox.x + elementBox.width / 2;
@@ -280,7 +253,6 @@ export class AdvancedSelectors {
       }
     }
     
-    // Return first matching element as a locator
     if (filteredElements.length > 0) {
       const firstElement = filteredElements[0];
       if (firstElement) {
@@ -288,7 +260,6 @@ export class AdvancedSelectors {
       }
     }
     
-    // Return an empty locator if no matches
     return page.locator('xpath=//no-such-element');
   }
 
@@ -296,7 +267,7 @@ export class AdvancedSelectors {
     page: Page,
     options: FilterOptions
   ): Promise<Locator> {
-    let locator = page.locator('*'); // Start with all elements
+    let locator = page.locator('*');
     
     if (options.hasText) {
       locator = locator.filter({ hasText: options.hasText });
@@ -339,7 +310,6 @@ export class AdvancedSelectors {
     page: Page,
     options: ComponentOptions
   ): Promise<Locator> {
-    // React component selector using React DevTools protocol
     const selector = `_react=${options.componentName}`;
     
     if (options.props) {
@@ -356,7 +326,6 @@ export class AdvancedSelectors {
     page: Page,
     options: ComponentOptions
   ): Promise<Locator> {
-    // Vue component selector
     const selector = `_vue=${options.componentName}`;
     
     if (options.props) {
@@ -373,7 +342,6 @@ export class AdvancedSelectors {
     page: Page,
     options: ComponentOptions
   ): Promise<Locator> {
-    // Angular component selector using component tag name
     const selector = options.componentName.toLowerCase().replace(/([A-Z])/g, '-$1');
     return page.locator(selector);
   }
@@ -382,14 +350,12 @@ export class AdvancedSelectors {
     page: Page,
     selector: string
   ): Promise<Locator> {
-    // Handle shadow DOM penetration
     const parts = selector.split('>>>').map(s => s.trim());
     
     if (parts.length === 1) {
       return page.locator(selector);
     }
     
-    // Build shadow-piercing selector
     let current = page.locator(parts[0] || '');
     
     for (let i = 1; i < parts.length; i++) {
@@ -439,8 +405,6 @@ export class AdvancedSelectors {
     page: Page,
     selectors: CSGetElementOptions[]
   ): Promise<Locator> {
-    // Combine multiple selectors with OR logic
-    // Playwright doesn't have built-in OR for locators, so we use a workaround
     const combinedSelector = selectors
       .map(sel => this.optionsToSelector(sel))
       .join(', ');
@@ -495,7 +459,6 @@ export class AdvancedSelectors {
       case 'css':
         return options.locatorValue;
       case 'xpath':
-        // Can't combine xpath with CSS
         throw new Error('Cannot combine XPath selectors');
       case 'text':
         return `text="${options.locatorValue}"`;
@@ -520,7 +483,6 @@ export class AdvancedSelectors {
           matches.push(element);
         }
       } catch {
-        // Element might be stale, skip it
       }
     }
     
@@ -533,13 +495,10 @@ export class AdvancedSelectors {
     attributeValue?: string | RegExp
   ): Promise<Locator> {
     if (attributeValue === undefined) {
-      // Find elements that have the attribute
       return page.locator(`[${attributeName}]`);
     } else if (typeof attributeValue === 'string') {
-      // Exact match
       return page.locator(`[${attributeName}="${attributeValue}"]`);
     } else {
-      // RegExp match - need to evaluate all elements
       const allElements = await page.locator(`[${attributeName}]`).all();
       const matchingElements: Locator[] = [];
       
@@ -550,7 +509,6 @@ export class AdvancedSelectors {
         }
       }
       
-      // Return first matching element or empty locator
       if (matchingElements.length > 0) {
         const firstElement = matchingElements[0];
         if (firstElement) {
@@ -571,7 +529,6 @@ export class AdvancedSelectors {
   }
 
   async findInteractableElements(page: Page): Promise<Locator> {
-    // Find all elements that can be interacted with
     const selector = [
       'a',
       'button',

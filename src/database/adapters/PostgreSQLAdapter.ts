@@ -13,9 +13,6 @@ import {
 import { DatabaseAdapter } from './DatabaseAdapter';
 import { logger } from '../../core/utils/Logger';
 
-/**
- * PostgreSQL database adapter implementation
- */
 export class PostgreSQLAdapter extends DatabaseAdapter {
   private pg: any;
   private preparedStatements: Map<string, any> = new Map();
@@ -25,9 +22,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     super();
   }
 
-  /**
-   * Load pg module dynamically
-   */
   private async loadDriver(): Promise<void> {
     if (!this.pg) {
       try {
@@ -38,9 +32,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Connect to PostgreSQL
-   */
   async connect(config: DatabaseConfig): Promise<DatabaseConnection> {
     await this.loadDriver();
     this.config = config;
@@ -64,7 +55,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
         ...config.additionalOptions
       };
 
-      // Handle connection string
       if (config.additionalOptions?.['connectionString']) {
         return new this.pg.Pool({
           connectionString: config.additionalOptions['connectionString'],
@@ -75,7 +65,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
         });
       }
 
-      // Create connection pool
       const poolSize = config.connectionPoolSize || config.additionalOptions?.['poolSize'];
       if (poolSize && poolSize > 1) {
         return new this.pg.Pool({
@@ -85,7 +74,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
           idleTimeoutMillis: config.additionalOptions?.['poolIdleTimeout'] || 30000
         });
       } else {
-        // Single client
         const client = new this.pg.Client(connectionConfig);
         await client.connect();
         return client;
@@ -95,20 +83,15 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Disconnect from PostgreSQL
-   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const conn = connection as any;
       
-      // Clear prepared statements
       this.preparedStatements.clear();
       
       if (conn.end) {
         await conn.end();
       } else if (conn.release) {
-        // Pool client
         conn.release();
       }
     } catch (error) {
@@ -117,9 +100,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute query
-   */
   async query(
     connection: DatabaseConnection, 
     sql: string, 
@@ -128,13 +108,10 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   ): Promise<QueryResult> {
     const conn = connection as any;
     
-    // Handle pool vs client
-    // const isPool = conn.query && !conn.release;
     
     try {
       const startTime = Date.now();
       
-      // Set statement timeout if specified
       if (options?.timeout) {
         await this.setStatementTimeout(conn, options.timeout);
       }
@@ -142,7 +119,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       const result = await conn.query(sql, params || []);
       const executionTime = Date.now() - startTime;
 
-      // Reset statement timeout
       if (options?.timeout) {
         await this.resetStatementTimeout(conn);
       }
@@ -168,9 +144,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute stored procedure
-   */
   async executeStoredProcedure(
     connection: DatabaseConnection,
     procedureName: string,
@@ -184,9 +157,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     return this.query(connection, sql, params, options);
   }
 
-  /**
-   * Execute function
-   */
   async executeFunction(
     connection: DatabaseConnection,
     functionName: string,
@@ -201,9 +171,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     return result.rows[0]?.result;
   }
 
-  /**
-   * Begin transaction
-   */
   async beginTransaction(
     connection: DatabaseConnection,
     options?: TransactionOptions
@@ -225,49 +192,30 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     await this.query(connection, sql);
   }
 
-  /**
-   * Commit transaction
-   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     await this.query(connection, 'COMMIT');
   }
 
-  /**
-   * Rollback transaction
-   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     await this.query(connection, 'ROLLBACK');
   }
 
-  /**
-   * Create savepoint
-   */
   async createSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `SAVEPOINT ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Release savepoint
-   */
   async releaseSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `RELEASE SAVEPOINT ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Rollback to savepoint
-   */
   async rollbackToSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `ROLLBACK TO SAVEPOINT ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Prepare statement
-   */
   async prepare(connection: DatabaseConnection, sql: string): Promise<PreparedStatement> {
     const conn = connection as any;
     const statementName = `stmt_${++this.statementCounter}`;
     
-    // Prepare the statement
     await conn.query(`PREPARE ${statementName} AS ${sql}`);
     
     this.preparedStatements.set(statementName, {
@@ -291,9 +239,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     } as PreparedStatement;
   }
 
-  /**
-   * Execute prepared statement
-   */
   async executePrepared(
     statement: PreparedStatement,
     params?: any[]
@@ -301,16 +246,10 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     return await (statement as any).execute(params);
   }
 
-  /**
-   * Ping connection
-   */
   async ping(connection: DatabaseConnection): Promise<void> {
     await this.query(connection, 'SELECT 1');
   }
 
-  /**
-   * Get database metadata
-   */
   async getMetadata(connection: DatabaseConnection): Promise<DatabaseMetadata> {
     const versionResult = await this.query(connection, 'SELECT version()');
     const dbNameResult = await this.query(connection, 'SELECT current_database()');
@@ -341,11 +280,7 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Get table information
-   */
   async getTableInfo(connection: DatabaseConnection, tableName: string): Promise<TableInfo> {
-    // Parse schema and table name
     const parts = tableName.split('.');
     const schemaName = parts.length > 1 ? parts[0] : 'public';
     const actualTableName = parts.length > 1 ? parts[1] : tableName;
@@ -455,9 +390,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Bulk insert using COPY
-   */
   async bulkInsert(
     connection: DatabaseConnection,
     table: string,
@@ -469,7 +401,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     const columns = Object.keys(data[0]);
     const columnNames = columns.map(col => this.escapeIdentifier(col)).join(', ');
     
-    // Use COPY for best performance
     const copyStream = conn.query(
       `COPY ${this.escapeIdentifier(table)} (${columnNames}) FROM STDIN WITH (FORMAT CSV, HEADER false)`
     );
@@ -480,7 +411,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       copyStream.on('error', reject);
       copyStream.on('end', () => resolve(rowCount));
       
-      // Convert data to CSV format
       data.forEach(row => {
         const values = columns.map(col => {
           const value = row[col];
@@ -502,9 +432,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     });
   }
 
-  /**
-   * Stream query results
-   */
   override async *stream(
     connection: DatabaseConnection,
     sql: string,
@@ -519,23 +446,14 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Set statement timeout
-   */
   private async setStatementTimeout(connection: any, timeout: number): Promise<void> {
     await connection.query(`SET statement_timeout = ${timeout}`);
   }
 
-  /**
-   * Reset statement timeout
-   */
   private async resetStatementTimeout(connection: any): Promise<void> {
     await connection.query('SET statement_timeout = DEFAULT');
   }
 
-  /**
-   * Parse query error
-   */
   private parseQueryError(error: any, sql: string): Error {
     const message = `PostgreSQL Error: ${error.message}\nSQL: ${sql.substring(0, 200)}${sql.length > 200 ? '...' : ''}`;
     const enhancedError = new Error(message);
@@ -564,16 +482,10 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     return enhancedError;
   }
 
-  /**
-   * Escape identifier
-   */
   override escapeIdentifier(identifier: string): string {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
-  /**
-   * Set session parameter
-   */
   override async setSessionParameter(
     connection: DatabaseConnection,
     parameter: string,
@@ -583,9 +495,6 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     await this.query(connection, sql, [value]);
   }
 
-  /**
-   * Get server info
-   */
   override async getServerInfo(connection: DatabaseConnection): Promise<any> {
     const result = await this.query(connection, `
       SELECT 
@@ -621,17 +530,12 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Cancel running query
-   */
   override async cancelQuery(connection: DatabaseConnection): Promise<void> {
     const conn = connection as any;
     
-    // Get backend PID
     const pidResult = await this.query(conn, 'SELECT pg_backend_pid()');
     const pid = pidResult.rows[0].pg_backend_pid;
     
-    // Cancel the query using a new connection
     const cancelClient = new this.pg.Client(this.config);
     await cancelClient.connect();
     

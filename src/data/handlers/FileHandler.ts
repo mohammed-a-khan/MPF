@@ -10,12 +10,7 @@ import * as path from 'path';
 import { createReadStream, statSync } from 'fs';
 import * as readline from 'readline';
 import * as zlib from 'zlib';
-// import { pipeline } from 'stream/promises'; // Not used
 
-/**
- * Base file handler for generic file operations
- * Can handle any text-based file format with compression support
- */
 export class FileHandler implements DataHandler {
     private validator: DataValidator;
     private transformer: DataTransformer;
@@ -27,19 +22,14 @@ export class FileHandler implements DataHandler {
         this.transformer = new DataTransformer();
     }
 
-    /**
-     * Load data from file
-     */
     async load(options: DataProviderOptions): Promise<DataProviderResult> {
         const startTime = Date.now();
         ActionLogger.logInfo('Data handler operation: file_load', { operation: 'file_load', options });
         
         try {
-            // Validate file exists
             const filePath = await this.resolveFilePath(options.source!);
             await this.validateFile(filePath);
             
-            // Detect file format
             const format = await this.detectFormat(filePath, options);
             
             let data: TestData[];
@@ -74,12 +64,10 @@ export class FileHandler implements DataHandler {
                     throw new Error(`Unsupported file format: ${format}`);
             }
             
-            // Apply filter if specified
             if (options.filter) {
                 data = data.filter(row => this.matchesFilter(row, options.filter!));
             }
             
-            // Apply transformations if specified
             if (options.transformations && options.transformations.length > 0) {
                 data = await this.transformer.transform(data, options.transformations);
             }
@@ -103,9 +91,6 @@ export class FileHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load file as lines
-     */
     private async loadLines(filePath: string, options: DataProviderOptions): Promise<DataProviderResult> {
         const data: TestData[] = [];
         const fileStream = await this.createInputStream(filePath);
@@ -121,32 +106,27 @@ export class FileHandler implements DataHandler {
         for await (const line of rl) {
             lineNumber++;
             
-            // Skip empty lines if configured
             if (!line.trim() && fileOptions.skipEmptyLines !== false) {
                 skippedLines++;
                 continue;
             }
             
-            // Skip header lines
             if (options.skipRows && lineNumber <= options.skipRows) {
                 skippedLines++;
                 continue;
             }
             
-            // Skip comment lines
             if (fileOptions.commentPrefix && line.trim().startsWith(fileOptions.commentPrefix)) {
                 skippedLines++;
                 continue;
             }
             
-            // Create record
             const record: TestData = {
                 lineNumber,
                 content: line,
                 length: line.length
             };
             
-            // Parse if pattern specified
             if (fileOptions.linePattern) {
                 const parsed = this.parseLinePattern(line, fileOptions.linePattern);
                 Object.assign(record, parsed);
@@ -154,7 +134,6 @@ export class FileHandler implements DataHandler {
             
             data.push(record);
             
-            // Check max records
             if (options.maxRecords && data.length >= options.maxRecords) {
                 break;
             }
@@ -172,9 +151,6 @@ export class FileHandler implements DataHandler {
         };
     }
 
-    /**
-     * Load delimited file
-     */
     private async loadDelimited(filePath: string, options: DataProviderOptions): Promise<DataProviderResult> {
         const fileOptions = options as any;
         const delimiter = fileOptions.delimiter || this.detectDelimiter(await this.readSampleLines(filePath, 10));
@@ -192,19 +168,16 @@ export class FileHandler implements DataHandler {
         for await (const line of rl) {
             lineNumber++;
             
-            // Skip empty lines
             if (!line.trim() && fileOptions.skipEmptyLines !== false) {
                 skippedLines++;
                 continue;
             }
             
-            // Skip header lines
             if (options.skipRows && lineNumber <= options.skipRows) {
                 skippedLines++;
                 continue;
             }
             
-            // Skip comment lines
             if (fileOptions.commentPrefix && line.trim().startsWith(fileOptions.commentPrefix)) {
                 skippedLines++;
                 continue;
@@ -212,22 +185,18 @@ export class FileHandler implements DataHandler {
             
             const parts = this.splitDelimited(line, delimiter, options);
             
-            // First line as headers if specified
             if (options.headers !== false && headers.length === 0) {
                 headers = parts.map(h => h.trim());
                 continue;
             }
             
-            // Create record
             const record: TestData = {};
             
             if (headers.length > 0) {
-                // Map to headers
                 headers.forEach((header, index) => {
                     record[header] = this.parseValue(parts[index] || '');
                 });
             } else {
-                // Use column indices
                 parts.forEach((value, index) => {
                     record[`column_${index + 1}`] = this.parseValue(value);
                 });
@@ -235,7 +204,6 @@ export class FileHandler implements DataHandler {
             
             data.push(record);
             
-            // Check max records
             if (options.maxRecords && data.length >= options.maxRecords) {
                 break;
             }
@@ -255,9 +223,6 @@ export class FileHandler implements DataHandler {
         };
     }
 
-    /**
-     * Load fixed-width file
-     */
     private async loadFixedWidth(filePath: string, options: DataProviderOptions): Promise<DataProviderResult> {
         const fileOptions = options as any;
         if (!fileOptions.columnWidths) {
@@ -278,19 +243,16 @@ export class FileHandler implements DataHandler {
         for await (const line of rl) {
             lineNumber++;
             
-            // Skip empty lines
             if (!line.trim() && fileOptions.skipEmptyLines !== false) {
                 skippedLines++;
                 continue;
             }
             
-            // Skip header lines
             if (options.skipRows && lineNumber <= options.skipRows) {
                 skippedLines++;
                 continue;
             }
             
-            // Parse fixed-width columns
             const record: TestData = {};
             let position = 0;
             
@@ -302,7 +264,6 @@ export class FileHandler implements DataHandler {
             
             data.push(record);
             
-            // Check max records
             if (options.maxRecords && data.length >= options.maxRecords) {
                 break;
             }
@@ -321,9 +282,6 @@ export class FileHandler implements DataHandler {
         };
     }
 
-    /**
-     * Load key-value file
-     */
     private async loadKeyValue(filePath: string, options: DataProviderOptions): Promise<DataProviderResult> {
         const fileOptions = options as any;
         const separator = fileOptions.keyValueSeparator || '=';
@@ -331,7 +289,6 @@ export class FileHandler implements DataHandler {
         const data: TestData[] = [];
         const content = await this.readFileContent(filePath);
         
-        // Split into sections
         const sections = typeof sectionDelimiter === 'string' 
             ? content.split(sectionDelimiter)
             : content.split(sectionDelimiter);
@@ -348,7 +305,6 @@ export class FileHandler implements DataHandler {
             for (const line of lines) {
                 const trimmedLine = line.trim();
                 
-                // Skip empty lines and comments
                 if (!trimmedLine || 
                     (fileOptions.commentPrefix && trimmedLine.startsWith(fileOptions.commentPrefix))) {
                     continue;
@@ -363,14 +319,12 @@ export class FileHandler implements DataHandler {
             }
             
             if (Object.keys(record).length > 0) {
-                // Add section metadata if requested
                 if (fileOptions.includeSectionMetadata) {
                     record['_section'] = sectionCount;
                 }
                 data.push(record);
             }
             
-            // Check max records
             if (options.maxRecords && data.length >= options.maxRecords) {
                 break;
             }
@@ -388,9 +342,6 @@ export class FileHandler implements DataHandler {
         };
     }
 
-    /**
-     * Stream data from file
-     */
     async *stream(options: DataProviderOptions): AsyncIterableIterator<TestData> {
         const filePath = await this.resolveFilePath(options.source!);
         const format = await this.detectFormat(filePath, options);
@@ -400,7 +351,6 @@ export class FileHandler implements DataHandler {
         } else if (format === 'delimited') {
             yield* this.streamDelimited(filePath, options);
         } else {
-            // For other formats, load all and yield one by one
             const result = await this.load(options);
             for (const record of result.data) {
                 yield record;
@@ -408,9 +358,6 @@ export class FileHandler implements DataHandler {
         }
     }
 
-    /**
-     * Stream lines from file
-     */
     private async *streamLines(filePath: string, options: DataProviderOptions): AsyncIterableIterator<TestData> {
         const fileStream = await this.createInputStream(filePath);
         const rl = readline.createInterface({
@@ -425,29 +372,23 @@ export class FileHandler implements DataHandler {
         for await (const line of rl) {
             lineNumber++;
             
-            // Skip empty lines
             if (!line.trim() && fileOptions.skipEmptyLines !== false) continue;
             
-            // Skip header lines
             if (options.skipRows && lineNumber <= options.skipRows) continue;
             
-            // Skip comment lines
             if (fileOptions.commentPrefix && line.trim().startsWith(fileOptions.commentPrefix)) continue;
             
-            // Create record
             const record: TestData = {
                 lineNumber,
                 content: line,
                 length: line.length
             };
             
-            // Parse if pattern specified
             if (fileOptions.linePattern) {
                 const parsed = this.parseLinePattern(line, fileOptions.linePattern);
                 Object.assign(record, parsed);
             }
             
-            // Apply filter
             if (options.filter && !this.matchesFilter(record, options.filter)) {
                 continue;
             }
@@ -455,16 +396,12 @@ export class FileHandler implements DataHandler {
             yield record;
             recordCount++;
             
-            // Check max records
             if (options.maxRecords && recordCount >= options.maxRecords) {
                 break;
             }
         }
     }
 
-    /**
-     * Stream delimited data from file
-     */
     private async *streamDelimited(filePath: string, options: DataProviderOptions): AsyncIterableIterator<TestData> {
         const fileOptions = options as any;
         const delimiter = fileOptions.delimiter || this.detectDelimiter(await this.readSampleLines(filePath, 10));
@@ -481,24 +418,19 @@ export class FileHandler implements DataHandler {
         for await (const line of rl) {
             lineNumber++;
             
-            // Skip empty lines
             if (!line.trim() && fileOptions.skipEmptyLines !== false) continue;
             
-            // Skip header lines
             if (options.skipRows && lineNumber <= options.skipRows) continue;
             
-            // Skip comment lines
             if (fileOptions.commentPrefix && line.trim().startsWith(fileOptions.commentPrefix)) continue;
             
             const parts = this.splitDelimited(line, delimiter, options);
             
-            // First line as headers if specified
             if (options.headers !== false && headers.length === 0) {
                 headers = parts.map(h => h.trim());
                 continue;
             }
             
-            // Create record
             const record: TestData = {};
             
             if (headers.length > 0) {
@@ -511,7 +443,6 @@ export class FileHandler implements DataHandler {
                 });
             }
             
-            // Apply filter
             if (options.filter && !this.matchesFilter(record, options.filter)) {
                 continue;
             }
@@ -519,16 +450,12 @@ export class FileHandler implements DataHandler {
             yield record;
             recordCount++;
             
-            // Check max records
             if (options.maxRecords && recordCount >= options.maxRecords) {
                 break;
             }
         }
     }
 
-    /**
-     * Load partial data from file
-     */
     async loadPartial(
         options: DataProviderOptions, 
         offset: number, 
@@ -537,7 +464,6 @@ export class FileHandler implements DataHandler {
         const data: TestData[] = [];
         let currentIndex = 0;
         
-        // Use streaming to efficiently handle offset
         for await (const record of this.stream(options)) {
             if (currentIndex >= offset && data.length < limit) {
                 data.push(record);
@@ -561,27 +487,19 @@ export class FileHandler implements DataHandler {
         };
     }
 
-    /**
-     * Load schema from file
-     */
     async loadSchema(options: DataProviderOptions): Promise<any> {
-        // Load sample data to infer schema
         const sampleOptions = { ...options, maxRecords: 100 };
         const sampleData = await this.load(sampleOptions);
         
         return this.inferSchema(sampleData.data);
     }
 
-    /**
-     * Get file metadata
-     */
     async getMetadata(options: DataProviderOptions): Promise<Record<string, any>> {
         try {
             const filePath = await this.resolveFilePath(options.source!);
             const stats = await fs.stat(filePath);
             const format = await this.detectFormat(filePath, options);
             
-            // Count lines efficiently
             let lineCount = 0;
             const fileStream = await this.createInputStream(filePath);
             const rl = readline.createInterface({ input: fileStream });
@@ -590,10 +508,8 @@ export class FileHandler implements DataHandler {
                 lineCount++;
             }
             
-            // Detect encoding
             const encoding = await this.detectEncoding(filePath);
             
-            // Check compression
             const isCompressed = this.isCompressed(filePath);
             
             return {
@@ -615,9 +531,6 @@ export class FileHandler implements DataHandler {
         }
     }
 
-    /**
-     * Validate data
-     */
     async validate(data: TestData[], _options?: any): Promise<ValidationResult> {
         const validationRules: Record<string, any> = {};
         
@@ -638,16 +551,10 @@ export class FileHandler implements DataHandler {
         };
     }
 
-    /**
-     * Transform data
-     */
     async transform(data: TestData[], transformations: DataTransformation[]): Promise<TestData[]> {
         return await this.transformer.transform(data, transformations);
     }
 
-    /**
-     * Create input stream with compression support
-     */
     protected async createInputStream(filePath: string): Promise<NodeJS.ReadableStream> {
         const stream = createReadStream(filePath);
         
@@ -670,17 +577,11 @@ export class FileHandler implements DataHandler {
         return stream;
     }
 
-    /**
-     * Check if file is compressed
-     */
     protected isCompressed(filePath: string): boolean {
         const ext = path.extname(filePath).toLowerCase();
         return ['.gz', '.gzip', '.z', '.br'].includes(ext);
     }
 
-    /**
-     * Get compression type
-     */
     protected getCompressionType(filePath: string): string {
         const ext = path.extname(filePath).toLowerCase();
         
@@ -697,9 +598,6 @@ export class FileHandler implements DataHandler {
         }
     }
 
-    /**
-     * Read file content with compression support
-     */
     protected async readFileContent(filePath: string): Promise<string> {
         if (this.isCompressed(filePath)) {
             const stream = await this.createInputStream(filePath);
@@ -715,9 +613,6 @@ export class FileHandler implements DataHandler {
         return await fs.readFile(filePath, 'utf-8');
     }
 
-    /**
-     * Detect delimiter in sample
-     */
     protected detectDelimiter(lines: string[]): string {
         const delimiters = ['\t', ',', '|', ';', ':'];
         const scores: Record<string, number> = {};
@@ -725,7 +620,6 @@ export class FileHandler implements DataHandler {
         for (const delimiter of delimiters) {
             scores[delimiter] = 0;
             
-            // Check consistency across lines
             const counts = lines.map(line => (line.match(new RegExp(this.escapeRegex(delimiter), 'g')) || []).length);
             
             if (counts.length > 1) {
@@ -737,7 +631,6 @@ export class FileHandler implements DataHandler {
             }
         }
         
-        // Return delimiter with highest score
         let maxScore = 0;
         let bestDelimiter = '\t';
         
@@ -751,9 +644,6 @@ export class FileHandler implements DataHandler {
         return bestDelimiter;
     }
 
-    /**
-     * Split delimited line handling quotes
-     */
     protected splitDelimited(line: string, delimiter: string, options: DataProviderOptions): string[] {
         const fileOptions = options as any;
         const quote = fileOptions.quoteChar || '"';
@@ -781,10 +671,8 @@ export class FileHandler implements DataHandler {
             }
         }
         
-        // Add last part
         parts.push(current);
         
-        // Remove quotes if configured
         if (fileOptions.removeQuotes !== false) {
             return parts.map(part => {
                 if (part.startsWith(quote) && part.endsWith(quote)) {
@@ -797,17 +685,12 @@ export class FileHandler implements DataHandler {
         return parts;
     }
 
-    /**
-     * Detect file format
-     */
     protected async detectFormat(filePath: string, options: DataProviderOptions): Promise<string> {
-        // Explicit format specified
         const fileOptions = options as any;
         if (fileOptions.fileFormat) {
             return fileOptions.fileFormat;
         }
         
-        // Detect based on extension
         const ext = path.extname(filePath).toLowerCase();
         if (['.tsv', '.tab'].includes(ext)) {
             return 'delimited';
@@ -822,10 +705,8 @@ export class FileHandler implements DataHandler {
             return 'key-value';
         }
         
-        // Detect based on content
         const sample = await this.readSampleLines(filePath, 10);
         
-        // Check for consistent delimiters
         const delimiters = ['\t', ',', '|', ';', ':'];
         for (const delimiter of delimiters) {
             if (this.hasConsistentDelimiter(sample, delimiter)) {
@@ -833,41 +714,32 @@ export class FileHandler implements DataHandler {
             }
         }
         
-        // Check for key-value format
         if (this.isKeyValueFormat(sample)) {
             return 'key-value';
         }
         
-        // Check for fixed-width
         if (fileOptions.columnWidths || this.isFixedWidthFormat(sample)) {
             return 'fixed-width';
         }
         
-        // Default to lines
         return 'lines';
     }
 
-    /**
-     * Parse line pattern
-     */
     protected parseLinePattern(line: string, pattern: string | RegExp): Record<string, any> {
         const result: Record<string, any> = {};
         
         if (typeof pattern === 'string') {
-            // Simple pattern with named groups
             const regex = new RegExp(pattern);
             const match = line.match(regex);
             
             if (match && match.groups) {
                 Object.assign(result, match.groups);
             } else if (match) {
-                // Numbered groups
                 match.slice(1).forEach((value, index) => {
                     result[`group_${index + 1}`] = value;
                 });
             }
         } else {
-            // RegExp pattern
             const match = line.match(pattern);
             
             if (match && match.groups) {
@@ -882,20 +754,14 @@ export class FileHandler implements DataHandler {
         return result;
     }
 
-    /**
-     * Parse value (auto-detect type)
-     */
     protected parseValue(value: string): any {
-        // Null/undefined
         if (!value || value.toLowerCase() === 'null' || value.toLowerCase() === 'nil') {
             return null;
         }
         
-        // Boolean
         if (value.toLowerCase() === 'true' || value.toLowerCase() === 'yes') return true;
         if (value.toLowerCase() === 'false' || value.toLowerCase() === 'no') return false;
         
-        // Number
         if (/^-?\d+$/.test(value)) {
             const num = parseInt(value, 10);
             return isNaN(num) ? value : num;
@@ -905,7 +771,6 @@ export class FileHandler implements DataHandler {
             return isNaN(num) ? value : num;
         }
         
-        // Date (ISO format)
         if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
             const date = new Date(value);
             if (!isNaN(date.getTime())) {
@@ -913,21 +778,17 @@ export class FileHandler implements DataHandler {
             }
         }
         
-        // Array (comma-separated)
         if (value.includes(',') && value.startsWith('[') && value.endsWith(']')) {
             return value.slice(1, -1).split(',').map(v => this.parseValue(v.trim()));
         }
         
-        // Object (JSON)
         if (value.startsWith('{') && value.endsWith('}')) {
             try {
                 return JSON.parse(value);
             } catch {
-                // Not valid JSON, return as string
             }
         }
         
-        // String (remove quotes if present)
         if ((value.startsWith('"') && value.endsWith('"')) || 
             (value.startsWith("'") && value.endsWith("'"))) {
             return value.slice(1, -1);
@@ -936,9 +797,6 @@ export class FileHandler implements DataHandler {
         return value;
     }
 
-    /**
-     * Check if lines have consistent delimiter
-     */
     protected hasConsistentDelimiter(lines: string[], delimiter: string): boolean {
         if (lines.length < 2) return false;
         
@@ -948,18 +806,14 @@ export class FileHandler implements DataHandler {
         
         if (firstCount === undefined) return false;
         
-        // Check if all lines have same number of delimiters (allowing for header)
         const consistent = counts.slice(1).filter(count => count === firstCount || count === firstCount - 1);
-        return consistent.length >= (counts.length - 1) * 0.8; // 80% consistency
+        return consistent.length >= (counts.length - 1) * 0.8;
     }
 
-    /**
-     * Check if key-value format
-     */
     protected isKeyValueFormat(lines: string[]): boolean {
         const keyValuePatterns = [
             /^[a-zA-Z0-9_\-\.]+\s*[:=]\s*.+$/,
-            /^[a-zA-Z0-9_\-\.]+\s+.+$/  // Space separated
+            /^[a-zA-Z0-9_\-\.]+\s+.+$/
         ];
         
         let matchCount = 0;
@@ -971,28 +825,19 @@ export class FileHandler implements DataHandler {
             }
         }
         
-        // Consider key-value if most lines match the pattern
         return matchCount >= lines.length * 0.7;
     }
 
-    /**
-     * Check if fixed-width format
-     */
     protected isFixedWidthFormat(lines: string[]): boolean {
         if (lines.length < 3) return false;
         
-        // Check if all lines have similar length
         const lengths = lines.map(line => line.length);
         const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
         const variance = lengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / lengths.length;
         
-        // Low variance indicates fixed-width
         return variance < avgLength * 0.1;
     }
 
-    /**
-     * Read sample lines from file
-     */
     protected async readSampleLines(filePath: string, count: number): Promise<string[]> {
         const lines: string[] = [];
         const fileStream = await this.createInputStream(filePath);
@@ -1009,9 +854,6 @@ export class FileHandler implements DataHandler {
         return lines;
     }
 
-    /**
-     * Detect file encoding
-     */
     protected async detectEncoding(filePath: string): Promise<string> {
         const buffer = Buffer.alloc(4);
         const fd = await fs.open(filePath, 'r');
@@ -1019,7 +861,6 @@ export class FileHandler implements DataHandler {
         try {
             await fd.read(buffer, 0, 4, 0);
             
-            // Check for BOM
             if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
                 return 'utf-8';
             }
@@ -1036,16 +877,12 @@ export class FileHandler implements DataHandler {
                 return 'utf-32be';
             }
             
-            // Default to UTF-8
             return 'utf-8';
         } finally {
             await fd.close();
         }
     }
 
-    /**
-     * Infer schema from data
-     */
     protected inferSchema(data: TestData[]): any {
         if (data.length === 0) {
             return { version: '1.0', fields: [] };
@@ -1053,7 +890,6 @@ export class FileHandler implements DataHandler {
         
         const fieldMap = new Map<string, any>();
         
-        // Analyze all records
         for (const record of data) {
             for (const [key, value] of Object.entries(record)) {
                 if (!fieldMap.has(key)) {
@@ -1081,13 +917,11 @@ export class FileHandler implements DataHandler {
                         field.samples.push(value);
                     }
                     
-                    // Track string lengths
                     if (typeof value === 'string') {
                         field.minLength = Math.min(field.minLength, value.length);
                         field.maxLength = Math.max(field.maxLength, value.length);
                     }
                     
-                    // Track numeric ranges
                     if (typeof value === 'number') {
                         field.minValue = Math.min(field.minValue, value);
                         field.maxValue = Math.max(field.maxValue, value);
@@ -1096,7 +930,6 @@ export class FileHandler implements DataHandler {
             }
         }
         
-        // Convert to schema
         const fields = Array.from(fieldMap.entries()).map(([key, analysis]) => {
             const types = Array.from(analysis.types);
             let type = 'string';
@@ -1104,7 +937,6 @@ export class FileHandler implements DataHandler {
             if (types.length === 1) {
                 type = types[0] as string;
             } else if (types.includes('number') && types.includes('string')) {
-                // Mixed types, check if strings are numeric
                 const allNumeric = analysis.samples
                     .filter((s: any) => typeof s === 'string')
                     .every((s: string) => !isNaN(Number(s)));
@@ -1121,7 +953,6 @@ export class FileHandler implements DataHandler {
                 samples: analysis.samples.slice(0, 5)
             };
             
-            // Add constraints
             if (type === 'string') {
                 fieldSchema.minLength = analysis.minLength === Infinity ? 0 : analysis.minLength;
                 fieldSchema.maxLength = analysis.maxLength;
@@ -1140,22 +971,16 @@ export class FileHandler implements DataHandler {
         };
     }
 
-    /**
-     * Resolve file path
-     */
     protected async resolveFilePath(source: string): Promise<string> {
-        // Check if absolute path
         if (path.isAbsolute(source)) {
             return source;
         }
         
-        // Try relative to current directory
         const relativePath = path.resolve(process.cwd(), source);
         if (await this.fileExists(relativePath)) {
             return relativePath;
         }
         
-        // Try relative to test data directory
         const testDataPath = path.resolve(
             process.cwd(),
             process.env['DEFAULT_DATA_PATH'] || './test-data',
@@ -1166,7 +991,6 @@ export class FileHandler implements DataHandler {
             return testDataPath;
         }
         
-        // Try relative to project root
         const projectRoot = process.env['PROJECT_ROOT'] || process.cwd();
         const projectPath = path.resolve(projectRoot, source);
         
@@ -1177,9 +1001,6 @@ export class FileHandler implements DataHandler {
         throw new Error(`File not found: ${source}. Searched in current directory, test-data directory, and project root.`);
     }
 
-    /**
-     * Validate file
-     */
     protected async validateFile(filePath: string): Promise<void> {
         const stats = await fs.stat(filePath);
         
@@ -1189,7 +1010,6 @@ export class FileHandler implements DataHandler {
         
         const ext = path.extname(filePath).toLowerCase();
         
-        // Check if compressed
         if (this.isCompressed(filePath)) {
             const baseExt = path.extname(path.basename(filePath, ext)).toLowerCase();
             if (!this.isSupported(baseExt)) {
@@ -1199,8 +1019,7 @@ export class FileHandler implements DataHandler {
             logger.warn(`Unsupported file extension: ${ext}. Attempting to process anyway.`);
         }
         
-        // Check file size limit
-        const maxSize = parseInt(process.env['MAX_FILE_SIZE'] || '524288000'); // 500MB
+        const maxSize = parseInt(process.env['MAX_FILE_SIZE'] || '524288000');
         if (stats.size > maxSize) {
             throw new Error(
                 `File too large: ${stats.size} bytes (max: ${maxSize} bytes). ` +
@@ -1209,9 +1028,6 @@ export class FileHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if extension is supported
-     */
     protected isSupported(ext: string): boolean {
         return this.supportedExtensions.includes(ext) || 
                ext === '.csv' || 
@@ -1219,9 +1035,6 @@ export class FileHandler implements DataHandler {
                ext === '';
     }
 
-    /**
-     * Check if file exists
-     */
     protected async fileExists(filePath: string): Promise<boolean> {
         try {
             await fs.access(filePath);
@@ -1231,9 +1044,6 @@ export class FileHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get file size
-     */
     protected getFileSize(filePath: string): number {
         try {
             return statSync(filePath).size;
@@ -1242,33 +1052,25 @@ export class FileHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if record matches filter
-     */
     protected matchesFilter(record: TestData, filter: Record<string, any>): boolean {
         for (const [key, value] of Object.entries(filter)) {
             if (typeof value === 'function') {
-                // Function filter
                 if (!value(record[key])) {
                     return false;
                 }
             } else if (value instanceof RegExp) {
-                // Regex filter
                 if (!value.test(String(record[key] || ''))) {
                     return false;
                 }
             } else if (Array.isArray(value)) {
-                // Array filter (IN)
                 if (!value.includes(record[key])) {
                     return false;
                 }
             } else if (typeof value === 'object' && value !== null) {
-                // Object filter (range, operators)
                 if (!this.matchesComplexFilter(record[key], value)) {
                     return false;
                 }
             } else {
-                // Simple equality
                 if (record[key] !== value) {
                     return false;
                 }
@@ -1277,9 +1079,6 @@ export class FileHandler implements DataHandler {
         return true;
     }
 
-    /**
-     * Match complex filter
-     */
     protected matchesComplexFilter(value: any, filter: any): boolean {
         if ('$gt' in filter && !(value > filter.$gt)) return false;
         if ('$gte' in filter && !(value >= filter.$gte)) return false;
@@ -1293,16 +1092,10 @@ export class FileHandler implements DataHandler {
         return true;
     }
 
-    /**
-     * Escape regex special characters
-     */
     protected escapeRegex(str: string): string {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    /**
-     * Enhance error with context
-     */
     protected enhanceError(error: any, options: DataProviderOptions): Error {
         const enhancedError = new Error(
             `File Handler Error: ${error instanceof Error ? error.message : String(error)}\n` +

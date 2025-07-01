@@ -13,11 +13,9 @@ const ffmpeg = require('fluent-ffmpeg');
 import * as ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import * as ffprobeInstaller from '@ffprobe-installer/ffprobe';
 
-// Set ffmpeg paths
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
-// Define local types for VideoCollector
 interface VideoEvidence {
   id: string;
   type: string;
@@ -58,9 +56,6 @@ interface VideoMetadata {
   originalSize?: number;
 }
 
-/**
- * Collects and manages video recordings of test execution
- */
 export class VideoCollector {
   private static instance: VideoCollector;
   private readonly logger = Logger.getInstance(VideoCollector.name);
@@ -103,16 +98,12 @@ export class VideoCollector {
     return VideoCollector.instance;
   }
 
-  /**
-   * Initialize collector for execution
-   */
   async initialize(executionId: string, _options?: CollectorOptions): Promise<void> {
     this.executionId = executionId;
     this.videoCount = 0;
     this.videos.clear();
     this.activeRecordings.clear();
     
-    // Create video directory
     // Note: options parameter is reserved for future extensions
     if (!fs.existsSync(this.videoPath)) {
       fs.mkdirSync(this.videoPath, { recursive: true });
@@ -121,9 +112,6 @@ export class VideoCollector {
     ActionLogger.logCollectorInitialization('video', executionId);
   }
 
-  /**
-   * Start recording for a scenario
-   */
   async startRecording(
     scenarioId: string,
     context: BrowserContext,
@@ -139,25 +127,20 @@ export class VideoCollector {
         fs.mkdirSync(videoDir, { recursive: true });
       }
       
-      // Configure video recording - Playwright configures video at context creation
-      // These options are stored for later processing
       const videoConfig = {
         dir: videoDir,
         size: options.size || this.videoSize
       };
       
-      // Ensure the video directory exists for this scenario
       if (!fs.existsSync(videoConfig.dir)) {
         fs.mkdirSync(videoConfig.dir, { recursive: true });
       }
       
-      // Start recording on all pages in context
       const pages = context.pages();
       for (const page of pages) {
-        await page.video()?.delete().catch(() => {}); // Clean any existing
+        await page.video()?.delete().catch(() => {});
       }
       
-      // Store recording info
       this.activeRecordings.set(scenarioId, {
         context,
         startTime: new Date(),
@@ -175,9 +158,6 @@ export class VideoCollector {
     }
   }
 
-  /**
-   * Stop recording for a scenario
-   */
   async stopRecording(scenarioId: string): Promise<VideoEvidence | null> {
     if (!this.recordVideos) {
       return null;
@@ -192,7 +172,6 @@ export class VideoCollector {
       const { context, startTime, options } = recording;
       const duration = Date.now() - startTime.getTime();
       
-      // Get video from first page
       const pages = context.pages();
       if (pages.length === 0) {
         return null;
@@ -208,16 +187,13 @@ export class VideoCollector {
         return null;
       }
       
-      // Save video
       const videoFileName = `${scenarioId}_${startTime.getTime()}.webm`;
       const videoPath = path.join(this.videoPath, this.executionId, videoFileName);
       await video.saveAs(videoPath);
       await video.delete();
       
-      // Get video file info
       const stats = await fs.promises.stat(videoPath);
       
-      // Process video if needed
       let processedPath = videoPath;
       let processedSize = stats.size;
       
@@ -233,10 +209,8 @@ export class VideoCollector {
         }
       }
       
-      // Extract metadata
       const metadata = await this.extractVideoMetadata(processedPath);
       
-      // Generate thumbnail
       const thumbnail = await this.generateVideoThumbnail(processedPath);
       
       const evidence: VideoEvidence = {
@@ -261,7 +235,6 @@ export class VideoCollector {
         format: path.extname(processedPath).substring(1)
       };
       
-      // Store evidence
       if (!this.videos.has(scenarioId)) {
         this.videos.set(scenarioId, []);
       }
@@ -281,25 +254,19 @@ export class VideoCollector {
     }
   }
 
-  /**
-   * Collect videos for scenario
-   */
   async collectForScenario(
     scenarioId: string,
     scenarioName: string
   ): Promise<VideoEvidence[]> {
-    // Stop any active recording
     if (this.activeRecordings.has(scenarioId)) {
       const video = await this.stopRecording(scenarioId);
       if (video) {
-        // Enhance video evidence with scenario name
         video.name = scenarioName || video.name;
         video.description = `Video recording of scenario: ${scenarioName}`;
         return [video];
       }
     }
     
-    // Enhance existing videos with scenario name if available
     const existingVideos = this.videos.get(scenarioId) || [];
     if (scenarioName && existingVideos.length > 0) {
       existingVideos.forEach(video => {
@@ -313,9 +280,6 @@ export class VideoCollector {
     return existingVideos;
   }
 
-  /**
-   * Compress video using ffmpeg
-   */
   private async compressVideo(
     inputPath: string,
     options: VideoOptions
@@ -327,18 +291,16 @@ export class VideoCollector {
         .outputOptions([
           '-c:v libx264',
           '-preset fast',
-          '-crf 28', // Quality (lower = better, 18-28 is good range)
+          '-crf 28',
           '-c:a aac',
           '-b:a 128k',
-          '-movflags +faststart' // Enable streaming
+          '-movflags +faststart'
         ]);
       
-      // Apply size if different from original
       if (options.size) {
         command.size(`${options.size.width}x${options.size.height}`);
       }
       
-      // Set max duration
       if (this.maxVideoDuration > 0) {
         command.duration(this.maxVideoDuration);
       }
@@ -366,9 +328,6 @@ export class VideoCollector {
     });
   }
 
-  /**
-   * Extract video metadata using ffprobe
-   */
   private async extractVideoMetadata(videoPath: string): Promise<VideoMetadata> {
     return new Promise((resolve) => {
       ffmpeg.ffprobe(videoPath, (err: Error | null, metadata: any) => {
@@ -404,9 +363,6 @@ export class VideoCollector {
     });
   }
 
-  /**
-   * Generate video thumbnail
-   */
   private async generateVideoThumbnail(videoPath: string): Promise<Buffer | null> {
     return new Promise((resolve) => {
       const tempPath = path.join(
@@ -416,7 +372,7 @@ export class VideoCollector {
       
       ffmpeg(videoPath)
         .screenshots({
-          timestamps: ['10%'], // Take screenshot at 10% of video
+          timestamps: ['10%'],
           filename: path.basename(tempPath),
           folder: path.dirname(tempPath),
           size: '320x240'
@@ -424,7 +380,7 @@ export class VideoCollector {
         .on('end', async () => {
           try {
             const thumbnail = await fs.promises.readFile(tempPath);
-            await fs.promises.unlink(tempPath); // Clean up
+            await fs.promises.unlink(tempPath);
             resolve(thumbnail);
           } catch (error) {
             resolve(null);
@@ -437,9 +393,6 @@ export class VideoCollector {
     });
   }
 
-  /**
-   * Merge multiple video clips
-   */
   async mergeVideos(
     videoPaths: string[],
     outputPath: string
@@ -447,7 +400,6 @@ export class VideoCollector {
     return new Promise((resolve) => {
       const command = ffmpeg();
       
-      // Add all input files
       videoPaths.forEach(path => {
         command.input(path);
       });
@@ -491,9 +443,6 @@ export class VideoCollector {
     });
   }
 
-  /**
-   * Extract video segment
-   */
   async extractSegment(
     videoPath: string,
     startTime: number,
@@ -511,9 +460,6 @@ export class VideoCollector {
     });
   }
 
-  /**
-   * Add watermark to video
-   */
   async addWatermark(
     videoPath: string,
     watermarkText: string,
@@ -530,9 +476,6 @@ export class VideoCollector {
     });
   }
 
-  /**
-   * Convert video format
-   */
   async convertFormat(
     videoPath: string,
     targetFormat: 'mp4' | 'webm' | 'avi',
@@ -541,7 +484,6 @@ export class VideoCollector {
     return new Promise((resolve) => {
       const command = ffmpeg(videoPath);
       
-      // Set format-specific options
       switch (targetFormat) {
         case 'mp4':
           command.outputOptions(['-c:v libx264', '-c:a aac']);
@@ -561,9 +503,6 @@ export class VideoCollector {
     });
   }
 
-  /**
-   * Get video statistics
-   */
   getStatistics(): {
     totalRecorded: number;
     totalSize: number;
@@ -608,9 +547,6 @@ export class VideoCollector {
     };
   }
 
-  /**
-   * Clean up old videos
-   */
   async cleanupOldVideos(retentionDays: number = 7): Promise<void> {
     try {
       const cutoffDate = new Date();
@@ -623,7 +559,6 @@ export class VideoCollector {
         const stats = await fs.promises.stat(dirPath);
         
         if (stats.isDirectory() && stats.mtime < cutoffDate) {
-          // Remove old video directory
           await fs.promises.rm(dirPath, { recursive: true, force: true });
           this.logger.info(`Cleaned up old video directory: ${dir}`);
         }
@@ -633,17 +568,12 @@ export class VideoCollector {
     }
   }
 
-  /**
-   * Finalize collection
-   */
   async finalize(executionId: string): Promise<void> {
-    // Stop any remaining recordings
     const activeScenarios = Array.from(this.activeRecordings.keys());
     for (const scenarioId of activeScenarios) {
       await this.stopRecording(scenarioId);
     }
     
-    // Clean up
     this.videos.clear();
     this.activeRecordings.clear();
     

@@ -22,14 +22,12 @@ export class RequestBuilder {
       this.options.url = baseUrl;
     }
     
-    // Set defaults from configuration with fallbacks
     try {
       this.options.timeout = ConfigurationManager.getInt('API_DEFAULT_TIMEOUT', 60000);
       this.options.validateSSL = ConfigurationManager.getBoolean('API_VALIDATE_SSL', true);
       this.options.compress = ConfigurationManager.getBoolean('API_COMPRESS', true);
       this.options.maxRedirects = ConfigurationManager.getInt('API_MAX_REDIRECTS', 5);
     } catch (error) {
-      // Use default values if configuration is not initialized
       this.options.timeout = 60000;
       this.options.validateSSL = true;
       this.options.compress = true;
@@ -96,7 +94,6 @@ export class RequestBuilder {
       throw new Error('Base URL must be set before adding path');
     }
     
-    // Ensure proper URL joining
     const baseUrl = this.options.url.endsWith('/') ? this.options.url.slice(0, -1) : this.options.url;
     const pathPart = path.startsWith('/') ? path : `/${path}`;
     
@@ -181,7 +178,6 @@ export class RequestBuilder {
       data: Buffer.isBuffer(data) ? data : Buffer.from(data)
     } as any;
     
-    // Only add contentType if it's defined
     if (contentType !== undefined) {
       fileData.contentType = contentType;
     }
@@ -357,13 +353,11 @@ export class RequestBuilder {
       this.options.method = 'GET';
     }
 
-    // Apply query parameters
     if (this.queryParams.toString()) {
       const separator = this.options.url.includes('?') ? '&' : '?';
       this.options.url += separator + this.queryParams.toString();
     }
 
-    // Build multipart form data if needed
     if (this.formData) {
       const boundary = `----CSFormBoundary${crypto.randomBytes(16).toString('hex')}`;
       const body = this.buildMultipartBody(this.formData, boundary);
@@ -372,7 +366,6 @@ export class RequestBuilder {
       this.options.body = body;
     }
 
-    // Validate the built options
     this.validateOptions();
 
     ActionLogger.getInstance().debug('Request built', {
@@ -388,7 +381,6 @@ export class RequestBuilder {
     const parts: Buffer[] = [];
     const newline = Buffer.from('\r\n');
 
-    // Add fields
     Object.entries(formData.fields).forEach(([name, value]) => {
       parts.push(Buffer.from(`--${boundary}`));
       parts.push(newline);
@@ -399,7 +391,6 @@ export class RequestBuilder {
       parts.push(newline);
     });
 
-    // Add files
     formData.files.forEach(file => {
       parts.push(Buffer.from(`--${boundary}`));
       parts.push(newline);
@@ -415,7 +406,6 @@ export class RequestBuilder {
       parts.push(newline);
     });
 
-    // Add closing boundary
     parts.push(Buffer.from(`--${boundary}--`));
     parts.push(newline);
 
@@ -425,25 +415,21 @@ export class RequestBuilder {
   private validateOptions(): void {
     const url = this.options.url!;
     
-    // Validate URL format
     try {
       new URL(url);
     } catch (error) {
       throw new Error(`Invalid URL: ${url}`);
     }
 
-    // Validate method
     const validMethods: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'TRACE', 'CONNECT'];
     if (!validMethods.includes(this.options.method!)) {
       throw new Error(`Invalid HTTP method: ${this.options.method}`);
     }
 
-    // Validate timeout
     if (this.options.timeout && this.options.timeout < 0) {
       throw new Error('Timeout must be a positive number');
     }
 
-    // Validate retry options
     if (this.options.retryCount && this.options.retryCount < 0) {
       throw new Error('Retry count must be a positive number');
     }

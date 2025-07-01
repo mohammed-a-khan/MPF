@@ -2,9 +2,6 @@
 
 import { TestData } from '../types/data.types';
 
-/**
- * Extended merge options for internal use
- */
 export interface ExtendedMergeOptions {
     strategy: MergeStrategy;
     key?: string | string[];
@@ -23,9 +20,6 @@ export interface ExtendedMergeOptions {
     validators?: Map<string, (value: any, path: string) => boolean>;
 }
 
-/**
- * Merge result
- */
 export interface MergeResult {
     success: boolean;
     result: any;
@@ -48,12 +42,6 @@ export interface MergeResult {
     };
 }
 
-/**
- * Merge strategy type
- */
 export type MergeStrategy = 'append' | 'merge' | 'replace' | 'join' | 'deep' | 'array';
 
-/**
- * Conflict resolution type
- */
 export type ConflictResolution = 'original' | 'new' | 'custom' | 'override' | 'preserve' | 'error' | 'array' | 'concat' | 'sum' | 'average' | 'min' | 'max';

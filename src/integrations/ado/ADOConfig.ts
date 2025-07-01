@@ -71,9 +71,6 @@ export class ADOConfig {
   private static endpoints: ADOEndpoints;
   private static initialized: boolean = false;
 
-  /**
-   * Initialize ADO configuration
-   */
   static initialize(): void {
     if (this.initialized) {
       return;
@@ -107,9 +104,6 @@ export class ADOConfig {
     }
   }
 
-  /**
-   * Load configuration from environment
-   */
   private static loadConfiguration(): ADOConfiguration {
     const orgUrl = ConfigurationManager.get('ADO_ORGANIZATION_URL', '');
     const projectName = ConfigurationManager.get('ADO_PROJECT_NAME', '');
@@ -196,9 +190,6 @@ export class ADOConfig {
     return config;
   }
 
-  /**
-   * Create disabled configuration
-   */
   private static createDisabledConfiguration(): ADOConfiguration {
     return {
       organizationUrl: '',
@@ -218,9 +209,6 @@ export class ADOConfig {
     };
   }
 
-  /**
-   * Create disabled endpoints
-   */
   private static createDisabledEndpoints(): ADOEndpoints {
     return {
       testPlans: '',
@@ -236,9 +224,6 @@ export class ADOConfig {
     };
   }
 
-  /**
-   * Validate configuration
-   */
   private static validateConfiguration(): void {
     const errors: string[] = [];
 
@@ -291,9 +276,6 @@ export class ADOConfig {
     }
   }
 
-  /**
-   * Build API endpoints
-   */
   private static buildEndpoints(): void {
     if (!this.config.organizationUrl || !this.config.projectName) {
       ADOConfig.logger.warn('ADO endpoints not built - missing organizationUrl or projectName');
@@ -328,9 +310,6 @@ export class ADOConfig {
     };
   }
 
-  /**
-   * Get configuration
-   */
   static getConfig(): ADOConfiguration {
     if (!this.config) {
       this.initialize();
@@ -338,9 +317,6 @@ export class ADOConfig {
     return { ...this.config };
   }
 
-  /**
-   * Get endpoints
-   */
   static getEndpoints(): ADOEndpoints {
     if (!this.endpoints) {
       this.initialize();
@@ -348,16 +324,10 @@ export class ADOConfig {
     return { ...this.endpoints };
   }
 
-  /**
-   * Get base URL
-   */
   static getBaseUrl(): string {
     return `${this.config.organizationUrl}/${this.config.projectName}/_apis`;
   }
 
-  /**
-   * Get authentication headers
-   */
   static getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
@@ -383,16 +353,10 @@ export class ADOConfig {
     return headers;
   }
 
-  /**
-   * Get API version parameter
-   */
   static getApiVersionParam(): string {
     return `api-version=${this.config.apiVersion}`;
   }
 
-  /**
-   * Build URL with query parameters
-   */
   static buildUrl(endpoint: string, params?: Record<string, any>): string {
     if (!endpoint) {
       throw new Error('ADO endpoint is empty - ADO configuration may not be properly initialized');
@@ -412,16 +376,10 @@ export class ADOConfig {
     return url;
   }
 
-  /**
-   * Get proxy configuration
-   */
   static getProxyConfig(): ADOProxyConfig | undefined {
     return this.config.proxy;
   }
   
-  /**
-   * Reset configuration to force re-initialization
-   */
   static reset(): void {
     ADOConfig.logger.info('Resetting ADO configuration');
     this.config = null as any;
@@ -429,9 +387,6 @@ export class ADOConfig {
     this.initialized = false;
   }
 
-  /**
-   * Check if proxy should be bypassed for URL
-   */
   static shouldBypassProxy(url: string): boolean {
     if (!this.config.proxy?.enabled || !this.config.proxy.bypass) {
       return false;
@@ -453,9 +408,6 @@ export class ADOConfig {
     return false;
   }
 
-  /**
-   * Get upload configuration
-   */
   static getUploadConfig(): Pick<ADOConfiguration, 
     'uploadAttachments' | 'uploadScreenshots' | 'uploadVideos' | 'uploadLogs'> {
     return {
@@ -466,16 +418,10 @@ export class ADOConfig {
     };
   }
 
-  /**
-   * Get bug template
-   */
   static getBugTemplate(): ADOBugTemplate | undefined {
     return this.config.bugTemplate;
   }
 
-  /**
-   * Format bug title
-   */
   static formatBugTitle(testName: string, errorMessage?: string): string {
     if (!this.config.bugTemplate) {
       return `Test Failed: ${testName}`;
@@ -488,9 +434,6 @@ export class ADOConfig {
       .replace('{error}', errorMessage || 'Unknown error');
   }
 
-  /**
-   * Update configuration at runtime
-   */
   static updateConfig(updates: Partial<ADOConfiguration>): void {
     this.config = {
       ...this.config,

@@ -3,21 +3,10 @@ import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { TestData } from '../types/data.types';
 
-/**
- * Data Encryption Manager for handling sensitive data in test data files
- * 
- * Features:
- * - Automatically detects and decrypts ENCRYPTED: prefixed values in test data
- * - Supports encryption of sensitive data before storing in files
- * - Works with all data formats (CSV, JSON, Excel, XML)
- * - Configurable sensitive field detection
- * - Batch processing for large datasets
- */
 export class DataEncryptionManager {
   private static logger = Logger.getInstance();
   private static readonly ENCRYPTED_PREFIX = 'ENCRYPTED:';
   
-  // Default sensitive field patterns
   private static readonly DEFAULT_SENSITIVE_PATTERNS = [
     'password',
     'passwd',
@@ -44,9 +33,6 @@ export class DataEncryptionManager {
   private static sensitivePatterns: string[] = [...this.DEFAULT_SENSITIVE_PATTERNS];
   private static isInitialized = false;
 
-  /**
-   * Initialize the data encryption manager
-   */
   static initialize(options: {
     sensitivePatterns?: string[];
     enableAutoDecryption?: boolean;
@@ -59,7 +45,6 @@ export class DataEncryptionManager {
     this.sensitivePatterns = [...sensitivePatterns];
     
     if (enableAutoDecryption) {
-      // Initialize encryption configuration manager
       EncryptionConfigurationManager.initializeEncryption({
         enabled: true
       });
@@ -72,9 +57,6 @@ export class DataEncryptionManager {
     });
   }
 
-  /**
-   * Process test data array - decrypt any encrypted values
-   */
   static async processTestData(data: TestData[]): Promise<TestData[]> {
     if (!this.isInitialized) {
       this.initialize();
@@ -97,7 +79,6 @@ export class DataEncryptionManager {
         processedData.push(processedRecord);
       } catch (error) {
         this.logger.error('Failed to process test data record', error instanceof Error ? error : new Error(String(error)));
-        // Keep original record if processing fails
         processedData.push(record);
       }
     }
@@ -105,9 +86,6 @@ export class DataEncryptionManager {
     return processedData;
   }
 
-  /**
-   * Process a single test data record
-   */
   static async processRecord(record: TestData): Promise<TestData> {
     if (!record || typeof record !== 'object') {
       return record;
@@ -118,18 +96,17 @@ export class DataEncryptionManager {
     for (const [key, value] of Object.entries(record)) {
       if (typeof value === 'string' && value.startsWith(this.ENCRYPTED_PREFIX)) {
         try {
-          // Decrypt the value
           const testResult = await EncryptionConfigurationManager.testDecryption(value);
           if (testResult.success && testResult.decrypted) {
             processedRecord[key] = testResult.decrypted;
             this.logger.debug(`Decrypted field: ${key}`);
           } else {
             this.logger.warn(`Failed to decrypt field: ${key}`);
-            processedRecord[key] = value; // Keep encrypted value
+            processedRecord[key] = value;
           }
         } catch (error) {
           this.logger.error(`Error decrypting field ${key}:`, error instanceof Error ? error : new Error(String(error)));
-          processedRecord[key] = value; // Keep encrypted value
+          processedRecord[key] = value;
         }
       } else {
         processedRecord[key] = value;
@@ -139,9 +116,6 @@ export class DataEncryptionManager {
     return processedRecord;
   }
 
-  /**
-   * Encrypt sensitive values in test data before storing
-   */
   static async encryptSensitiveData(data: TestData[]): Promise<TestData[]> {
     if (!this.isInitialized) {
       this.initialize();
@@ -164,7 +138,6 @@ export class DataEncryptionManager {
         encryptedData.push(encryptedRecord);
       } catch (error) {
         this.logger.error('Failed to encrypt test data record', error instanceof Error ? error : new Error(String(error)));
-        // Keep original record if encryption fails
         encryptedData.push(record);
       }
     }
@@ -172,9 +145,6 @@ export class DataEncryptionManager {
     return encryptedData;
   }
 
-  /**
-   * Encrypt sensitive fields in a single record
-   */
   static async encryptRecord(record: TestData): Promise<TestData> {
     if (!record || typeof record !== 'object') {
       return record;
@@ -185,13 +155,12 @@ export class DataEncryptionManager {
     for (const [key, value] of Object.entries(record)) {
       if (typeof value === 'string' && this.isSensitiveField(key) && !value.startsWith(this.ENCRYPTED_PREFIX)) {
         try {
-          // Encrypt the value
           const encrypted = await EncryptionConfigurationManager.encryptValue(value);
           encryptedRecord[key] = encrypted;
           this.logger.debug(`Encrypted field: ${key}`);
         } catch (error) {
           this.logger.error(`Error encrypting field ${key}:`, error instanceof Error ? error : new Error(String(error)));
-          encryptedRecord[key] = value; // Keep original value
+          encryptedRecord[key] = value;
         }
       } else {
         encryptedRecord[key] = value;
@@ -201,9 +170,6 @@ export class DataEncryptionManager {
     return encryptedRecord;
   }
 
-  /**
-   * Check if a field name indicates sensitive data
-   */
   static isSensitiveField(fieldName: string): boolean {
     const lowerFieldName = fieldName.toLowerCase();
     return this.sensitivePatterns.some(pattern => 
@@ -211,9 +177,6 @@ export class DataEncryptionManager {
     );
   }
 
-  /**
-   * Get list of sensitive fields in test data
-   */
   static getSensitiveFields(data: TestData[]): string[] {
     const sensitiveFields = new Set<string>();
 
@@ -230,9 +193,6 @@ export class DataEncryptionManager {
     return Array.from(sensitiveFields);
   }
 
-  /**
-   * Validate that sensitive fields are encrypted
-   */
   static validateEncryption(data: TestData[]): {
     valid: boolean;
     unencryptedFields: Array<{ record: number; field: string; value: string }>;
@@ -268,17 +228,11 @@ export class DataEncryptionManager {
     };
   }
 
-  /**
-   * Add custom sensitive field patterns
-   */
   static addSensitivePatterns(patterns: string[]): void {
     this.sensitivePatterns.push(...patterns);
     this.logger.info('Added custom sensitive patterns', { patterns });
   }
 
-  /**
-   * Remove sensitive field patterns
-   */
   static removeSensitivePatterns(patterns: string[]): void {
     this.sensitivePatterns = this.sensitivePatterns.filter(
       pattern => !patterns.includes(pattern)
@@ -286,24 +240,15 @@ export class DataEncryptionManager {
     this.logger.info('Removed sensitive patterns', { patterns });
   }
 
-  /**
-   * Get current sensitive patterns
-   */
   static getSensitivePatterns(): string[] {
     return [...this.sensitivePatterns];
   }
 
-  /**
-   * Reset to default sensitive patterns
-   */
   static resetSensitivePatterns(): void {
     this.sensitivePatterns = [...this.DEFAULT_SENSITIVE_PATTERNS];
     this.logger.info('Reset to default sensitive patterns');
   }
 
-  /**
-   * Mask a value for logging/display
-   */
   private static maskValue(value: string): string {
     if (!value || value.length <= 4) {
       return '***';
@@ -311,9 +256,6 @@ export class DataEncryptionManager {
     return value.substring(0, 2) + '*'.repeat(value.length - 4) + value.substring(value.length - 2);
   }
 
-  /**
-   * Get encryption statistics for test data
-   */
   static getEncryptionStats(data: TestData[]): {
     totalRecords: number;
     totalFields: number;
@@ -357,9 +299,6 @@ export class DataEncryptionManager {
     };
   }
 
-  /**
-   * Create a sample encrypted test data record
-   */
   static async createSampleEncryptedRecord(): Promise<TestData> {
     const sampleData: TestData = {
       username: 'testuser',
@@ -372,9 +311,6 @@ export class DataEncryptionManager {
     return await this.encryptRecord(sampleData);
   }
 
-  /**
-   * Bulk encrypt existing test data files
-   */
   static async bulkEncryptData(
     data: TestData[],
     options: {
@@ -391,13 +327,10 @@ export class DataEncryptionManager {
     const errors: string[] = [];
 
     try {
-      // Get initial stats
       const initialStats = this.getEncryptionStats(data);
       
-      // Encrypt the data
       const encryptedData = await this.encryptSensitiveData(data);
       
-      // Validate if requested
       if (validateAfterEncryption) {
         const validation = this.validateEncryption(encryptedData);
         if (!validation.valid) {
@@ -405,7 +338,6 @@ export class DataEncryptionManager {
         }
       }
 
-      // Get final stats
       const finalStats = this.getEncryptionStats(encryptedData);
 
       return {

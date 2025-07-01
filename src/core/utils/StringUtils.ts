@@ -1,9 +1,3 @@
-/**
- * CS Test Automation Framework - String Utilities
- * 
- * Comprehensive string manipulation utilities with encoding support,
- * pattern matching, and advanced text processing capabilities.
- */
 
 import * as crypto from 'crypto';
 
@@ -33,7 +27,6 @@ export interface LevenshteinOptions {
 }
 
 export class StringUtils {
-  // Basic string operations
   public static isEmpty(str: string | null | undefined): boolean {
     return !str || str.length === 0;
   }
@@ -58,7 +51,6 @@ export class StringUtils {
     return this.isBlank(str) ? defaultValue : str!.trim();
   }
 
-  // Trimming operations
   public static trim(str: string, chars?: string): string {
     if (!chars) {
       return str.trim();
@@ -99,7 +91,6 @@ export class StringUtils {
     return trimLength > 0 ? str.substring(0, trimLength) + suffix : str.substring(0, maxLength);
   }
 
-  // Case conversion
   public static toCamelCase(str: string): string {
     return str
       .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => 
@@ -151,7 +142,6 @@ export class StringUtils {
     );
   }
 
-  // Padding operations
   public static padStart(str: string, length: number, padString: string = ' '): string {
     return str.padStart(length, padString);
   }
@@ -175,7 +165,6 @@ export class StringUtils {
       .substring(0, rightPadding);
   }
 
-  // Comparison operations
   public static equals(str1: string | null | undefined, str2: string | null | undefined, options: StringCompareOptions = {}): boolean {
     const {
       caseSensitive = true,
@@ -255,7 +244,6 @@ export class StringUtils {
     return arr1.length - arr2.length;
   }
 
-  // Search operations
   public static contains(str: string, searchStr: string, options: StringSearchOptions = {}): boolean {
     const {
       caseSensitive = true,
@@ -355,7 +343,6 @@ export class StringUtils {
     return count;
   }
 
-  // Replace operations
   public static replace(str: string, searchStr: string | RegExp, replaceStr: string | ((match: string, ...args: any[]) => string)): string {
     return str.replace(searchStr, replaceStr as any);
   }
@@ -392,7 +379,6 @@ export class StringUtils {
     return str.substring(0, start) + replaceStr + str.substring(end);
   }
 
-  // Split operations
   public static split(str: string, separator: string | RegExp, options: StringSplitOptions = {}): string[] {
     const {
       limit,
@@ -438,7 +424,6 @@ export class StringUtils {
     return chunks;
   }
 
-  // Join operations
   public static join(arr: any[], separator: string = ','): string {
     return arr.join(separator);
   }
@@ -451,7 +436,6 @@ export class StringUtils {
     return words.join(' ');
   }
 
-  // Substring operations
   public static substring(str: string, start: number, end?: number): string {
     return str.substring(start, end);
   }
@@ -504,7 +488,6 @@ export class StringUtils {
     return results;
   }
 
-  // Reverse operations
   public static reverse(str: string): string {
     return str.split('').reverse().join('');
   }
@@ -513,14 +496,12 @@ export class StringUtils {
     return str.split(/\s+/).reverse().join(' ');
   }
 
-  // Repeat operations
   public static repeat(str: string, count: number, separator: string = ''): string {
     if (count <= 0) return '';
     
     return new Array(count).fill(str).join(separator);
   }
 
-  // Remove operations
   public static remove(str: string, remove: string): string {
     return this.replaceAll(str, remove, '');
   }
@@ -553,7 +534,6 @@ export class StringUtils {
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
 
-  // Escape operations
   public static escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
@@ -613,7 +593,6 @@ export class StringUtils {
     return str.replace(/'/g, "''");
   }
 
-  // Encoding operations
   public static toBase64(str: string): string {
     return Buffer.from(str, 'utf8').toString('base64');
   }
@@ -646,7 +625,6 @@ export class StringUtils {
     return new TextDecoder().decode(bytes);
   }
 
-  // Hash operations
   public static md5(str: string): string {
     return crypto.createHash('md5').update(str, 'utf8').digest('hex');
   }
@@ -667,7 +645,6 @@ export class StringUtils {
     return crypto.createHash(algorithm).update(str, 'utf8').digest('hex');
   }
 
-  // Random string generation
   public static random(length: number, options: {
     uppercase?: boolean;
     lowercase?: boolean;
@@ -689,7 +666,6 @@ export class StringUtils {
     if (numbers) chars += '0123456789';
     if (symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
 
-    // Remove excluded characters
     if (exclude) {
       chars = chars.split('').filter(char => !exclude.includes(char)).join('');
     }
@@ -726,7 +702,6 @@ export class StringUtils {
     });
   }
 
-  // Validation operations
   public static isAlpha(str: string): boolean {
     return /^[a-zA-Z]+$/.test(str);
   }
@@ -786,7 +761,6 @@ export class StringUtils {
     return uuidRegex.test(str);
   }
 
-  // Format operations
   public static format(template: string, ...args: any[]): string {
     return template.replace(/{(\d+)}/g, (match, index) => {
       const argIndex = parseInt(index, 10);
@@ -868,7 +842,6 @@ export class StringUtils {
     return result;
   }
 
-  // Text analysis
   public static wordCount(str: string): number {
     return this.splitWords(str).length;
   }
@@ -900,7 +873,6 @@ export class StringUtils {
       .map(([word, count]) => ({ word, count }));
   }
 
-  // Distance calculations
   public static levenshteinDistance(str1: string, str2: string, options: LevenshteinOptions = {}): number {
     const {
       insertCost = 1,
@@ -914,20 +886,16 @@ export class StringUtils {
     if (m === 0) return n * insertCost;
     if (n === 0) return m * deleteCost;
 
-    // Use a Map to store dp values
     const dpMap = new Map<string, number>();
     
-    // Helper function to get dp value
     const getDp = (i: number, j: number): number => {
       return dpMap.get(`${i},${j}`) ?? 0;
     };
     
-    // Helper function to set dp value
     const setDp = (i: number, j: number, value: number): void => {
       dpMap.set(`${i},${j}`, value);
     };
     
-    // Initialize base cases
     for (let i = 0; i <= m; i++) {
       setDp(i, 0, i * deleteCost);
     }
@@ -936,16 +904,15 @@ export class StringUtils {
       setDp(0, j, j * insertCost);
     }
 
-    // Fill the dp table
     for (let i = 1; i <= m; i++) {
       for (let j = 1; j <= n; j++) {
         if (str1.charAt(i - 1) === str2.charAt(j - 1)) {
           setDp(i, j, getDp(i - 1, j - 1));
         } else {
           setDp(i, j, Math.min(
-            getDp(i - 1, j) + deleteCost,     // Delete
-            getDp(i, j - 1) + insertCost,     // Insert
-            getDp(i - 1, j - 1) + replaceCost // Replace
+            getDp(i - 1, j) + deleteCost,
+            getDp(i, j - 1) + insertCost,
+            getDp(i - 1, j - 1) + replaceCost
           ));
         }
       }
@@ -1014,7 +981,6 @@ export class StringUtils {
     return frequency;
   }
 
-  // Text wrapping
   public static wrap(str: string, width: number, options: {
     indent?: string;
     newline?: string;
@@ -1044,7 +1010,6 @@ export class StringUtils {
 
       for (const word of words) {
         if (word.length > width && cut) {
-          // Cut long words
           if (currentLine.length > indent.length) {
             lines.push(currentLine.trim());
             currentLine = indent;
@@ -1055,13 +1020,11 @@ export class StringUtils {
           }
           currentLine = indent;
         } else if (currentLine.length + word.length + 1 > width) {
-          // Word doesn't fit on current line
           if (currentLine.length > indent.length) {
             lines.push(currentLine.trim());
           }
           currentLine = indent + word;
         } else {
-          // Add word to current line
           if (currentLine.length > indent.length) {
             currentLine += ' ';
           }
@@ -1081,7 +1044,6 @@ export class StringUtils {
     return str.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  // Truncate with ellipsis
   public static truncate(str: string, length: number, options: {
     ellipsis?: string;
     position?: 'end' | 'middle' | 'start';
@@ -1132,7 +1094,6 @@ export class StringUtils {
     return truncated;
   }
 
-  // Highlight text
   public static highlight(str: string, search: string, options: {
     caseSensitive?: boolean;
     highlightStart?: string;
@@ -1153,7 +1114,6 @@ export class StringUtils {
     return str.replace(regex, `${highlightStart}$1${highlightEnd}`);
   }
 
-  // Slugify
   public static slugify(str: string, options: {
     separator?: string;
     lowercase?: boolean;
@@ -1167,12 +1127,12 @@ export class StringUtils {
 
     let slug = str
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, ''); // Remove accents
+      .replace(/[\u0300-\u036f]/g, '');
 
     if (strict) {
-      slug = slug.replace(/[^a-zA-Z0-9\s-]/g, ''); // Remove non-alphanumeric
+      slug = slug.replace(/[^a-zA-Z0-9\s-]/g, '');
     } else {
-      slug = slug.replace(/[^\w\s-]/g, ''); // Keep Unicode word characters
+      slug = slug.replace(/[^\w\s-]/g, '');
     }
 
     slug = slug
@@ -1183,7 +1143,6 @@ export class StringUtils {
     return lowercase ? slug.toLowerCase() : slug;
   }
 
-  // Template operations
   public static interpolate(template: string, data: any, options: {
     startDelimiter?: string;
     endDelimiter?: string;
@@ -1211,7 +1170,6 @@ export class StringUtils {
         return undefined;
       }
 
-      // Handle array indices
       const arrayMatch = key.match(/^(\w+)\[(\d+)\]$/);
       if (arrayMatch && arrayMatch.length >= 3) {
         const arrayKey = arrayMatch[1];
@@ -1228,17 +1186,14 @@ export class StringUtils {
     }, obj);
   }
 
-  // Diff operations
   public static diffChars(str1: string, str2: string): Array<{
     type: 'add' | 'remove' | 'equal';
     value: string;
   }> {
     const result: Array<{ type: 'add' | 'remove' | 'equal'; value: string }> = [];
     
-    // Use a Map to store dp values
     const dpMap = new Map<string, number>();
     
-    // Helper functions
     const getDp = (i: number, j: number): number => {
       return dpMap.get(`${i},${j}`) ?? 0;
     };
@@ -1247,7 +1202,6 @@ export class StringUtils {
       dpMap.set(`${i},${j}`, value);
     };
     
-    // Initialize base cases
     for (let i = 0; i <= str1.length; i++) {
       setDp(i, 0, 0);
     }
@@ -1256,7 +1210,6 @@ export class StringUtils {
       setDp(0, j, 0);
     }
 
-    // Build LCS table
     for (let i = 1; i <= str1.length; i++) {
       for (let j = 1; j <= str2.length; j++) {
         if (str1.charAt(i - 1) === str2.charAt(j - 1)) {
@@ -1267,7 +1220,6 @@ export class StringUtils {
       }
     }
 
-    // Backtrack to find diff
     let i = str1.length;
     let j = str2.length;
 
@@ -1285,7 +1237,6 @@ export class StringUtils {
       }
     }
 
-    // Merge consecutive equal parts
     const merged: typeof result = [];
     let current = result[0];
 
@@ -1325,10 +1276,8 @@ export class StringUtils {
   }> {
     const result: Array<{ type: 'add' | 'remove' | 'equal'; values: T[] }> = [];
     
-    // Use a Map to store dp values
     const dpMap = new Map<string, number>();
     
-    // Helper functions
     const getDp = (i: number, j: number): number => {
       return dpMap.get(`${i},${j}`) ?? 0;
     };
@@ -1337,7 +1286,6 @@ export class StringUtils {
       dpMap.set(`${i},${j}`, value);
     };
     
-    // Initialize base cases
     for (let i = 0; i <= arr1.length; i++) {
       setDp(i, 0, 0);
     }
@@ -1346,7 +1294,6 @@ export class StringUtils {
       setDp(0, j, 0);
     }
 
-    // Build LCS table
     for (let i = 1; i <= arr1.length; i++) {
       for (let j = 1; j <= arr2.length; j++) {
         if (arr1[i - 1] === arr2[j - 1]) {
@@ -1357,7 +1304,6 @@ export class StringUtils {
       }
     }
 
-    // Backtrack
     let i = arr1.length;
     let j = arr2.length;
     let currentType: 'add' | 'remove' | 'equal' | null = null;

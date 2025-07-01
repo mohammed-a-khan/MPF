@@ -52,7 +52,6 @@ export class RedisAdapter extends DatabaseAdapter {
         try {
             ActionLogger.logInfo('Connecting to Redis', { host: config.host, port: config.port });
 
-            // Configure Redis client options
             const clientOptions: redis.RedisClientOptions = {
                 socket: {
                     host: config.host,
@@ -72,7 +71,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 ...this.buildSSLOptions(config)
             };
 
-            // Handle Redis Cluster
             if (config.additionalOptions?.['cluster']) {
                 const clusterNodes = this.parseClusterNodes(config);
                 (clientOptions as any).cluster = {
@@ -84,33 +82,25 @@ export class RedisAdapter extends DatabaseAdapter {
                 };
             }
 
-            // Create main client
             this.client = redis.createClient(clientOptions) as redis.RedisClientType;
 
-            // Set up event handlers
             this.setupEventHandlers(this.client, 'main');
 
-            // Connect
             await this.client.connect();
 
-            // Test connection
             await this.client.ping();
 
-            // Create pub/sub clients if needed
             if (config.additionalOptions?.['enablePubSub']) {
                 await this.setupPubSubClients(clientOptions);
             }
 
-            // Load Lua scripts
             await this.loadLuaScripts();
 
-            // Start health monitoring
             this.startHealthMonitoring();
 
             logger.info(`Successfully connected to Redis: ${config.host}:${config.port || 6379}`);
             ActionLogger.logInfo('Connected to Redis');
             
-            // Return DatabaseConnection object
             return {
                 id: `redis-${++this.connectionId}`,
                 type: 'redis',
@@ -134,17 +124,14 @@ export class RedisAdapter extends DatabaseAdapter {
         try {
             ActionLogger.logInfo('Disconnecting from Redis');
 
-            // Stop health monitoring
             if (this.healthCheckInterval) {
                 clearInterval(this.healthCheckInterval);
                 this.healthCheckInterval = null;
             }
 
-            // Clean up pub/sub
             this.pubsubHandlers.clear();
             this.streamConsumers.clear();
 
-            // Disconnect all clients
             const disconnectPromises: Promise<void>[] = [];
             
             if (this.subscriber) {
@@ -190,13 +177,10 @@ export class RedisAdapter extends DatabaseAdapter {
             const actionLogger = ActionLogger.getInstance();
             await actionLogger.logDatabase('execute', query, 0, 0, { params });
 
-            // Parse Redis command
             const command = this.parseRedisCommand(query, params);
             let result: any;
 
-            // Handle transaction commands specially
             if (this.isInTransaction && !['EXEC', 'DISCARD', 'WATCH', 'UNWATCH'].includes(command.cmd.toUpperCase())) {
-                // Queue command for transaction
                 this.transactionCommands.push(async () => {
                     return await this.executeRedisCommand(command);
                 });
@@ -227,7 +211,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 throw new Error('Transaction already in progress');
             }
 
-            // Redis transactions use MULTI command
             await this.client!.multi();
             this.isInTransaction = true;
             this.transactionCommands = [];
@@ -250,7 +233,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 throw new Error('No active transaction to commit');
             }
 
-            // Execute all queued commands
             await Promise.all(
                 this.transactionCommands.map(cmd => cmd())
             );
@@ -280,8 +262,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return;
             }
 
-            // Discard all queued commands
-            // Redis doesn't have discard in newer versions, just reset state
             this.isInTransaction = false;
             this.transactionCommands = [];
 
@@ -299,8 +279,6 @@ export class RedisAdapter extends DatabaseAdapter {
     }
 
     async prepareStatement(query: string): Promise<PreparedStatement> {
-        // Redis doesn't support prepared statements
-        // We'll create a function that executes the command
         const id = `ps_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         const preparedStatement: PreparedStatement = {
@@ -334,16 +312,12 @@ export class RedisAdapter extends DatabaseAdapter {
                 count: values.length 
             });
 
-            // Redis bulk operations depend on the data structure
-            // We'll use pipeline for efficiency
             const pipeline = this.client!.multi();
             let insertedCount = 0;
 
-            // Determine operation based on table name pattern
             if (table.includes(':hash:')) {
-                // Bulk hash sets
                 for (const row of values) {
-                    const key = `${table}:${row[0]}`; // First column as key suffix
+                    const key = `${table}:${row[0]}`;
                     const hashData: Record<string, any> = {};
                     
                     columns.slice(1).forEach((col, index) => {
@@ -354,7 +328,6 @@ export class RedisAdapter extends DatabaseAdapter {
                     insertedCount++;
                 }
             } else if (table.includes(':set:')) {
-                // Bulk set additions
                 for (const row of values) {
                     const key = `${table}:${row[0]}`;
                     const members = row.slice(1);
@@ -362,7 +335,6 @@ export class RedisAdapter extends DatabaseAdapter {
                     insertedCount++;
                 }
             } else if (table.includes(':list:')) {
-                // Bulk list pushes
                 for (const row of values) {
                     const key = `${table}:${row[0]}`;
                     const elements = row.slice(1);
@@ -370,7 +342,6 @@ export class RedisAdapter extends DatabaseAdapter {
                     insertedCount++;
                 }
             } else if (table.includes(':zset:')) {
-                // Bulk sorted set additions
                 for (const row of values) {
                     const key = `${table}:${row[0]}`;
                     const members: { score: number; value: string }[] = [];
@@ -388,7 +359,6 @@ export class RedisAdapter extends DatabaseAdapter {
                     insertedCount++;
                 }
             } else {
-                // Default: bulk string sets
                 for (const row of values) {
                     const key = `${table}:${row[0]}`;
                     const value = columns.length > 1 ? 
@@ -406,7 +376,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 }
             }
 
-            // Execute pipeline
             await pipeline.exec();
 
             const duration = Date.now() - startTime;
@@ -446,20 +415,16 @@ export class RedisAdapter extends DatabaseAdapter {
 
             const startTime = Date.now();
             
-            // Ping to check latency
             await this.client.ping();
             const latency = Date.now() - startTime;
 
-            // Get server info
             const info = await this.client.info();
             const serverInfo = this.parseRedisInfo(info);
 
-            // Get client list for connection count
             const clientList = await this.client.clientList();
             const clientListStr = typeof clientList === 'string' ? clientList : '';
             const activeConnections = Array.isArray(clientList) ? clientList.length : clientListStr.split('\n').filter((line: string) => line.trim()).length;
 
-            // Get memory info
             const memoryInfo = serverInfo.memory || {};
             const usedMemory = parseInt(memoryInfo.used_memory || '0');
             const maxMemory = parseInt(memoryInfo.maxmemory || '0');
@@ -525,7 +490,6 @@ export class RedisAdapter extends DatabaseAdapter {
         params?: any[], 
         _options?: QueryOptions
     ): Promise<QueryResult> {
-        // Redis uses Lua scripts instead of stored procedures
         const startTime = Date.now();
         
         try {
@@ -534,7 +498,6 @@ export class RedisAdapter extends DatabaseAdapter {
 
             let result: any;
 
-            // Check if it's a registered script
             if (this.scripts.has(procedureName)) {
                 const script = this.scripts.get(procedureName)!;
                 const keys = params?.[0] || [];
@@ -545,10 +508,6 @@ export class RedisAdapter extends DatabaseAdapter {
                     arguments: args.map(String)
                 });
             } else {
-                // Try to load and execute script from name
-                // const scriptPath = `scripts/${procedureName}.lua`;
-                // In real implementation, would load from file system
-                // For now, handle common Redis operations as "procedures"
                 result = await this.executeRedisFunction(procedureName, params);
             }
 
@@ -572,7 +531,6 @@ export class RedisAdapter extends DatabaseAdapter {
         params?: any[], 
         _options?: QueryOptions
     ): Promise<any> {
-        // Redis functions for common operations
         const startTime = Date.now();
         
         try {
@@ -610,7 +568,6 @@ export class RedisAdapter extends DatabaseAdapter {
         };
     }
 
-    // Redis-specific public methods
 
     async publish(channel: string, message: string): Promise<number> {
         this.validateConnection();
@@ -647,7 +604,6 @@ export class RedisAdapter extends DatabaseAdapter {
         await this.subscriber.unsubscribe(channel);
     }
 
-    // Private helper methods
 
     private buildSSLOptions(config: DatabaseConfig): any {
         if (!config.ssl) {
@@ -675,7 +631,6 @@ export class RedisAdapter extends DatabaseAdapter {
     private parseClusterNodes(config: DatabaseConfig): Array<{ host: string; port: number }> {
         const nodes: Array<{ host: string; port: number }> = [];
         
-        // Parse comma-separated host:port pairs
         const hostList = config.host.split(',');
         
         for (const hostPort of hostList) {
@@ -713,12 +668,10 @@ export class RedisAdapter extends DatabaseAdapter {
     }
 
     private async setupPubSubClients(options: redis.RedisClientOptions): Promise<void> {
-        // Create subscriber client
         this.subscriber = redis.createClient(options) as redis.RedisClientType;
         this.setupEventHandlers(this.subscriber, 'subscriber');
         await this.subscriber.connect();
 
-        // Create publisher client
         this.publisher = redis.createClient(options) as redis.RedisClientType;
         this.setupEventHandlers(this.publisher, 'publisher');
         await this.publisher.connect();
@@ -727,10 +680,7 @@ export class RedisAdapter extends DatabaseAdapter {
     }
 
     private async loadLuaScripts(): Promise<void> {
-        // Load common Lua scripts
-        // In production, these would be loaded from files
         
-        // Example: Atomic increment with max value
         this.scripts.set('incrWithMax', `
             local current = redis.call('get', KEYS[1])
             if not current then current = 0 else current = tonumber(current) end
@@ -742,7 +692,6 @@ export class RedisAdapter extends DatabaseAdapter {
             end
         `);
 
-        // Example: Conditional set
         this.scripts.set('setIfGreater', `
             local current = redis.call('get', KEYS[1])
             local new = ARGV[1]
@@ -765,7 +714,7 @@ export class RedisAdapter extends DatabaseAdapter {
                 logger.error('Health check failed:', error as Error);
                 this.isHealthy = false;
             }
-        }, 30000); // Check every 30 seconds
+        }, 30000);
     }
 
     protected override validateConnection(): void {
@@ -791,7 +740,6 @@ export class RedisAdapter extends DatabaseAdapter {
         const cmd = parts[0].toUpperCase();
         let args = parts.slice(1);
 
-        // Replace parameter placeholders
         if (params && params.length > 0) {
             args = args.map(arg => {
                 if (arg.startsWith('$')) {
@@ -809,9 +757,7 @@ export class RedisAdapter extends DatabaseAdapter {
         const { cmd, args } = command;
         const client = this.client!;
 
-        // Map commands to client methods
         switch (cmd) {
-            // String operations
             case 'GET': return await client.get(args[0]);
             case 'SET': return await client.set(args[0], args[1]);
             case 'SETEX': return await client.setEx(args[0], parseInt(args[1]), args[2]);
@@ -833,7 +779,6 @@ export class RedisAdapter extends DatabaseAdapter {
             case 'GETRANGE': return await client.getRange(args[0], parseInt(args[1]), parseInt(args[2]));
             case 'SETRANGE': return await client.setRange(args[0], parseInt(args[1]), args[2]);
             
-            // Key operations
             case 'DEL': return await client.del(args);
             case 'EXISTS': return await client.exists(args);
             case 'EXPIRE': return await client.expire(args[0], parseInt(args[1]));
@@ -854,7 +799,6 @@ export class RedisAdapter extends DatabaseAdapter {
             case 'RENAME': return await client.rename(args[0], args[1]);
             case 'RENAMENX': return await client.renameNX(args[0], args[1]);
             
-            // Hash operations
             case 'HGET': return await client.hGet(args[0], args[1]);
             case 'HSET': return await client.hSet(args[0], args[1], args[2]);
             case 'HMGET': return await client.hmGet(args[0], args.slice(1));
@@ -882,7 +826,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return await client.hScan(args[0], cursor as any, options);
             }
             
-            // List operations
             case 'LPUSH': return await client.lPush(args[0], args.slice(1));
             case 'RPUSH': return await client.rPush(args[0], args.slice(1));
             case 'LPOP': return await client.lPop(args[0]);
@@ -897,7 +840,6 @@ export class RedisAdapter extends DatabaseAdapter {
             case 'BLPOP': return await client.blPop(args.slice(0, -1), parseInt(args[args.length - 1]));
             case 'BRPOP': return await client.brPop(args.slice(0, -1), parseInt(args[args.length - 1]));
             
-            // Set operations
             case 'SADD': return await client.sAdd(args[0], args.slice(1));
             case 'SREM': return await client.sRem(args[0], args.slice(1));
             case 'SMEMBERS': return await client.sMembers(args[0]);
@@ -922,7 +864,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return await client.sScan(args[0], cursor as any, options);
             }
             
-            // Sorted set operations
             case 'ZADD': {
                 const members: { score: number; value: string }[] = [];
                 for (let i = 1; i < args.length; i += 2) {
@@ -947,14 +888,12 @@ export class RedisAdapter extends DatabaseAdapter {
             case 'ZREMRANGEBYRANK': return await client.zRemRangeByRank(args[0], parseInt(args[1]), parseInt(args[2]));
             case 'ZREMRANGEBYSCORE': return await client.zRemRangeByScore(args[0], args[1], args[2]);
             
-            // Transaction commands
             case 'MULTI': return await client.multi();
-            case 'EXEC': return 'OK'; // Handled separately in execute method
-            case 'DISCARD': return 'OK'; // Discard is handled separately
+            case 'EXEC': return 'OK';
+            case 'DISCARD': return 'OK';
             case 'WATCH': return await client.watch(args);
             case 'UNWATCH': return await client.unwatch();
             
-            // Server commands
             case 'PING': return await client.ping(args[0]);
             case 'ECHO': return await client.echo(args[0]);
             case 'INFO': return await client.info(args[0]);
@@ -972,12 +911,10 @@ export class RedisAdapter extends DatabaseAdapter {
                 throw new Error(`Unsupported CONFIG subcommand: ${args[0]}`);
             }
             
-            // Pub/Sub commands (handled separately)
             case 'PUBLISH': return await this.publish(args[0], args[1]);
             case 'SUBSCRIBE': throw new Error('Use subscribe() method for SUBSCRIBE');
             case 'UNSUBSCRIBE': throw new Error('Use unsubscribe() method for UNSUBSCRIBE');
             
-            // Stream operations
             case 'XADD': {
                 const key = args[0];
                 const id = args[1];
@@ -1003,7 +940,6 @@ export class RedisAdapter extends DatabaseAdapter {
             case 'XRANGE': return await client.xRange(args[0], args[1], args[2]);
             case 'XREVRANGE': return await client.xRevRange(args[0], args[1], args[2]);
             
-            // Geospatial commands
             case 'GEOADD': {
                 const key = args[0];
                 const members: Array<{ longitude: number; latitude: number; member: string }> = [];
@@ -1020,12 +956,10 @@ export class RedisAdapter extends DatabaseAdapter {
             case 'GEOPOS': return await client.geoPos(args[0], args.slice(1));
             case 'GEORADIUS': return await client.geoRadius(args[0], { longitude: parseFloat(args[1]), latitude: parseFloat(args[2]) }, parseFloat(args[3]), args[4] as any);
             
-            // HyperLogLog commands
             case 'PFADD': return await client.pfAdd(args[0], args.slice(1));
             case 'PFCOUNT': return await client.pfCount(args);
             case 'PFMERGE': return await client.pfMerge(args[0], args.slice(1));
             
-            // Bit operations
             case 'SETBIT': return await client.setBit(args[0], parseInt(args[1]), parseInt(args[2]) as 0 | 1);
             case 'GETBIT': return await client.getBit(args[0], parseInt(args[1]));
             case 'BITCOUNT': return args.length > 1 ? await client.bitCount(args[0], { start: parseInt(args[1]), end: parseInt(args[2]) }) : await client.bitCount(args[0]);
@@ -1038,12 +972,10 @@ export class RedisAdapter extends DatabaseAdapter {
 
     private async executeRedisFunction(name: string, params?: any[]): Promise<any> {
         const functionMap: Record<string, () => Promise<any>> = {
-            // Utility functions
             'dbsize': async () => await this.client!.dbSize(),
             'randomkey': async () => await this.client!.randomKey(),
             'lastsave': async () => await this.client!.lastSave(),
             
-            // Batch operations
             'multiget': async () => {
                 const keys = params?.[0] || [];
                 return await this.client!.mGet(keys);
@@ -1053,7 +985,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return await this.client!.mSet(pairs);
             },
             
-            // Pattern operations
             'deletePattern': async () => {
                 const pattern = params?.[0] || '*';
                 const keys = await this.client!.keys(pattern);
@@ -1068,7 +999,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return keys.length;
             },
             
-            // TTL operations
             'setWithTTL': async () => {
                 const key = params?.[0];
                 const value = params?.[1];
@@ -1080,7 +1010,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return await this.client!.ttl(key);
             },
             
-            // Atomic operations
             'getSet': async () => {
                 const key = params?.[0];
                 const value = params?.[1];
@@ -1092,7 +1021,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return await this.client!.incrByFloat(key, increment);
             },
             
-            // JSON operations (if using RedisJSON)
             'jsonSet': async () => {
                 const key = params?.[0];
                 const path = params?.[1] || '$';
@@ -1105,7 +1033,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return await this.client!.json.get(key, { path });
             },
             
-            // Search operations (if using RediSearch)
             'search': async () => {
                 const index = params?.[0];
                 const query = params?.[1];
@@ -1113,7 +1040,6 @@ export class RedisAdapter extends DatabaseAdapter {
                 return await this.client!.ft.search(index, query, options);
             },
             
-            // Time series operations (if using RedisTimeSeries)
             'tsAdd': async () => {
                 const key = params?.[0];
                 const timestamp = params?.[1] || '*';
@@ -1137,28 +1063,23 @@ export class RedisAdapter extends DatabaseAdapter {
     }
 
     private formatResult(result: any, command: string, duration: number): QueryResult {
-        // Format Redis results into standard QueryResult
         let rows: any[] = [];
         let fields: Array<{ name: string; dataType: string }> = [];
         let rowCount = 0;
 
         if (result === null || result === undefined) {
-            // No result
             rowCount = 0;
         } else if (typeof result === 'string' || typeof result === 'number' || typeof result === 'boolean') {
-            // Single value result
             rows = [{ value: result }];
             fields = [{ name: 'value', dataType: typeof result }];
             rowCount = 1;
         } else if (Array.isArray(result)) {
-            // Array result
             rows = result.map((item, index) => ({ [`item_${index}`]: item }));
             fields = result.length > 0 ? 
                 [{ name: 'item_0', dataType: typeof result[0] }] : 
                 [];
             rowCount = result.length;
         } else if (typeof result === 'object') {
-            // Object result
             rows = [result];
             fields = Object.keys(result).map(key => ({
                 name: key,
@@ -1167,7 +1088,6 @@ export class RedisAdapter extends DatabaseAdapter {
             rowCount = 1;
         }
 
-        // Map Redis commands to SQL-like commands
         const commandMap: Record<string, string> = {
             'SET': 'INSERT',
             'GET': 'SELECT',
@@ -1200,7 +1120,6 @@ export class RedisAdapter extends DatabaseAdapter {
             const trimmed = line.trim();
             
             if (!trimmed || trimmed.startsWith('#')) {
-                // Section header
                 if (trimmed.startsWith('# ')) {
                     currentSection = trimmed.substring(2).toLowerCase();
                     sections[currentSection] = {};
@@ -1257,7 +1176,6 @@ export class RedisAdapter extends DatabaseAdapter {
     }
 
     async getTableInfo(_connection: DatabaseConnection, tableName: string): Promise<TableInfo> {
-        // Redis doesn't have tables, return key info
         const keyType = await this.client!.type(tableName);
         const ttl = await this.client!.ttl(tableName);
         
@@ -1308,12 +1226,10 @@ export class RedisAdapter extends DatabaseAdapter {
         table: string,
         data: any[]
     ): Promise<number> {
-        // Extract columns from first row
         if (data.length === 0) return 0;
         const columns = Object.keys(data[0]);
         const values = data.map(row => columns.map(col => row[col]));
         
-        // Use the existing bulk insert implementation
         const result = await this.executeBulkInsert(table, columns, values);
         return result.rowCount;
     }
@@ -1322,13 +1238,11 @@ export class RedisAdapter extends DatabaseAdapter {
         const enhancedError = new Error(`Redis ${operation} failed: ${error.message}`);
         enhancedError.name = 'RedisError';
         
-        // Add context
         (enhancedError as any).context = {
             operation,
             ...context
         };
 
-        // Add specific error codes and solutions
         if (error.message.includes('Connection')) {
             (enhancedError as any).code = 'CONNECTION_ERROR';
             (enhancedError as any).solution = 'Check Redis connection settings and ensure the server is running';

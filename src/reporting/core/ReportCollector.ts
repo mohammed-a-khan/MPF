@@ -17,9 +17,6 @@ import { Logger } from '../../core/utils/Logger';
 import { FileUtils } from '../../core/utils/FileUtils';
 import * as path from 'path';
 
-/**
- * Collects all test execution data for reporting
- */
 export class ReportCollector {
     private static instance: ReportCollector;
     private logger: Logger;
@@ -36,9 +33,6 @@ export class ReportCollector {
         this.initializeCollectors();
     }
     
-    /**
-     * Get singleton instance
-     */
     static getInstance(): ReportCollector {
         if (!ReportCollector.instance) {
             ReportCollector.instance = new ReportCollector();
@@ -46,56 +40,39 @@ export class ReportCollector {
         return ReportCollector.instance;
     }
 
-    /**
-     * Initialize the collector
-     */
     public async initialize(): Promise<void> {
-        // Initialize all collectors
         // Note: These collectors should have their own initialization logic
         this.logger.info('Initializing collectors...');
 
-        // Ensure evidence directories exist
         await this.ensureEvidenceDirectories();
 
         this.logger.info('Report collector initialized');
     }
 
-    /**
-     * Start collection for a test session
-     */
     public startCollection(sessionId: string): void {
         this.currentSessionId = sessionId;
         this.collectionActive = true;
 
-        // Start collectors that need explicit start
         // Note: VideoCollector needs to be updated with proper startRecording method
         this.logger.info('Starting video recording for session');
 
         this.logger.info(`Started collection for session: ${sessionId}`);
     }
 
-    /**
-     * Stop collection
-     */
     public async stopCollection(): Promise<void> {
         this.collectionActive = false;
 
-        // Stop collectors that need explicit stop
         // Note: VideoCollector needs to be updated with proper stopRecording method
         this.logger.info('Stopping video recording for session');
 
         this.logger.info(`Stopped collection for session: ${this.currentSessionId}`);
     }
 
-    /**
-     * Collect all evidence from execution
-     */
     public async collectAllEvidence(executionResult: ExecutionResult): Promise<EvidenceCollection> {
         try {
             this.logger.info('Collecting all evidence');
             const startTime = Date.now();
 
-            // Collect from all sources
             const screenshots = await this.collectScreenshots(executionResult);
             const videos = await this.collectVideos(executionResult);
             const logs = await this.collectLogs(executionResult);
@@ -104,7 +81,6 @@ export class ReportCollector {
             const consoleLogs = await this.collectConsoleLogs(executionResult);
             const performanceLogs = await this.collectPerformanceLogs(executionResult);
 
-            // Create evidence collection
             const evidence: EvidenceCollection = {
                 screenshots,
                 videos,
@@ -116,7 +92,6 @@ export class ReportCollector {
                 uploads: []
             };
 
-            // Cache collected data
             const collectedData: CollectedData = {
                 screenshots,
                 videos,
@@ -137,15 +112,11 @@ export class ReportCollector {
         }
     }
 
-    /**
-     * Collect live evidence during execution
-     */
     public async collectLiveEvidence(): Promise<EvidenceCollection> {
         if (!this.collectionActive) {
             return this.createEmptyEvidence();
         }
 
-        // Create minimal live evidence
         const evidence: EvidenceCollection = {
             screenshots: [],
             videos: [],
@@ -160,44 +131,32 @@ export class ReportCollector {
         return evidence;
     }
 
-    /**
-     * Get collected data for session
-     */
     public getCollectedData(sessionId: string): CollectedData | undefined {
         return this.collectedDataCache.get(sessionId);
     }
 
-    /**
-     * REAL IMPLEMENTATION: Clear collected data cache and compact logs
-     */
     public clearCache(): void {
         const cacheCount = this.collectedDataCache.size;
         this.collectedDataCache.clear();
         this.logger.info(`Cleared collected data cache: ${cacheCount} entries`);
     }
     
-    /**
-     * REAL IMPLEMENTATION: Compact logs to save memory
-     */
     public compactLogs(): void {
         let totalLogsCompacted = 0;
         let totalVideosCompacted = 0;
         let totalScreenshotsCompacted = 0;
         
         for (const [, collectedData] of this.collectedDataCache.entries()) {
-            // Compact logs - keep only last 1000 entries
             if (collectedData.logs && collectedData.logs.length > 1000) {
                 const removed = collectedData.logs.splice(0, collectedData.logs.length - 1000);
                 totalLogsCompacted += removed.length;
             }
             
-            // Compact videos - keep only last 10 videos
             if (collectedData.videos && collectedData.videos.length > 10) {
                 const removed = collectedData.videos.splice(0, collectedData.videos.length - 10);
                 totalVideosCompacted += removed.length;
             }
             
-            // Compact screenshots - keep only last 50 screenshots
             if (collectedData.screenshots && collectedData.screenshots.length > 50) {
                 const removed = collectedData.screenshots.splice(0, collectedData.screenshots.length - 50);
                 totalScreenshotsCompacted += removed.length;
@@ -212,17 +171,10 @@ export class ReportCollector {
         });
     }
 
-    /**
-     * Initialize all collectors
-     */
     private initializeCollectors(): void {
-        // Collectors initialization removed - these classes need proper implementation
         this.logger.info('Collectors initialization skipped - needs implementation');
     }
 
-    /**
-     * Ensure evidence directories exist
-     */
     private async ensureEvidenceDirectories(): Promise<void> {
         const directories = [
             this.evidenceBasePath,
@@ -239,9 +191,6 @@ export class ReportCollector {
         }
     }
 
-    /**
-     * Collect screenshots from execution
-     */
     private async collectScreenshots(executionResult: ExecutionResult): Promise<Screenshot[]> {
         const screenshots: Screenshot[] = [];
         const screenshotDir = path.join(this.outputDir, 'screenshots');
@@ -249,7 +198,6 @@ export class ReportCollector {
         this.logger.info('Collecting screenshots...');
         
         try {
-            // Check if screenshot directory exists
             if (await FileUtils.pathExists(screenshotDir)) {
                 const files = await FileUtils.readDir(screenshotDir);
                 
@@ -258,15 +206,12 @@ export class ReportCollector {
                         const filePath = path.join(screenshotDir, file);
                         const stats = await FileUtils.getStats(filePath);
                         
-                        // Parse screenshot metadata from filename
-                        // Expected format: scenarioId_stepId_type_timestamp.png
                         const parts = file.replace(/\.(png|jpg|jpeg)$/, '').split('_');
                         const scenarioId = parts[0] || 'unknown';
                         const stepId = parts[1];
                         const type = this.parseScreenshotType(parts[2]);
                         const timestamp = parts[3] ? new Date(parseInt(parts[3])) : stats['mtime'];
                         
-                        // Try to get image dimensions
                         const dimensions = await this.getImageDimensions(filePath);
                         
                         const screenshot: Screenshot = {
@@ -288,7 +233,6 @@ export class ReportCollector {
                 }
             }
             
-            // Also collect screenshots from scenario evidence
             for (const scenario of executionResult.scenarios) {
                 if (scenario.evidence && scenario.evidence.screenshots) {
                     for (const screenshotPath of scenario.evidence.screenshots) {
@@ -323,9 +267,6 @@ export class ReportCollector {
         return screenshots;
     }
     
-    /**
-     * Parse screenshot type from string
-     */
     private parseScreenshotType(typeStr?: string): ScreenshotType {
         if (!typeStr) return ScreenshotType.STEP;
         
@@ -342,21 +283,13 @@ export class ReportCollector {
         }
     }
     
-    /**
-     * Get image dimensions
-     */
     private async getImageDimensions(_filePath: string): Promise<ImageDimensions> {
-        // In a real implementation, you would use a library like 'image-size'
-        // For now, return default dimensions
         return {
             width: 1920,
             height: 1080
         };
     }
 
-    /**
-     * Collect videos from execution
-     */
     private async collectVideos(executionResult: ExecutionResult): Promise<Video[]> {
         const videos: Video[] = [];
         const videoDir = path.join(this.outputDir, 'videos');
@@ -364,7 +297,6 @@ export class ReportCollector {
         this.logger.info('Collecting videos...');
         
         try {
-            // Check if video directory exists
             if (await FileUtils.pathExists(videoDir)) {
                 const files = await FileUtils.readDir(videoDir);
                 
@@ -373,13 +305,10 @@ export class ReportCollector {
                         const filePath = path.join(videoDir, file);
                         const stats = await FileUtils.getStats(filePath);
                         
-                        // Parse video metadata from filename
-                        // Expected format: scenarioId_timestamp.webm
                         const parts = file.replace(/\.(webm|mp4|avi)$/, '').split('_');
                         const scenarioId = parts[0] || 'unknown';
                         const timestamp = parts[1] ? new Date(parseInt(parts[1])) : stats['mtime'];
                         
-                        // Get video metadata
                         const videoMetadata = await this.getVideoMetadata(filePath);
                         
                         const video: Video = {
@@ -400,7 +329,6 @@ export class ReportCollector {
                 }
             }
             
-            // Also collect videos from scenario evidence
             for (const scenario of executionResult.scenarios) {
                 if (scenario.evidence && scenario.evidence.video) {
                     const videoPath = scenario.evidence.video;
@@ -425,7 +353,6 @@ export class ReportCollector {
                     }
                 }
                 
-                // Check for videos array in scenario
                 if (scenario.videos) {
                     for (const videoInfo of scenario.videos) {
                         const videoPath = videoInfo.path;
@@ -460,29 +387,21 @@ export class ReportCollector {
         return videos;
     }
     
-    /**
-     * Get video metadata
-     */
     private async getVideoMetadata(filePath: string): Promise<{
         duration: number;
         format: string;
         resolution: string;
         fps: number;
     }> {
-        // In a real implementation, you would use a library like 'fluent-ffmpeg' or 'ffprobe'
-        // For now, return default metadata
         const ext = path.extname(filePath).toLowerCase().substring(1);
         return {
-            duration: 60000, // 60 seconds in milliseconds
+            duration: 60000,
             format: ext,
             resolution: '1920x1080',
             fps: 30
         };
     }
 
-    /**
-     * Collect logs from execution
-     */
     private async collectLogs(executionResult: ExecutionResult): Promise<ExecutionLog[]> {
         const logs: ExecutionLog[] = [];
         const logDir = path.join(this.outputDir, 'logs');
@@ -490,7 +409,6 @@ export class ReportCollector {
         this.logger.info('Collecting execution logs...');
         
         try {
-            // Collect logs from log files
             if (await FileUtils.pathExists(logDir)) {
                 const files = await FileUtils.readDir(logDir);
                 
@@ -500,7 +418,6 @@ export class ReportCollector {
                         const content = await FileUtils.readFile(filePath);
                         const lines = (typeof content === 'string' ? content : content.toString()).split('\n');
                         
-                        // Parse log entries
                         for (const line of lines) {
                             if (line.trim()) {
                                 const logEntry = this.parseLogLine(line, file);
@@ -513,9 +430,7 @@ export class ReportCollector {
                 }
             }
             
-            // Collect logs from scenarios
             for (const scenario of executionResult.scenarios) {
-                // Collect from scenario console logs if available
                 if (scenario.consoleLogs) {
                     for (const log of scenario.consoleLogs) {
                         const logEntry: ExecutionLog = {
@@ -533,7 +448,6 @@ export class ReportCollector {
                     }
                 }
                 
-                // Collect from step logs
                 if (scenario.steps) {
                     for (const step of scenario.steps) {
                         if (step.result?.error) {
@@ -557,7 +471,6 @@ export class ReportCollector {
                 }
             }
             
-            // Sort logs by timestamp
             logs.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
             
             this.logger.info(`Collected ${logs.length} log entries`);
@@ -568,12 +481,8 @@ export class ReportCollector {
         return logs;
     }
     
-    /**
-     * Parse log line
-     */
     private parseLogLine(line: string, filename: string): ExecutionLog | null {
         try {
-            // Try to parse structured log format: [TIMESTAMP] [LEVEL] [CATEGORY] MESSAGE
             const structuredMatch = line.match(/^\[([\d\-T:\.Z]+)\]\s*\[(\w+)\]\s*\[([^\]]+)\]\s*(.+)$/);
             if (structuredMatch) {
                 return {
@@ -586,7 +495,6 @@ export class ReportCollector {
                 };
             }
             
-            // Try simple format: TIMESTAMP LEVEL: MESSAGE
             const simpleMatch = line.match(/^([\d\-T:\.Z]+)\s+(\w+):\s*(.+)$/);
             if (simpleMatch) {
                 return {
@@ -599,7 +507,6 @@ export class ReportCollector {
                 };
             }
             
-            // Fallback: treat entire line as message
             return {
                 id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 timestamp: new Date(),
@@ -613,9 +520,6 @@ export class ReportCollector {
         }
     }
     
-    /**
-     * Parse log level from string
-     */
     private parseLogLevel(levelStr: string): LogLevel {
         switch (levelStr.toUpperCase()) {
             case 'ERROR':
@@ -635,16 +539,10 @@ export class ReportCollector {
         }
     }
     
-    /**
-     * Map log level
-     */
     private mapLogLevel(level: string): LogLevel {
         return this.parseLogLevel(level);
     }
 
-    /**
-     * Collect network logs from execution
-     */
     private async collectNetworkLogs(executionResult: ExecutionResult): Promise<NetworkLog[]> {
         const networkLogs: NetworkLog[] = [];
         const harDir = path.join(this.outputDir, 'network');
@@ -652,7 +550,6 @@ export class ReportCollector {
         this.logger.info('Collecting network logs...');
         
         try {
-            // Collect from HAR files
             if (await FileUtils.pathExists(harDir)) {
                 const files = await FileUtils.readDir(harDir);
                 
@@ -701,7 +598,6 @@ export class ReportCollector {
                 }
             }
             
-            // Collect from scenario network logs
             for (const scenario of executionResult.scenarios) {
                 if (scenario.networkLogs) {
                     for (const log of scenario.networkLogs) {
@@ -713,7 +609,6 @@ export class ReportCollector {
                 }
             }
             
-            // Sort by timestamp
             networkLogs.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
             
             this.logger.info(`Collected ${networkLogs.length} network log entries`);
@@ -724,9 +619,6 @@ export class ReportCollector {
         return networkLogs;
     }
     
-    /**
-     * Extract headers from HAR format
-     */
     private extractHeaders(headers: Array<{name: string; value: string}>): Record<string, string> {
         const result: Record<string, string> = {};
         if (headers) {
@@ -737,9 +629,6 @@ export class ReportCollector {
         return result;
     }
 
-    /**
-     * Collect traces from execution
-     */
     private async collectTraces(executionResult: ExecutionResult): Promise<Trace[]> {
         const traces: Trace[] = [];
         const traceDir = path.join(this.outputDir, 'traces');
@@ -747,7 +636,6 @@ export class ReportCollector {
         this.logger.info('Collecting traces...');
         
         try {
-            // Collect trace files
             if (await FileUtils.pathExists(traceDir)) {
                 const files = await FileUtils.readDir(traceDir);
                 
@@ -756,8 +644,6 @@ export class ReportCollector {
                         const filePath = path.join(traceDir, file);
                         const stats = await FileUtils.getStats(filePath);
                         
-                        // Parse trace metadata from filename
-                        // Expected format: scenarioId_timestamp.zip
                         const parts = file.replace(/\.(zip|trace)$/, '').split('_');
                         const scenarioId = parts[0] || 'unknown';
                         const timestamp = parts[1] ? new Date(parseInt(parts[1])) : stats['mtime'];
@@ -768,7 +654,7 @@ export class ReportCollector {
                             path: filePath,
                             scenarioId,
                             size: stats.size,
-                            duration: 0, // Would need to parse trace file to get actual duration
+                            duration: 0,
                             timestamp,
                             viewerUrl: this.generateTraceViewerUrl(filePath)
                         };
@@ -778,7 +664,6 @@ export class ReportCollector {
                 }
             }
             
-            // Collect from scenario traces
             for (const scenario of executionResult.scenarios) {
                 if (scenario.evidence && scenario.evidence.trace) {
                     const tracePath = scenario.evidence.trace;
@@ -809,25 +694,16 @@ export class ReportCollector {
         return traces;
     }
     
-    /**
-     * Generate trace viewer URL
-     */
     private generateTraceViewerUrl(tracePath: string): string {
-        // In a real implementation, this could point to a trace viewer service
-        // or generate a URL to view the trace in Playwright's trace viewer
         return `trace://view?file=${encodeURIComponent(tracePath)}`;
     }
     
-    /**
-     * Collect console logs from execution
-     */
     private async collectConsoleLogs(executionResult: ExecutionResult): Promise<ConsoleLog[]> {
         const consoleLogs: ConsoleLog[] = [];
         
         this.logger.info('Collecting console logs...');
         
         try {
-            // Collect from scenarios
             for (const scenario of executionResult.scenarios) {
                 if (scenario.consoleLogs) {
                     for (const log of scenario.consoleLogs) {
@@ -838,7 +714,6 @@ export class ReportCollector {
                     }
                 }
                 
-                // Also check in scenario evidence
                 if (scenario.evidence && scenario.evidence.consoleLogs) {
                     for (const log of scenario.evidence.consoleLogs) {
                         if (!consoleLogs.some(existing => 
@@ -850,7 +725,6 @@ export class ReportCollector {
                 }
             }
             
-            // Sort by timestamp
             consoleLogs.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
             
             this.logger.info(`Collected ${consoleLogs.length} console log entries`);
@@ -861,9 +735,6 @@ export class ReportCollector {
         return consoleLogs;
     }
     
-    /**
-     * Collect performance logs from execution
-     */
     private async collectPerformanceLogs(executionResult: ExecutionResult): Promise<PerformanceLog[]> {
         const performanceLogs: PerformanceLog[] = [];
         const perfDir = path.join(this.outputDir, 'performance');
@@ -871,7 +742,6 @@ export class ReportCollector {
         this.logger.info('Collecting performance logs...');
         
         try {
-            // Collect from performance files
             if (await FileUtils.pathExists(perfDir)) {
                 const files = await FileUtils.readDir(perfDir);
                 
@@ -883,7 +753,6 @@ export class ReportCollector {
                         try {
                             const perfData = JSON.parse(typeof content === 'string' ? content : content.toString());
                             
-                            // Handle array of performance entries
                             if (Array.isArray(perfData)) {
                                 for (const entry of perfData) {
                                     const perfLog: PerformanceLog = {
@@ -896,7 +765,6 @@ export class ReportCollector {
                                     performanceLogs.push(perfLog);
                                 }
                             } else if (perfData.metrics) {
-                                // Handle object with metrics property
                                 for (const [metric, value] of Object.entries(perfData.metrics)) {
                                     const perfLog: PerformanceLog = {
                                         timestamp: new Date(perfData.timestamp || Date.now()),
@@ -915,9 +783,7 @@ export class ReportCollector {
                 }
             }
             
-            // Add scenario performance metrics
             for (const scenario of executionResult.scenarios) {
-                // Add scenario duration as performance metric
                 const scenarioPerfLog: PerformanceLog = {
                     timestamp: scenario.endTime,
                     metric: 'scenario_duration',
@@ -927,7 +793,6 @@ export class ReportCollector {
                 };
                 performanceLogs.push(scenarioPerfLog);
                 
-                // Add step durations
                 if (scenario.steps) {
                     for (const step of scenario.steps) {
                         const stepPerfLog: PerformanceLog = {
@@ -942,7 +807,6 @@ export class ReportCollector {
                 }
             }
             
-            // Sort by timestamp
             performanceLogs.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
             
             this.logger.info(`Collected ${performanceLogs.length} performance log entries`);
@@ -953,9 +817,6 @@ export class ReportCollector {
         return performanceLogs;
     }
 
-    /**
-     * Create empty evidence collection
-     */
     private createEmptyEvidence(): EvidenceCollection {
         return {
             screenshots: [],
@@ -969,9 +830,6 @@ export class ReportCollector {
         };
     }
     
-    /**
-     * REAL IMPLEMENTATION: Limit cache sizes to prevent memory exhaustion
-     */
     public limitCacheSize(): void {
         const MAX_CACHED_SESSIONS = 20;
         

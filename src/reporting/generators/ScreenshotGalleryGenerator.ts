@@ -4,7 +4,6 @@ import { Screenshot, ReportTheme } from '../types/reporting.types';
 import { Logger } from '../../core/utils/Logger';
 import { DateUtils } from '../../core/utils/DateUtils';
 
-// Define missing types locally
 interface ScreenshotGallery {
   categories: GalleryCategory[];
   totalScreenshots: number;
@@ -25,9 +24,6 @@ export class ScreenshotGalleryGenerator {
     this.theme = theme;
   }
 
-  /**
-   * Generate interactive screenshot gallery
-   */
   async generateGallery(screenshots: Screenshot[]): Promise<string> {
     ScreenshotGalleryGenerator.logger.info(`Generating screenshot gallery with ${screenshots.length} images`);
 
@@ -45,13 +41,9 @@ export class ScreenshotGalleryGenerator {
     `;
   }
 
-  /**
-   * Organize screenshots into categories
-   */
   private organizeScreenshots(screenshots: Screenshot[]): ScreenshotGallery {
     const categories: Map<string, GalleryCategory> = new Map();
     
-    // Categorize screenshots
     screenshots.forEach(screenshot => {
       const category = this.determineCategory(screenshot);
       
@@ -66,7 +58,6 @@ export class ScreenshotGalleryGenerator {
       cat.screenshots.push(screenshot);
     });
 
-    // Sort screenshots within each category
     categories.forEach(category => {
       category.screenshots.sort((a: Screenshot, b: Screenshot) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -80,9 +71,6 @@ export class ScreenshotGalleryGenerator {
     };
   }
 
-  /**
-   * Determine screenshot category
-   */
   private determineCategory(screenshot: Screenshot): string {
     const desc = screenshot.description.toLowerCase();
     if (screenshot.type === 'failure' || desc.includes('failure')) return 'Failures';
@@ -94,9 +82,6 @@ export class ScreenshotGalleryGenerator {
     return 'General';
   }
 
-  /**
-   * Get category icon
-   */
   private getCategoryIcon(category: string): string {
     const icons: Record<string, string> = {
       'Failures': '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/></svg>',
@@ -110,9 +95,6 @@ export class ScreenshotGalleryGenerator {
   }
 
 
-  /**
-   * Generate gallery HTML
-   */
   private generateGalleryHTML(gallery: ScreenshotGallery): string {
     return `
       <div class="gallery-header">
@@ -289,9 +271,6 @@ export class ScreenshotGalleryGenerator {
     `;
   }
 
-  /**
-   * Generate gallery CSS
-   */
   private generateGalleryCSS(): string {
     return `
       .cs-screenshot-gallery {
@@ -482,7 +461,6 @@ export class ScreenshotGalleryGenerator {
         color: ${this.theme.colors?.textLight || this.theme.textColor};
       }
 
-      /* Grid View */
       .gallery-container[data-view="grid"] .screenshots-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -583,7 +561,6 @@ export class ScreenshotGalleryGenerator {
         color: ${this.theme.colors?.textLight || this.theme.textColor};
       }
 
-      /* List View */
       .gallery-container[data-view="list"] .screenshots-grid {
         display: flex;
         flex-direction: column;
@@ -608,7 +585,6 @@ export class ScreenshotGalleryGenerator {
         padding: 0;
       }
 
-      /* Compare View */
       .comparison-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
@@ -701,7 +677,6 @@ export class ScreenshotGalleryGenerator {
         cursor: pointer;
       }
 
-      /* Lightbox */
       .screenshot-lightbox {
         position: fixed;
         top: 0;
@@ -852,7 +827,6 @@ export class ScreenshotGalleryGenerator {
         background: rgba(255, 255, 255, 0.2);
       }
 
-      /* Responsive */
       @media (max-width: 768px) {
         .gallery-header {
           flex-direction: column;
@@ -897,7 +871,6 @@ export class ScreenshotGalleryGenerator {
         }
       }
 
-      /* Hide elements for filtering */
       .screenshot-item.hidden {
         display: none;
       }
@@ -908,9 +881,6 @@ export class ScreenshotGalleryGenerator {
     `;
   }
 
-  /**
-   * Generate gallery JavaScript
-   */
   private generateGalleryJS(): string {
     return `
       (function() {
@@ -918,7 +888,6 @@ export class ScreenshotGalleryGenerator {
         let allScreenshots = [];
         let currentView = 'grid';
 
-        // Initialize all screenshots array
         function initializeScreenshots() {
           allScreenshots = [];
           window.screenshotGalleryData.categories.forEach(category => {
@@ -928,25 +897,21 @@ export class ScreenshotGalleryGenerator {
           });
         }
 
-        // Set gallery view
         window.setGalleryView = function(view) {
           currentView = view;
           const container = document.querySelector('.gallery-container');
           container.setAttribute('data-view', view);
           
-          // Update active button
           document.querySelectorAll('.view-btn').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-view') === view);
           });
 
-          // Show/hide comparison section based on view
           const comparisonSection = document.querySelector('[data-category="comparisons"]');
           if (comparisonSection) {
             comparisonSection.style.display = view === 'compare' ? 'block' : 'none';
           }
         };
 
-        // Filter by category
         window.filterByCategory = function(category) {
           const sections = document.querySelectorAll('.category-section');
           sections.forEach(section => {
@@ -958,7 +923,6 @@ export class ScreenshotGalleryGenerator {
           });
         };
 
-        // Search screenshots
         window.searchScreenshots = function(query) {
           const lowerQuery = query.toLowerCase();
           const items = document.querySelectorAll('.screenshot-item');
@@ -972,20 +936,17 @@ export class ScreenshotGalleryGenerator {
             }
           });
 
-          // Hide empty categories
           document.querySelectorAll('.category-section').forEach(section => {
             const visibleItems = section.querySelectorAll('.screenshot-item:not(.hidden)');
             section.classList.toggle('hidden', visibleItems.length === 0);
           });
         };
 
-        // Toggle filter panel
         window.toggleFilterPanel = function() {
           const panel = document.getElementById('filterPanel');
           panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
         };
 
-        // Apply time filter
         window.applyTimeFilter = function() {
           const startTime = document.getElementById('startTime').value;
           const endTime = document.getElementById('endTime').value;
@@ -1006,7 +967,6 @@ export class ScreenshotGalleryGenerator {
           updateCategoriesVisibility();
         };
 
-        // Apply status filter
         window.applyStatusFilter = function() {
           const checkedStatuses = Array.from(
             document.querySelectorAll('.filter-section input[type="checkbox"]:checked')
@@ -1026,7 +986,6 @@ export class ScreenshotGalleryGenerator {
           updateCategoriesVisibility();
         };
 
-        // Update categories visibility
         function updateCategoriesVisibility() {
           document.querySelectorAll('.category-section').forEach(section => {
             const visibleItems = section.querySelectorAll('.screenshot-item:not(.hidden)');
@@ -1034,7 +993,6 @@ export class ScreenshotGalleryGenerator {
           });
         }
 
-        // Open lightbox
         window.openLightbox = function(screenshotId) {
           const screenshot = allScreenshots.find(s => s.id === screenshotId);
           if (!screenshot) return;
@@ -1046,13 +1004,11 @@ export class ScreenshotGalleryGenerator {
           document.body.style.overflow = 'hidden';
         };
 
-        // Close lightbox
         window.closeLightbox = function() {
           document.getElementById('screenshotLightbox').style.display = 'none';
           document.body.style.overflow = '';
         };
 
-        // Navigate lightbox
         window.navigateLightbox = function(direction) {
           currentLightboxIndex += direction;
           
@@ -1065,7 +1021,6 @@ export class ScreenshotGalleryGenerator {
           showLightboxImage(allScreenshots[currentLightboxIndex]);
         };
 
-        // Show lightbox image
         function showLightboxImage(screenshot) {
           const img = document.getElementById('lightboxImage');
           const title = document.getElementById('lightboxTitle');
@@ -1083,23 +1038,16 @@ export class ScreenshotGalleryGenerator {
             <div>\${new Date(screenshot.timestamp).toLocaleString()}</div>
           \`;
           
-          // Store current screenshot data
           window.currentLightboxScreenshot = screenshot;
         }
 
-        // Open comparison lightbox
         window.openComparisonLightbox = function(beforeId, afterId) {
-          // For now, just open the before image
           openLightbox(beforeId);
         };
 
-        // Update comparison slider
         window.updateComparison = function(pairIndex, value) {
-          // This would implement image comparison logic
-          // For now, it's just a visual indicator
         };
 
-        // Download screenshot
         window.downloadScreenshot = function() {
           const screenshot = window.currentLightboxScreenshot;
           if (!screenshot) return;
@@ -1116,13 +1064,11 @@ export class ScreenshotGalleryGenerator {
           link.click();
         };
 
-        // Copy screenshot path
         window.copyScreenshotPath = function() {
           const screenshot = window.currentLightboxScreenshot;
           if (!screenshot || !screenshot.path) return;
           
           navigator.clipboard.writeText(screenshot.path).then(() => {
-            // Show success notification
             const btn = event.target.closest('button');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.647-6.647a.5.5 0 0 1 .708 0z"/></svg> Copied!';
@@ -1132,7 +1078,6 @@ export class ScreenshotGalleryGenerator {
           });
         };
 
-        // Keyboard navigation
         document.addEventListener('keydown', function(e) {
           const lightbox = document.getElementById('screenshotLightbox');
           if (lightbox.style.display === 'none') return;
@@ -1150,7 +1095,6 @@ export class ScreenshotGalleryGenerator {
           }
         });
 
-        // Initialize
         initializeScreenshots();
       })();
     `;

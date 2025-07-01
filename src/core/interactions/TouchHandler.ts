@@ -83,7 +83,6 @@ export class TouchHandler {
     const steps = options?.steps || 10;
     const duration = options?.duration || 250;
     
-    // Calculate intermediate points
     const deltaX = (endPoint.x - startPoint.x) / steps;
     const deltaY = (endPoint.y - startPoint.y) / steps;
     const stepDelay = duration / steps;
@@ -115,15 +114,12 @@ export class TouchHandler {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
     
-    // Simulate pinch gesture with two touch points
     const page = element.page;
     const distance = Math.min(box.width, box.height) * 0.4;
     
     if (scale < 1) {
-      // Pinch in (zoom out)
       await this.simulatePinch(page, centerX, centerY, distance, distance * scale);
     } else {
-      // Pinch out (zoom in)
       await this.simulatePinch(page, centerX, centerY, distance * (1 / scale), distance);
     }
   }
@@ -141,7 +137,6 @@ export class TouchHandler {
     for (let i = 0; i <= steps; i++) {
       const currentDistance = startDistance + (deltaDistance * i);
       
-      // Two touch points moving symmetrically
       const x1 = centerX - currentDistance / 2;
       const x2 = centerX + currentDistance / 2;
       
@@ -169,7 +164,6 @@ export class TouchHandler {
     const centerY = box.y + box.height / 2;
     const radius = Math.min(box.width, box.height) * 0.3;
     
-    // Simulate rotation with two touch points
     const page = element.page;
     const steps = 20;
     const angleStep = (degrees * Math.PI / 180) / steps;
@@ -177,7 +171,6 @@ export class TouchHandler {
     for (let i = 0; i <= steps; i++) {
       const angle = angleStep * i;
       
-      // Two touch points rotating around center
       const x1 = centerX + radius * Math.cos(angle);
       const y1 = centerY + radius * Math.sin(angle);
       const x2 = centerX - radius * Math.cos(angle);

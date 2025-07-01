@@ -12,7 +12,6 @@ export class EnvironmentLoader {
   async loadGlobalConfig(): Promise<ConfigMap> {
     const config: ConfigMap = {};
 
-    // Load global.env from config directory
     const globalEnvPath = path.join(process.cwd(), this.configDir, 'global.env');
     if (fs.existsSync(globalEnvPath)) {
       const globalConfig = dotenv.parse(fs.readFileSync(globalEnvPath));
@@ -20,7 +19,6 @@ export class EnvironmentLoader {
       console.log('✅ Loaded global.env configuration');
     }
 
-    // Load other .env files from config directory (except environment-specific ones)
     const configFiles = fs.readdirSync(path.join(process.cwd(), this.configDir))
       .filter(file => file.endsWith('.env') && !file.includes('environments/'));
 
@@ -39,7 +37,6 @@ export class EnvironmentLoader {
   async loadEnvironmentFiles(environment: string): Promise<ConfigMap> {
     const config: ConfigMap = {};
 
-    // Load environment-specific configuration
     const envPath = path.join(process.cwd(), this.configDir, this.envDir, `${environment}.env`);
     if (fs.existsSync(envPath)) {
       const envConfig = dotenv.parse(fs.readFileSync(envPath));

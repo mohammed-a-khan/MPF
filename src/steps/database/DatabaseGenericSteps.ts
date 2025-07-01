@@ -23,14 +23,11 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
         await actionLogger.logAction('connectToDatabase', { databaseAlias });
 
         try {
-            // Get database configuration
             const config = this.getDatabaseConfig(databaseAlias);
             
-            // Create and connect to database
             this.currentDatabase = await CSDatabase.getInstance(databaseAlias);
             await this.currentDatabase.connect();
 
-            // Store in context
             this.databases.set(databaseAlias, this.currentDatabase);
             const connection = await this.currentDatabase.getConnection();
             const adapter = this.currentDatabase.getAdapter();
@@ -77,7 +74,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logAction('setDatabaseTimeout', { timeout });
 
-        // Set timeout on the context instead
         this.databaseContext.setQueryTimeout(timeout * 1000);
 
         await actionLogger.logDatabase('timeout_set', 'timeout', 0, undefined, { timeout });
@@ -92,8 +88,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
             throw new Error(`Invalid pool size: ${poolSize}. Must be between 1 and 100`);
         }
 
-        // Pool size is configured during connection, cannot be changed at runtime
-        // Store for future connections
         this.store('defaultPoolSize', poolSize);
 
         await actionLogger.logDatabase('pool_size_set', 'pool', 0, undefined, { poolSize });
@@ -113,9 +107,7 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
             const result = await db.query(interpolatedQuery);
             const executionTime = Date.now() - startTime;
 
-            // Store result in context
             this.store('lastDatabaseResult', result);
-            // Convert ResultSet to QueryResult for DatabaseContext
             const queryResult = {
                 rows: result.rows || [],
                 rowCount: result.rowCount,
@@ -149,7 +141,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
             
             const result = await db.query(interpolatedQuery);
             
-            // Store with alias
             const queryResult = {
                 rows: result.rows || [],
                 rowCount: result.rowCount,
@@ -253,7 +244,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
             columns: result.columns ? result.columns.map(col => col.name) : []
         });
 
-        // Log first 10 rows for visibility
         const rowsToLog = result.rows ? Math.min(10, result.rows.length) : 0;
         if (rowsToLog > 0 && result.rows) {
             console.log('\n=== Query Result ===');
@@ -277,7 +267,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logAction('clearDatabaseCache', {});
 
-        // Clear stored results in context
         this.store('lastDatabaseResult', null);
         this.store('databaseQueryLogging', null);
         
@@ -289,7 +278,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logAction('enableQueryLogging', {});
 
-        // Store logging preference
         this.store('databaseQueryLogging', true);
         
         await actionLogger.logDatabase('query_logging_enabled', 'config', 0, undefined, {});
@@ -300,7 +288,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logAction('disableQueryLogging', {});
 
-        // Store logging preference
         this.store('databaseQueryLogging', false);
         
         await actionLogger.logDatabase('query_logging_disabled', 'config', 0, undefined, {});
@@ -322,11 +309,9 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
         await actionLogger.logDatabase('connection_validated', 'validation', 0, undefined, { status: 'active' });
     }
 
-    // Helper methods
     private getDatabaseConfig(alias: string): DatabaseConfig {
         const envPrefix = `DB_${alias.toUpperCase()}_`;
         
-        // Check for predefined database configs
         const type = ConfigurationManager.get(`${envPrefix}TYPE`) || 
                     ConfigurationManager.get('DB_TYPE', 'sqlserver');
         
@@ -381,7 +366,6 @@ export class DatabaseGenericSteps extends CSBDDBaseStepDefinition {
     }
 
     private sanitizeQueryForLog(query: string): string {
-        // Truncate long queries for logging
         const maxLength = 200;
         if (query.length > maxLength) {
             return query.substring(0, maxLength) + '...';

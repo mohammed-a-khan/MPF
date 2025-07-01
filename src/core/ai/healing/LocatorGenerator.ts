@@ -4,14 +4,9 @@ import { ElementHandle } from 'playwright';
 import { logger } from '../../utils/Logger';
 import { ActionLogger } from '../../logging/ActionLogger';
 
-/**
- * Generates robust locators for elements
- * Prioritizes stability and uniqueness
- */
 export class LocatorGenerator {
     private static instance: LocatorGenerator;
     
-    // Locator type priorities (higher score = more stable)
     private readonly locatorPriorities = {
         id: 10,
         testId: 9,
@@ -25,7 +20,6 @@ export class LocatorGenerator {
         css: 1
     };
     
-    // Attribute priorities for robust selectors
     private readonly attributePriorities = [
         'data-testid',
         'data-test',
@@ -41,7 +35,6 @@ export class LocatorGenerator {
     ];
     
     private constructor() {
-        // Constructor
     }
     
     static getInstance(): LocatorGenerator {
@@ -51,9 +44,6 @@ export class LocatorGenerator {
         return LocatorGenerator.instance;
     }
     
-    /**
-     * Generate a single best locator for an element
-     */
     async generateLocator(element: ElementHandle | Element): Promise<string> {
         try {
             const locators = await this.generateMultipleLocators(element);
@@ -62,7 +52,6 @@ export class LocatorGenerator {
                 throw new Error('Could not generate any locators for element');
             }
             
-            // Return the best scoring locator
             return locators[0] || '';
             
         } catch (error) {
@@ -71,19 +60,13 @@ export class LocatorGenerator {
         }
     }
     
-    /**
-     * Generate multiple locators for an element, ordered by stability
-     */
     async generateMultipleLocators(element: ElementHandle | Element): Promise<string[]> {
         const locators: LocatorCandidate[] = [];
         
         try {
-            // Extract element information
             const info = await this.extractElementInfo(element);
             
-            // Generate different types of locators
             
-            // 1. ID-based locator
             if (info.id) {
                 locators.push({
                     selector: `#${this.escapeSelector(info.id)}`,
@@ -92,7 +75,6 @@ export class LocatorGenerator {
                 });
             }
             
-            // 2. Test ID locators
             for (const testIdAttr of ['data-testid', 'data-test', 'data-qa', 'data-automation-id']) {
                 if (info.attributes[testIdAttr]) {
                     locators.push({
@@ -103,7 +85,6 @@ export class LocatorGenerator {
                 }
             }
             
-            // 3. ARIA-based locators
             if (info.attributes['aria-label']) {
                 locators.push({
                     selector: `[aria-label="${this.escapeAttributeValue(info.attributes['aria-label'])}"]`,
@@ -112,7 +93,6 @@ export class LocatorGenerator {
                 });
             }
             
-            // 4. Role-based locators
             if (info.attributes['role']) {
                 const roleSelector = this.generateRoleSelector(info);
                 if (roleSelector) {
@@ -124,7 +104,6 @@ export class LocatorGenerator {
                 }
             }
             
-            // 5. Text-based locators
             if (info.text && info.text.length > 0 && info.text.length < 100) {
                 const textSelector = this.generateTextSelector(info);
                 if (textSelector) {
@@ -136,7 +115,6 @@ export class LocatorGenerator {
                 }
             }
             
-            // 6. Attribute-based locators
             const attrSelector = this.generateAttributeSelector(info);
             if (attrSelector) {
                 locators.push({
@@ -146,7 +124,6 @@ export class LocatorGenerator {
                 });
             }
             
-            // 7. Class-based locators
             if (info.classes.length > 0) {
                 const classSelector = this.generateClassSelector(info);
                 if (classSelector) {
@@ -158,7 +135,6 @@ export class LocatorGenerator {
                 }
             }
             
-            // 8. XPath as fallback
             const xpathSelector = await this.generateXPathSelector(element, info);
             if (xpathSelector) {
                 locators.push({
@@ -168,21 +144,18 @@ export class LocatorGenerator {
                 });
             }
             
-            // 9. CSS path as last resort
             const cssPath = await this.generateCSSPath(element, info);
             if (cssPath) {
                 locators.push({
                     selector: cssPath,
                     type: 'css',
-                    score: this.calculateLocatorScore('css', info) * 0.5 // Lower score for path selectors
+                    score: this.calculateLocatorScore('css', info) * 0.5
                 });
             }
             
-            // Sort by score descending and remove duplicates
             const uniqueLocators = this.deduplicateLocators(locators);
             uniqueLocators.sort((a, b) => b.score - a.score);
             
-            // Validate and optimize locators
             const validatedLocators: string[] = [];
             
             for (const locator of uniqueLocators) {
@@ -206,15 +179,11 @@ export class LocatorGenerator {
         }
     }
     
-    /**
-     * Generate a robust locator that combines multiple strategies
-     */
     async generateRobustLocator(element: ElementHandle | Element): Promise<RobustLocator> {
         try {
             const locators = await this.generateMultipleLocators(element);
             const info = await this.extractElementInfo(element);
             
-            // Calculate stability scores
             const scoredLocators = await Promise.all(
                 locators.slice(0, 5).map(async (selector) => {
                     const score = await this.scoreLocatorStability(selector, info);
@@ -222,7 +191,6 @@ export class LocatorGenerator {
                 })
             );
             
-            // Sort by stability
             scoredLocators.sort((a, b) => b.score - a.score);
             
             const robustLocator: RobustLocator = {
@@ -252,47 +220,39 @@ export class LocatorGenerator {
         }
     }
     
-    /**
-     * Score locator stability (0-1, higher is more stable)
-     */
     async scoreLocatorStability(locator: string, elementInfo?: ElementInfo): Promise<number> {
-        let score = 0.5; // Base score
+        let score = 0.5;
         
         try {
-            // Score based on locator type
             if (locator.startsWith('#')) {
-                score = 0.95; // ID selectors are most stable
+                score = 0.95;
             } else if (locator.includes('data-testid') || locator.includes('data-test')) {
-                score = 0.9; // Test IDs are very stable
+                score = 0.9;
             } else if (locator.includes('aria-label')) {
-                score = 0.85; // ARIA labels are stable
+                score = 0.85;
             } else if (locator.includes('role=')) {
-                score = 0.8; // Role selectors are stable
+                score = 0.8;
             } else if (locator.includes(':text') || locator.includes('has-text')) {
-                score = 0.6; // Text can change more often
+                score = 0.6;
             } else if (locator.includes(':nth-child') || locator.includes(':nth-of-type')) {
-                score = 0.4; // Position-based are less stable
+                score = 0.4;
             } else if (locator.includes('>') && locator.split('>').length > 3) {
-                score = 0.3; // Deep paths are fragile
+                score = 0.3;
             }
             
-            // Adjust based on specificity
             const attributeCount = (locator.match(/\[/g) || []).length;
             if (attributeCount > 0) {
                 score += Math.min(attributeCount * 0.05, 0.2);
             }
             
-            // Penalize overly complex selectors
             if (locator.length > 100) {
                 score *= 0.8;
             }
             
-            // Penalize generic class names
             if (elementInfo && elementInfo.classes.some(c => this.isGenericClass(c))) {
                 score *= 0.9;
             }
             
-            // Ensure score is between 0 and 1
             score = Math.max(0, Math.min(1, score));
             
             return score;
@@ -303,22 +263,16 @@ export class LocatorGenerator {
         }
     }
     
-    /**
-     * Optimize a locator for better performance and stability
-     */
     optimizeLocator(locator: string): string {
         try {
             let optimized = locator.trim();
             
-            // Remove redundant spaces
             optimized = optimized.replace(/\s+/g, ' ');
             
-            // Simplify descendant selectors
             optimized = optimized.replace(/\s*>\s*/g, ' > ');
             optimized = optimized.replace(/\s*\+\s*/g, ' + ');
             optimized = optimized.replace(/\s*~\s*/g, ' ~ ');
             
-            // Remove unnecessary quotes in attribute selectors
             optimized = optimized.replace(/\[([^=]+)="([^"]*?)"\]/g, (match, attr, value) => {
                 if (/^[a-zA-Z0-9_-]+$/.test(value)) {
                     return `[${attr}=${value}]`;
@@ -326,18 +280,14 @@ export class LocatorGenerator {
                 return match;
             });
             
-            // Simplify :nth-child(1) to :first-child
             optimized = optimized.replace(/:nth-child\(1\)/g, ':first-child');
             optimized = optimized.replace(/:nth-last-child\(1\)/g, ':last-child');
             
-            // Remove body from beginning if present
             if (optimized.startsWith('body > ')) {
                 optimized = optimized.substring(7);
             }
             
-            // Convert complex paths to simpler ones if possible
             if (optimized.includes(' > ') && optimized.split(' > ').length > 4) {
-                // Try to simplify by finding unique attributes in the path
                 const parts = optimized.split(' > ');
                 const simplified: string[] = [];
                 
@@ -346,12 +296,10 @@ export class LocatorGenerator {
                     if (part) {
                         simplified.unshift(part);
                         
-                        // If we have an ID or unique attribute, we can stop
                         if (part.includes('#') || part.includes('[data-')) {
                             break;
                         }
                         
-                        // Keep at most 3 levels
                         if (simplified.length >= 3) {
                             break;
                         }
@@ -371,11 +319,9 @@ export class LocatorGenerator {
         }
     }
     
-    // Private helper methods
     
     private async extractElementInfo(element: ElementHandle | Element): Promise<ElementInfo> {
         if ('evaluate' in element) {
-            // ElementHandle
             return await element.evaluate(el => {
                 const elem = el as Element;
                 const rect = elem.getBoundingClientRect();
@@ -403,7 +349,6 @@ export class LocatorGenerator {
                 };
             });
         } else {
-            // Regular Element
             const rect = element.getBoundingClientRect();
             const attributes: Record<string, string> = {};
             
@@ -433,24 +378,19 @@ export class LocatorGenerator {
     private calculateLocatorScore(type: string, info: ElementInfo): number {
         let baseScore = this.locatorPriorities[type as keyof typeof this.locatorPriorities] || 1;
         
-        // Adjust score based on element characteristics
         
-        // Bonus for unique IDs
         if (type === 'id' && info.id && !this.isGenericId(info.id)) {
             baseScore += 2;
         }
         
-        // Bonus for semantic elements
         if (['button', 'input', 'select', 'a', 'textarea'].includes(info.tagName)) {
             baseScore += 0.5;
         }
         
-        // Penalty for generic classes
         if (type === 'uniqueClass' && info.classes.some(c => this.isGenericClass(c))) {
             baseScore -= 1;
         }
         
-        // Bonus for form elements with name
         if (info.attributes['name'] && ['input', 'select', 'textarea'].includes(info.tagName)) {
             baseScore += 1;
         }
@@ -464,7 +404,6 @@ export class LocatorGenerator {
         
         let selector = `[role="${role}"]`;
         
-        // Add name if available
         if (info.attributes['aria-label']) {
             selector = `:role("${role}")[name="${this.escapeAttributeValue(info.attributes['aria-label'])}"]`;
         } else if (info.text && info.text.length < 50) {
@@ -479,12 +418,10 @@ export class LocatorGenerator {
         
         const text = info.text;
         
-        // For exact short text
         if (text.length < 30) {
             return `:text("${this.escapeTextContent(text)}")`;
         }
         
-        // For longer text, use partial match
         const words = text.split(/\s+/).slice(0, 5).join(' ');
         return `:has-text("${this.escapeTextContent(words)}")`;
     }
@@ -492,18 +429,17 @@ export class LocatorGenerator {
     private generateAttributeSelector(info: ElementInfo): string | null {
         const parts = [info.tagName];
         
-        // Add important attributes
         for (const attr of this.attributePriorities) {
             if (info.attributes[attr]) {
                 const value = info.attributes[attr];
                 if (value && value.length < 100) {
                     parts.push(`[${attr}="${this.escapeAttributeValue(value)}"]`);
-                    if (parts.length >= 3) break; // Limit complexity
+                    if (parts.length >= 3) break;
                 }
             }
         }
         
-        if (parts.length === 1) return null; // Just tag name is not specific enough
+        if (parts.length === 1) return null;
         
         return parts.join('');
     }
@@ -517,7 +453,6 @@ export class LocatorGenerator {
         
         if (semanticClasses.length === 0) return null;
         
-        // Use most specific classes
         const selectedClasses = semanticClasses.slice(0, 2);
         
         return `${info.tagName}.${selectedClasses.join('.')}`;
@@ -538,7 +473,6 @@ export class LocatorGenerator {
                         while (current && current !== document.body) {
                             let part = current.tagName.toLowerCase();
                             
-                            // Add position if there are siblings
                             if (current.parentElement) {
                                 const siblings = Array.from(current.parentElement.children)
                                     .filter(s => s.tagName === current!.tagName);
@@ -591,7 +525,6 @@ export class LocatorGenerator {
                                 }
                             }
                             
-                            // Add nth-child if needed
                             if (current.parentElement) {
                                 const siblings = Array.from(current.parentElement.children);
                                 if (siblings.length > 1) {
@@ -659,35 +592,32 @@ export class LocatorGenerator {
     
     private isGenericId(id: string): boolean {
         const genericPatterns = [
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, // UUID
-            /^[0-9]+$/, // Just numbers
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+            /^[0-9]+$/,
             /^temp/i,
             /^auto/i,
             /^generated/i,
             /^dynamic/i,
-            /^ember\d+/, // Ember.js
-            /^react-/, // React
-            /^vue-/, // Vue.js
-            /^ng-/, // Angular
-            /^ext-gen/, // ExtJS
-            /^yui_/ // YUI
+            /^ember\d+/,
+            /^react-/,
+            /^vue-/,
+            /^ng-/,
+            /^ext-gen/,
+            /^yui_/
         ];
         
         return genericPatterns.some(pattern => pattern.test(id));
     }
     
     private escapeSelector(value: string): string {
-        // Escape special characters for CSS selectors
         return value.replace(/([!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~])/g, '\\$1');
     }
     
     private escapeAttributeValue(value: string): string {
-        // Escape quotes for attribute values
         return value.replace(/"/g, '\\"');
     }
     
     private escapeTextContent(text: string): string {
-        // Escape quotes for text content
         return text.replace(/"/g, '\\"').replace(/\n/g, '\\n');
     }
     
@@ -707,7 +637,6 @@ export class LocatorGenerator {
     }
 }
 
-// Type definitions
 interface ElementInfo {
     tagName: string;
     id: string;

@@ -35,7 +35,6 @@ export class RetryHandler {
         
         const result = await fn();
         
-        // Check if result is a Response and should be retried
         if (this.isResponse(result)) {
           lastResponse = result as unknown as Response;
           if (attempt < maxRetries && retryCondition(null, lastResponse)) {
@@ -57,7 +56,6 @@ export class RetryHandler {
           }
         }
 
-        // Success - return result
         if (attempt > 0) {
           ActionLogger.getInstance().info(`Request succeeded after ${attempt} retries`);
         }
@@ -88,7 +86,6 @@ export class RetryHandler {
       }
     }
 
-    // This should never be reached, but TypeScript needs it
     throw lastError || new Error('Retry handler failed without error');
   }
 
@@ -112,10 +109,8 @@ export class RetryHandler {
         delay = baseDelay;
     }
 
-    // Apply max delay cap
     delay = Math.min(delay, this.maxDelay);
 
-    // Add jitter to prevent thundering herd
     const jitter = delay * this.jitterFactor * (Math.random() * 2 - 1);
     delay = Math.round(delay + jitter);
 
@@ -137,7 +132,6 @@ export class RetryHandler {
   }
 
   private defaultRetryCondition(error: any, response?: Response): boolean {
-    // Retry on network errors
     if (error) {
       const retryableErrors = [
         'ECONNRESET',
@@ -154,25 +148,20 @@ export class RetryHandler {
         return true;
       }
 
-      // Retry on timeout errors
       if (error.message && error.message.toLowerCase().includes('timeout')) {
         return true;
       }
     }
 
-    // Retry on server errors
     if (response) {
-      // 5xx errors (server errors)
       if (response.status >= 500 && response.status < 600) {
         return true;
       }
 
-      // 429 Too Many Requests
       if (response.status === 429) {
         return true;
       }
 
-      // 408 Request Timeout
       if (response.status === 408) {
         return true;
       }
@@ -200,17 +189,14 @@ export class RetryHandler {
     customCondition?: (error: any, response?: Response) => boolean;
   }): (error: any, response?: Response) => boolean {
     return (error: any, response?: Response) => {
-      // Check custom condition first
       if (config.customCondition && config.customCondition(error, response)) {
         return true;
       }
 
-      // Check error codes
       if (error && config.errorCodes && error.code && config.errorCodes.includes(error.code)) {
         return true;
       }
 
-      // Check error patterns
       if (error && config.errorPatterns && error.message) {
         for (const pattern of config.errorPatterns) {
           if (pattern.test(error.message)) {
@@ -219,12 +205,10 @@ export class RetryHandler {
         }
       }
 
-      // Check status codes
       if (response && config.statusCodes && config.statusCodes.includes(response.status)) {
         return true;
       }
 
-      // Use default condition
       return this.defaultRetryCondition(error, response);
     };
   }
@@ -274,13 +258,11 @@ export class RetryHandler {
 
     const retryAfter = Array.isArray(retryAfterHeader) ? retryAfterHeader[0] : retryAfterHeader;
 
-    // Check if it's a delay in seconds
     const seconds = parseInt(retryAfter || '', 10);
     if (!isNaN(seconds)) {
       return seconds * 1000;
     }
 
-    // Check if it's an HTTP date
     const retryDate = new Date(retryAfter || '');
     if (!isNaN(retryDate.getTime())) {
       const delay = retryDate.getTime() - Date.now();
@@ -299,7 +281,6 @@ export class RetryHandler {
       delay: options?.delay ?? this.defaultDelay,
       ...options,
       retryCondition: (error, response) => {
-        // First check if we should retry based on standard conditions
         const shouldRetry = options?.retryCondition 
           ? options.retryCondition(error, response)
           : this.defaultRetryCondition(error, response);
@@ -308,12 +289,10 @@ export class RetryHandler {
           return false;
         }
 
-        // Special handling for rate limits
         if (response && response.status === 429) {
           const retryAfter = this.calculateRetryAfter(response);
           if (retryAfter !== null) {
             ActionLogger.getInstance().info(`Rate limited. Retry after: ${retryAfter}ms`);
-            // Store the retry delay for the next attempt
             (response as any).__retryDelay = retryAfter;
           }
         }
@@ -326,7 +305,6 @@ export class RetryHandler {
       try {
         const result = await fn();
         
-        // Check if we have a stored retry delay
         if (this.isResponse(result) && (result as any).__retryDelay) {
           await this.sleep((result as any).__retryDelay);
           delete (result as any).__retryDelay;

@@ -354,7 +354,6 @@ export class AdvancedInteractionSteps extends CSBDDBaseStepDefinition {
                window.scrollBy(0, scrollAmount);
            }, pixels);
            
-           // Wait for scroll to complete
            await this.page.waitForTimeout(ConfigurationManager.getInt('SCROLL_DELAY', 300));
            
            await actionLogger.logAction('Page scrolled', { pixels });
@@ -387,7 +386,6 @@ export class AdvancedInteractionSteps extends CSBDDBaseStepDefinition {
            const absoluteEndX = box.x + endX;
            const absoluteEndY = box.y + endY;
            
-           // Create path for drawing
            const path = await this.mouseHandler.createMousePath(
                { x: absoluteStartX, y: absoluteStartY },
                { x: absoluteEndX, y: absoluteEndY },

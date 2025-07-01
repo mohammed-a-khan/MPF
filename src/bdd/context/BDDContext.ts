@@ -12,10 +12,6 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import { Feature, Scenario } from '../types/bdd.types';
 import { CSBasePage } from '../../core/pages/CSBasePage';
 
-/**
- * Central BDD execution context
- * Manages all test state and provides access to various contexts
- */
 export class BDDContext {
   private static instance: BDDContext;
   private executionContext: ExecutionContext | undefined;
@@ -37,9 +33,6 @@ export class BDDContext {
     this.worldContext = WorldContext.getInstance();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): BDDContext {
     if (!BDDContext.instance) {
       BDDContext.instance = new BDDContext();
@@ -47,9 +40,6 @@ export class BDDContext {
     return BDDContext.instance;
   }
 
-  /**
-   * Initialize for new execution
-   */
   public initialize(executionContext: ExecutionContext): void {
     this.executionContext = executionContext;
     this.softAssertions = [];
@@ -59,17 +49,11 @@ export class BDDContext {
     this.logger.info('BDD context initialized');
   }
 
-  /**
-   * Set current feature
-   */
   public setFeature(feature: Feature): void {
     this.featureContext = new FeatureContext(feature);
     ActionLogger.logFeatureStart(feature.name);
   }
 
-  /**
-   * Set current scenario
-   */
   public setScenario(scenario: Scenario): void {
     if (!this.featureContext) {
       throw new Error('Feature context not set');
@@ -83,16 +67,10 @@ export class BDDContext {
     ActionLogger.logScenarioStart(scenario.name);
   }
 
-  /**
-   * Set current step
-   */
   public setStep(stepContext: StepContext): void {
     this.stepContext = stepContext;
   }
 
-  /**
-   * Get execution context
-   */
   public getExecutionContext(): ExecutionContext {
     if (!this.executionContext) {
       throw new Error('Execution context not initialized');
@@ -100,9 +78,6 @@ export class BDDContext {
     return this.executionContext;
   }
 
-  /**
-   * Get feature context
-   */
   public getFeatureContext(): FeatureContext {
     if (!this.featureContext) {
       throw new Error('Feature context not set');
@@ -110,9 +85,6 @@ export class BDDContext {
     return this.featureContext;
   }
 
-  /**
-   * Get scenario context
-   */
   public getScenarioContext(): ScenarioContext {
     if (!this.scenarioContext) {
       throw new Error('Scenario context not set');
@@ -120,9 +92,6 @@ export class BDDContext {
     return this.scenarioContext;
   }
 
-  /**
-   * Get step context
-   */
   public getStepContext(): StepContext {
     if (!this.stepContext) {
       throw new Error('Step context not set');
@@ -130,23 +99,14 @@ export class BDDContext {
     return this.stepContext;
   }
 
-  /**
-   * Get response storage
-   */
   public getResponseStorage(): ResponseStorage {
     return this.responseStorage;
   }
 
-  /**
-   * Get world context
-   */
   public getWorld(): WorldContext {
     return this.worldContext;
   }
 
-  /**
-   * Set test data
-   */
   public setTestData(data: any): void {
     this.testData = data;
     ActionLogger.logTestDataSet(`Test data set with ${Object.keys(data).length} keys`, { 
@@ -155,16 +115,10 @@ export class BDDContext {
     });
   }
 
-  /**
-   * Get test data
-   */
   public getTestData(): any {
     return this.testData;
   }
 
-  /**
-   * Get test data value
-   */
   public getTestDataValue(key: string, defaultValue?: any): any {
     const keys = key.split('.');
     let value = this.testData;
@@ -180,9 +134,6 @@ export class BDDContext {
     return value;
   }
 
-  /**
-   * Register a page object for use in steps
-   */
   public registerPageObject<T extends CSBasePage>(name: string, pageObjectClass: new () => T): void {
     const pageObject = new pageObjectClass();
     if (this.currentPage) {
@@ -193,9 +144,6 @@ export class BDDContext {
     ActionLogger.logDebug(`Page object registered: ${name}`);
   }
 
-  /**
-   * Get a registered page object
-   */
   public getPageObject<T extends CSBasePage>(name: string): T {
     const pageObject = this.pageObjects.get(name);
     if (!pageObject) {
@@ -204,9 +152,6 @@ export class BDDContext {
     return pageObject as T;
   }
 
-  /**
-   * Initialize all registered page objects with current page
-   */
   private async initializePageObjects(): Promise<void> {
     if (!this.currentPage) {
       return;
@@ -222,28 +167,18 @@ export class BDDContext {
     }
   }
 
-  /**
-   * Set current page
-   */
   public async setCurrentPage(page: Page): Promise<void> {
     this.currentPage = page;
     
-    // Initialize all registered page objects with the new page
     await this.initializePageObjects();
   }
 
-  /**
-   * Get current page with improved validation
-   */
   public static getCurrentPage(): Page {
     const instance = BDDContext.getInstance();
     
-    // BROWSER FLASHING FIX: Improved page validation
     if (!instance.currentPage || instance.currentPage.isClosed()) {
-      // Try to get page from execution context
       if (instance.executionContext) {
         try {
-          // Use the new getOrCreatePage method if available
           if (instance.executionContext.isPageValid()) {
             instance.currentPage = instance.executionContext.getPage();
             ActionLogger.logInfo('Reusing valid page from execution context');
@@ -260,7 +195,6 @@ export class BDDContext {
       }
     }
 
-    // Final validation
     if (!instance.currentPage || instance.currentPage.isClosed()) {
       throw new Error('Page is not available or has been closed - please reinitialize');
     }
@@ -268,16 +202,10 @@ export class BDDContext {
     return instance.currentPage;
   }
 
-  /**
-   * Set browser context
-   */
   public setCurrentBrowserContext(context: BrowserContext): void {
     this.currentBrowserContext = context;
   }
 
-  /**
-   * Get browser context
-   */
   public getCurrentBrowserContext(): BrowserContext {
     if (!this.currentBrowserContext) {
       throw new Error('No browser context is currently active');
@@ -285,54 +213,33 @@ export class BDDContext {
     return this.currentBrowserContext;
   }
 
-  /**
-   * Add soft assertion failure
-   */
   public addSoftAssertionFailure(message: string): void {
     this.softAssertions.push(message);
     ActionLogger.logSoftAssertionFailure(message);
   }
 
-  /**
-   * Get soft assertion failures
-   */
   public getSoftAssertionFailures(): string[] {
     return [...this.softAssertions];
   }
 
-  /**
-   * Check if there are soft assertion failures
-   */
   public hasSoftAssertionFailures(): boolean {
     return this.softAssertions.length > 0;
   }
 
-  /**
-   * Clear soft assertions
-   */
   public clearSoftAssertions(): void {
     this.softAssertions = [];
   }
 
-  /**
-   * Store API response
-   */
   public storeResponse(alias: string, response: any): void {
     const scenarioId = this.scenarioContext?.getScenarioId() || 'global';
     this.responseStorage.store(alias, response, scenarioId);
   }
 
-  /**
-   * Retrieve API response
-   */
   public retrieveResponse<T = any>(alias: string): T {
     const scenarioId = this.scenarioContext?.getScenarioId() || 'global';
     return this.responseStorage.retrieve<T>(alias, scenarioId);
   }
 
-  /**
-   * Store value in appropriate context
-   */
   public store(key: string, value: any, scope: 'step' | 'scenario' | 'feature' | 'world' = 'scenario'): void {
     switch (scope) {
       case 'step':
@@ -356,11 +263,7 @@ export class BDDContext {
     }
   }
 
-  /**
-   * Retrieve value from contexts (searches in order: step -> scenario -> feature -> world)
-   */
   public retrieve<T = any>(key: string, defaultValue?: T): T | undefined {
-    // Check step context
     if (this.stepContext) {
       const stepValue = this.stepContext.getMetadata(key);
       if (stepValue !== undefined) {
@@ -368,17 +271,14 @@ export class BDDContext {
       }
     }
 
-    // Check scenario context
     if (this.scenarioContext && this.scenarioContext.has(key)) {
       return this.scenarioContext.get<T>(key);
     }
 
-    // Check feature context
     if (this.featureContext && this.featureContext.has(key)) {
       return this.featureContext.get<T>(key);
     }
 
-    // Check world context
     if (this.worldContext.has(key)) {
       return this.worldContext.get<T>(key);
     }
@@ -386,23 +286,16 @@ export class BDDContext {
     return defaultValue;
   }
 
-  /**
-   * Clear scenario-level state
-   */
   public clearScenarioState(): void {
     this.scenarioContext?.clear();
     this.stepContext = undefined;
     this.clearSoftAssertions();
     
-    // Clear scenario-specific responses
     if (this.scenarioContext) {
       this.responseStorage.clearScenario(this.scenarioContext.getScenarioId());
     }
   }
 
-  /**
-   * Clear feature-level state
-   */
   public clearFeatureState(): void {
     this.featureContext?.clear();
     this.scenarioContext = undefined;
@@ -410,9 +303,6 @@ export class BDDContext {
     this.clearSoftAssertions();
   }
 
-  /**
-   * Clear all state
-   */
   public clear(): void {
     this.executionContext = undefined;
     this.featureContext = undefined;
@@ -427,9 +317,6 @@ export class BDDContext {
     this.logger.info('BDD context cleared');
   }
 
-  /**
-   * Export context for debugging
-   */
   public export(): any {
     return {
       hasExecutionContext: !!this.executionContext,
@@ -445,5 +332,4 @@ export class BDDContext {
   }
 }
 
-// Export singleton instance
 export const bddContext = BDDContext.getInstance();

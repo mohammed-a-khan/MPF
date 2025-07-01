@@ -5,16 +5,8 @@ import { CSBDDBaseStepDefinition } from '../../bdd/base/CSBDDBaseStepDefinition'
 import { APIContext } from '../../api/context/APIContext';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Step definitions for managing API request headers
- * Provides comprehensive header manipulation capabilities
- */
 export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
     
-    /**
-     * Sets a single request header
-     * Example: Given user sets request header "Content-Type" to "application/json"
-     */
     @CSBDDStepDef("user sets request header {string} to {string}")
     async setRequestHeader(headerName: string, headerValue: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -23,15 +15,12 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Validate header name
             if (!headerName || headerName.trim().length === 0) {
                 throw new Error('Header name cannot be empty');
             }
             
-            // Check for restricted headers
             this.validateHeaderName(headerName);
             
-            // Interpolate value
             const interpolatedValue = await this.interpolateValue(headerValue);
             
             currentContext.setHeader(headerName, interpolatedValue);
@@ -48,12 +37,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets multiple request headers from a data table
-     * Example: Given user sets request headers:
-     *   | Authorization | Bearer {{token}} |
-     *   | X-API-Key    | {{apiKey}}       |
-     */
     @CSBDDStepDef("user sets request headers:")
     async setRequestHeaders(dataTable: any): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -63,7 +46,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const headers: Record<string, string> = {};
             
-            // Parse data table
             const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
             
             for (const row of rows) {
@@ -74,10 +56,8 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
                     throw new Error('Header name cannot be empty');
                 }
                 
-                // Validate header name
                 this.validateHeaderName(headerName);
                 
-                // Interpolate value
                 const interpolatedValue = await this.interpolateValue(String(headerValue || ''));
                 headers[headerName] = interpolatedValue;
                 
@@ -94,10 +74,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Removes a request header
-     * Example: Given user removes request header "X-Debug"
-     */
     @CSBDDStepDef("user removes request header {string}")
     async removeRequestHeader(headerName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -115,10 +91,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Clears all request headers
-     * Example: Given user clears all request headers
-     */
     @CSBDDStepDef("user clears all request headers")
     async clearAllRequestHeaders(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -136,10 +108,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets Accept header
-     * Example: Given user accepts "application/json"
-     */
     @CSBDDStepDef("user accepts {string}")
     async setAcceptHeader(contentType: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -157,10 +125,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets a default header that will be used for all requests
-     * Example: Given user sets default header "X-Client-ID" to "test-client"
-     */
     @CSBDDStepDef("user sets default header {string} to {string}")
     async setDefaultHeader(headerName: string, headerValue: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -169,13 +133,10 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Validate header name
             this.validateHeaderName(headerName);
             
-            // Interpolate value
             const interpolatedValue = await this.interpolateValue(headerValue);
             
-            // Store as default header in context variables
             const defaultHeaders = currentContext.getVariable('defaultHeaders') || {};
             defaultHeaders[headerName] = interpolatedValue;
             currentContext.setVariable('defaultHeaders', defaultHeaders);
@@ -192,10 +153,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Removes a default header
-     * Example: Given user removes default header "X-Debug"
-     */
     @CSBDDStepDef("user removes default header {string}")
     async removeDefaultHeader(headerName: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -204,7 +161,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Remove from default headers in context variables
             const defaultHeaders = currentContext.getVariable('defaultHeaders') || {};
             delete defaultHeaders[headerName];
             currentContext.setVariable('defaultHeaders', defaultHeaders);
@@ -216,16 +172,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets custom headers from JSON
-     * Example: Given user sets headers from JSON:
-     *   """
-     *   {
-     *     "X-Custom-Header": "value",
-     *     "X-Request-ID": "{{requestId}}"
-     *   }
-     *   """
-     */
     @CSBDDStepDef("user sets headers from JSON:")
     async setHeadersFromJSON(jsonString: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -234,7 +180,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Parse JSON
             let headers: Record<string, any>;
             try {
                 headers = JSON.parse(jsonString);
@@ -242,7 +187,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`Invalid JSON format: ${error instanceof Error ? error.message : String(error)}`);
             }
             
-            // Validate and set headers
             for (const [headerName, headerValue] of Object.entries(headers)) {
                 this.validateHeaderName(headerName);
                 
@@ -262,10 +206,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Copies headers from a previous response
-     * Example: Given user copies response headers from "loginResponse"
-     */
     @CSBDDStepDef("user copies response headers from {string}")
     async copyResponseHeaders(responseAlias: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -283,10 +223,8 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`Response '${responseAlias}' has no headers`);
             }
             
-            // Copy headers
             let copiedCount = 0;
             for (const [headerName, headerValue] of Object.entries(storedResponse.headers)) {
-                // Skip certain headers that shouldn't be copied
                 if (this.shouldSkipHeader(headerName)) {
                     continue;
                 }
@@ -306,10 +244,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets a header with base64 encoded value
-     * Example: Given user sets header "X-Auth-Token" to base64 encoded "username:password"
-     */
     @CSBDDStepDef("user sets header {string} to base64 encoded {string}")
     async setBase64EncodedHeader(headerName: string, value: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -318,10 +252,8 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Interpolate value first
             const interpolatedValue = await this.interpolateValue(value);
             
-            // Base64 encode
             const encodedValue = Buffer.from(interpolatedValue).toString('base64');
             
             currentContext.setHeader(headerName, encodedValue);
@@ -337,9 +269,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to get current API context
-     */
     private getAPIContext(): APIContext {
         const context = this.retrieve('currentAPIContext') as APIContext;
         if (!context) {
@@ -348,22 +277,16 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         return context;
     }
 
-    /**
-     * Helper method to validate header names
-     */
     private validateHeaderName(headerName: string): void {
-        // Check for empty or whitespace-only names
         if (!headerName || headerName.trim().length === 0) {
             throw new Error('Header name cannot be empty');
         }
         
-        // Check for invalid characters
         const validHeaderRegex = /^[!#$%&'*+\-.0-9A-Z^_`a-z|~]+$/;
         if (!validHeaderRegex.test(headerName)) {
             throw new Error(`Invalid header name '${headerName}'. Header names must contain only valid HTTP header characters`);
         }
         
-        // Warn about potentially problematic headers
         const restrictedHeaders = [
             'Host', 'Connection', 'Content-Length', 'Transfer-Encoding',
             'Upgrade', 'Proxy-Connection', 'TE', 'Trailer'
@@ -374,9 +297,6 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to determine if a header should be skipped when copying
-     */
     private shouldSkipHeader(headerName: string): boolean {
         const skipHeaders = [
             'content-length',
@@ -392,15 +312,11 @@ export class RequestHeaderSteps extends CSBDDBaseStepDefinition {
         return skipHeaders.includes(headerName.toLowerCase());
     }
 
-    /**
-     * Helper method to interpolate variables
-     */
     private async interpolateValue(value: string): Promise<string> {
         if (!value.includes('{{')) {
             return value;
         }
         
-        // Simple placeholder replacement for common variables
         let interpolated = value;
         interpolated = interpolated.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
             const varValue = this.retrieve(varName);

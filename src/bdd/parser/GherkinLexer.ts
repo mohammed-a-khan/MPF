@@ -11,7 +11,6 @@ export class GherkinLexer {
   private readonly docStringDelimiterAlt: string = '```';
   
   constructor() {
-    // Initialize English keywords
     this.keywords = new Map([
       ['Feature:', TokenType.FeatureLine],
       ['Background:', TokenType.BackgroundLine],
@@ -28,7 +27,6 @@ export class GherkinLexer {
       ['*', TokenType.StepLine]
     ]);
     
-    // Initialize language support
     this.languageKeywords = new Map();
     this.initializeLanguages();
   }
@@ -49,15 +47,12 @@ export class GherkinLexer {
       if (line === undefined) continue;
       const trimmedLine = line.trim();
       
-      // Skip empty lines unless in doc string
       if (trimmedLine === '' && !inDocString) {
         continue;
       }
       
-      // Handle doc strings
       if (inDocString) {
         if (trimmedLine === docStringDelimiter) {
-          // End of doc string
           tokens.push({
             type: TokenType.DocStringSeparator,
             value: docStringLines.join('\n'),
@@ -70,13 +65,11 @@ export class GherkinLexer {
           docStringLines = [];
           continue;
         } else {
-          // Collect doc string content
           docStringLines.push(line || '');
           continue;
         }
       }
       
-      // Check for doc string start
       if (trimmedLine === this.docStringDelimiter || trimmedLine === this.docStringDelimiterAlt) {
         inDocString = true;
         docStringDelimiter = trimmedLine;
@@ -86,7 +79,6 @@ export class GherkinLexer {
         continue;
       }
       
-      // Handle comments
       if (trimmedLine.startsWith(this.commentPrefix)) {
         tokens.push({
           type: TokenType.Comment,
@@ -98,7 +90,6 @@ export class GherkinLexer {
         continue;
       }
       
-      // Handle tags
       if (trimmedLine.startsWith(this.tagPrefix)) {
         const tags = this.parseTags(trimmedLine);
         tags.forEach(tag => {
@@ -113,7 +104,6 @@ export class GherkinLexer {
         continue;
       }
       
-      // Handle table rows
       if (trimmedLine.startsWith(this.tableDelimiter) && trimmedLine.endsWith(this.tableDelimiter)) {
         const cells = this.parseTableRow(trimmedLine);
         tokens.push({
@@ -126,7 +116,6 @@ export class GherkinLexer {
         continue;
       }
       
-      // Handle language directive
       if (trimmedLine.startsWith('# language:')) {
         const language = trimmedLine.substring('# language:'.length).trim();
         this.setLanguage(language);
@@ -140,12 +129,10 @@ export class GherkinLexer {
         continue;
       }
       
-      // Parse keyword lines
       const keywordToken = this.parseKeywordLine(line || '', currentLine, filePath);
       if (keywordToken) {
         tokens.push(keywordToken);
       } else if (trimmedLine !== '') {
-        // Handle description lines
         tokens.push({
           type: TokenType.Comment,
           value: trimmedLine,
@@ -156,7 +143,6 @@ export class GherkinLexer {
       }
     }
     
-    // Check for unclosed doc string
     if (inDocString) {
       throw new ParseError(
         `Unclosed doc string starting at line ${docStringStartLine}`,
@@ -173,7 +159,6 @@ export class GherkinLexer {
     const trimmedLine = line.trim();
     const indent = this.getIndent(line);
     
-    // Check each keyword
     const keywordsArray = Array.from(this.keywords.entries());
     for (const [keyword, tokenType] of keywordsArray) {
       if (trimmedLine.startsWith(keyword)) {
@@ -187,7 +172,6 @@ export class GherkinLexer {
           indent: indent
         };
         
-        // Store the keyword for step tokens
         if (tokenType === TokenType.StepLine) {
           (token as any).keyword = keyword.trim();
         }
@@ -196,7 +180,6 @@ export class GherkinLexer {
       }
     }
     
-    // Check for step keywords without colon
     const stepKeywords = ['Given', 'When', 'Then', 'And', 'But', '*'];
     for (const keyword of stepKeywords) {
       if (trimmedLine.startsWith(keyword + ' ')) {
@@ -218,7 +201,6 @@ export class GherkinLexer {
   
   private parseTags(line: string): string[] {
     const tags: string[] = [];
-    // Updated pattern to capture tags with optional parentheses and their contents
     const tagPattern = /@[a-zA-Z0-9_-]+(?:[-:][a-zA-Z0-9_-]+)*(?:\([^)]*\))?/g;
     let match;
     
@@ -233,7 +215,6 @@ export class GherkinLexer {
     const cells: string[] = [];
     const parts = line.split(this.tableDelimiter);
     
-    // Skip first and last empty parts
     for (let i = 1; i < parts.length - 1; i++) {
       const part = parts[i];
       if (part !== undefined) {
@@ -253,7 +234,6 @@ export class GherkinLexer {
   private setLanguage(language: string): void {
     const currentLanguage = language;
     if (this.languageKeywords.has(language)) {
-      // Update keywords with language-specific ones
       const langKeywords = this.languageKeywords.get(language)!;
       langKeywords.forEach((tokenType, keyword) => {
         this.keywords.set(keyword, tokenType);
@@ -266,9 +246,7 @@ export class GherkinLexer {
   }
   
   private initializeLanguages(): void {
-    // Add support for common languages
     
-    // Spanish
     const spanish = new Map([
       ['Característica:', TokenType.FeatureLine],
       ['Antecedentes:', TokenType.BackgroundLine],
@@ -283,7 +261,6 @@ export class GherkinLexer {
     ]);
     this.languageKeywords.set('es', spanish);
     
-    // French
     const french = new Map([
       ['Fonctionnalité:', TokenType.FeatureLine],
       ['Contexte:', TokenType.BackgroundLine],
@@ -298,7 +275,6 @@ export class GherkinLexer {
     ]);
     this.languageKeywords.set('fr', french);
     
-    // German
     const german = new Map([
       ['Funktionalität:', TokenType.FeatureLine],
       ['Hintergrund:', TokenType.BackgroundLine],

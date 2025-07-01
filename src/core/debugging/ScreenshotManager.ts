@@ -16,10 +16,6 @@ import {
     ScreenshotComparison as ComparisonOptions
 } from './types/debug.types';
 
-/**
- * Advanced screenshot capabilities for debugging and visual testing
- * Supports full page, element, masking, and comparison
- */
 export class ScreenshotManager {
     private static instance: ScreenshotManager;
     private screenshotPath: string;
@@ -31,7 +27,6 @@ export class ScreenshotManager {
     private constructor() {
         this.screenshotPath = path.join(process.cwd(), 'screenshots');
         this.logger = Logger.getInstance('ScreenshotManager');
-        // Initialize with default values first
         this.defaultOptions = {
             type: 'png',
             quality: 80,
@@ -71,10 +66,8 @@ export class ScreenshotManager {
     
     private async initialize(): Promise<void> {
         try {
-            // Ensure screenshot directory exists
             await FileUtils.ensureDir(this.screenshotPath);
             
-            // Create subdirectories
             await Promise.all([
                 FileUtils.ensureDir(path.join(this.screenshotPath, 'actual')),
                 FileUtils.ensureDir(path.join(this.screenshotPath, 'expected')),
@@ -89,9 +82,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Take a screenshot of the page
-     */
     async takeScreenshot(
         page: Page,
         options?: Partial<ScreenshotOptions>
@@ -99,13 +89,11 @@ export class ScreenshotManager {
         try {
             const opts = { ...this.defaultOptions, ...options };
             
-            // Prepare page for screenshot
             await this.preparePageForScreenshot(page, opts);
             
             const startTime = Date.now();
             const screenshotOptions: any = {};
             if (opts.type !== undefined) screenshotOptions.type = opts.type;
-            // Only add quality for JPEG screenshots (PNG doesn't support quality)
             if (opts.quality !== undefined && opts.type === 'jpeg') screenshotOptions.quality = opts.quality;
             if (opts.fullPage !== undefined) screenshotOptions.fullPage = opts.fullPage;
             if (opts.clip !== undefined) screenshotOptions.clip = opts.clip;
@@ -121,7 +109,6 @@ export class ScreenshotManager {
             this.logger.debug(`Screenshot taken in ${duration}ms`);
             ActionLogger.logInfo('Screenshot taken', { type: 'page', size: screenshot.length });
             
-            // Process screenshot if needed
             const processed = await this.processScreenshot(screenshot, opts);
             
             return processed;
@@ -132,9 +119,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Take a screenshot of an element
-     */
     async takeElementScreenshot(
         element: CSWebElement | ElementHandle | Locator,
         options?: Partial<ScreenshotOptions>
@@ -150,17 +134,14 @@ export class ScreenshotManager {
                 elementHandle = element;
             }
             
-            // Scroll element into view
             if ('scrollIntoViewIfNeeded' in elementHandle) {
                 await elementHandle.scrollIntoViewIfNeeded();
             }
             
-            // Wait for element to be stable
             await this.waitForElementStability(elementHandle);
             
             const screenshotOptions: any = {};
             if (opts.type !== undefined) screenshotOptions.type = opts.type;
-            // Only add quality for JPEG screenshots (PNG doesn't support quality)
             if (opts.quality !== undefined && opts.type === 'jpeg') screenshotOptions.quality = opts.quality;
             if (opts.omitBackground !== undefined) screenshotOptions.omitBackground = opts.omitBackground;
             if (opts.animations !== undefined) screenshotOptions.animations = opts.animations;
@@ -181,9 +162,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Take a full page screenshot (including content below the fold)
-     */
     async takeFullPageScreenshot(page: Page): Promise<Buffer> {
         try {
             const opts = { 
@@ -192,7 +170,6 @@ export class ScreenshotManager {
                 animations: 'disabled' as const
             };
             
-            // Disable animations for consistent screenshots
             await page.addStyleTag({
                 content: [
                     '*, *::before, *::after {',
@@ -204,16 +181,14 @@ export class ScreenshotManager {
                 ].join('\n')
             });
             
-            // Scroll to top
             await page.evaluate(() => window.scrollTo(0, 0));
-            await page.waitForTimeout(500); // Wait for scroll
+            await page.waitForTimeout(500);
             
             const screenshotOptions: any = {
                 fullPage: opts.fullPage,
                 animations: opts.animations
             };
             if (opts.type !== undefined) screenshotOptions.type = opts.type;
-            // Only add quality for JPEG screenshots (PNG doesn't support quality)
             if (opts.quality !== undefined && opts.type === 'jpeg') screenshotOptions.quality = opts.quality;
             if (opts.omitBackground !== undefined) screenshotOptions.omitBackground = opts.omitBackground;
             if (opts.caret !== undefined) screenshotOptions.caret = opts.caret;
@@ -233,22 +208,16 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Take a screenshot with masked elements
-     */
     async takeScreenshotWithMask(
         page: Page,
         selectorsToMask: string[],
         options?: Partial<ScreenshotOptions>
     ): Promise<Buffer> {
         try {
-            // Apply masks
             await this.maskElements(page, selectorsToMask);
             
-            // Take screenshot
             const screenshot = await this.takeScreenshot(page, options);
             
-            // Remove masks
             await this.unmaskElements(page);
             
             return screenshot;
@@ -259,9 +228,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Mask sensitive elements on the page
-     */
     async maskElements(page: Page, selectors: string[]): Promise<void> {
         try {
             await page.addStyleTag({
@@ -306,9 +272,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Remove masks from elements
-     */
     async unmaskElements(page: Page): Promise<void> {
         try {
             await page.evaluate(() => {
@@ -330,9 +293,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Compare two screenshots
-     */
     async compareScreenshots(
         baseline: Buffer,
         current: Buffer,
@@ -345,7 +305,6 @@ export class ScreenshotManager {
                 ...options
             };
             
-            // Load images with sharp (lazy load)
             if (!this.sharp) {
                 try {
                     this.sharp = require('sharp');
@@ -355,7 +314,6 @@ export class ScreenshotManager {
             }
             
             if (!this.sharp) {
-                // Fallback when sharp is not available
                 return {
                     identical: false,
                     diffPercentage: 0,
@@ -369,13 +327,11 @@ export class ScreenshotManager {
                 this.sharp(current)
             ]);
             
-            // Get metadata
             const [baselineMeta, currentMeta] = await Promise.all([
                 baselineImg.metadata(),
                 currentImg.metadata()
             ]);
             
-            // Check dimensions
             if (baselineMeta.width !== currentMeta.width || 
                 baselineMeta.height !== currentMeta.height) {
                 return {
@@ -392,13 +348,11 @@ export class ScreenshotManager {
                 };
             }
             
-            // Get raw pixel data
             const [baselineData, currentData] = await Promise.all([
                 baselineImg.raw().toBuffer(),
                 currentImg.raw().toBuffer()
             ]);
             
-            // Compare pixels
             const result = await this.comparePixels(
                 baselineData,
                 currentData,
@@ -407,7 +361,6 @@ export class ScreenshotManager {
                 opts
             );
             
-            // Generate diff image if requested
             if (opts.generateDiff && result.diffPixels > 0 && result.diffImage) {
                 const diffImage = await this.generateDiffImage(
                     baselineData,
@@ -430,17 +383,12 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Save screenshot to file
-     */
     async saveScreenshot(
         screenshot: Buffer,
         fileName: string,
         subdir?: string
     ): Promise<string> {
         try {
-            // ALWAYS save to the default screenshots directory
-            // This prevents duplicate screenshots in different locations
             const baseDir = this.screenshotPath;
             
             const dir = subdir 
@@ -462,9 +410,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Load screenshot from file
-     */
     async loadScreenshot(fileName: string, subdir?: string): Promise<Buffer> {
         try {
             const dir = subdir 
@@ -482,9 +427,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Capture screenshot for visual regression testing
-     */
     async captureForVisualTesting(
         page: Page,
         testName: string,
@@ -502,7 +444,6 @@ export class ScreenshotManager {
             const expectedPath = path.join('expected', fileName);
             const diffPath = path.join('diff', fileName);
             
-            // Take current screenshot
             const screenshotOptions: Partial<ScreenshotOptions> = {};
             if (opts.fullPage !== undefined) {
                 screenshotOptions.fullPage = opts.fullPage;
@@ -512,16 +453,13 @@ export class ScreenshotManager {
             }
             const currentScreenshot = await this.takeScreenshot(page, screenshotOptions);
             
-            // Save actual screenshot
             await this.saveScreenshot(currentScreenshot, fileName, 'actual');
             
-            // Check if baseline exists
             const baselineExists = await FileUtils.exists(
                 path.join(this.screenshotPath, expectedPath)
             );
             
             if (!baselineExists || opts.updateBaseline) {
-                // Create or update baseline
                 await this.saveScreenshot(currentScreenshot, fileName, 'expected');
                 
                 this.logger.info(`Baseline ${opts.updateBaseline ? 'updated' : 'created'} for: ${testName}`);
@@ -535,10 +473,8 @@ export class ScreenshotManager {
                 };
             }
             
-            // Load baseline
             const baseline = await this.loadScreenshot(fileName, 'expected');
             
-            // Compare screenshots
             const diff = await this.compareScreenshots(baseline, currentScreenshot, {
                 threshold: opts.threshold || this.comparisonThreshold,
                 generateDiff: true
@@ -555,7 +491,6 @@ export class ScreenshotManager {
             };
             
             if (!diff.identical) {
-                // Save diff image
                 if (diff.diffImage) {
                     await this.saveScreenshot(diff.diffImage, fileName, 'diff');
                     result.diffPath = diffPath;
@@ -581,9 +516,6 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Generate screenshot report
-     */
     async generateScreenshotReport(results: VisualTestResult[]): Promise<string> {
         const html = `
 <!DOCTYPE html>
@@ -684,29 +616,21 @@ export class ScreenshotManager {
         return reportPath;
     }
     
-    /**
-     * Annotate screenshot with text or shapes
-     */
     async annotateScreenshot(
         screenshot: Buffer,
         _annotations: ScreenshotAnnotation[]
     ): Promise<Buffer> {
         try {
-            // Since we don't have sharp, return the original screenshot
-            // In production, you would implement actual annotation logic
             this.logger.debug('Screenshot annotated successfully');
             
             return screenshot;
             
         } catch (error) {
             this.logger.error(`Failed to annotate screenshot: ${(error as Error).message}`);
-            return screenshot; // Return original on error
+            return screenshot;
         }
     }
     
-    /**
-     * Stitch multiple screenshots together
-     */
     async stitchScreenshots(
         screenshots: Buffer[],
         direction: 'horizontal' | 'vertical' = 'vertical'
@@ -716,7 +640,6 @@ export class ScreenshotManager {
                 throw new Error('No screenshots to stitch');
             }
             
-            // Get metadata for all images
             const images = await Promise.all(
                 screenshots.map(async (buffer) => {
                     const img = this.sharp(buffer);
@@ -725,7 +648,6 @@ export class ScreenshotManager {
                 })
             );
             
-            // Calculate dimensions
             let totalWidth = 0;
             let totalHeight = 0;
             let maxWidth = 0;
@@ -744,10 +666,7 @@ export class ScreenshotManager {
                 }
             }
             
-            // Create composite array - unused for now
             
-            // Since we don't have sharp, return concatenated buffers
-            // In production, you would implement actual image stitching
             this.logger.debug(`Stitched ${screenshots.length} screenshots ${direction}ly`);
             
             return Buffer.concat(screenshots);
@@ -758,20 +677,14 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Generate screenshot thumbnail
-     */
     async generateThumbnail(
         screenshot: Buffer,
         width: number = 200,
         height?: number
     ): Promise<Buffer> {
         try {
-            // Placeholder implementation since we don't have sharp
-            // In production, you would implement actual thumbnail generation
             this.logger.debug(`Generating thumbnail: ${width}x${height || 'auto'}`);
             
-            // Return the original screenshot as a placeholder
             return screenshot;
             
         } catch (error) {
@@ -780,16 +693,11 @@ export class ScreenshotManager {
         }
     }
     
-    /**
-     * Apply effects to screenshot
-     */
     async applyEffects(
         screenshot: Buffer,
         _effects: ScreenshotEffects
     ): Promise<Buffer> {
         try {
-            // Since we don't have sharp, return the original screenshot
-            // In production, you would implement actual effects processing
             return screenshot;
             
         } catch (error) {
@@ -798,13 +706,11 @@ export class ScreenshotManager {
         }
     }
     
-    // Private helper methods
     
     private async preparePageForScreenshot(
         page: Page,
         options: ScreenshotOptions
     ): Promise<void> {
-        // Disable animations if requested
         if (options.animations === 'disabled') {
             await page.addStyleTag({
                 content: [
@@ -818,7 +724,6 @@ export class ScreenshotManager {
             });
         }
         
-        // Hide caret if requested
         if (options.caret === 'hide') {
             await page.addStyleTag({
                 content: [
@@ -829,12 +734,10 @@ export class ScreenshotManager {
             });
         }
         
-        // Wait for fonts to load
         await page.evaluate(() => {
             return document.fonts.ready;
         });
         
-        // Wait for images to load
         await page.waitForLoadState('networkidle');
     }
     
@@ -866,7 +769,6 @@ export class ScreenshotManager {
         screenshot: Buffer,
         _options: ScreenshotOptions
     ): Promise<Buffer> {
-        // Add any post-processing here
         return screenshot;
     }
     
@@ -901,13 +803,11 @@ export class ScreenshotManager {
             
             if (delta > options.threshold) {
                 diffPixels++;
-                // Mark diff in red
-                diffMask[i] = 255;     // R
-                diffMask[i + 1] = 0;   // G
-                diffMask[i + 2] = 0;   // B
-                diffMask[i + 3] = 255; // A
+                diffMask[i] = 255;
+                diffMask[i + 1] = 0;
+                diffMask[i + 2] = 0;
+                diffMask[i + 3] = 255;
             } else {
-                // Copy original pixel
                 diffMask[i] = baseR;
                 diffMask[i + 1] = baseG;
                 diffMask[i + 2] = baseB;
@@ -926,7 +826,6 @@ export class ScreenshotManager {
         
         if (diffPixels > 0) {
             result.diffImage = diffMask;
-            // Add regions with differences
             result.regions = [{
                 x: 0,
                 y: 0,
@@ -945,8 +844,6 @@ export class ScreenshotManager {
         _width: number,
         _height: number
     ): Promise<Buffer> {
-        // Since we don't have sharp, return the diffMask as is
-        // In production, you would implement actual diff image generation
         return diffMask;
     }
     
@@ -958,7 +855,6 @@ export class ScreenshotManager {
     }
 }
 
-// Type definitions - Additional internal types not in debug.types.ts
 interface ScreenshotData {
     buffer: Buffer;
     metadata: {
@@ -991,5 +887,4 @@ interface ScreenshotEffects {
     flop?: boolean;
 }
 
-// Export additional types
 export { ScreenshotData, ScreenshotAnnotation, ScreenshotEffects };

@@ -6,7 +6,6 @@ import { PatternMatcher } from './PatternMatcher';
 import { SimilarityCalculator } from './SimilarityCalculator';
 import { ElementFeatureExtractor } from './ElementFeatureExtractor';
 import { NaturalLanguageProcessor } from '../nlp/NaturalLanguageProcessor';
-// import { VisualRecognitionEngine } from './VisualRecognitionEngine';
 import { ActionLogger } from '../../logging/ActionLogger';
 import { ConfigurationManager } from '../../configuration/ConfigurationManager';
 import { CSWebElement } from '../../elements/CSWebElement';
@@ -28,12 +27,11 @@ export class AIElementIdentifier {
   private readonly similarityCalculator: SimilarityCalculator;
   private readonly featureExtractor: ElementFeatureExtractor;
   private readonly nlp: NaturalLanguageProcessor;
-  // private readonly visualEngine: VisualRecognitionEngine;
   
   private readonly confidenceThreshold: number;
   private readonly cache: Map<string, IdentificationCache> = new Map();
   private readonly trainingData: Set<TrainingData> = new Set();
-  private readonly cacheTimeout: number = 300000; // 5 minutes
+  private readonly cacheTimeout: number = 300000;
   private readonly maxCandidates: number = 100;
   
   private constructor() {
@@ -42,7 +40,6 @@ export class AIElementIdentifier {
     this.similarityCalculator = new SimilarityCalculator();
     this.featureExtractor = new ElementFeatureExtractor();
     this.nlp = new NaturalLanguageProcessor();
-    // this.visualEngine = new VisualRecognitionEngine();
     
     this.confidenceThreshold = ConfigurationManager.getFloat(
       'AI_CONFIDENCE_THRESHOLD',
@@ -57,9 +54,6 @@ export class AIElementIdentifier {
     return AIElementIdentifier.instance;
   }
   
-  /**
-   * Identify element by natural language description
-   */
   async identifyByDescription(
     description: string,
     page: Page,
@@ -75,7 +69,6 @@ export class AIElementIdentifier {
     });
 
     try {
-      // Check cache first
       const cached = this.getFromCache(cacheKey);
       if (cached && await this.isCacheValid(cached)) {
         ActionLogger.logInfo('AI Operation: cache_hit', {
@@ -85,7 +78,6 @@ export class AIElementIdentifier {
         return cached.locator;
       }
 
-      // Process natural language description
       const nlpResult = await this.nlp.processDescription(description);
       
       ActionLogger.logInfo('AI Operation: nlp_complete', {
@@ -93,7 +85,6 @@ export class AIElementIdentifier {
         keywords: nlpResult.keywords
       });
 
-      // Get candidate elements
       const candidates = await this.getCandidates(page, nlpResult, context);
 
       if (candidates.length === 0) {
@@ -105,14 +96,12 @@ export class AIElementIdentifier {
         count: candidates.length
       });
 
-      // Score each candidate
       const scoredElements = await this.scoreElements(
         candidates,
         nlpResult,
         description
       );
 
-      // Select best match
       const bestMatch = this.selectBestMatch(scoredElements);
 
       if (bestMatch.score < this.confidenceThreshold) {
@@ -129,10 +118,8 @@ export class AIElementIdentifier {
         );
       }
 
-      // Create locator - use the one from bestMatch
       const locator = bestMatch.locator;
       
-      // Cache result
       this.cacheResult(cacheKey, locator, bestMatch);
 
       ActionLogger.logInfo('AI Operation: identification_complete', {
@@ -153,9 +140,6 @@ export class AIElementIdentifier {
     }
   }
 
-  /**
-   * Identify with multiple fallback strategies
-   */
   async identifyWithFallback(
     description: string,
     page: Page,
@@ -214,9 +198,6 @@ export class AIElementIdentifier {
     return null;
   }
 
-  /**
-   * Combine multiple identification methods
-   */
   async identifyWithCombinedApproach(
     description: string,
     page: Page,
@@ -244,7 +225,6 @@ export class AIElementIdentifier {
     try {
       const scores: Map<string, { score: number; method: string }> = new Map();
 
-      // AI-based identification
       if (opts.useAI) {
         const aiScores = await this.getAIScores(description, page);
         aiScores.forEach(({ selector, score }) => {
@@ -252,7 +232,6 @@ export class AIElementIdentifier {
         });
       }
 
-      // Semantic analysis
       if (opts.useSemantic) {
         const semanticScores = await this.getSemanticScores(description, page);
         semanticScores.forEach(({ selector, score }) => {
@@ -265,7 +244,6 @@ export class AIElementIdentifier {
         });
       }
 
-      // Find best combined score
       let bestSelector = '';
       let bestScore = 0;
       let bestMethod = '';
@@ -303,9 +281,6 @@ export class AIElementIdentifier {
     }
   }
 
-  /**
-   * Train the AI with successful element identifications
-   */
   async train(
     description: string,
     selector: string,
@@ -338,7 +313,6 @@ export class AIElementIdentifier {
         featuresExtracted: Object.keys(features).length
       });
 
-      // Update pattern matcher with new patterns
       if (success) {
         await this.updatePatterns(features);
       }
@@ -348,7 +322,6 @@ export class AIElementIdentifier {
     }
   }
 
-  // Private helper methods
 
   private async getCandidates(
     page: Page,
@@ -357,7 +330,6 @@ export class AIElementIdentifier {
   ): Promise<ElementCandidate[]> {
     const candidates: ElementCandidate[] = [];
     
-    // Get interactive elements
     const selectors = this.generateSelectors(nlpResult);
     
     for (const selector of selectors) {
@@ -397,7 +369,6 @@ export class AIElementIdentifier {
           });
         }
       } catch (error) {
-        // Continue with next selector
       }
     }
 
@@ -408,7 +379,6 @@ export class AIElementIdentifier {
     const selectors: string[] = [];
     const { intent, keywords } = nlpResult;
 
-    // Generate selectors based on intent
     if (intent === 'click') {
       selectors.push('button', 'a', '[role="button"]', 'input[type="submit"]');
     }
@@ -421,17 +391,14 @@ export class AIElementIdentifier {
       selectors.push('select', '[role="combobox"]', '[role="listbox"]');
     }
 
-    // Add selectors based on element type
     if (nlpResult.elementType) {
       selectors.push(nlpResult.elementType);
     }
     
-    // Add selectors based on exact text
     if (nlpResult.exactText) {
       selectors.push(`text="${nlpResult.exactText}"`, `*:has-text("${nlpResult.exactText}")`);
     }
 
-    // Add keyword-based selectors
     keywords.forEach(keyword => {
       selectors.push(
         `[aria-label*="${keyword}" i]`,
@@ -441,10 +408,9 @@ export class AIElementIdentifier {
       );
     });
 
-    // Add generic interactive elements
     selectors.push('[role="button"]', '[role="link"]', '[role="textbox"]');
 
-    return [...new Set(selectors)]; // Remove duplicates
+    return [...new Set(selectors)];
   }
 
   private async getElementContext(element: any): Promise<any> {
@@ -479,7 +445,6 @@ export class AIElementIdentifier {
       const scores = await this.calculateScores(candidate, nlpResult, description);
       const totalScore = this.calculateTotalScore(scores);
 
-      // Get features for scored element
       const features = await this.featureExtractor.extractFeatures(candidate.element);
       
       scoredElements.push({
@@ -508,7 +473,6 @@ export class AIElementIdentifier {
       contextScore: 0
     };
 
-    // Text similarity
     if (candidate.text) {
       scores.textScore = this.similarityCalculator.calculateSimilarity(
         description.toLowerCase(),
@@ -516,27 +480,22 @@ export class AIElementIdentifier {
       );
     }
 
-    // Get features for scoring
     const features = await this.featureExtractor.extractFeatures(candidate.element);
     
-    // Semantic matching
     const semanticScore = await this.calculateSemanticScore(
       features,
       nlpResult
     );
     scores.structureScore += semanticScore * 0.5;
 
-    // Structural matching
     const structuralScore = await this.calculateStructuralScore(
       features,
       nlpResult
     );
     scores.structureScore += structuralScore * 0.5;
 
-    // Visual prominence
     scores.visualScore = this.calculateVisualScore(features);
 
-    // Context matching
     const context = await this.getElementContext(candidate.element);
     if (context) {
       scores.contextScore = this.calculateContextScore(
@@ -545,13 +504,11 @@ export class AIElementIdentifier {
       );
     }
 
-    // Pattern matching
     scores.patternScore = this.patternMatcher.match(
       features,
       nlpResult.keywords
     );
 
-    // Role matching - add to structure score
     if (features.structural.attributes?.['role']) {
       const roleScore = this.calculateRoleScore(
         features.structural.attributes['role'],
@@ -593,7 +550,6 @@ export class AIElementIdentifier {
     let score = 0;
     let matches = 0;
 
-    // Check if element type matches intent
     if (features.structural.tagName && nlpResult.intent) {
       const elementTypeScore = this.matchElementTypeToIntent(
         features.structural.tagName,
@@ -605,7 +561,6 @@ export class AIElementIdentifier {
       }
     }
 
-    // Check attribute matches
     if (features.structural.attributes) {
       nlpResult.keywords.forEach(keyword => {
         Object.values(features.structural.attributes).forEach(value => {
@@ -639,11 +594,9 @@ export class AIElementIdentifier {
   ): Promise<number> {
     let score = 0;
 
-    // Check if element is in expected position
     if (features.structural.isInteractive) score += 0.3;
     if (features.visual.isVisible) score += 0.2;
     
-    // Check for form elements
     if (nlpResult.intent === 'type' && features.structural.tagName === 'input') {
       score += 0.5;
     }
@@ -656,13 +609,11 @@ export class AIElementIdentifier {
 
     const { width, height } = features.visual.boundingBox;
     
-    // Larger elements are typically more important
     const area = width * height;
-    const viewportArea = 1920 * 1080; // Assume standard viewport
+    const viewportArea = 1920 * 1080;
     
     let score = Math.min(area / viewportArea * 10, 0.7);
 
-    // Bonus for centered elements
     if (features.visual.boundingBox?.x && features.visual.boundingBox.x > 100 && features.visual.boundingBox.x < 1820) {
       score += 0.1;
     }
@@ -673,7 +624,6 @@ export class AIElementIdentifier {
   private calculateContextScore(context: any, nlpResult: NLPResult): number {
     let score = 0;
 
-    // Check parent context
     if (context.parent) {
       nlpResult.keywords.forEach(keyword => {
         if (context.parent.className?.includes(keyword) ||
@@ -683,7 +633,6 @@ export class AIElementIdentifier {
       });
     }
 
-    // Position among siblings can be important
     if (nlpResult.positionKeywords && nlpResult.positionKeywords.length > 0) {
       score += 0.2;
     }
@@ -715,7 +664,6 @@ export class AIElementIdentifier {
       throw new Error('No best match found');
     }
 
-    // Log top matches for debugging
     ActionLogger.logInfo('AI Operation: top_matches', {
       matches: scoredElements.slice(0, 3).map(el => ({
         score: el.score,
@@ -728,7 +676,6 @@ export class AIElementIdentifier {
 
   private async fuzzyMatch(description: string, page: Page): Promise<Locator | null> {
     try {
-      // Get all text elements
       const elements = await page.locator('*:has-text("*")').all();
       
       let bestMatch: { element: Locator; score: number } | null = null;
@@ -761,7 +708,6 @@ export class AIElementIdentifier {
       const nlpResult = await this.nlp.processDescription(description);
       const semanticMap = await this.domAnalyzer.buildSemanticMap(page);
       
-      // Find best semantic match
       for (const landmark of semanticMap.landmarks) {
         if (nlpResult.keywords.some(keyword => 
           landmark.className?.includes(keyword) ||
@@ -779,8 +725,6 @@ export class AIElementIdentifier {
   }
 
   private async visualSearch(): Promise<Locator | null> {
-    // Visual search would require image recognition capabilities
-    // For now, return null as it's not implemented
     ActionLogger.logWarn('Visual search not implemented');
     return null;
   }
@@ -824,16 +768,13 @@ export class AIElementIdentifier {
       const nlpResult = await this.nlp.processDescription(description);
       const semanticMap = await this.domAnalyzer.buildSemanticMap(page);
       
-      // Score each landmark
       for (const landmark of semanticMap.landmarks) {
         let score = 0;
         
-        // Check role match
         if (landmark.role && nlpResult.intent) {
           score += this.calculateRoleScore(landmark.role, nlpResult.intent);
         }
         
-        // Check keyword matches
         nlpResult.keywords.forEach(keyword => {
           if (landmark.className?.toLowerCase().includes(keyword.toLowerCase()) ||
               landmark.id?.toLowerCase().includes(keyword.toLowerCase())) {
@@ -879,7 +820,6 @@ export class AIElementIdentifier {
     
     if (!cached) return null;
     
-    // Check if cache is expired
     const age = Date.now() - cached.timestamp;
     if (age > this.cacheTimeout) {
       this.cache.delete(key);
@@ -891,7 +831,6 @@ export class AIElementIdentifier {
 
   private async isCacheValid(cached: IdentificationCache): Promise<boolean> {
     try {
-      // Check if element still exists and is visible
       const isVisible = await cached.locator.isVisible().catch(() => false);
       return isVisible;
     } catch {
@@ -910,7 +849,6 @@ export class AIElementIdentifier {
       timestamp: Date.now()
     });
 
-    // Cleanup old cache entries
     if (this.cache.size > 100) {
       const oldest = Array.from(this.cache.entries())
         .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
@@ -921,14 +859,9 @@ export class AIElementIdentifier {
     }
   }
 
-  /**
-   * Convert CSWebElement to standard element for AI processing
-   */
   async convertToStandardElement(csElement: CSWebElement): Promise<Locator> {
-    // Get the page from the CSWebElement
     const page = csElement.page;
     
-    // Use the element's selector options to create a locator
     const selector = this.buildSelectorFromOptions(csElement.options);
     return page.locator(selector);
   }
@@ -940,7 +873,6 @@ export class AIElementIdentifier {
     if (options.text) return `text="${options.text}"`;
     if (options.role) return `[role="${options.role}"]`;
     
-    // Build attribute selector
     const attrs = [];
     if (options.id) attrs.push(`[id="${options.id}"]`);
     if (options.className) attrs.push(`[class*="${options.className}"]`);
@@ -949,24 +881,15 @@ export class AIElementIdentifier {
     return attrs.join('') || '*';
   }
 
-  /**
-   * Clear all caches and training data
-   */
   clearCache(): void {
     this.cache.clear();
     ActionLogger.logInfo('AI cache cleared');
   }
 
-  /**
-   * Export training data for analysis
-   */
   exportTrainingData(): TrainingData[] {
     return Array.from(this.trainingData);
   }
 
-  /**
-   * Import training data
-   */
   importTrainingData(data: TrainingData[]): void {
     data.forEach(entry => this.trainingData.add(entry));
     ActionLogger.logInfo('AI Operation: training_data_imported', {
@@ -974,27 +897,19 @@ export class AIElementIdentifier {
     });
   }
 
-  /**
-   * Train the AI with a successful healing result
-   * This method records successful element identifications to improve future healing
-   */
   async trainOnSuccess(element: CSWebElement, healedLocator: Locator): Promise<void> {
     try {
-      // Extract description from the element
       const description = element.description || element.options.description || 
                          `${element.options.locatorType} element`;
       
-      // Get the healed element handle
       const elementHandle = await healedLocator.elementHandle();
       if (!elementHandle) {
         ActionLogger.logWarn('trainOnSuccess: Could not get element handle from healed locator');
         return;
       }
 
-      // Extract features from the healed element
       const features = await this.featureExtractor.extractFeatures(elementHandle);
       
-      // Create a training entry
       const trainingEntry: TrainingData = {
         id: `healing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         description: description,
@@ -1006,18 +921,15 @@ export class AIElementIdentifier {
         elementType: features.structural.tagName
       };
 
-      // Add to training data
       this.trainingData.add(trainingEntry);
 
-      // Update pattern matcher with successful patterns
       await this.updatePatterns(features);
 
-      // Cache the successful healing for future use
       const cacheKey = this.generateCacheKey(description, element.page.url());
       this.cacheResult(cacheKey, healedLocator, {
         element: elementHandle,
         locator: healedLocator,
-        score: 0.95, // High confidence for healed elements
+        score: 0.95,
         breakdown: {
           textScore: 0.9,
           structureScore: 0.9,
@@ -1036,7 +948,6 @@ export class AIElementIdentifier {
         locator: healedLocator.toString()
       });
 
-      // Cleanup element handle
       await elementHandle.dispose();
 
     } catch (error) {

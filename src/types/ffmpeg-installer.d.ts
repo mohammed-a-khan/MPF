@@ -1,4 +1,3 @@
-// Type declarations for ffmpeg installer packages
 
 declare module '@ffmpeg-installer/ffmpeg' {
   interface FFmpegInstaller {

@@ -24,7 +24,7 @@ export class ResourceManager {
   private constructor() {
     this.downloadsPath = path.join(process.cwd(), 'downloads');
     this.tempPath = path.join(process.cwd(), 'temp');
-    this.maxMemoryUsage = 2 * 1024 * 1024 * 1024; // 2GB
+    this.maxMemoryUsage = 2 * 1024 * 1024 * 1024;
     this.ensureDirectories();
     this.startMonitoring();
   }
@@ -42,7 +42,6 @@ export class ResourceManager {
   }
 
   private startMonitoring(): void {
-    // Monitor resources every 30 seconds
     this.cleanupInterval = setInterval(async () => {
       const stats = await this.getResourceUsage();
       if (stats.memoryUsage > this.maxMemoryUsage * 0.8) {
@@ -57,17 +56,14 @@ export class ResourceManager {
     ActionLogger.logInfo('Resource cleanup operation', { operation: 'cleanup', type: 'scenario', scenarioId });
 
     try {
-      // Get all pages and contexts for this scenario
       const pageFactory = PageFactory.getInstance();
       const contextManager = ContextManager.getInstance();
       
-      // Close all popups first
       const pages = await this.getScenarioPages(scenarioId);
       for (const page of pages) {
         await this.closeAllPopups(page);
       }
 
-      // Clear browser storage if configured
       const contexts = await this.getScenarioContexts(scenarioId);
       for (const context of contexts) {
         if (process.env['CLEAR_STORAGE_AFTER_SCENARIO'] === 'true') {
@@ -75,25 +71,20 @@ export class ResourceManager {
         }
       }
 
-      // Close pages
       for (const page of pages) {
         await pageFactory.closePage(page);
         this.resourceTracking.delete(`page_${scenarioId}_${page.url()}`);
       }
 
-      // Close contexts
       await contextManager.closeAllContexts();
       for (const _ of contexts) {
         this.resourceTracking.delete(`context_${scenarioId}`);
       }
 
-      // Cleanup downloads
       await this.cleanupScenarioDownloads(scenarioId);
 
-      // Clear temp files
       await this.clearScenarioTempFiles(scenarioId);
 
-      // Force garbage collection if available
       if (global.gc) {
         global.gc();
       }
@@ -106,31 +97,22 @@ export class ResourceManager {
     }
   }
 
-  /**
-   * Force cleanup of all resources
-   */
   async forceCleanup(): Promise<void> {
     ActionLogger.logWarn('Forcing cleanup of all resources');
     
     try {
-      // Close all pages
       const pageFactory = PageFactory.getInstance();
       await pageFactory.closeAllPages();
       
-      // Close all contexts
       const contextManager = ContextManager.getInstance();
       await contextManager.closeAllContexts();
       
-      // Clear all downloads
       await this.cleanupDownloads();
       
-      // Clear all temp files
       await this.clearTempFiles();
       
-      // Clear resource tracking
       this.resourceTracking.clear();
       
-      // Force garbage collection
       await this.forceGarbageCollection();
       
       ActionLogger.logInfo('Force cleanup completed');
@@ -145,7 +127,6 @@ export class ResourceManager {
       const context = page.context();
       const pages = context.pages();
       
-      // Close all pages except the main one
       for (const p of pages) {
         if (p !== page && !p.isClosed()) {
           await p.close();
@@ -159,13 +140,10 @@ export class ResourceManager {
 
   async clearStorage(context: BrowserContext): Promise<void> {
     try {
-      // Clear cookies
       await context.clearCookies();
       
-      // Clear permissions
       await context.clearPermissions();
       
-      // For each page in context, clear local/session storage
       const pages = context.pages();
       for (const page of pages) {
         if (!page.isClosed()) {
@@ -174,7 +152,6 @@ export class ResourceManager {
               localStorage.clear();
               sessionStorage.clear();
             } catch (e) {
-              // Ignore errors - page might not support storage
             }
           });
         }
@@ -190,7 +167,7 @@ export class ResourceManager {
     try {
       const files = await fs.readdir(this.downloadsPath);
       const now = Date.now();
-      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      const maxAge = 24 * 60 * 60 * 1000;
 
       for (const file of files) {
         const filePath = path.join(this.downloadsPath, file);
@@ -261,7 +238,6 @@ export class ResourceManager {
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
     
-    // Count open resources
     let openPages = 0;
     let openContexts = 0;
     
@@ -312,7 +288,6 @@ export class ResourceManager {
     const pages: Page[] = [];
     const pageFactory = PageFactory.getInstance();
     
-    // Get all tracked pages for this scenario
     for (const [key, resource] of this.resourceTracking) {
       if (resource.type === 'page' && key.includes(scenarioId)) {
         const page = pageFactory.getPageByKey(key);
@@ -329,7 +304,6 @@ export class ResourceManager {
     const contexts: BrowserContext[] = [];
     const contextManager = ContextManager.getInstance();
     
-    // Get all tracked contexts for this scenario
     for (const [key, resource] of this.resourceTracking) {
       if (resource.type === 'context' && key.includes(scenarioId)) {
         const context = contextManager.tryGetContext(key);

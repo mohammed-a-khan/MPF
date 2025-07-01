@@ -14,9 +14,6 @@ import { DatabaseAdapter } from './DatabaseAdapter';
 import { logger } from '../../core/utils/Logger';
 import * as oracledb from 'oracledb';
 
-/**
- * Oracle database adapter implementation
- */
 export class OracleAdapter extends DatabaseAdapter {
   private oracledb!: typeof oracledb;
   private autoCommit: boolean = false;
@@ -26,16 +23,12 @@ export class OracleAdapter extends DatabaseAdapter {
     super();
   }
 
-  /**
-   * Load oracledb module dynamically
-   */
   private async loadDriver(): Promise<void> {
     if (!this.oracledb) {
       try {
         const oracleModule = await import('oracledb');
         this.oracledb = oracleModule;
         
-        // Configure Oracle client
         this.oracledb.outFormat = this.oracledb.OUT_FORMAT_OBJECT;
         this.oracledb.fetchAsString = [this.oracledb.CLOB];
         this.oracledb.autoCommit = false;
@@ -45,9 +38,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Connect to Oracle
-   */
   async connect(config: DatabaseConfig): Promise<DatabaseConnection> {
     await this.loadDriver();
     this.config = config;
@@ -65,19 +55,16 @@ export class OracleAdapter extends DatabaseAdapter {
         ...config.additionalOptions
       };
 
-      // Handle wallet configuration for cloud databases
       if (config.additionalOptions?.['walletDir']) {
         connectionConfig.walletLocation = config.additionalOptions['walletDir'];
         connectionConfig.walletPassword = config.additionalOptions['walletPassword'];
       }
 
-      // Create connection pool
       const poolSize = config.connectionPoolSize || config.additionalOptions?.['poolSize'];
       if (poolSize && poolSize > 1) {
         const pool = await this.oracledb.createPool(connectionConfig);
         return this.wrapConnection(pool, config, true);
       } else {
-        // Single connection
         const connection = await this.oracledb.getConnection(connectionConfig);
         return this.wrapConnection(connection, config, false);
       }
@@ -86,18 +73,13 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Disconnect from Oracle
-   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const conn = connection as any;
       
       if (conn.close) {
-        // Single connection
         await conn.close();
       } else if (conn.terminate) {
-        // Connection pool
         await conn.terminate();
       }
     } catch (error) {
@@ -106,9 +88,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute query
-   */
   async query(
     connection: DatabaseConnection, 
     sql: string, 
@@ -117,12 +96,10 @@ export class OracleAdapter extends DatabaseAdapter {
   ): Promise<QueryResult> {
     const conn = connection as any;
     
-    // Get connection from pool if needed
     const isPool = conn.getConnection !== undefined;
     const queryConn = isPool ? await conn.getConnection() : conn;
 
     try {
-      // Convert ? placeholders to :1, :2, etc.
       let oracleSql = sql;
       let bindParams: any = {};
       
@@ -141,18 +118,16 @@ export class OracleAdapter extends DatabaseAdapter {
       };
 
       if (options?.timeout) {
-        queryOptions.timeout = options.timeout / 1000; // Convert to seconds
+        queryOptions.timeout = options.timeout / 1000;
       }
 
       const startTime = Date.now();
       const result = await queryConn.execute(oracleSql, bindParams, queryOptions);
       const executionTime = Date.now() - startTime;
 
-      // Handle different result types
       let queryResult: QueryResult;
       
       if (result.rows !== undefined) {
-        // SELECT query
         queryResult = {
           rows: result.rows || [],
           rowCount: result.rows ? result.rows.length : 0,
@@ -162,7 +137,6 @@ export class OracleAdapter extends DatabaseAdapter {
           metadata: result.metaData
         };
       } else {
-        // DML query
         queryResult = {
           rows: [],
           rowCount: result.rowsAffected || 0,
@@ -173,7 +147,6 @@ export class OracleAdapter extends DatabaseAdapter {
         };
       }
 
-      // Handle implicit result sets (for stored procedures)
       if (result['implicitResults']) {
         queryResult['implicitResults'] = [];
         for (const resultSet of result['implicitResults']) {
@@ -196,9 +169,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute stored procedure
-   */
   async executeStoredProcedure(
     connection: DatabaseConnection,
     procedureName: string,
@@ -209,7 +179,6 @@ export class OracleAdapter extends DatabaseAdapter {
     const procConn = isPool ? await conn.getConnection() : conn;
 
     try {
-      // Build procedure call
       const bindVars: any = {};
       const paramList: string[] = [];
       
@@ -218,7 +187,6 @@ export class OracleAdapter extends DatabaseAdapter {
           const bindName = `p${index + 1}`;
           
           if (param && typeof param === 'object' && param.dir) {
-            // Bind parameter with direction
             bindVars[bindName] = {
               dir: this.getBindDirection(param.dir),
               type: param.type || this.oracledb.STRING,
@@ -226,7 +194,6 @@ export class OracleAdapter extends DatabaseAdapter {
               val: param.val
             };
           } else {
-            // Input parameter
             bindVars[bindName] = param;
           }
           
@@ -240,7 +207,6 @@ export class OracleAdapter extends DatabaseAdapter {
         autoCommit: this.autoCommit
       });
 
-      // Extract output parameters
       const output: any = {};
       Object.keys(bindVars).forEach(key => {
         if (bindVars[key].dir && bindVars[key].dir !== this.oracledb.BIND_IN) {
@@ -263,9 +229,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Execute function
-   */
   async executeFunction(
     connection: DatabaseConnection,
     functionName: string,
@@ -291,15 +254,10 @@ export class OracleAdapter extends DatabaseAdapter {
     return result['output']?.result;
   }
 
-  /**
-   * Begin transaction
-   */
   async beginTransaction(
     connection: DatabaseConnection,
     options?: TransactionOptions
   ): Promise<void> {
-    // Oracle uses implicit transactions
-    // Just set autocommit to false
     this.autoCommit = false;
     
     if (options?.isolationLevel) {
@@ -312,16 +270,12 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Commit transaction
-   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     const conn = connection as any;
     
     if (conn.commit) {
       await conn.commit();
     } else {
-      // Pool - get connection and commit
       const commitConn = await conn.getConnection();
       try {
         await commitConn.commit();
@@ -331,16 +285,12 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Rollback transaction
-   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     const conn = connection as any;
     
     if (conn.rollback) {
       await conn.rollback();
     } else {
-      // Pool - get connection and rollback
       const rollbackConn = await conn.getConnection();
       try {
         await rollbackConn.rollback();
@@ -350,34 +300,18 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Create savepoint
-   */
   async createSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `SAVEPOINT ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Release savepoint
-   */
   async releaseSavepoint(_connection: DatabaseConnection, _name: string): Promise<void> {
-    // Oracle doesn't support explicit savepoint release
-    // Savepoints are automatically released on commit
   }
 
-  /**
-   * Rollback to savepoint
-   */
   async rollbackToSavepoint(connection: DatabaseConnection, name: string): Promise<void> {
     await this.query(connection, `ROLLBACK TO ${this.escapeIdentifier(name)}`);
   }
 
-  /**
-   * Prepare statement
-   */
   async prepare(connection: DatabaseConnection, sql: string): Promise<PreparedStatement> {
-    // Oracle doesn't have explicit prepare like other databases
-    // We'll simulate it by storing the SQL
     const preparedSql = sql;
     const conn = connection;
 
@@ -386,14 +320,10 @@ export class OracleAdapter extends DatabaseAdapter {
         return this.query(conn, preparedSql, params);
       },
       close: async () => {
-        // Nothing to close in Oracle
       }
     } as PreparedStatement;
   }
 
-  /**
-   * Execute prepared statement
-   */
   async executePrepared(
     statement: PreparedStatement,
     params?: any[]
@@ -401,16 +331,10 @@ export class OracleAdapter extends DatabaseAdapter {
     return await (statement as any).execute(params);
   }
 
-  /**
-   * Ping connection
-   */
   async ping(connection: DatabaseConnection): Promise<void> {
     await this.query(connection, 'SELECT 1 FROM DUAL');
   }
 
-  /**
-   * Get database metadata
-   */
   async getMetadata(connection: DatabaseConnection): Promise<DatabaseMetadata> {
     const versionResult = await this.query(connection, `
       SELECT 
@@ -446,9 +370,6 @@ export class OracleAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Get table information
-   */
   async getTableInfo(connection: DatabaseConnection, tableName: string): Promise<TableInfo> {
     const upperTableName = tableName.toUpperCase();
     
@@ -526,9 +447,6 @@ export class OracleAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Bulk insert
-   */
   async bulkInsert(
     connection: DatabaseConnection,
     table: string,
@@ -541,14 +459,12 @@ export class OracleAdapter extends DatabaseAdapter {
     const insertConn = isPool ? await conn.getConnection() : conn;
 
     try {
-      // Get columns from first row
       const columns = Object.keys(data[0]);
       const columnList = columns.map(col => this.escapeIdentifier(col)).join(', ');
       const bindList = columns.map((_, i) => `:${i + 1}`).join(', ');
       
       const sql = `INSERT INTO ${this.escapeIdentifier(table)} (${columnList}) VALUES (${bindList})`;
       
-      // Prepare bind definitions
       const bindDefs: any = {};
       columns.forEach((col, index) => {
         const sampleValue = data[0][col];
@@ -558,7 +474,6 @@ export class OracleAdapter extends DatabaseAdapter {
         };
       });
 
-      // Convert data to bind array format
       const binds = data.map(row => {
         const bindRow: any = {};
         columns.forEach((col, index) => {
@@ -567,7 +482,6 @@ export class OracleAdapter extends DatabaseAdapter {
         return bindRow;
       });
 
-      // Execute batch insert
       const result = await insertConn.executeMany(sql, binds, {
         autoCommit: true,
         bindDefs
@@ -581,16 +495,13 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Get Oracle type for value
-   */
   private getOracleType(value: any): any {
     if (value === null || value === undefined) {
       return this.oracledb.STRING;
     } else if (typeof value === 'number') {
       return this.oracledb.NUMBER;
     } else if (typeof value === 'boolean') {
-      return this.oracledb.NUMBER; // Oracle doesn't have boolean
+      return this.oracledb.NUMBER;
     } else if (value instanceof Date) {
       return this.oracledb.DATE;
     } else if (Buffer.isBuffer(value)) {
@@ -600,9 +511,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Get bind direction
-   */
   private getBindDirection(dir: string): any {
     switch (dir.toUpperCase()) {
       case 'IN':
@@ -616,9 +524,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Get Oracle isolation level
-   */
   private getOracleIsolationLevel(level: string): string {
     switch (level.toUpperCase()) {
       case 'READ_COMMITTED':
@@ -630,9 +535,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Map constraint type
-   */
   private mapConstraintType(type: string): string {
     switch (type) {
       case 'P': return 'primary';
@@ -643,9 +545,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Parse query error
-   */
   private parseQueryError(error: any, sql: string): Error {
     const message = `Oracle Error: ${error.message}\nSQL: ${sql.substring(0, 200)}${sql.length > 200 ? '...' : ''}`;
     const enhancedError = new Error(message);
@@ -660,9 +559,6 @@ export class OracleAdapter extends DatabaseAdapter {
     return enhancedError;
   }
 
-  /**
-   * Parse metadata
-   */
   private parseMetadata(metaData: any[]): QueryResult['fields'] {
     return metaData.map(col => ({
       name: col.name,
@@ -674,9 +570,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }));
   }
 
-  /**
-   * Map Oracle type to generic type
-   */
   private mapOracleType(dbType: number): string {
     const typeMap: Record<number, string> = {
       2001: 'string',
@@ -703,9 +596,6 @@ export class OracleAdapter extends DatabaseAdapter {
     return typeMap[dbType] || 'unknown';
   }
 
-  /**
-   * Wrap connection to match DatabaseConnection interface
-   */
   private wrapConnection(conn: any, config: DatabaseConfig, _isPool: boolean): DatabaseConnection {
     return {
       id: `oracle-${++this.connectionCounter}`,
@@ -720,16 +610,10 @@ export class OracleAdapter extends DatabaseAdapter {
     };
   }
 
-  /**
-   * Escape identifier
-   */
   override escapeIdentifier(identifier: string): string {
     return `"${identifier.toUpperCase()}"`;
   }
 
-  /**
-   * Stream query results
-   */
   override async *stream(
     connection: DatabaseConnection,
     sql: string,
@@ -759,9 +643,6 @@ export class OracleAdapter extends DatabaseAdapter {
     }
   }
 
-  /**
-   * Set session parameter
-   */
   override async setSessionParameter(
     connection: DatabaseConnection,
     parameter: string,

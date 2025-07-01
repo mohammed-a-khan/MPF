@@ -8,10 +8,6 @@ import { DateUtils } from '../utils/DateUtils';
 import { ConfigurationManager } from '../configuration/ConfigurationManager';
 import * as path from 'path';
 
-/**
- * Captures and manages browser console logs for debugging
- * Provides filtering, analysis, and reporting capabilities
- */
 export class ConsoleLogger {
     private static instance: ConsoleLogger;
     private activeSessions: Map<string, ConsoleSession> = new Map();
@@ -59,10 +55,8 @@ export class ConsoleLogger {
     
     private async initialize(): Promise<void> {
         try {
-            // Ensure console log directory exists
             await FileUtils.ensureDir(this.consoleLogPath);
             
-            // Clean old logs if needed
             if (!this.captureOptions.preserveLogs) {
                 await this.cleanOldLogs();
             }
@@ -74,9 +68,6 @@ export class ConsoleLogger {
         }
     }
     
-    /**
-     * Start capturing console logs for a page
-     */
     startCapture(page: Page, sessionId?: string): string {
         if (!this.captureOptions.enabled) {
             this.logger.debug('Console capture is disabled');
@@ -85,7 +76,6 @@ export class ConsoleLogger {
         
         const id = sessionId || this.generateSessionId();
         
-        // Check if already capturing
         if (this.activeSessions.has(id)) {
             this.logger.warn(`Console capture already active for session: ${id}`);
             return id;
@@ -106,11 +96,9 @@ export class ConsoleLogger {
             }
         };
         
-        // Set up console message handler
         const messageHandler = (msg: ConsoleMessage) => this.handleConsoleMessage(session, msg);
         page.on('console', messageHandler);
         
-        // Store handler reference for cleanup
         session.messageHandler = messageHandler;
         
         this.activeSessions.set(id, session);
@@ -122,9 +110,6 @@ export class ConsoleLogger {
         return id;
     }
     
-    /**
-     * Stop capturing console logs
-     */
     stopCapture(sessionId?: string): ConsoleLog[] {
         const session = sessionId 
             ? this.activeSessions.get(sessionId)
@@ -135,22 +120,18 @@ export class ConsoleLogger {
             return [];
         }
         
-        // Remove event listener
         if (session.messageHandler) {
             session.page.off('console', session.messageHandler);
         }
         
         session.endTime = new Date();
         
-        // Get logs from buffer
         const logs = this.logBuffer.get(session.id) || [];
         
-        // Save logs if needed
         if (this.captureOptions.preserveLogs && logs.length > 0) {
             this.saveLogsAsync(session, logs);
         }
         
-        // Clean up
         this.activeSessions.delete(session.id);
         this.logBuffer.delete(session.id);
         
@@ -162,9 +143,6 @@ export class ConsoleLogger {
         return logs;
     }
     
-    /**
-     * Get console logs for a session
-     */
     getConsoleLogs(sessionId?: string): ConsoleLog[] {
         const id = sessionId || this.getLatestSessionId();
         
@@ -175,17 +153,11 @@ export class ConsoleLogger {
         return this.logBuffer.get(id) || [];
     }
     
-    /**
-     * Filter logs by level
-     */
     filterLogs(logs: ConsoleLog[], level: LogLevel | LogLevel[]): ConsoleLog[] {
         const levels = Array.isArray(level) ? level : [level];
         return logs.filter(log => levels.includes(log.level));
     }
     
-    /**
-     * Search logs by text
-     */
     searchLogs(logs: ConsoleLog[], searchText: string, caseSensitive: boolean = false): ConsoleLog[] {
         const search = caseSensitive ? searchText : searchText.toLowerCase();
         
@@ -197,9 +169,6 @@ export class ConsoleLogger {
         });
     }
     
-    /**
-     * Export logs to different formats
-     */
     async exportLogs(
         logs: ConsoleLog[],
         format: 'json' | 'text' | 'html' = 'json',
@@ -244,9 +213,6 @@ export class ConsoleLogger {
         }
     }
     
-    /**
-     * Analyze console logs for issues
-     */
     analyzeLogs(logs: ConsoleLog[]): LogAnalysis {
         const analysis: LogAnalysis = {
             summary: {
@@ -277,7 +243,6 @@ export class ConsoleLogger {
             }
         };
         
-        // Count by level
         for (const log of logs) {
             const level = log.level.toLowerCase() as keyof typeof analysis.summary.byLevel;
             if (level in analysis.summary.byLevel) {
@@ -285,24 +250,17 @@ export class ConsoleLogger {
             }
         }
         
-        // Find patterns
         analysis.patterns = this.findPatterns(logs);
         
-        // Get top errors
         analysis.topErrors = this.getTopErrors(logs);
         
-        // Analyze performance issues
         analysis.performance = this.analyzePerformance(logs);
         
-        // Check for security issues
         analysis.security = this.analyzeSecurityIssues(logs);
         
         return analysis;
     }
     
-    /**
-     * Get real-time console stats
-     */
     getStats(sessionId?: string): ConsoleStats | null {
         const session = sessionId 
             ? this.activeSessions.get(sessionId)
@@ -320,9 +278,6 @@ export class ConsoleLogger {
         };
     }
     
-    /**
-     * Clear console logs for a session
-     */
     clearLogs(sessionId?: string): void {
         const id = sessionId || this.getLatestSessionId();
         
@@ -346,17 +301,10 @@ export class ConsoleLogger {
         }
     }
     
-    /**
-     * Set up automatic error reporting
-     */
     enableErrorReporting(_callback: (error: ConsoleLog) => void): void {
-        // This would integrate with error reporting services
         this.logger.info('Error reporting enabled for console errors');
     }
     
-    /**
-     * Generate console log report
-     */
     async generateReport(logs: ConsoleLog[]): Promise<string> {
         const analysis = this.analyzeLogs(logs);
         
@@ -467,7 +415,6 @@ export class ConsoleLogger {
         return reportPath;
     }
     
-    // Private helper methods
     
     private mapConsoleTypeToLogLevel(type: string): LogLevel {
         const mapping: Record<string, LogLevel> = {
@@ -485,7 +432,6 @@ export class ConsoleLogger {
         try {
             const type = msg.type();
             
-            // Check if we should capture this type
             if (this.captureOptions.captureTypes !== 'all' && 
                 !this.captureOptions.captureTypes.includes(type as LogLevel)) {
                 return;
@@ -493,12 +439,10 @@ export class ConsoleLogger {
             
             const text = msg.text();
             
-            // Apply filters
             if (!this.shouldCapture(text)) {
                 return;
             }
             
-            // Extract additional info
             const location = msg.location();
             const args = msg.args();
             
@@ -517,7 +461,6 @@ export class ConsoleLogger {
                 };
             }
             
-            // Process arguments
             if (args.length > 0 && this.captureOptions.includeStackTrace) {
                 for (const arg of args) {
                     try {
@@ -528,18 +471,15 @@ export class ConsoleLogger {
                 }
             }
             
-            // Add to buffer
             const buffer = this.logBuffer.get(session.id) || [];
             buffer.push(log);
             
-            // Maintain buffer size
             if (buffer.length > this.maxBufferSize) {
                 buffer.shift();
             }
             
             this.logBuffer.set(session.id, buffer);
             
-            // Update session stats
             session.stats.total++;
             
             switch (type) {
@@ -560,7 +500,6 @@ export class ConsoleLogger {
                     break;
             }
             
-            // Log significant messages
             if (type === 'error') {
                 this.logger.debug(`Browser error: ${text}`);
             }
@@ -571,7 +510,6 @@ export class ConsoleLogger {
     }
     
     private shouldCapture(text: string): boolean {
-        // Check exclude patterns
         if (this.captureOptions.excludePatterns.length > 0) {
             for (const pattern of this.captureOptions.excludePatterns) {
                 if (pattern.test(text)) {
@@ -580,7 +518,6 @@ export class ConsoleLogger {
             }
         }
         
-        // Check include patterns
         if (this.captureOptions.filterPatterns.length > 0) {
             for (const pattern of this.captureOptions.filterPatterns) {
                 if (pattern.test(text)) {
@@ -686,7 +623,6 @@ export class ConsoleLogger {
         const patterns: LogPattern[] = [];
         const patternMap = new Map<string, number>();
         
-        // Common patterns to look for
         const patternDetectors = [
             {
                 regex: /Failed to load resource/i,
@@ -749,7 +685,6 @@ export class ConsoleLogger {
             existing.count++;
             
             if (!existing.stack && error.args.length > 0) {
-                // Try to extract stack trace
                 const stackArg = error.args.find(arg => arg.includes('at '));
                 if (stackArg) {
                     existing.stack = stackArg;
@@ -778,7 +713,6 @@ export class ConsoleLogger {
             memoryWarnings: []
         };
         
-        // Look for performance timing logs
         const timingRegex = /took (\d+(?:\.\d+)?)\s*(ms|s|seconds|milliseconds)/i;
         
         for (const log of logs) {
@@ -787,12 +721,11 @@ export class ConsoleLogger {
                 let duration = parseFloat(match[1]);
                 const unit = match[2].toLowerCase();
                 
-                // Convert to ms
                 if (unit === 's' || unit === 'seconds') {
                     duration *= 1000;
                 }
                 
-                if (duration > 1000) { // Over 1 second
+                if (duration > 1000) {
                     analysis.slowOperations.push({
                         operation: log.text,
                         duration,
@@ -801,7 +734,6 @@ export class ConsoleLogger {
                 }
             }
             
-            // Check for memory warnings
             if (/memory|heap|out of memory/i.test(log.text)) {
                 analysis.memoryWarnings.push({
                     message: log.text,
@@ -820,16 +752,14 @@ export class ConsoleLogger {
             corsIssues: []
         };
         
-        // Patterns that might indicate sensitive data
         const sensitivePatterns = [
             /password|token|api[_-]?key|secret|credential/i,
-            /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, // Email
-            /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/, // Phone
-            /\b\d{3}-\d{2}-\d{4}\b/ // SSN pattern
+            /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/,
+            /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/,
+            /\b\d{3}-\d{2}-\d{4}\b/
         ];
         
         for (const log of logs) {
-            // Check for sensitive data
             for (const pattern of sensitivePatterns) {
                 if (pattern.test(log.text)) {
                     analysis.sensitiveDataExposure.push({
@@ -841,7 +771,6 @@ export class ConsoleLogger {
                 }
             }
             
-            // Check for mixed content
             if (/mixed content|http:.*https:/i.test(log.text)) {
                 analysis.mixedContent.push({
                     message: log.text,
@@ -849,7 +778,6 @@ export class ConsoleLogger {
                 });
             }
             
-            // Check for CORS issues
             if (/cors|cross-origin|access-control/i.test(log.text)) {
                 analysis.corsIssues.push({
                     message: log.text,
@@ -862,11 +790,10 @@ export class ConsoleLogger {
     }
     
     private normalizeErrorMessage(message: string): string {
-        // Remove line numbers, timestamps, and other variable parts
         return message
-            .replace(/:\d+:\d+/g, '') // Line:column
-            .replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\b/g, '') // Timestamps
-            .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '') // UUIDs
+            .replace(/:\d+:\d+/g, '')
+            .replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\b/g, '')
+            .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '')
             .replace(/\s+/g, ' ')
             .trim();
     }
@@ -953,7 +880,6 @@ export class ConsoleLogger {
     }
 }
 
-// Type definitions
 type LogLevel = 'error' | 'warning' | 'info' | 'log' | 'debug' | 'trace';
 
 interface CaptureOptions {

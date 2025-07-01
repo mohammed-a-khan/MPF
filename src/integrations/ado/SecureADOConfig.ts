@@ -1,7 +1,6 @@
 import { EncryptionConfigurationManager } from '../../core/configuration/EncryptionConfigurationManager';
 import { Logger } from '../../core/utils/Logger';
 
-// Type definitions for secure ADO configuration
 export type ADOAuthType = 'pat' | 'basic' | 'oauth';
 
 export interface ADOTestRunConfig {
@@ -40,32 +39,16 @@ export interface ADOIntegrationConfig {
   testRun: ADOTestRunConfig;
 }
 
-/**
- * Secure ADO Configuration Manager with automatic decryption support
- * 
- * This class provides the same interface as ADOConfig but automatically
- * decrypts encrypted configuration values for enhanced security.
- * 
- * Usage:
- * 1. Encrypt your PAT token using the encryption tool
- * 2. Set ADO_PERSONAL_ACCESS_TOKEN=ENCRYPTED:... in your config
- * 3. Use this class instead of ADOConfig
- */
 export class SecureADOConfig {
   private static config: ADOIntegrationConfig | null = null;
   private static logger = Logger.getInstance();
 
-  /**
-   * Initialize ADO configuration with automatic decryption
-   */
   static async initialize(): Promise<void> {
     try {
-      // Initialize encryption support first
       EncryptionConfigurationManager.initializeEncryption({
         enabled: true
       });
 
-      // Load configuration with automatic decryption
       const testPlanId = EncryptionConfigurationManager.getNumber('ADO_TEST_PLAN_ID');
       const testSuiteId = EncryptionConfigurationManager.getNumber('ADO_TEST_SUITE_ID');
       
@@ -76,12 +59,10 @@ export class SecureADOConfig {
         projectName: EncryptionConfigurationManager.get('ADO_PROJECT_NAME', ''),
         authType: this.parseAuthType(EncryptionConfigurationManager.get('ADO_AUTH_TYPE', 'pat')),
         
-        // Sensitive values - automatically decrypted if encrypted
         personalAccessToken: EncryptionConfigurationManager.get('ADO_PERSONAL_ACCESS_TOKEN', ''),
         username: EncryptionConfigurationManager.get('ADO_USERNAME', ''),
         password: EncryptionConfigurationManager.get('ADO_PASSWORD', ''),
         
-        // Other configuration
         apiVersion: EncryptionConfigurationManager.get('ADO_API_VERSION', '7.0'),
         ...(testPlanId !== undefined && { testPlanId }),
         ...(testSuiteId !== undefined && { testSuiteId }),
@@ -89,18 +70,15 @@ export class SecureADOConfig {
         uploadScreenshots: EncryptionConfigurationManager.getBoolean('ADO_UPLOAD_SCREENSHOTS', false),
         uploadLogs: EncryptionConfigurationManager.getBoolean('ADO_UPLOAD_LOGS', false),
         
-        // Advanced settings
         timeout: EncryptionConfigurationManager.getNumber('ADO_TIMEOUT', 30000) || 30000,
         retryCount: EncryptionConfigurationManager.getNumber('ADO_RETRY_COUNT', 3) || 3,
         retryDelay: EncryptionConfigurationManager.getNumber('ADO_RETRY_DELAY', 1000) || 1000,
         maxConcurrentRequests: EncryptionConfigurationManager.getNumber('ADO_MAX_CONCURRENT_REQUESTS', 5) || 5,
         enableCaching: EncryptionConfigurationManager.getBoolean('ADO_ENABLE_CACHING', true),
         
-        // Test run configuration
         testRun: this.getTestRunConfig()
       };
 
-      // Validate configuration
       this.validateConfiguration();
       
       this.logger.info('Secure ADO configuration initialized successfully', {
@@ -117,9 +95,6 @@ export class SecureADOConfig {
     }
   }
 
-  /**
-   * Get current configuration (ensures initialization)
-   */
   static getConfig(): ADOIntegrationConfig {
     if (!this.config) {
       throw new Error('Secure ADO configuration not initialized. Call SecureADOConfig.initialize() first.');
@@ -127,9 +102,6 @@ export class SecureADOConfig {
     return this.config;
   }
 
-  /**
-   * Get authentication headers with automatic token decryption
-   */
   static getAuthHeaders(): Record<string, string> {
     const config = this.getConfig();
     
@@ -145,7 +117,6 @@ export class SecureADOConfig {
           throw new Error('ADO Personal Access Token is required but not configured or failed to decrypt');
         }
         
-        // Token is automatically decrypted by EncryptionConfigurationManager
         const token = Buffer.from(`:${config.personalAccessToken}`).toString('base64');
         headers['Authorization'] = `Basic ${token}`;
         
@@ -160,13 +131,11 @@ export class SecureADOConfig {
           throw new Error('Username and password are required for basic authentication');
         }
         
-        // Password is automatically decrypted
         const creds = Buffer.from(`${config.username}:${config.password}`).toString('base64');
         headers['Authorization'] = `Basic ${creds}`;
         break;
 
       case 'oauth':
-        // OAuth implementation would go here
         throw new Error('OAuth authentication not yet implemented');
 
       default:
@@ -176,9 +145,6 @@ export class SecureADOConfig {
     return headers;
   }
 
-  /**
-   * Build ADO API URL with parameters
-   */
   static buildUrl(endpoint: string, params?: Record<string, any>): string {
     const config = this.getConfig();
     
@@ -188,14 +154,12 @@ export class SecureADOConfig {
 
     let url = endpoint;
     
-    // Replace URL parameters
     if (params) {
       for (const [key, value] of Object.entries(params)) {
         url = url.replace(`{${key}}`, encodeURIComponent(value.toString()));
       }
     }
 
-    // Add API version if not already present
     const separator = url.includes('?') ? '&' : '?';
     if (!url.includes('api-version=')) {
       url += `${separator}api-version=${config.apiVersion}`;
@@ -204,9 +168,6 @@ export class SecureADOConfig {
     return url;
   }
 
-  /**
-   * Get base API URL for the configured organization and project
-   */
   static getBaseApiUrl(): string {
     const config = this.getConfig();
     
@@ -217,9 +178,6 @@ export class SecureADOConfig {
     return `${config.organizationUrl}/${config.projectName}/_apis`;
   }
 
-  /**
-   * Check if ADO integration is enabled and properly configured
-   */
   static isEnabled(): boolean {
     try {
       const config = this.getConfig();
@@ -232,15 +190,11 @@ export class SecureADOConfig {
     }
   }
 
-  /**
-   * Validate configuration completeness and security
-   */
   private static validateConfiguration(): void {
     const config = this.config!;
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Required fields
     if (!config.organizationUrl) {
       errors.push('ADO_ORGANIZATION_URL is required');
     }
@@ -249,7 +203,6 @@ export class SecureADOConfig {
       errors.push('ADO_PROJECT_NAME is required');
     }
 
-    // Authentication validation
     if (config.authType === 'pat' && !config.personalAccessToken) {
       errors.push('ADO_PERSONAL_ACCESS_TOKEN is required for PAT authentication');
     }
@@ -258,7 +211,6 @@ export class SecureADOConfig {
       errors.push('ADO_USERNAME and ADO_PASSWORD are required for basic authentication');
     }
 
-    // Security warnings
     if (config.personalAccessToken && !config.personalAccessToken.startsWith('ENCRYPTED:')) {
       warnings.push('ADO_PERSONAL_ACCESS_TOKEN is not encrypted - consider using encryption for security');
     }
@@ -267,7 +219,6 @@ export class SecureADOConfig {
       warnings.push('ADO_PASSWORD is not encrypted - consider using encryption for security');
     }
 
-    // Configuration warnings
     if (config.enabled && !config.uploadResults) {
       warnings.push('ADO integration is enabled but result uploading is disabled');
     }
@@ -281,9 +232,6 @@ export class SecureADOConfig {
     }
   }
 
-  /**
-   * Get test run configuration
-   */
   private static getTestRunConfig(): ADOTestRunConfig {
     return {
       testPlanId: EncryptionConfigurationManager.getNumber('ADO_TEST_PLAN_ID') || 0,
@@ -299,9 +247,6 @@ export class SecureADOConfig {
     };
   }
 
-  /**
-   * Parse authentication type from string
-   */
   private static parseAuthType(authType: string): ADOAuthType {
     switch (authType.toLowerCase()) {
       case 'pat':
@@ -319,9 +264,6 @@ export class SecureADOConfig {
     }
   }
 
-  /**
-   * Get configuration for display (with sensitive values masked)
-   */
   static getConfigForDisplay(): Partial<ADOIntegrationConfig> {
     const config = this.getConfig();
     
@@ -333,18 +275,13 @@ export class SecureADOConfig {
     };
   }
 
-  /**
-   * Test ADO connection with current configuration
-   */
   static async testConnection(): Promise<{ success: boolean; error?: string; details?: any }> {
     try {
       const config = this.getConfig();
       const headers = this.getAuthHeaders();
       
-      // Simple test API call to validate connection
       const testUrl = this.buildUrl(`${this.getBaseApiUrl()}/projects`);
       
-      // Create abort controller for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), config.timeout || 30000);
       
@@ -385,9 +322,6 @@ export class SecureADOConfig {
     }
   }
 
-  /**
-   * Clear sensitive data from memory
-   */
   static clearSensitiveData(): void {
     if (this.config) {
       this.config.personalAccessToken = '';
@@ -399,24 +333,15 @@ export class SecureADOConfig {
   }
 }
 
-/**
- * Migration helper - use this to replace existing ADOConfig usage
- */
 export class ADOConfig extends SecureADOConfig {
-  // Backward compatibility alias
 }
 
-/**
- * Utility function to help migrate from old ADOConfig
- */
 export async function migrateToSecureADOConfig(): Promise<void> {
   await SecureADOConfig.initialize();
   
-  // Log migration info
   const logger = Logger.getInstance();
   logger.info('Successfully migrated to SecureADOConfig with encryption support');
   
-  // Test configuration
   const testResult = await SecureADOConfig.testConnection();
   if (testResult.success) {
     logger.info('ADO connection test successful', testResult.details);

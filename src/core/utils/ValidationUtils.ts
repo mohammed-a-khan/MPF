@@ -37,18 +37,15 @@ interface CountryFormats {
 export class ValidationUtils {
   private static readonly logger = Logger.getInstance();
 
-  // Email validation patterns
   private static readonly EMAIL_PATTERN = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   private static readonly EMAIL_TLD_PATTERN = /\.[a-zA-Z]{2,}$/;
   private static readonly EMAIL_MAX_LENGTH = 254;
 
-  // URL validation patterns
   private static readonly URL_PATTERN = /^(?:(?:https?|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:[/?#]\S*)?$/i;
   private static readonly PROTOCOL_PATTERN = /^https?:\/\//i;
   private static readonly IP_PATTERN = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
   private static readonly IPV6_PATTERN = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
 
-  // Credit card patterns
   private static readonly CREDIT_CARD_PATTERNS = {
     visa: /^4[0-9]{12}(?:[0-9]{3})?$/,
     mastercard: /^5[1-5][0-9]{14}$/,
@@ -59,7 +56,6 @@ export class ValidationUtils {
     unionPay: /^(62[0-9]{14,17})$/
   };
 
-  // Country-specific formats
   private static readonly COUNTRY_FORMATS: Record<string, CountryFormats> = {
     US: {
       phone: /^(\+?1)?[-.\s]?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
@@ -109,7 +105,6 @@ export class ValidationUtils {
     }
   };
 
-  // Common patterns
   private static readonly COMMON_PATTERNS = {
     alphanumeric: /^[a-zA-Z0-9]+$/,
     alphabetic: /^[a-zA-Z]+$/,
@@ -127,9 +122,6 @@ export class ValidationUtils {
     }
   };
 
-  /**
-   * Validate email address
-   */
   static isEmail(email: string): boolean {
     try {
       if (!email || typeof email !== 'string') {
@@ -138,22 +130,18 @@ export class ValidationUtils {
 
       const trimmed = email.trim().toLowerCase();
 
-      // Check length
       if (trimmed.length > this.EMAIL_MAX_LENGTH || trimmed.length < 3) {
         return false;
       }
 
-      // Check basic pattern
       if (!this.EMAIL_PATTERN.test(trimmed)) {
         return false;
       }
 
-      // Check TLD
       if (!this.EMAIL_TLD_PATTERN.test(trimmed)) {
         return false;
       }
 
-      // Split local and domain parts
       const atIndex = trimmed.lastIndexOf('@');
       if (atIndex === -1) {
         return false;
@@ -162,17 +150,14 @@ export class ValidationUtils {
       const local = trimmed.substring(0, atIndex);
       const domain = trimmed.substring(atIndex + 1);
 
-      // Validate local part
       if (local.length > 64) {
         return false;
       }
 
-      // Check for consecutive dots
       if (trimmed.includes('..')) {
         return false;
       }
 
-      // Check start/end characters
       if (local.startsWith('.') || local.endsWith('.') || 
           domain.startsWith('.') || domain.endsWith('.') ||
           domain.startsWith('-') || domain.endsWith('-')) {
@@ -187,9 +172,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate URL
-   */
   static isURL(url: string, options?: { requireProtocol?: boolean; protocols?: string[] }): boolean {
     try {
       if (!url || typeof url !== 'string') {
@@ -200,35 +182,29 @@ export class ValidationUtils {
       const requireProtocol = options?.requireProtocol ?? true;
       const allowedProtocols = options?.protocols || ['http', 'https', 'ftp'];
 
-      // Add protocol if missing and not required
       let urlToValidate = trimmed;
       if (!this.PROTOCOL_PATTERN.test(trimmed) && !requireProtocol) {
         urlToValidate = `https://${trimmed}`;
       }
 
-      // Try URL constructor for additional validation
       try {
         const urlObj = new URL(urlToValidate);
         
-        // Check protocol
-        const protocol = urlObj.protocol.slice(0, -1); // Remove trailing ':'
+        const protocol = urlObj.protocol.slice(0, -1);
         if (!allowedProtocols.includes(protocol)) {
           return false;
         }
 
-        // Check hostname
         if (!urlObj.hostname || urlObj.hostname.length < 3) {
           return false;
         }
 
-        // Additional hostname validation
         if (urlObj.hostname.includes('..') || 
             urlObj.hostname.startsWith('.') || 
             urlObj.hostname.endsWith('.')) {
           return false;
         }
       } catch {
-        // URL constructor failed, fall back to regex
         if (!this.URL_PATTERN.test(urlToValidate)) {
           return false;
         }
@@ -242,9 +218,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate phone number
-   */
   static isPhoneNumber(phone: string, country?: string): boolean {
     try {
       if (!phone || typeof phone !== 'string') {
@@ -253,12 +226,10 @@ export class ValidationUtils {
 
       const cleaned = phone.replace(/[\s.-]/g, '');
       
-      // Check if it's too short or too long
       if (cleaned.length < 7 || cleaned.length > 20) {
         return false;
       }
 
-      // Country-specific validation
       if (country) {
         const countryUpper = country.toUpperCase();
         const format = this.COUNTRY_FORMATS[countryUpper];
@@ -268,14 +239,12 @@ export class ValidationUtils {
         }
       }
 
-      // Generic international format
       const internationalPattern = /^\+?[1-9]\d{1,14}$/;
       if (internationalPattern.test(cleaned)) {
         this.logger.debug(`Phone validation passed for: ${phone}`);
         return true;
       }
 
-      // Check common formats if no country specified
       for (const [countryCode, format] of Object.entries(this.COUNTRY_FORMATS)) {
         if (format.phone.test(phone)) {
           this.logger.debug(`Phone validation passed for: ${phone} (detected country: ${countryCode})`);
@@ -290,29 +259,22 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate credit card number using Luhn algorithm
-   */
   static isCreditCard(card: string): boolean {
     try {
       if (!card || typeof card !== 'string') {
         return false;
       }
 
-      // Remove spaces and dashes
       const cleaned = card.replace(/[\s-]/g, '');
 
-      // Check if all digits
       if (!/^\d+$/.test(cleaned)) {
         return false;
       }
 
-      // Check length (most cards are 13-19 digits)
       if (cleaned.length < 13 || cleaned.length > 19) {
         return false;
       }
 
-      // Check against known patterns
       let cardType = null;
       for (const [type, pattern] of Object.entries(this.CREDIT_CARD_PATTERNS)) {
         if (pattern.test(cleaned)) {
@@ -325,7 +287,6 @@ export class ValidationUtils {
         return false;
       }
 
-      // Luhn algorithm validation
       let sum = 0;
       let isEven = false;
 
@@ -355,9 +316,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate IP address (v4 or v6)
-   */
   static isIPAddress(ip: string, version?: 4 | 6): boolean {
     try {
       if (!ip || typeof ip !== 'string') {
@@ -371,7 +329,6 @@ export class ValidationUtils {
       } else if (version === 6) {
         return this.IPV6_PATTERN.test(trimmed);
       } else {
-        // Check both
         return this.IP_PATTERN.test(trimmed) || this.IPV6_PATTERN.test(trimmed);
       }
     } catch (error) {
@@ -380,9 +337,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate postal code
-   */
   static isPostalCode(code: string, country: string): boolean {
     try {
       if (!code || !country || typeof code !== 'string') {
@@ -404,9 +358,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Match value against regex pattern
-   */
   static matchesPattern(value: string, pattern: RegExp | string): boolean {
     try {
       if (!value || typeof value !== 'string') {
@@ -421,9 +372,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate data against schema
-   */
   static async validateSchema(data: any, schema: Schema): Promise<ValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -457,9 +405,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate business rule
-   */
   static async validateBusinessRule(data: any, rule: BusinessRule): Promise<ValidationResult> {
     const errors: string[] = [];
 
@@ -486,9 +431,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate multiple business rules
-   */
   static async validateBusinessRules(data: any, rules: BusinessRule[]): Promise<ValidationResult> {
     const allErrors: string[] = [];
     const allWarnings: string[] = [];
@@ -513,9 +455,6 @@ export class ValidationUtils {
     return result;
   }
 
-  /**
-   * Validate value against schema (recursive)
-   */
   private static async validateValue(
     value: any,
     schema: Schema,
@@ -525,14 +464,12 @@ export class ValidationUtils {
   ): Promise<void> {
     const currentPath = path || 'root';
 
-    // Type validation
     const actualType = Array.isArray(value) ? 'array' : typeof value;
     if (actualType !== schema.type && value !== null && value !== undefined) {
       errors.push(`${currentPath}: Expected type ${schema.type}, got ${actualType}`);
       return;
     }
 
-    // Null/undefined handling
     if (value === null || value === undefined) {
       if (schema.required && schema.required.length > 0) {
         errors.push(`${currentPath}: Value is required`);
@@ -540,7 +477,6 @@ export class ValidationUtils {
       return;
     }
 
-    // Type-specific validation
     switch (schema.type) {
       case 'string':
         await this.validateString(value, schema, currentPath, errors, warnings);
@@ -549,7 +485,6 @@ export class ValidationUtils {
         this.validateNumber(value, schema, currentPath, errors);
         break;
       case 'boolean':
-        // No additional validation for boolean
         break;
       case 'object':
         await this.validateObject(value, schema, currentPath, errors, warnings);
@@ -559,15 +494,11 @@ export class ValidationUtils {
         break;
     }
 
-    // Enum validation
     if (schema.enum && !schema.enum.includes(value)) {
       errors.push(`${currentPath}: Value must be one of: ${schema.enum.join(', ')}`);
     }
   }
 
-  /**
-   * Validate string value
-   */
   private static async validateString(
     value: string,
     schema: Schema,
@@ -587,7 +518,6 @@ export class ValidationUtils {
       errors.push(`${path}: String does not match pattern ${schema.pattern}`);
     }
 
-    // Format validation
     if (schema.format) {
       switch (schema.format) {
         case 'email':
@@ -636,9 +566,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate number value
-   */
   private static validateNumber(
     value: number,
     schema: Schema,
@@ -654,9 +581,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate object value
-   */
   private static async validateObject(
     value: Record<string, any>,
     schema: Schema,
@@ -664,7 +588,6 @@ export class ValidationUtils {
     errors: string[],
     warnings: string[]
   ): Promise<void> {
-    // Check required properties
     if (schema.required) {
       for (const requiredProp of schema.required) {
         if (!(requiredProp in value)) {
@@ -673,7 +596,6 @@ export class ValidationUtils {
       }
     }
 
-    // Validate properties
     if (schema.properties) {
       for (const [propName, propSchema] of Object.entries(schema.properties)) {
         if (propName in value) {
@@ -689,9 +611,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate array value
-   */
   private static async validateArray(
     value: any[],
     schema: Schema,
@@ -707,7 +626,6 @@ export class ValidationUtils {
       errors.push(`${path}: Array length ${value.length} exceeds maximum ${schema.maxLength}`);
     }
 
-    // Validate items
     if (schema.items) {
       for (let i = 0; i < value.length; i++) {
         await this.validateValue(
@@ -721,11 +639,7 @@ export class ValidationUtils {
     }
   }
 
-  // Additional utility methods
 
-  /**
-   * Validate tax ID/SSN
-   */
   static isTaxId(taxId: string, country: string): boolean {
     try {
       if (!taxId || !country) {
@@ -747,9 +661,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate UUID
-   */
   static isUUID(uuid: string, version?: 1 | 3 | 4 | 5): boolean {
     try {
       if (!uuid || typeof uuid !== 'string') {
@@ -774,27 +685,21 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate base64 string
-   */
   static isBase64(value: string): boolean {
     try {
       if (!value || typeof value !== 'string') {
         return false;
       }
 
-      // Check pattern
       if (!this.COMMON_PATTERNS.base64.test(value)) {
         return false;
       }
 
-      // Check padding
       const remainder = value.length % 4;
       if (remainder === 1) {
         return false;
       }
 
-      // Try to decode
       try {
         const decoded = Buffer.from(value, 'base64').toString('base64');
         return decoded === value;
@@ -807,9 +712,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate JSON string
-   */
   static isJSON(value: string): boolean {
     try {
       if (!value || typeof value !== 'string') {
@@ -823,9 +725,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate hex color
-   */
   static isHexColor(color: string): boolean {
     try {
       if (!color || typeof color !== 'string') {
@@ -839,9 +738,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate password strength
-   */
   static getPasswordStrength(password: string): 'weak' | 'medium' | 'strong' | 'invalid' {
     try {
       if (!password || typeof password !== 'string') {
@@ -863,9 +759,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate username
-   */
   static isUsername(username: string): boolean {
     try {
       if (!username || typeof username !== 'string') {
@@ -879,9 +772,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate slug
-   */
   static isSlug(slug: string): boolean {
     try {
       if (!slug || typeof slug !== 'string') {
@@ -895,9 +785,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate date range
-   */
   static isDateInRange(date: string | Date, min?: Date, max?: Date): boolean {
     try {
       const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -921,9 +808,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate MIME type
-   */
   static isMimeType(mimeType: string): boolean {
     try {
       if (!mimeType || typeof mimeType !== 'string') {
@@ -937,9 +821,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate file extension
-   */
   static hasValidExtension(filename: string, allowedExtensions: string[]): boolean {
     try {
       if (!filename || !allowedExtensions || allowedExtensions.length === 0) {
@@ -962,24 +843,18 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Sanitize input for display
-   */
   static sanitizeInput(input: string): string {
     if (!input || typeof input !== 'string') {
       return '';
     }
 
     return input
-      .replace(/[<>]/g, '') // Remove angle brackets
-      .replace(/javascript:/gi, '') // Remove javascript protocol
-      .replace(/on\w+\s*=/gi, '') // Remove event handlers
+      .replace(/[<>]/g, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
       .trim();
   }
 
-  /**
-   * Validate alphanumeric
-   */
   static isAlphanumeric(value: string, allowSpaces: boolean = false): boolean {
     try {
       if (!value || typeof value !== 'string') {
@@ -994,9 +869,6 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Get credit card type
-   */
   static getCreditCardType(card: string): string | null {
     const cleaned = card.replace(/[\s-]/g, '');
 
@@ -1009,9 +881,6 @@ export class ValidationUtils {
     return null;
   }
 
-  /**
-   * Mask sensitive data
-   */
   static maskSensitiveData(value: string, type: 'email' | 'phone' | 'card' | 'custom', visibleChars: number = 4): string {
     if (!value || typeof value !== 'string') {
       return '';
@@ -1051,23 +920,14 @@ export class ValidationUtils {
     }
   }
 
-  /**
-   * Validate email address
-   */
   static isValidEmail(email: string): boolean {
     return this.isEmail(email);
   }
 
-  /**
-   * Validate URL
-   */
   static isValidUrl(url: string): boolean {
     return this.isURL(url);
   }
 
-  /**
-   * Validate phone number
-   */
   static isValidPhone(phone: string, country?: string): boolean {
     return this.isPhoneNumber(phone, country);
   }

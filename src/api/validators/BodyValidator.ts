@@ -319,7 +319,6 @@ export class BodyValidator {
       }
       
       const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString());
-      // Payload parsing is handled in validateJWTClaims method when needed
       
       if (!header.alg || !header.typ) {
         return {
@@ -377,7 +376,6 @@ export class BodyValidator {
       
       for (const [claim, expectedValue] of Object.entries(expectedClaims)) {
         if (claim === 'exp' || claim === 'iat' || claim === 'nbf') {
-          // Time-based claims
           const actualValue = payload[claim];
           if (actualValue === undefined) {
             errors.push({
@@ -408,7 +406,6 @@ export class BodyValidator {
             });
           }
         } else {
-          // Regular claims
           const actualValue = payload[claim];
           if (this.deepEqual(actualValue, expectedValue) === false) {
             errors.push({
@@ -518,7 +515,6 @@ export class BodyValidator {
         return errors;
       }
       
-      // Check for missing keys in actual
       for (const key of Object.keys(expected)) {
         if (!(key in actual)) {
           errors.push({
@@ -533,7 +529,6 @@ export class BodyValidator {
         }
       }
       
-      // Check for extra keys in actual
       for (const key of Object.keys(actual)) {
         if (!(key in expected)) {
           errors.push({
@@ -546,7 +541,6 @@ export class BodyValidator {
         }
       }
     } else {
-      // Primitive values
       if (expected !== actual) {
         errors.push({
           path,
@@ -565,7 +559,6 @@ export class BodyValidator {
     const errors: ValidationError[] = [];
     
     if (structure === '?') {
-      // Any value is allowed
       return errors;
     }
     
@@ -600,7 +593,6 @@ export class BodyValidator {
       }
       
       if (structure.length > 0) {
-        // Validate each item against the first structure element
         const itemStructure = structure[0];
         data.forEach((item, index) => {
           errors.push(...this.validateStructure(item, itemStructure, `${path}[${index}]`));
@@ -620,13 +612,11 @@ export class BodyValidator {
       
       for (const [key, value] of Object.entries(structure)) {
         if (key.endsWith('?')) {
-          // Optional field
           const actualKey = key.slice(0, -1);
           if (actualKey in data) {
             errors.push(...this.validateStructure(data[actualKey], value, `${path}.${actualKey}`));
           }
         } else {
-          // Required field
           if (!(key in data)) {
             errors.push({
               path: `${path}.${key}`,
@@ -687,7 +677,6 @@ export class BodyValidator {
       const errors: ValidationError[] = [];
       const bodyStr = this.normalizeBody(body);
       
-      // Check contains
       if (config.contains) {
         const searchStrings = Array.isArray(config.contains) ? config.contains : [config.contains];
         for (const str of searchStrings) {
@@ -696,7 +685,6 @@ export class BodyValidator {
         }
       }
       
-      // Check not contains
       if (config.notContains) {
         const searchStrings = Array.isArray(config.notContains) ? config.notContains : [config.notContains];
         for (const str of searchStrings) {
@@ -705,55 +693,46 @@ export class BodyValidator {
         }
       }
       
-      // Check equals
       if (config.equals !== undefined) {
         const result = this.validateEquals(body, config.equals);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check pattern
       if (config.pattern) {
         const result = this.validatePattern(bodyStr, config.pattern);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check length
       if (config.length) {
         const result = this.validateLength(bodyStr, config.length.value, config.length.operator);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check JSON
       if (config.json !== undefined) {
         const result = this.validateJSON(body, config.json);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check structure
       if (config.structure) {
         const result = this.validateJSONStructure(body, config.structure);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check not empty
       if (config.notEmpty) {
         const result = this.validateNotEmpty(body);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check checksum
       if (config.checksum) {
         const result = this.validateChecksum(bodyStr, config.checksum.value, config.checksum.algorithm);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check base64
       if (config.base64) {
         const result = this.validateBase64(bodyStr);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check JWT
       if (config.jwt) {
         if (config.jwt === true) {
           const result = this.validateJWT(bodyStr);

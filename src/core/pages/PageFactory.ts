@@ -5,19 +5,12 @@ import { CSBasePage } from './CSBasePage';
 import { PageRegistry } from './PageRegistry';
 import { PageCreationOptions, PageCacheEntry } from './types/page.types';
 
-/**
- * PageFactory - Create and manage page object instances
- * Implements caching and lifecycle management
- */
 export class PageFactory {
     private static pageCache: Map<string, PageCacheEntry> = new Map();
     private static pageLocks: Map<string, Promise<CSBasePage>> = new Map();
-    private static cacheTimeout: number = 300000; // 5 minutes default
+    private static cacheTimeout: number = 300000;
     private static maxCacheSize: number = 50;
 
-    /**
-     * Create a page object instance
-     */
     static async createPage<T extends CSBasePage>(
         PageClass: new(...args: any[]) => T, 
         page: Page,
@@ -27,7 +20,6 @@ export class PageFactory {
         const cacheKey = this.getCacheKey(className, page.url(), options);
         
         try {
-            // Check cache first if enabled
             if (options?.useCache !== false) {
                 const cached = this.getFromCache<T>(cacheKey);
                 if (cached) {
@@ -38,20 +30,17 @@ export class PageFactory {
                 }
             }
 
-            // Check if page is already being created (prevent race conditions)
             if (this.pageLocks.has(cacheKey)) {
                 ActionLogger.logPageOperation('page_factory_wait_lock', className);
                 return await this.pageLocks.get(cacheKey) as T;
             }
 
-            // Create page with lock
             const createPromise = this.createPageInternal<T>(PageClass, page, options);
             this.pageLocks.set(cacheKey, createPromise);
 
             try {
                 const pageObject = await createPromise;
                 
-                // Add to cache if enabled
                 if (options?.useCache !== false) {
                     this.addToCache(cacheKey, pageObject, options?.cacheTTL);
                 }
@@ -66,9 +55,6 @@ export class PageFactory {
         }
     }
 
-    /**
-     * Get or create a page object
-     */
     static async getPage<T extends CSBasePage>(
         PageClass: new(...args: any[]) => T, 
         page: Page,
@@ -77,9 +63,6 @@ export class PageFactory {
         return this.createPage(PageClass, page, { ...options, useCache: true });
     }
 
-    /**
-     * Create page by name from registry
-     */
     static async createPageByName(
         name: string, 
         page: Page,
@@ -99,9 +82,6 @@ export class PageFactory {
         }
     }
 
-    /**
-     * Create multiple pages
-     */
     static async createPages<T extends CSBasePage>(
         pageClasses: Array<new(...args: any[]) => T>,
         page: Page,
@@ -125,23 +105,16 @@ export class PageFactory {
         }
     }
 
-    /**
-     * Check if page is cached
-     */
     static isCached(PageClass: new(...args: any[]) => CSBasePage, page: Page): boolean {
         const cacheKey = this.getCacheKey(PageClass.name, page.url());
         return this.pageCache.has(cacheKey);
     }
 
-    /**
-     * Clear cache for specific page
-     */
     static clearPageCache(PageClass: new(...args: any[]) => CSBasePage, page?: Page): void {
         if (page) {
             const cacheKey = this.getCacheKey(PageClass.name, page.url());
             this.removeFromCache(cacheKey);
         } else {
-            // Clear all instances of this page class
             const className = PageClass.name;
             const keysToRemove: string[] = [];
             
@@ -157,13 +130,9 @@ export class PageFactory {
         ActionLogger.logPageOperation('page_factory_cache_clear', PageClass.name);
     }
 
-    /**
-     * Clear entire cache
-     */
     static clearCache(): void {
         const cacheSize = this.pageCache.size;
         
-        // Cleanup all pages
         this.pageCache.forEach(entry => {
             if (entry.instance.cleanup) {
                 entry.instance.cleanup().catch((error: Error) => {
@@ -180,12 +149,8 @@ export class PageFactory {
         });
     }
 
-    /**
-     * Dispose a page object
-     */
     static async disposePage(pageObject: CSBasePage): Promise<void> {
         try {
-            // Find and remove from cache
             const cacheKey = Array.from(this.pageCache.entries())
                 .find(([_, entry]) => entry.instance === pageObject)?.[0];
             
@@ -193,7 +158,6 @@ export class PageFactory {
                 this.removeFromCache(cacheKey);
             }
             
-            // Cleanup page resources
             if (pageObject.cleanup) {
                 await pageObject.cleanup();
             }
@@ -204,9 +168,6 @@ export class PageFactory {
         }
     }
 
-    /**
-     * Get cache statistics
-     */
     static getCacheStats(): any {
         const stats = {
             size: this.pageCache.size,
@@ -250,9 +211,6 @@ export class PageFactory {
         };
     }
 
-    /**
-     * Configure cache settings
-     */
     static configureCaching(options: {
         defaultTTL?: number;
         maxCacheSize?: number;
@@ -273,7 +231,6 @@ export class PageFactory {
         ActionLogger.logPageOperation('page_factory_configure', 'PageFactory', options);
     }
 
-    // Private methods
 
     private static async createPageInternal<T extends CSBasePage>(
         PageClass: new(...args: any[]) => T,
@@ -282,15 +239,12 @@ export class PageFactory {
     ): Promise<T> {
         const startTime = Date.now();
         
-        // Create instance
         const pageObject = new PageClass();
         
-        // Initialize with options
         if (!options?.skipInitialization) {
             await pageObject.initialize(page);
         }
         
-        // Wait for custom ready state if provided
         if (options?.waitForReady) {
             await options.waitForReady(pageObject);
         }
@@ -326,13 +280,11 @@ export class PageFactory {
             return null;
         }
         
-        // Check if expired
         if (entry.expiresAt && Date.now() > entry.expiresAt) {
             this.removeFromCache(cacheKey);
             return null;
         }
         
-        // Update last accessed
         entry.lastAccessed = Date.now();
         
         return entry.instance as T;
@@ -343,7 +295,6 @@ export class PageFactory {
         instance: CSBasePage, 
         ttl?: number
     ): void {
-        // Check cache size limit
         if (this.pageCache.size >= this.maxCacheSize) {
             this.evictOldestEntry();
         }
@@ -363,7 +314,6 @@ export class PageFactory {
         const entry = this.pageCache.get(cacheKey);
         
         if (entry) {
-            // Cleanup if needed
             if (entry.instance.cleanup) {
                 entry.instance.cleanup().catch((error: Error) => {
                     logger.error('PageFactory: Error during cache removal cleanup', error);
@@ -378,7 +328,6 @@ export class PageFactory {
         let oldestKey: string | null = null;
         let oldestTime = Date.now();
         
-        // Find least recently accessed
         this.pageCache.forEach((entry, key) => {
             if (entry.lastAccessed < oldestTime) {
                 oldestTime = entry.lastAccessed;
@@ -398,12 +347,10 @@ export class PageFactory {
     private static cacheCleanupInterval: NodeJS.Timeout | null = null;
 
     private static startCacheCleanup(interval: number): void {
-        // Clear existing interval
         if (this.cacheCleanupInterval) {
             clearInterval(this.cacheCleanupInterval);
         }
         
-        // Start new interval
         this.cacheCleanupInterval = setInterval(() => {
             this.cleanupExpiredEntries();
         }, interval);

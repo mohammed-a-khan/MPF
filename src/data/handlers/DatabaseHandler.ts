@@ -8,10 +8,6 @@ import { logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 
-/**
- * Handler for database sources
- * Supports all 6 database types through CSDatabase
- */
 export class DatabaseHandler implements DataHandler {
     private validator: DataValidator;
     private transformer: DataTransformer;
@@ -23,40 +19,31 @@ export class DatabaseHandler implements DataHandler {
         this.transformer = new DataTransformer();
     }
 
-    /**
-     * Load data from database
-     */
     async load(options: DataProviderOptions): Promise<DataProviderResult> {
         const startTime = Date.now();
         ActionLogger.logInfo('Data handler operation: database_load', { operation: 'database_load', options });
         
         try {
-            // Get connection configuration
             this.currentSource = options.source;
             const connectionName = options.connection || this.resolveConnectionName(options.source!);
             const connection = await this.getOrCreateDatabase(connectionName);
             
-            // Build query
             const query = await this.buildQuery(options);
             const params = options.params || [];
             
             logger.debug(`Executing query: ${query}`);
             
-            // Execute query
             const result = await connection.query(query, params);
             let data = result.rows || [];
             
-            // Apply filter if specified
             if (options.filter) {
                 data = data.filter((row: any) => this.matchesFilter(row, options.filter!));
             }
             
-            // Apply transformations if specified
             if (options.transformations && options.transformations.length > 0) {
                 data = await this.transformer.transform(data, options.transformations);
             }
             
-            // Limit records if specified
             if (options.maxRecords && data.length > options.maxRecords) {
                 data = data.slice(0, options.maxRecords);
             }
@@ -81,9 +68,6 @@ export class DatabaseHandler implements DataHandler {
         }
     }
 
-    /**
-     * Stream data from database
-     */
     async *stream(options: DataProviderOptions): AsyncIterableIterator<TestData> {
         const connectionName = options.connection || this.resolveConnectionName(options.source!);
         const connection = await this.getOrCreateDatabase(connectionName);
@@ -92,7 +76,6 @@ export class DatabaseHandler implements DataHandler {
         const params = options.params || [];
         const batchSize = options.batchSize || 1000;
         
-        // Use offset-based pagination
             let offset = 0;
             let recordCount = 0;
             
@@ -104,7 +87,6 @@ export class DatabaseHandler implements DataHandler {
                 if (rows.length === 0) break;
                 
                 for (const row of rows) {
-                    // Apply filter
                     if (options.filter && !this.matchesFilter(row, options.filter)) {
                         continue;
                     }
@@ -112,7 +94,6 @@ export class DatabaseHandler implements DataHandler {
                     yield row;
                     recordCount++;
                     
-                    // Check max records
                     if (options.maxRecords && recordCount >= options.maxRecords) {
                         return;
                     }
@@ -120,14 +101,10 @@ export class DatabaseHandler implements DataHandler {
                 
                 offset += batchSize;
                 
-                // Break if we got less than batch size (no more records)
                 if (rows.length < batchSize) break;
             }
     }
 
-    /**
-     * Load partial data from database
-     */
     async loadPartial(
         options: DataProviderOptions, 
         offset: number, 
@@ -139,16 +116,13 @@ export class DatabaseHandler implements DataHandler {
             const connectionName = options.connection || this.resolveConnectionName(options.source!);
             const connection = await this.getOrCreateDatabase(connectionName);
             
-            // Build query with pagination
             const baseQuery = await this.buildQuery(options);
             const query = this.addPagination(baseQuery, offset, limit, this.database?.getType() || 'postgresql');
             const params = options.params || [];
             
-            // Execute query
             const result = await connection.query(query, params);
             const data = result.rows || [];
             
-            // Get total count
             const countQuery = `SELECT COUNT(*) as total FROM (${baseQuery}) as subquery`;
             const countResult = await connection.query(countQuery, params);
             const totalCount = countResult.rows[0]?.total || 0;
@@ -174,21 +148,16 @@ export class DatabaseHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load schema from database
-     */
     async loadSchema(options: DataProviderOptions): Promise<any> {
         try {
             const connectionName = options.connection || this.resolveConnectionName(options.source!);
             const connection = await this.getOrCreateDatabase(connectionName);
             
-            // Get table schema
             if (options.table) {
                 const tableInfo = await connection.getTableInfo(options.table);
                 return this.convertToDataSchema(tableInfo);
             }
             
-            // For queries, analyze result structure
             const query = await this.buildQuery(options);
             const result = await connection.query(`${query} LIMIT 1`, options.params || []);
             
@@ -204,9 +173,6 @@ export class DatabaseHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get database metadata
-     */
     async getMetadata(options: DataProviderOptions): Promise<Record<string, any>> {
         try {
             const connectionName = options.connection || this.resolveConnectionName(options.source!);
@@ -219,7 +185,6 @@ export class DatabaseHandler implements DataHandler {
             };
             
             if (options.table) {
-                // Get table metadata
                 const tableInfo = await connection.getTableInfo(options.table);
                 metadata['table'] = {
                     name: options.table,
@@ -232,7 +197,6 @@ export class DatabaseHandler implements DataHandler {
             }
             
             if (options.query) {
-                // Query plan analysis not supported in current implementation
                 metadata['queryPlan'] = 'Not available';
             }
             
@@ -244,9 +208,6 @@ export class DatabaseHandler implements DataHandler {
         }
     }
 
-    /**
-     * Validate data
-     */
     async validate(data: TestData[]): Promise<ValidationResult> {
         const validationRules: Record<string, any> = {};
         
@@ -267,29 +228,19 @@ export class DatabaseHandler implements DataHandler {
         };
     }
 
-    /**
-     * Transform data
-     */
     async transform(data: TestData[], transformations: DataTransformation[]): Promise<TestData[]> {
         return await this.transformer.transform(data, transformations);
     }
 
-    /**
-     * Build query from options
-     */
     private async buildQuery(options: DataProviderOptions): Promise<string> {
-        // Direct query
         if (options.query) {
-            // Check for predefined query
             const predefinedQuery = ConfigurationManager.get(options.query, '');
             return predefinedQuery || options.query;
         }
         
-        // Build from table
         if (options.table) {
             let query = `SELECT * FROM ${options.table}`;
             
-            // Add WHERE clause
             if (options.where) {
                 query += ` WHERE ${options.where}`;
             } else if (options.filter) {
@@ -310,7 +261,6 @@ export class DatabaseHandler implements DataHandler {
                 }
             }
             
-            // Add ORDER BY
             const dbOptions = options as any;
             if (dbOptions.orderBy) {
                 query += ` ORDER BY ${dbOptions.orderBy}`;
@@ -322,20 +272,15 @@ export class DatabaseHandler implements DataHandler {
         throw new Error('Either query or table must be specified');
     }
 
-    /**
-     * Add pagination to query
-     */
     private addPagination(query: string, offset: number, limit: number, dbType: string): string {
         switch (dbType) {
             case 'sqlserver':
-                // SQL Server uses OFFSET FETCH
                 if (!query.toUpperCase().includes('ORDER BY')) {
-                    query += ' ORDER BY (SELECT NULL)'; // Required for OFFSET
+                    query += ' ORDER BY (SELECT NULL)';
                 }
                 return `${query} OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
                 
             case 'oracle':
-                // Oracle uses ROWNUM or OFFSET FETCH (12c+)
                 return `
                     SELECT * FROM (
                         SELECT a.*, ROWNUM rnum FROM (${query}) a
@@ -347,30 +292,20 @@ export class DatabaseHandler implements DataHandler {
             case 'mysql':
             case 'postgresql':
             default:
-                // MySQL and PostgreSQL use LIMIT OFFSET
                 return `${query} LIMIT ${limit} OFFSET ${offset}`;
         }
     }
 
-    /**
-     * Resolve connection name from source
-     */
     private resolveConnectionName(source: string): string {
-        // Check if source is a connection string
         if (source.includes('://') || source.includes('server=')) {
-            // For connection strings, use connectWithConnectionString method
             const connectionName = `dynamic_${Date.now()}`;
             // Note: Connection string will be handled in getOrCreateDatabase
             return connectionName;
         }
         
-        // Otherwise treat as connection name
         return source;
     }
 
-    /**
-     * Convert database schema to data schema
-     */
     private convertToDataSchema(dbSchema: any): any {
         const fields = dbSchema.columns.map((col: any) => ({
             name: col.name,
@@ -388,9 +323,6 @@ export class DatabaseHandler implements DataHandler {
         };
     }
 
-    /**
-     * Map database type to data type
-     */
     private mapDatabaseType(dbType: string): string {
         const typeMap: Record<string, string> = {
             'varchar': 'string',
@@ -415,9 +347,6 @@ export class DatabaseHandler implements DataHandler {
         return typeMap[normalizedType as keyof typeof typeMap] || 'string';
     }
 
-    /**
-     * Infer schema from data
-     */
     private inferSchemaFromData(record: any): any {
         const fields = Object.entries(record).map(([key, value]) => ({
             name: key,
@@ -432,9 +361,6 @@ export class DatabaseHandler implements DataHandler {
         };
     }
 
-    /**
-     * Get value type
-     */
     private getValueType(value: any): string {
         if (value === null || value === undefined) return 'string';
         if (typeof value === 'number') return 'number';
@@ -444,9 +370,6 @@ export class DatabaseHandler implements DataHandler {
         return 'string';
     }
 
-    /**
-     * Check if record matches filter
-     */
     private matchesFilter(record: TestData, filter: Record<string, any>): boolean {
         for (const [key, value] of Object.entries(filter)) {
             if (record[key] !== value) {
@@ -456,23 +379,15 @@ export class DatabaseHandler implements DataHandler {
         return true;
     }
 
-    /**
-     * Sanitize query for logging
-     */
     private sanitizeQueryForLogging(query: string): string {
-        // Remove potential sensitive data
         return query
             .replace(/password\s*=\s*'[^']*'/gi, "password='***'")
             .replace(/pwd\s*=\s*'[^']*'/gi, "pwd='***'")
             .replace(/token\s*=\s*'[^']*'/gi, "token='***'");
     }
 
-    /**
-     * Get or create database instance
-     */
     private async getOrCreateDatabase(connectionName: string): Promise<CSDatabase> {
         if (!this.database) {
-            // Check if this is a connection string
             const source = this.currentSource;
             if (source && (source.includes('://') || source.includes('server='))) {
                 this.database = await CSDatabase.connectWithConnectionString(source, connectionName);
@@ -485,9 +400,6 @@ export class DatabaseHandler implements DataHandler {
     }
     
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, options: DataProviderOptions): Error {
         const enhancedError = new Error(
             `Database Handler Error: ${error instanceof Error ? error.message : String(error)}\n` +

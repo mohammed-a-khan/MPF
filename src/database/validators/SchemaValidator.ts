@@ -15,9 +15,6 @@ export class SchemaValidator {
         this.adapterType = connection.type || 'unknown';
     }
 
-    /**
-     * Validate table exists
-     */
     async validateTableExists(tableName: string, schema?: string): Promise<ValidationResult> {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -69,9 +66,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate column exists
-     */
     async validateColumnExists(
         tableName: string, 
         columnName: string, 
@@ -132,9 +126,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate table schema
-     */
     async validateTableSchema(
         tableName: string,
         expectedColumns: Array<{
@@ -157,7 +148,6 @@ export class SchemaValidator {
             const issues: string[] = [];
             const columnComparison: any[] = [];
 
-            // Check each expected column
             for (const expectedCol of expectedColumns) {
                 const actualCol = actualColumns.find(col => 
                     col.name.toLowerCase() === expectedCol.name.toLowerCase()
@@ -182,21 +172,18 @@ export class SchemaValidator {
                     actual: actualCol
                 };
 
-                // Validate data type
                 if (!this.compareDataTypes(actualCol.dataType, expectedCol.dataType)) {
                     passed = false;
                     issues.push(`Column '${expectedCol.name}' type mismatch. Expected: ${expectedCol.dataType}, Actual: ${actualCol.dataType}`);
                     comparison.typeMismatch = true;
                 }
 
-                // Validate nullable
                 if (expectedCol.nullable !== undefined && actualCol.nullable !== expectedCol.nullable) {
                     passed = false;
                     issues.push(`Column '${expectedCol.name}' nullable mismatch. Expected: ${expectedCol.nullable}, Actual: ${actualCol.nullable}`);
                     comparison.nullableMismatch = true;
                 }
 
-                // Validate default value
                 if (expectedCol.defaultValue !== undefined && 
                     !this.compareDefaultValues(actualCol.defaultValue, expectedCol.defaultValue)) {
                     passed = false;
@@ -204,7 +191,6 @@ export class SchemaValidator {
                     comparison.defaultMismatch = true;
                 }
 
-                // Validate primary key
                 if (expectedCol.primaryKey !== undefined && actualCol.primaryKey !== expectedCol.primaryKey) {
                     passed = false;
                     issues.push(`Column '${expectedCol.name}' primary key mismatch`);
@@ -214,7 +200,6 @@ export class SchemaValidator {
                 columnComparison.push(comparison);
             }
 
-            // Check for unexpected columns if strict mode
             if (options?.strict) {
                 for (const actualCol of actualColumns) {
                     if (!expectedColumns.find(col => 
@@ -276,9 +261,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate index exists
-     */
     async validateIndexExists(
         tableName: string,
         indexName: string,
@@ -339,9 +321,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate foreign key exists
-     */
     async validateForeignKeyExists(
         tableName: string,
         foreignKeyName: string,
@@ -402,9 +381,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate constraint exists
-     */
     async validateConstraintExists(
         tableName: string,
         constraintName: string,
@@ -473,9 +449,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate view exists
-     */
     async validateViewExists(viewName: string, schema?: string): Promise<ValidationResult> {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -527,9 +500,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate stored procedure exists
-     */
     async validateStoredProcedureExists(
         procedureName: string, 
         schema?: string
@@ -584,9 +554,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate function exists
-     */
     async validateFunctionExists(functionName: string, schema?: string): Promise<ValidationResult> {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -638,7 +605,6 @@ export class SchemaValidator {
         }
     }
 
-    // Private helper methods
 
     private getTableExistsQuery(tableName: string, schema?: string): string {
         switch (this.adapterType) {
@@ -722,11 +688,9 @@ export class SchemaValidator {
                 `;
             
             case 'mongodb':
-                // MongoDB doesn't have fixed schema, check if field exists in any document
                 return `db.${tableName}.findOne({ "${columnName}": { $exists: true } })`;
             
             case 'redis':
-                // Redis doesn't have columns, check if hash field exists
                 return `HEXISTS ${tableName}:sample ${columnName}`;
             
             default:
@@ -832,7 +796,6 @@ export class SchemaValidator {
     }
 
     private compareDataTypes(actual: string, expected: string): boolean {
-        // Normalize data types for comparison
         const normalizeType = (type: string): string => {
             return type.toLowerCase()
                 .replace(/\s+/g, '')
@@ -847,7 +810,6 @@ export class SchemaValidator {
         const normalizedActual = normalizeType(actual);
         const normalizedExpected = normalizeType(expected);
         
-        // Handle type aliases
         const typeAliases: Record<string, string[]> = {
             'integer': ['int', 'integer', 'int4', 'int32'],
             'bigint': ['bigint', 'int8', 'int64'],
@@ -858,12 +820,10 @@ export class SchemaValidator {
             'decimal': ['decimal', 'numeric', 'number']
         };
         
-        // Check direct match
         if (normalizedActual === normalizedExpected) {
             return true;
         }
         
-        // Check aliases
         for (const [_key, aliases] of Object.entries(typeAliases)) {
             if (aliases.includes(normalizedActual) && aliases.includes(normalizedExpected)) {
                 return true;
@@ -874,19 +834,17 @@ export class SchemaValidator {
     }
 
     private compareDefaultValues(actual: any, expected: any): boolean {
-        // Handle null/undefined
         if (actual === null || actual === undefined) {
             return expected === null || expected === undefined;
         }
         
-        // Normalize default value expressions
         const normalizeDefault = (value: any): string => {
             if (value === null || value === undefined) return '';
             
             return String(value)
-                .replace(/^'|'$/g, '')  // Remove quotes
-                .replace(/\(\)/g, '')   // Remove parentheses
-                .replace(/::[\w\s]+/g, '') // Remove PostgreSQL type casts
+                .replace(/^'|'$/g, '')
+                .replace(/\(\)/g, '')
+                .replace(/::[\w\s]+/g, '')
                 .toLowerCase()
                 .trim();
         };

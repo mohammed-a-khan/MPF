@@ -8,8 +8,6 @@ export class LoginPage extends CSBasePage {
         return process.env['APP_BASE_URL'] || 'https://opensource-demo.orangehrmlive.com/web/index.php/auth/login';
     }
 
-    // These locators will work on NetScaler login page
-    // Update them based on your actual NetScaler login form
     @CSGetElement({
         locatorType: 'xpath',
         locatorValue: '//input[@name="username" or @id="username" or @name="login" or @id="login"]',
@@ -46,25 +44,20 @@ export class LoginPage extends CSBasePage {
     private welcomeMessage!: CSWebElement;
 
     protected async waitForPageLoad(): Promise<void> {
-        // For NetScaler scenarios, we might be on either the auth page or the app page
         const currentUrl = this.page.url();
         
         if (currentUrl.toLowerCase().includes('auth') || 
             currentUrl.toLowerCase().includes('login') ||
             currentUrl.toLowerCase().includes('netscaler') ||
             currentUrl.toLowerCase().includes('citrix')) {
-            // We're on the authentication page, just wait for DOM
             await this.waitForLoadState('domcontentloaded');
-            // Small wait to ensure form elements are interactive
             await this.page.waitForTimeout(1000);
         } else {
-            // We're on the application page, wait for full load
             await this.waitForLoadState('networkidle');
         }
     }
 
     async navigate(): Promise<void> {
-        // Navigate to the app URL - framework will handle NetScaler redirect
         await this.navigateTo();
     }
 
@@ -82,16 +75,11 @@ export class LoginPage extends CSBasePage {
     }
 
     async clickLogOn(): Promise<void> {
-        // Playwright auto-waits for navigation after click
-        // It handles redirects automatically
         await this.logOnLink.click();
         
-        // Playwright's click() already waits for navigation
-        // Only add explicit wait if your app has specific requirements
     }
 
     async verifyHomeHeader(): Promise<void> {
-        // Framework automatically handles navigation, just verify the header
         await this.homeHeader.waitFor({ state: 'visible' });
     }
 
@@ -101,7 +89,6 @@ export class LoginPage extends CSBasePage {
         
         const passed = welcomeText === 'Admin';
         
-        // Log the verification
         await ActionLogger.logVerification(
             'Welcome message verification',
             expectedUsername,
@@ -115,12 +102,10 @@ export class LoginPage extends CSBasePage {
     }
 
     async verifyLoginSuccess(): Promise<void> {
-        // Framework automatically handles navigation, just verify the header
         await this.homeHeader.waitFor({ state: 'visible' });
     }
 
     async verifyHomePage(): Promise<void> {
-        // Same as verifyHomeHeader
         await this.verifyHomeHeader();
     }
 } 

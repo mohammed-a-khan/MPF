@@ -11,10 +11,6 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { statSync } from 'fs';
 
-/**
- * Handler for Excel files (.xlsx, .xls)
- * Uses xlsx library for parsing
- */
 export class ExcelHandler implements DataHandler {
     private parser: ExcelParser;
     private validator: DataValidator;
@@ -25,22 +21,17 @@ export class ExcelHandler implements DataHandler {
         this.parser = new ExcelParser();
         this.validator = new DataValidator();
         this.transformer = new DataTransformer();
-        this.streamingThreshold = parseInt(process.env['EXCEL_STREAMING_THRESHOLD'] || '10485760'); // 10MB
+        this.streamingThreshold = parseInt(process.env['EXCEL_STREAMING_THRESHOLD'] || '10485760');
     }
 
-    /**
-     * Load data from Excel file
-     */
     async load(options: DataProviderOptions): Promise<DataProviderResult> {
         const startTime = Date.now();
         ActionLogger.logInfo('Data handler operation: excel_load', { operation: 'excel_load', options });
         
         try {
-            // Validate file exists
             const filePath = await this.resolveFilePath(options.source!);
             await this.validateFile(filePath);
             
-            // Determine if streaming is needed
             const fileSize = this.getFileSize(filePath);
             const useStreaming = options.streaming || fileSize > this.streamingThreshold;
             
@@ -53,7 +44,6 @@ export class ExcelHandler implements DataHandler {
                 data = result.data;
                 metadata = result.metadata || {};
             } else {
-                // Load entire file
                 const fileBuffer = await fs.readFile(filePath);
                 const parseResult = await this.parser.parse(fileBuffer, {
                     ...(options.sheet && { sheetName: options.sheet }),
@@ -68,12 +58,10 @@ export class ExcelHandler implements DataHandler {
                 metadata = parseResult.metadata || {};
             }
             
-            // Apply transformations if specified
             if (options.transformations && options.transformations.length > 0) {
                 data = await this.transformer.transform(data, options.transformations);
             }
             
-            // Process encrypted data (decrypt sensitive fields)
             data = await DataEncryptionManager.processTestData(data);
             
             const loadTime = Date.now() - startTime;
@@ -96,9 +84,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load Excel file using streaming
-     */
     private async loadStreaming(filePath: string, options: DataProviderOptions): Promise<DataProviderResult> {
         const data: TestData[] = [];
         const batchSize = options.batchSize || 1000;
@@ -109,18 +94,16 @@ export class ExcelHandler implements DataHandler {
             headerRow: options.skipRows ? options.skipRows + 1 : 1,
             headers: options.headers !== false,
             batchSize,
-            highWaterMark: 65536, // 64KB chunks
+            highWaterMark: 65536,
             onBatch: async (batch: TestData[]) => {
-                // Apply filter if specified
                 if (options.filter) {
                     batch = batch.filter(row => this.matchesFilter(row, options.filter!));
                 }
                 
                 data.push(...batch);
                 
-                // Check max records limit
                 if (options.maxRecords && data.length >= options.maxRecords) {
-                    throw new Error('MAX_RECORDS_REACHED'); // Special error to stop streaming
+                    throw new Error('MAX_RECORDS_REACHED');
                 }
             }
         };
@@ -128,7 +111,6 @@ export class ExcelHandler implements DataHandler {
         try {
             await this.parser.stream(filePath, streamOptions);
             
-            // Trim to max records if exceeded
             if (options.maxRecords && data.length > options.maxRecords) {
                 data.splice(options.maxRecords);
             }
@@ -144,7 +126,6 @@ export class ExcelHandler implements DataHandler {
             
         } catch (error: any) {
             if (error.message === 'MAX_RECORDS_REACHED') {
-                // This is expected, not an error
                 return {
                     data: data.slice(0, options.maxRecords),
                     metadata: {
@@ -159,9 +140,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Stream data from Excel file
-     */
     async *stream(options: DataProviderOptions): AsyncIterableIterator<TestData> {
         const filePath = await this.resolveFilePath(options.source!);
         
@@ -177,7 +155,6 @@ export class ExcelHandler implements DataHandler {
         
         for await (const batch of this.parser.streamBatches(filePath, streamOptions)) {
             for (const record of batch) {
-                // Apply filter
                 if (options.filter && !this.matchesFilter(record, options.filter)) {
                     continue;
                 }
@@ -185,7 +162,6 @@ export class ExcelHandler implements DataHandler {
                 yield record;
                 recordCount++;
                 
-                // Check max records
                 if (options.maxRecords && recordCount >= options.maxRecords) {
                     return;
                 }
@@ -193,9 +169,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load partial data from Excel file
-     */
     async loadPartial(
         options: DataProviderOptions, 
         offset: number, 
@@ -206,7 +179,6 @@ export class ExcelHandler implements DataHandler {
         try {
             const filePath = await this.resolveFilePath(options.source!);
             
-            // For Excel, we need to read the file and extract the specific range
             const fileBuffer = await fs.readFile(filePath);
             const parseResult = await this.parser.parsePartial(fileBuffer, {
                 ...(options.sheet && { sheetName: options.sheet }),
@@ -236,9 +208,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Load schema from Excel file
-     */
     async loadSchema(options: DataProviderOptions): Promise<any> {
         try {
             const filePath = await this.resolveFilePath(options.source!);
@@ -255,9 +224,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get Excel file metadata
-     */
     async getMetadata(options: DataProviderOptions): Promise<Record<string, any>> {
         try {
             const filePath = await this.resolveFilePath(options.source!);
@@ -280,9 +246,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Validate data
-     */
     async validate(data: TestData[]): Promise<ValidationResult> {
         const validationRules: Record<string, any> = {};
         
@@ -303,29 +266,20 @@ export class ExcelHandler implements DataHandler {
         };
     }
 
-    /**
-     * Transform data
-     */
     async transform(data: TestData[], transformations: DataTransformation[]): Promise<TestData[]> {
         return await this.transformer.transform(data, transformations);
     }
 
-    /**
-     * Resolve file path
-     */
     private async resolveFilePath(source: string): Promise<string> {
-        // Check if absolute path
         if (path.isAbsolute(source)) {
             return source;
         }
         
-        // Try relative to current directory
         const relativePath = path.resolve(process.cwd(), source);
         if (await this.fileExists(relativePath)) {
             return relativePath;
         }
         
-        // Try relative to test data directory
         const testDataPath = path.resolve(
             process.cwd(),
             process.env['DEFAULT_DATA_PATH'] || './test-data',
@@ -339,9 +293,6 @@ export class ExcelHandler implements DataHandler {
         throw new Error(`Excel file not found: ${source}`);
     }
 
-    /**
-     * Validate file
-     */
     private async validateFile(filePath: string): Promise<void> {
         const stats = await fs.stat(filePath);
         
@@ -354,8 +305,7 @@ export class ExcelHandler implements DataHandler {
             throw new Error(`Invalid Excel file extension: ${ext}`);
         }
         
-        // Check file size limit
-        const maxSize = parseInt(process.env['MAX_EXCEL_FILE_SIZE'] || '104857600'); // 100MB
+        const maxSize = parseInt(process.env['MAX_EXCEL_FILE_SIZE'] || '104857600');
         if (stats.size > maxSize) {
             throw new Error(
                 `Excel file too large: ${stats.size} bytes (max: ${maxSize} bytes). ` +
@@ -364,9 +314,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if file exists
-     */
     private async fileExists(filePath: string): Promise<boolean> {
         try {
             await fs.access(filePath);
@@ -376,9 +323,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Get file size
-     */
     private getFileSize(filePath: string): number {
         try {
             return statSync(filePath).size;
@@ -387,9 +331,6 @@ export class ExcelHandler implements DataHandler {
         }
     }
 
-    /**
-     * Check if record matches filter
-     */
     private matchesFilter(record: TestData, filter: Record<string, any>): boolean {
         for (const [key, value] of Object.entries(filter)) {
             if (record[key] !== value) {
@@ -399,9 +340,6 @@ export class ExcelHandler implements DataHandler {
         return true;
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, options: DataProviderOptions): Error {
         const enhancedError = new Error(
             `Excel Handler Error: ${error instanceof Error ? error.message : String(error)}\n` +

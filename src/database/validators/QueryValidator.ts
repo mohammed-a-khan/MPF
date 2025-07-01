@@ -17,9 +17,6 @@ export class QueryValidator {
         /(\b(waitfor|delay|benchmark|sleep)\b)/gi
     ];
 
-    /**
-     * Validate query syntax
-     */
     validateSyntax(query: string, databaseType: string): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -28,34 +25,29 @@ export class QueryValidator {
         let passed = true;
         const issues: string[] = [];
 
-        // Basic validation
         if (!query || query.trim().length === 0) {
             passed = false;
             issues.push('Query is empty');
         }
 
-        // Check for balanced parentheses
         const parenthesesBalance = this.checkParenthesesBalance(query);
         if (!parenthesesBalance.balanced) {
             passed = false;
             issues.push(`Unbalanced parentheses: ${parenthesesBalance.message}`);
         }
 
-        // Check for balanced quotes
         const quotesBalance = this.checkQuotesBalance(query);
         if (!quotesBalance.balanced) {
             passed = false;
             issues.push(`Unbalanced quotes: ${quotesBalance.message}`);
         }
 
-        // Database-specific syntax validation
         const syntaxValidation = this.validateDatabaseSpecificSyntax(query, databaseType);
         if (!syntaxValidation.valid) {
             passed = false;
             issues.push(...syntaxValidation.issues);
         }
 
-        // Check for common syntax errors
         const commonErrors = this.checkCommonSyntaxErrors(query);
         if (commonErrors.length > 0) {
             passed = false;
@@ -87,9 +79,6 @@ export class QueryValidator {
         return validationResult;
     }
 
-    /**
-     * Validate query is safe (no dangerous operations)
-     */
     validateSafety(query: string, allowDangerous: boolean = false): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -100,7 +89,6 @@ export class QueryValidator {
         const foundDangerous: string[] = [];
 
         if (!allowDangerous) {
-            // Check for dangerous keywords
             const upperQuery = query.toUpperCase();
             for (const keyword of this.dangerousKeywords) {
                 const regex = new RegExp(`\\b${keyword}\\b`, 'g');
@@ -115,7 +103,6 @@ export class QueryValidator {
             }
         }
 
-        // Check for SQL injection patterns
         const injectionCheck = this.checkSQLInjection(query);
         if (!injectionCheck.safe) {
             passed = false;
@@ -147,9 +134,6 @@ export class QueryValidator {
         return validationResult;
     }
 
-    /**
-     * Validate query parameters
-     */
     validateParameters(query: string, params: any[]): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -158,18 +142,14 @@ export class QueryValidator {
         let passed = true;
         const issues: string[] = [];
 
-        // Count parameter placeholders in query
         const placeholderCount = this.countParameterPlaceholders(query);
         
-        // Check parameter count matches
         if (placeholderCount !== params.length) {
             passed = false;
             issues.push(`Parameter count mismatch. Expected: ${placeholderCount}, Provided: ${params.length}`);
         }
 
-        // Validate parameter values
         params.forEach((param, index) => {
-            // Check for potential injection in parameters
             if (typeof param === 'string') {
                 const paramInjection = this.checkParameterInjection(param);
                 if (!paramInjection.safe) {
@@ -178,7 +158,6 @@ export class QueryValidator {
                 }
             }
 
-            // Check for null/undefined when not allowed
             if (param === undefined) {
                 passed = false;
                 issues.push(`Parameter ${index + 1} is undefined`);
@@ -210,9 +189,6 @@ export class QueryValidator {
         return validationResult;
     }
 
-    /**
-     * Validate query performance (basic checks)
-     */
     validatePerformance(query: string): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -224,12 +200,10 @@ export class QueryValidator {
 
         const upperQuery = query.toUpperCase();
 
-        // Check for SELECT *
         if (/SELECT\s+\*/.test(upperQuery)) {
             warnings.push('SELECT * detected - consider specifying columns');
         }
 
-        // Check for missing WHERE clause in UPDATE/DELETE
         if (/UPDATE\s+\w+\s+SET/.test(upperQuery) && !/WHERE/i.test(upperQuery)) {
             passed = false;
             warnings.push('UPDATE without WHERE clause - will affect all rows');
@@ -240,32 +214,27 @@ export class QueryValidator {
             warnings.push('DELETE without WHERE clause - will delete all rows');
         }
 
-        // Check for LIKE with leading wildcard
         if (/LIKE\s+['"]%/.test(upperQuery)) {
             warnings.push('LIKE with leading wildcard - may cause full table scan');
             suggestions.push('Consider using full-text search or indexing strategy');
         }
 
-        // Check for NOT IN with subquery
         if (/NOT\s+IN\s*\(SELECT/i.test(upperQuery)) {
             warnings.push('NOT IN with subquery - consider using NOT EXISTS');
             suggestions.push('NOT EXISTS often performs better than NOT IN');
         }
 
-        // Check for multiple JOINs
         const joinCount = (upperQuery.match(/\bJOIN\b/g) || []).length;
         if (joinCount > 5) {
             warnings.push(`Query contains ${joinCount} JOINs - may impact performance`);
             suggestions.push('Consider breaking into smaller queries or using materialized views');
         }
 
-        // Check for OR in WHERE clause
         if (/WHERE.*\bOR\b/i.test(upperQuery)) {
             warnings.push('OR condition in WHERE clause - may prevent index usage');
             suggestions.push('Consider using UNION or restructuring the query');
         }
 
-        // Check for functions in WHERE clause
         if (/WHERE.*\b(UPPER|LOWER|SUBSTRING|DATEPART|YEAR|MONTH|DAY)\s*\(/i.test(upperQuery)) {
             warnings.push('Function in WHERE clause - may prevent index usage');
             suggestions.push('Consider using computed columns or functional indexes');
@@ -297,9 +266,6 @@ export class QueryValidator {
         return validationResult;
     }
 
-    /**
-     * Validate query complexity
-     */
     validateComplexity(query: string, maxComplexity: number = 100): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -339,7 +305,6 @@ export class QueryValidator {
         return validationResult;
     }
 
-    // Private helper methods
 
     private checkParenthesesBalance(query: string): { balanced: boolean; message?: string } {
         let depth = 0;
@@ -350,7 +315,6 @@ export class QueryValidator {
             const char = query[i];
             const prevChar = i > 0 ? query[i - 1] : '';
 
-            // Handle string literals
             if ((char === "'" || char === '"') && prevChar !== '\\') {
                 if (!inString) {
                     inString = true;
@@ -361,10 +325,8 @@ export class QueryValidator {
                 continue;
             }
 
-            // Skip characters inside strings
             if (inString) continue;
 
-            // Count parentheses
             if (char === '(') {
                 depth++;
             } else if (char === ')') {
@@ -396,18 +358,16 @@ export class QueryValidator {
 
         for (let i = 0; i < query.length; i++) {
             const char = query[i];
-            if (!char) continue; // Skip if char is undefined
+            if (!char) continue;
             
             const prevChar = i > 0 ? query[i - 1] : '';
 
-            // Handle escape sequences
             if (prevChar === '\\' && !escaped) {
                 escaped = true;
                 continue;
             }
             escaped = false;
 
-            // Handle quotes
             if (quoteTypes.includes(char)) {
                 if (!currentQuote) {
                     currentQuote = char;
@@ -421,7 +381,6 @@ export class QueryValidator {
             }
         }
 
-        // Check if we're still inside a quote
         if (currentQuote) {
             return { 
                 balanced: false, 
@@ -429,7 +388,6 @@ export class QueryValidator {
             };
         }
 
-        // Check if all quotes are balanced
         for (const [quote, count] of Object.entries(quoteCounts)) {
             if (count % 2 !== 0) {
                 return { 
@@ -448,7 +406,6 @@ export class QueryValidator {
 
         switch (databaseType.toLowerCase()) {
             case 'sqlserver':
-                // SQL Server specific validations
                 if (/\bLIMIT\b/i.test(query)) {
                     issues.push('LIMIT is not supported in SQL Server. Use TOP or OFFSET-FETCH');
                 }
@@ -464,7 +421,6 @@ export class QueryValidator {
                 break;
 
             case 'mysql':
-                // MySQL specific validations
                 if (/\bTOP\s+\d+/i.test(query)) {
                     issues.push('TOP is not supported in MySQL. Use LIMIT');
                 }
@@ -480,7 +436,6 @@ export class QueryValidator {
                 break;
 
             case 'postgresql':
-                // PostgreSQL specific validations
                 if (/\bTOP\s+\d+/i.test(query)) {
                     issues.push('TOP is not supported in PostgreSQL. Use LIMIT');
                 }
@@ -499,7 +454,6 @@ export class QueryValidator {
                 break;
 
             case 'oracle':
-                // Oracle specific validations
                 if (/\bLIMIT\b/i.test(query)) {
                     issues.push('LIMIT is not supported in Oracle. Use ROWNUM or FETCH FIRST');
                 }
@@ -518,14 +472,12 @@ export class QueryValidator {
                 break;
 
             case 'mongodb':
-                // MongoDB validations (checking for SQL in NoSQL context)
                 if (/\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN)\b/i.test(query)) {
                     issues.push('SQL syntax detected. MongoDB uses different query syntax');
                 }
                 break;
 
             case 'redis':
-                // Redis validations
                 if (/\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN)\b/i.test(query)) {
                     issues.push('SQL syntax detected. Redis uses command-based syntax');
                 }
@@ -538,22 +490,18 @@ export class QueryValidator {
     private checkCommonSyntaxErrors(query: string): string[] {
         const errors: string[] = [];
 
-        // Check for multiple consecutive spaces (might indicate missing operator)
         if (/\s{3,}/.test(query)) {
             errors.push('Multiple consecutive spaces detected - possible missing operator');
         }
 
-        // Check for missing FROM in SELECT
         if (/SELECT\s+[\w\s,]+\s+WHERE/i.test(query) && !/FROM/i.test(query)) {
             errors.push('SELECT with WHERE but no FROM clause');
         }
 
-        // Check for comma before FROM
         if (/,\s*FROM/i.test(query)) {
             errors.push('Trailing comma before FROM clause');
         }
 
-        // Check for missing comma in column list
         if (/SELECT.*\w\s+\w+\s+FROM/i.test(query)) {
             const selectPart = query.match(/SELECT\s+(.*?)\s+FROM/i)?.[1];
             if (selectPart && !selectPart.includes('AS') && !selectPart.includes('*')) {
@@ -561,12 +509,10 @@ export class QueryValidator {
             }
         }
 
-        // Check for UPDATE with SET but no equals
         if (/UPDATE.*SET\s+\w+\s+\w+/i.test(query) && !/UPDATE.*SET\s+\w+\s*=/i.test(query)) {
             errors.push('UPDATE SET without equals sign');
         }
 
-        // Check for INSERT with mismatched parentheses
         const insertMatch = query.match(/INSERT\s+INTO.*VALUES\s*\((.*?)\)/i);
         if (insertMatch && insertMatch[1]) {
             const valuesPart = insertMatch[1];
@@ -577,18 +523,15 @@ export class QueryValidator {
             }
         }
 
-        // Check for invalid operators
         if (/\b(=<|=>)\b/.test(query)) {
             errors.push('Invalid comparison operator (use <= or >=)');
         }
 
-        // Check for missing quotes around string literals
         if (/=\s*[a-zA-Z]+(?![a-zA-Z0-9_\(\)])/.test(query) && 
             !/=\s*(TRUE|FALSE|NULL|CURRENT_DATE|CURRENT_TIME|CURRENT_TIMESTAMP)/i.test(query)) {
             errors.push('Possible missing quotes around string literal');
         }
 
-        // Check for semicolon in the middle of query
         const semicolonPos = query.indexOf(';');
         if (semicolonPos > -1 && semicolonPos < query.length - 1) {
             const afterSemicolon = query.substring(semicolonPos + 1).trim();
@@ -610,9 +553,7 @@ export class QueryValidator {
             }
         }
 
-        // Additional checks for common injection techniques
         
-        // Check for tautologies
         if (/\b\d+\s*=\s*\d+\b/.test(query)) {
             const tautology = query.match(/\b(\d+)\s*=\s*(\d+)\b/);
             if (tautology && tautology[1] === tautology[2]) {
@@ -620,25 +561,20 @@ export class QueryValidator {
             }
         }
 
-        // Check for stacked queries
         if (/;\s*(DROP|CREATE|ALTER|EXEC)/i.test(query)) {
             matches.push('Stacked query attempt detected');
         }
 
-        // Check for out-of-band techniques
         if (/\b(UTL_HTTP|DBMS_LDAP|UTL_SMTP|xp_cmdshell|xp_dirtree)\b/i.test(query)) {
             matches.push('Out-of-band SQL injection technique detected');
         }
 
-        // Check for time-based injection
         if (/\b(SLEEP|WAITFOR\s+DELAY|BENCHMARK|pg_sleep)\b/i.test(query)) {
             matches.push('Time-based SQL injection technique detected');
         }
 
-        // Check for union-based injection
         const unionMatch = query.match(/UNION\s+(ALL\s+)?SELECT/i);
         if (unionMatch) {
-            // Check if the UNION SELECT has same number of columns
             const beforeUnion = query.substring(0, query.indexOf(unionMatch[0]));
             const afterUnion = query.substring(query.indexOf(unionMatch[0]));
             
@@ -663,28 +599,23 @@ export class QueryValidator {
     }
 
     private checkParameterInjection(param: string): { safe: boolean; reason?: string } {
-        // Check for SQL keywords in parameters
         const sqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|AND|OR)\b/i;
         if (sqlKeywords.test(param)) {
             return { safe: false, reason: 'SQL keywords detected in parameter' };
         }
 
-        // Check for comment sequences
         if (/(--)|(\/\*)|(\*\/)|(#)/.test(param)) {
             return { safe: false, reason: 'SQL comment sequence detected in parameter' };
         }
 
-        // Check for suspicious character sequences
         if (/[;`]/.test(param)) {
             return { safe: false, reason: 'Suspicious characters detected in parameter' };
         }
 
-        // Check for encoded characters that might be injection attempts
         if (/%27|%22|%3B|%2D%2D/.test(param)) {
             return { safe: false, reason: 'URL-encoded SQL characters detected' };
         }
 
-        // Check for hex encoding
         if (/0x[0-9a-fA-F]+/.test(param) && param.length > 10) {
             return { safe: false, reason: 'Hex-encoded data detected - possible injection' };
         }
@@ -693,30 +624,25 @@ export class QueryValidator {
     }
 
     private countParameterPlaceholders(query: string): number {
-        // Count different parameter placeholder styles
         let count = 0;
 
-        // Question mark placeholders (?, used by MySQL, PostgreSQL)
         const questionMarks = query.match(/\?/g);
         if (questionMarks) {
             count = questionMarks.length;
         }
 
-        // Numbered placeholders ($1, $2, etc., used by PostgreSQL)
         const numberedParams = query.match(/\$\d+/g);
         if (numberedParams) {
             const uniqueNumbers = new Set(numberedParams);
             count = Math.max(count, uniqueNumbers.size);
         }
 
-        // Named placeholders (@param, :param, used by SQL Server, Oracle)
         const namedParams = query.match(/[@:]\w+/g);
         if (namedParams) {
             const uniqueNames = new Set(namedParams);
             count = Math.max(count, uniqueNames.size);
         }
 
-        // MongoDB style placeholders
         const mongoParams = query.match(/\$\d+|\$\w+/g);
         if (mongoParams) {
             const uniqueMongo = new Set(mongoParams);
@@ -729,17 +655,15 @@ export class QueryValidator {
     private calculateQueryComplexity(query: string): number {
         let complexity = 0;
 
-        // Base complexity by query length
         complexity += Math.floor(query.length / 100);
 
-        // Add complexity for various SQL constructs
         const complexityFactors = [
             { pattern: /\bJOIN\b/gi, weight: 5 },
             { pattern: /\bLEFT\s+JOIN\b/gi, weight: 6 },
             { pattern: /\bRIGHT\s+JOIN\b/gi, weight: 6 },
             { pattern: /\bFULL\s+OUTER\s+JOIN\b/gi, weight: 8 },
             { pattern: /\bCROSS\s+JOIN\b/gi, weight: 7 },
-            { pattern: /\(SELECT/gi, weight: 10 }, // Subqueries
+            { pattern: /\(SELECT/gi, weight: 10 },
             { pattern: /\bUNION\b/gi, weight: 8 },
             { pattern: /\bINTERSECT\b/gi, weight: 8 },
             { pattern: /\bEXCEPT\b/gi, weight: 8 },
@@ -750,7 +674,7 @@ export class QueryValidator {
             { pattern: /\bCASE\s+WHEN\b/gi, weight: 4 },
             { pattern: /\bEXISTS\b/gi, weight: 6 },
             { pattern: /\bNOT\s+EXISTS\b/gi, weight: 7 },
-            { pattern: /WITH\s+\w+\s+AS\s*\(/gi, weight: 10 }, // CTEs
+            { pattern: /WITH\s+\w+\s+AS\s*\(/gi, weight: 10 },
             { pattern: /\bPARTITION\s+BY\b/gi, weight: 6 },
             { pattern: /\bROW_NUMBER\s*\(\)/gi, weight: 5 },
             { pattern: /\bRANK\s*\(\)/gi, weight: 5 },
@@ -769,7 +693,6 @@ export class QueryValidator {
             }
         }
 
-        // Add complexity for nested parentheses depth
         let maxDepth = 0;
         let currentDepth = 0;
         for (const char of query) {
@@ -782,19 +705,16 @@ export class QueryValidator {
         }
         complexity += maxDepth * 3;
 
-        // Add complexity for number of tables referenced
         const tableReferences = query.match(/\b(FROM|JOIN)\s+(\w+\.)?(\w+)/gi);
         if (tableReferences) {
             complexity += tableReferences.length * 2;
         }
 
-        // Add complexity for aggregate functions
         const aggregates = query.match(/\b(COUNT|SUM|AVG|MAX|MIN|STDDEV|VARIANCE)\s*\(/gi);
         if (aggregates) {
             complexity += aggregates.length * 3;
         }
 
-        // Add complexity for window functions
         const windowFunctions = query.match(/\bOVER\s*\(/gi);
         if (windowFunctions) {
             complexity += windowFunctions.length * 6;

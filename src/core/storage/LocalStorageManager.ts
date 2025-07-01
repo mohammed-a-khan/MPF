@@ -3,19 +3,11 @@ import { logger } from '../utils/Logger';
 import { ActionLogger } from '../logging/ActionLogger';
 import { StorageQuota, StorageItemInfo } from './types/storage.types';
 
-/**
- * LocalStorageManager - Complete localStorage management
- * Handles all localStorage operations with quota monitoring
- */
 export class LocalStorageManager {
-    private readonly STORAGE_LIMIT = 5 * 1024 * 1024; // 5MB typical limit
+    private readonly STORAGE_LIMIT = 5 * 1024 * 1024;
 
-    /**
-     * Set localStorage item
-     */
     async setItem(page: Page, key: string, value: string): Promise<void> {
         try {
-            // Check quota before setting
             await this.checkQuotaBeforeSet(page, key, value);
             
             await page.evaluate(([k, v]) => {
@@ -36,9 +28,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Set JSON value in localStorage
-     */
     async setJSON(page: Page, key: string, value: any): Promise<void> {
         try {
             const jsonString = JSON.stringify(value);
@@ -49,9 +38,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Get localStorage item
-     */
     async getItem(page: Page, key: string): Promise<string | null> {
         try {
             const value = await page.evaluate((k) => {
@@ -72,9 +58,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Get JSON value from localStorage
-     */
     async getJSON(page: Page, key: string): Promise<any> {
         try {
             const value = await this.getItem(page, key);
@@ -87,7 +70,7 @@ export class LocalStorageManager {
                 return JSON.parse(value);
             } catch (parseError) {
                 logger.warn(`LocalStorageManager: Failed to parse JSON for key '${key}'`);
-                return value; // Return as string if not valid JSON
+                return value;
             }
         } catch (error) {
             logger.error('LocalStorageManager: Failed to get JSON', error as Error);
@@ -95,9 +78,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Remove localStorage item
-     */
     async removeItem(page: Page, key: string): Promise<void> {
         try {
             await page.evaluate((k) => {
@@ -115,9 +95,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Clear all localStorage
-     */
     async clear(page: Page): Promise<void> {
         try {
             const itemCount = await this.getItemCount(page);
@@ -137,9 +114,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Get all localStorage items
-     */
     async getAllItems(page: Page): Promise<Record<string, string>> {
         try {
             const items = await page.evaluate(() => {
@@ -166,9 +140,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Get all localStorage keys
-     */
     async getKeys(page: Page): Promise<string[]> {
         try {
             const keys = await page.evaluate(() => {
@@ -187,9 +158,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Get localStorage size in bytes
-     */
     async getSize(page: Page): Promise<number> {
         try {
             const size = await page.evaluate(() => {
@@ -211,9 +179,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Check if localStorage has item
-     */
     async hasItem(page: Page, key: string): Promise<boolean> {
         try {
             const value = await this.getItem(page, key);
@@ -224,9 +189,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Export localStorage data
-     */
     async exportData(page: Page): Promise<Record<string, string>> {
         try {
             const data = await this.getAllItems(page);
@@ -245,15 +207,10 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Import localStorage data
-     */
     async importData(page: Page, data: Record<string, string>): Promise<void> {
         try {
-            // Clear existing data
             await this.clear(page);
             
-            // Import new data
             await page.evaluate((items) => {
                 Object.entries(items).forEach(([key, value]) => {
                     localStorage.setItem(key, value);
@@ -271,9 +228,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Get storage quota information
-     */
     async getQuota(page: Page): Promise<StorageQuota> {
         try {
             const currentSize = await this.getSize(page);
@@ -298,12 +252,8 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Set multiple items
-     */
     async setItems(page: Page, items: Record<string, string>): Promise<void> {
         try {
-            // Check total size first
             const totalSize = Object.entries(items).reduce(
                 (sum, [key, value]) => sum + key.length + value.length, 
                 0
@@ -332,9 +282,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Remove multiple items
-     */
     async removeItems(page: Page, keys: string[]): Promise<void> {
         try {
             await page.evaluate((keys) => {
@@ -352,9 +299,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Get item info (size, type, etc.)
-     */
     async getItemInfo(page: Page, key: string): Promise<StorageItemInfo | null> {
         try {
             const value = await this.getItem(page, key);
@@ -366,7 +310,6 @@ export class LocalStorageManager {
             let type: 'string' | 'json' | 'number' | 'boolean' = 'string';
             let parsed: any = value;
             
-            // Try to determine type
             try {
                 parsed = JSON.parse(value);
                 if (typeof parsed === 'object') {
@@ -377,7 +320,6 @@ export class LocalStorageManager {
                     type = 'boolean';
                 }
             } catch {
-                // Not JSON, keep as string
             }
             
             const info: StorageItemInfo = {
@@ -385,7 +327,7 @@ export class LocalStorageManager {
                 value,
                 size: key.length + value.length,
                 type,
-                lastModified: new Date() // localStorage doesn't track this
+                lastModified: new Date()
             };
             
             return info;
@@ -395,9 +337,6 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Search items by key pattern
-     */
     async searchItems(page: Page, pattern: string | RegExp): Promise<Record<string, string>> {
         try {
             const allItems = await this.getAllItems(page);
@@ -418,14 +357,10 @@ export class LocalStorageManager {
         }
     }
 
-    /**
-     * Monitor localStorage changes
-     */
     async monitorChanges(
         page: Page, 
         callback: (event: any) => void
     ): Promise<() => void> {
-        // Inject monitoring script
         await page.addInitScript(() => {
             const originalSetItem = localStorage.setItem.bind(localStorage);
             const originalRemoveItem = localStorage.removeItem.bind(localStorage);
@@ -462,7 +397,6 @@ export class LocalStorageManager {
             };
         });
         
-        // Listen for changes
         await page.exposeFunction('onLocalStorageChange', callback);
         await page.evaluate(() => {
             window.addEventListener('localStorageChange', (event: any) => {
@@ -470,7 +404,6 @@ export class LocalStorageManager {
             });
         });
         
-        // Return cleanup function
         return async () => {
             await page.evaluate(() => {
                 window.removeEventListener('localStorageChange', () => {});
@@ -478,13 +411,11 @@ export class LocalStorageManager {
         };
     }
 
-    // Private helper methods
 
     private async checkQuotaBeforeSet(page: Page, key: string, value: string): Promise<void> {
         const currentSize = await this.getSize(page);
         const newItemSize = key.length + value.length;
         
-        // Check if key exists (for replacement)
         const existingValue = await this.getItem(page, key);
         const existingSize = existingValue ? key.length + existingValue.length : 0;
         

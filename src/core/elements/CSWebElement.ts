@@ -19,12 +19,10 @@ import { ConfigurationManager } from '../configuration/ConfigurationManager';
 import { expect } from '@playwright/test';
 import { NavigationRegistry } from '../pages/NavigationRegistry';
 import { SmartElementResolver } from './SmartElementResolver';
-// Import dynamically to avoid circular dependency
 let BDDContext: any = null;
 try {
     BDDContext = require('../bdd/context/BDDContext').BDDContext;
 } catch (error) {
-    // BDDContext might not be available in non-BDD scenarios
 }
 
 export interface ElementConfig {
@@ -42,59 +40,47 @@ export interface ElementConfig {
 }
 
 export class CSWebElement {
-    // Public properties for backward compatibility
     private _page: Page | null;
     public options: CSGetElementOptions;
     public description: string;
     
-    // Internal properties
     protected locator: Locator | null;
     private _config: ElementConfig;
     private actionHistory: ActionRecord[] = [];
     private lastResolvedAt: Date | null;
-    private cacheValidityMs = 5000; // Cache valid for 5 seconds
+    private cacheValidityMs = 5000;
     private readonly elementId: string;
     
-    // Dynamic page getter - always returns current page
     public get page(): Page {
-        // Try to get current page from BDDContext first
         if (BDDContext) {
             try {
                 const currentPage = BDDContext.getCurrentPage();
                 if (currentPage && !currentPage.isClosed()) {
-                    // Update our internal reference if it has changed
                     if (this._page !== currentPage) {
                         this._page = currentPage;
-                        // Clear cached locator as page has changed
                         this.clearCache();
                     }
                     return currentPage;
                 }
             } catch (error) {
-                // BDDContext might not be available in some scenarios
             }
         }
         
-        // Fallback to stored page reference
         if (!this._page || this._page.isClosed()) {
             throw new Error('Page not initialized or has been closed for element: ' + this.description);
         }
         return this._page;
     }
     
-    // Setter for backward compatibility
     public set page(page: Page) {
         this._page = page;
     }
 
-    // Support both new constructor with parameters and legacy no-parameter constructor
     constructor(page?: Page, partialConfig?: Partial<ElementConfig> & Pick<ElementConfig, 'locatorType' | 'locatorValue' | 'description'>) {
-        // Initialize with defaults for backward compatibility
         this._page = page || null;
         this.elementId = `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         if (partialConfig) {
-            // New style constructor
             this._config = {
                 locatorType: partialConfig.locatorType,
                 locatorValue: partialConfig.locatorValue,
@@ -109,7 +95,6 @@ export class CSWebElement {
                 fallbacks: partialConfig.fallbacks ?? []
             };
             
-            // Sync public properties with config
             this.description = this._config.description;
             this.options = {
                 locatorType: this._config.locatorType as any,
@@ -125,7 +110,6 @@ export class CSWebElement {
                 fallbacks: this._config.fallbacks as any
             };
         } else {
-            // Legacy style constructor - initialize with defaults
             this.description = '';
             this.options = {
                 locatorType: 'css',
@@ -141,7 +125,6 @@ export class CSWebElement {
                 fallbacks: []
             };
             
-            // Create config from options (will be synced when options are set)
             this._config = {
                 locatorType: 'css',
                 locatorValue: '',
@@ -160,19 +143,16 @@ export class CSWebElement {
         this.locator = null;
         this.lastResolvedAt = null;
         
-        // Create locator if we have the necessary info
         if (this.page && this.options.locatorValue) {
             this.locator = this.createLocator();
         }
     }
 
-    // Getter for config to maintain backward compatibility
     get config(): ElementConfig {
         this.syncConfigFromOptions();
         return this._config;
     }
 
-    // Sync config when options are updated (for backward compatibility)
     private syncConfigFromOptions(): void {
         if (this.options) {
             this.description = this.options.description;
@@ -191,7 +171,6 @@ export class CSWebElement {
                 value: f.value 
             }));
             
-            // Recreate locator with new values
             if (this.page && this.options.locatorValue) {
                 this.locator = this.createLocator();
             }
@@ -228,15 +207,10 @@ export class CSWebElement {
             case 'title':
                 return this.page.getByTitle(locatorValue);
             default:
-                // Fallback to CSS for unknown types
                 return this.page.locator(locatorValue);
         }
     }
 
-    /**
-     * Ensure page is ready before interaction
-     * This is called automatically before any element interaction
-     */
     private async ensurePageReady(): Promise<void> {
         try {
             const currentPage = this.page;
@@ -244,7 +218,6 @@ export class CSWebElement {
                 await NavigationRegistry.getInstance().ensurePageReady(currentPage);
             }
         } catch (error) {
-            // If navigation registry is not available, continue anyway
             ActionLogger.logDebug('NavigationRegistry not available, skipping page readiness check');
         }
     }
@@ -252,18 +225,14 @@ export class CSWebElement {
     private async resolve(): Promise<Locator> {
         const startTime = Date.now();
         
-        // Ensure config is synced with options (for backward compatibility)
         this.syncConfigFromOptions();
         
-        // Use SmartElementResolver for robust resolution
         try {
             const locator = await SmartElementResolver.resolveWithRetry(this);
             
-            // Cache the resolved locator
             this.locator = locator;
             this.lastResolvedAt = new Date();
             
-            // Log success
             ActionLogger.logInfo(`Element resolved successfully: ${this.description}`, {
                 duration: Date.now() - startTime,
                 locator: `${this._config.locatorType}=${this._config.locatorValue}`
@@ -271,7 +240,6 @@ export class CSWebElement {
             
             return locator;
         } catch (error) {
-            // Try AI healing if enabled and regular resolution failed
             if (this._config.aiEnabled) {
                 try {
                     ActionLogger.logInfo(`Attempting AI healing for element: ${this.description}`);
@@ -284,7 +252,6 @@ export class CSWebElement {
                 }
             }
             
-            // Log failure
             ActionLogger.logError(`Element resolution failed: ${this.description}`, error as Error);
             throw error;
         }
@@ -293,58 +260,45 @@ export class CSWebElement {
     private async resolveOld(): Promise<Locator> {
         const startTime = Date.now();
         
-        // Ensure config is synced with options (for backward compatibility)
         this.syncConfigFromOptions();
         
-        // Ensure page is ready before resolving
         await this.ensurePageReady();
         
         try {
-            // Always get the current page to ensure we're using the right one
             let currentPage: Page;
             try {
                 currentPage = this.page;
             } catch (pageError) {
-                // If getting page fails, try to get from BDDContext directly
                 if (BDDContext) {
                     currentPage = BDDContext.getCurrentPage();
-                    // Update our internal reference
                     this._page = currentPage;
                 } else {
                     throw new Error(`Cannot resolve element "${this.description}" - page is not available`);
                 }
             }
             
-            // Check cache first - but invalidate if page has changed
             if (this.locator && this.isCacheValid()) {
-                // Verify the locator's page is still valid
                 try {
-                    // Check if the locator's page is closed
                     const locatorPage = (this.locator as any).page?.() || (this.locator as any)._page;
                     if (!locatorPage || locatorPage.isClosed() || locatorPage !== currentPage) {
-                        // Page is closed or changed, invalidate cache
                         this.locator = null;
                         this.lastResolvedAt = null;
                     } else {
                         return this.locator;
                     }
                 } catch (error) {
-                    // If we can't check, invalidate to be safe
                     this.locator = null;
                     this.lastResolvedAt = null;
                 }
             }
             
-            // Ensure we have a valid page before trying to resolve
             if (!currentPage || currentPage.isClosed()) {
-                // Try one more time to get a valid page from BDDContext
                 if (BDDContext) {
                     try {
                         currentPage = BDDContext.getCurrentPage();
                         if (!currentPage || currentPage.isClosed()) {
                             throw new Error(`Cannot resolve element "${this.description}" - page is closed or not available`);
                         }
-                        // Update our internal reference
                         this._page = currentPage;
                     } catch (error) {
                         throw new Error(`Cannot resolve element "${this.description}" - page is closed or not available`);
@@ -354,12 +308,10 @@ export class CSWebElement {
                 }
             }
             
-            // Try resolution with the current page
             const resolvedLocator = await ElementResolver.getInstance().resolve(this);
             this.locator = resolvedLocator;
             this.lastResolvedAt = new Date();
             
-            // Log success
             ActionLogger.logInfo(`Element resolved successfully: ${this.description}`, {
                 duration: Date.now() - startTime,
                 locator: `${this._config.locatorType}=${this._config.locatorValue}`
@@ -367,7 +319,6 @@ export class CSWebElement {
             
             return resolvedLocator;
         } catch (error) {
-            // Try AI healing if enabled
             if (this._config.aiEnabled) {
                 try {
                     ActionLogger.logInfo(`Attempting AI healing for element: ${this.description}`);
@@ -380,7 +331,6 @@ export class CSWebElement {
                 }
             }
             
-            // Log failure
             ActionLogger.logError(`Element resolution failed: ${this.description}`, error as Error);
             throw error;
         }
@@ -389,25 +339,19 @@ export class CSWebElement {
     private isCacheValid(): boolean {
         if (!this.lastResolvedAt) return false;
         
-        // Invalidate cache if page context has changed
         if (BDDContext) {
             try {
                 const currentPage = BDDContext.getCurrentPage();
                 if (currentPage && this._page && currentPage !== this._page) {
-                    // Page has changed, invalidate cache
                     return false;
                 }
             } catch (error) {
-                // BDDContext might not be available
             }
         }
         
         return Date.now() - this.lastResolvedAt.getTime() < this.cacheValidityMs;
     }
     
-    /**
-     * Clear the cached locator - useful when page context changes
-     */
     public clearCache(): void {
         this.locator = null;
         this.lastResolvedAt = null;
@@ -497,7 +441,6 @@ export class CSWebElement {
         }
     }
 
-    // Basic Interaction Methods
 
     async click(options?: ClickOptions): Promise<void> {
         const startTime = Date.now();
@@ -512,16 +455,12 @@ export class CSWebElement {
                 await locator.waitFor(waitOptions);
             }
             if (this._config.waitForEnabled) {
-                // Wait for element to be enabled
                 const waitOptions: { state: 'visible'; timeout?: number } = { state: 'visible' };
                 if (this._config.waitTimeout !== undefined) {
                     waitOptions.timeout = this._config.waitTimeout;
                 }
                 await locator.waitFor(waitOptions);
                 
-                // Skip the JavaScript evaluation that causes CSP errors
-                // Playwright's click() will automatically fail if element is disabled
-                // No need for manual disabled check
             }
 
             await locator.click(options);
@@ -845,7 +784,6 @@ export class CSWebElement {
             try {
                 const locator = await this.resolve();
                 
-                // Create waitFor options with proper state
                 const waitOptions: { state?: 'attached' | 'detached' | 'visible' | 'hidden'; timeout?: number } = {};
                 
                 if (options?.state) {
@@ -864,12 +802,11 @@ export class CSWebElement {
                     duration: Date.now() - startTime,
                     state: options?.state 
                 });
-                return; // Success, exit the method
+                return;
             } catch (error: any) {
                 if (error.message?.includes('Execution context was destroyed') && retryCount < maxRetries) {
                     retryCount++;
                     ActionLogger.logDebug(`Context destroyed during waitFor, retrying (${retryCount}/${maxRetries})...`);
-                    // Small delay before retry
                     await new Promise(resolve => setTimeout(resolve, 500));
                     continue;
                 }
@@ -879,7 +816,6 @@ export class CSWebElement {
         }
     }
 
-    // Advanced Interaction Methods
 
     async dragTo(target: CSWebElement): Promise<void> {
         const startTime = Date.now();
@@ -1068,7 +1004,6 @@ export class CSWebElement {
             const centerY = box.y + box.height / 2;
             const distance = 100;
             
-            // Simulate pinch gesture
             await this.page.touchscreen.tap(centerX - distance / 2, centerY);
             await this.page.touchscreen.tap(centerX + distance / 2, centerY);
             
@@ -1235,7 +1170,6 @@ export class CSWebElement {
             const locator2 = await other.resolve();
             const orLocator = locator1.or(locator2);
             
-            // Create a new CSWebElement with the combined locator
             const elementConfig = {
                 ...this._config,
                 description: `${this._config.description} OR ${other.description}`,
@@ -1313,7 +1247,6 @@ export class CSWebElement {
             await this.page.touchscreen.tap(centerX, centerY);
             await this.page.waitForTimeout(100);
             
-            // Simulate swipe motion
             const steps = 10;
             for (let i = 1; i <= steps; i++) {
                 const x = centerX + (endX - centerX) * (i / steps);
@@ -1345,7 +1278,6 @@ export class CSWebElement {
         }
     }
 
-    // Validation Methods
 
     async isVisible(): Promise<boolean> {
         try {
@@ -1416,7 +1348,6 @@ export class CSWebElement {
             const box = await locator.boundingBox();
             if (!box) return false;
             
-            // Check if element is in viewport by evaluating in the browser
             return await locator.evaluate((el) => {
                 const rect = el.getBoundingClientRect();
                 return (
@@ -1500,7 +1431,6 @@ export class CSWebElement {
         }
     }
 
-    // Assertion Methods
 
     async assertText(expected: string, options?: AssertOptions): Promise<void> {
         const startTime = Date.now();
@@ -1945,7 +1875,6 @@ export class CSWebElement {
         }
     }
 
-    // Soft assertion variants
     async softAssertText(expected: string): Promise<void> {
         await this.assertText(expected, { soft: true });
     }
@@ -1998,7 +1927,6 @@ export class CSWebElement {
         await this.assertInViewport({ soft: true });
     }
 
-    // Helper methods
     
     invalidateCache(): void {
         this.lastResolvedAt = null;
@@ -2022,7 +1950,6 @@ export class CSWebElement {
     }
 
     private async clearActionHistory(): Promise<void> {
-        // Keep only last 50 actions to prevent memory issues
         if (this.actionHistory.length > 50) {
             this.actionHistory = this.actionHistory.slice(-50);
         }
@@ -2051,10 +1978,8 @@ export class CSWebElement {
         options: Partial<Omit<ElementConfig, 'locatorType' | 'locatorValue' | 'description'>> = {}
     ): CSWebElement {
         if (typeof configOrLocatorType === 'object') {
-            // Called with config object
             return new CSWebElement(page, configOrLocatorType);
         } else {
-            // Called with individual parameters
             return new CSWebElement(page, {
                 locatorType: configOrLocatorType as any,
                 locatorValue: locatorValue!,
@@ -2072,14 +1997,7 @@ export class CSWebElement {
         }
     }
 
-    // ============================================================================
-    // COLLECTION AND ADVANCED METHODS - For working with multiple elements
-    // ============================================================================
 
-    /**
-     * Get all matching elements as CSWebElement array
-     * Use this instead of page.locator().all()
-     */
     async getAllElements(): Promise<CSWebElement[]> {
         try {
             const locator = await this.resolve();
@@ -2092,7 +2010,6 @@ export class CSWebElement {
                     description: `${this._config.description} [${i}]`
                 };
                 const element = CSWebElement.createDynamic(this.page, elementConfig);
-                // Set the nth locator for this element
                 (element as any).locator = locator.nth(i);
                 elements.push(element);
             }
@@ -2105,10 +2022,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get element at specific index
-     * Use this instead of page.locator().nth()
-     */
     async getNthElement(index: number): Promise<CSWebElement> {
         try {
             const locator = await this.resolve();
@@ -2127,18 +2040,10 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get first element from collection
-     * Use this instead of page.locator().first()
-     */
     async getFirstElement(): Promise<CSWebElement> {
         return this.getNthElement(0);
     }
 
-    /**
-     * Get last element from collection
-     * Use this instead of page.locator().last()
-     */
     async getLastElement(): Promise<CSWebElement> {
         try {
             const locator = await this.resolve();
@@ -2157,9 +2062,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Filter elements by text content
-     */
     async filterByText(text: string): Promise<CSWebElement> {
         try {
             const locator = await this.resolve();
@@ -2178,9 +2080,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Filter elements by another locator
-     */
     async filterByLocator(filterLocator: string): Promise<CSWebElement> {
         try {
             const locator = await this.resolve();
@@ -2199,10 +2098,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get parent element
-     * Use this instead of page.locator().locator('..')
-     */
     async getParent(): Promise<CSWebElement> {
         try {
             const locator = await this.resolve();
@@ -2223,9 +2118,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Find child element by selector
-     */
     async findChild(selector: string, description?: string): Promise<CSWebElement> {
         try {
             const locator = await this.resolve();
@@ -2246,9 +2138,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Find all child elements by selector
-     */
     async findChildren(selector: string, description?: string): Promise<CSWebElement[]> {
         try {
             const locator = await this.resolve();
@@ -2283,9 +2172,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get sibling element by index offset
-     */
     async getSibling(offset: number): Promise<CSWebElement> {
         try {
             const parent = await this.getParent();
@@ -2309,23 +2195,14 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get next sibling element
-     */
     async getNextSibling(): Promise<CSWebElement> {
         return this.getSibling(1);
     }
 
-    /**
-     * Get previous sibling element
-     */
     async getPreviousSibling(): Promise<CSWebElement> {
         return this.getSibling(-1);
     }
 
-    /**
-     * Get element's index among siblings
-     */
     private async getSiblingIndex(): Promise<number> {
         try {
             const parent = await this.getParent();
@@ -2348,9 +2225,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Wait for element to contain specific text
-     */
     async waitForText(text: string, timeout: number = 30000): Promise<void> {
         try {
             const locator = await this.resolve();
@@ -2359,7 +2233,6 @@ export class CSWebElement {
                 timeout
             });
 
-            // Wait for the text to appear using expect
             await expect(locator).toContainText(text, { timeout });
 
             await this.logAction('wait_for_text', [text, timeout], 'success');
@@ -2369,9 +2242,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Wait for element to have specific attribute value
-     */
     async waitForAttribute(attributeName: string, expectedValue: string, timeout: number = 30000): Promise<void> {
         try {
             const locator = await this.resolve();
@@ -2380,7 +2250,6 @@ export class CSWebElement {
                 timeout
             });
 
-            // Wait for the attribute value using expect
             await expect(locator).toHaveAttribute(attributeName, expectedValue, { timeout });
 
             await this.logAction('wait_for_attribute', [attributeName, expectedValue, timeout], 'success');
@@ -2390,14 +2259,10 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Wait for element count to match expected value
-     */
     async waitForCount(expectedCount: number, timeout: number = 30000): Promise<void> {
         try {
             const locator = await this.resolve();
             
-            // Wait for the count using expect
             await expect(locator).toHaveCount(expectedCount, { timeout });
 
             await this.logAction('wait_for_count', [expectedCount, timeout], 'success');
@@ -2407,9 +2272,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Execute JavaScript on the element
-     */
     async evaluate<T>(script: string | ((element: Element, ...args: any[]) => T), ...args: any[]): Promise<T> {
         try {
             const locator = await this.resolve();
@@ -2423,9 +2285,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Execute JavaScript on all matching elements
-     */
     async evaluateAll<T>(script: string | ((element: Element, ...args: any[]) => T), ...args: any[]): Promise<T[]> {
         try {
             const locator = await this.resolve();
@@ -2439,9 +2298,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get element's computed style
-     */
     async getComputedStyle(): Promise<CSSStyleDeclaration> {
         try {
             const style = await this.evaluate('() => window.getComputedStyle(this)');
@@ -2454,9 +2310,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Check if element has specific class
-     */
     async hasClass(className: string): Promise<boolean> {
         try {
             const hasClass = await this.evaluate('(element, cls) => element.classList.contains(cls)', className);
@@ -2469,9 +2322,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get all class names of the element
-     */
     async getClassNames(): Promise<string[]> {
         try {
             const classNames = await this.evaluate('(element) => Array.from(element.classList)');
@@ -2484,9 +2334,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get all text content including from child elements
-     */
     async allTextContents(): Promise<string[]> {
         const startTime = Date.now();
         try {
@@ -2508,9 +2355,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get all inner texts including from child elements
-     */
     async allInnerTexts(): Promise<string[]> {
         const startTime = Date.now();
         try {
@@ -2532,14 +2376,10 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Evaluate JavaScript and return a handle to the result
-     */
     async evaluateHandle<T>(script: string | ((element: Element, ...args: any[]) => T), ...args: any[]): Promise<any> {
         const startTime = Date.now();
         try {
             const locator = await this.resolve();
-            // Pass arguments as a single array to match Playwright's API
             const handle = await locator.evaluateHandle(script as any, args);
             
             await this.logAction('evaluateHandle', [script, ...args], 'success');
@@ -2556,9 +2396,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get the owner frame if available
-     */
     async ownerFrame(): Promise<any> {
         const startTime = Date.now();
         try {
@@ -2582,9 +2419,6 @@ export class CSWebElement {
         }
     }
 
-    /**
-     * Get content frame for iframe elements
-     */
     async contentFrame(): Promise<any> {
         const startTime = Date.now();
         try {

@@ -1,9 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * API Test Runner
- * Runs API feature tests with proper configuration
- */
 
 import { CSFramework } from '../src/core/CSFramework';
 import { CommandLineParser } from '../src/core/cli/CommandLineParser';
@@ -13,28 +9,22 @@ async function main(): Promise<void> {
     const logger = Logger.getInstance('APITestRunner');
     
     try {
-        // Parse command line arguments
         const options = CommandLineParser.parse(process.argv);
         
-        // Set default environment to dev if not specified (dev has ADO disabled)
         const environment = options.environment || 'dev';
         
         logger.info(`🎯 Running API tests with environment: ${environment}`);
         
-        // Get framework instance
         const framework = CSFramework.getInstance();
         
-        // Initialize framework with the specified environment
         await framework.initialize(environment);
         
-        // Define API feature paths - use command line features if provided, otherwise default
         const featurePaths = options.features && options.features.length > 0 
             ? options.features 
             : ['./test/features/api/*.feature'];
         
         logger.info('📁 Feature paths:', featurePaths);
         
-        // Execute tests with API-specific configuration
         const testOptions: any = {
             environment: environment,
             parallel: options.parallel || false,
@@ -43,22 +33,20 @@ async function main(): Promise<void> {
             retry: options.retry || 0,
             ...(options.tags && { tags: options.tags }),
             dryRun: options.dryRun || false,
-            skipADO: true, // Disable ADO integration for API tests
-            headless: options.headless !== false, // Default to headless for API tests
-            browser: 'chromium', // Default browser for any UI components
-            slowMo: 0, // No slow motion for API tests
-            video: false, // No video recording for API tests
-            trace: false // No trace for API tests
+            skipADO: true,
+            headless: options.headless !== false,
+            browser: 'chromium',
+            slowMo: 0,
+            video: false,
+            trace: false
         };
         
-        // Only set screenshot options if not in dry-run mode
         if (!options.dryRun) {
-            testOptions.screenshot = 'on-failure'; // Screenshots only on failure
+            testOptions.screenshot = 'on-failure';
         }
         
         const results = await framework.executeTests(featurePaths, testOptions);
         
-        // Log results summary
         if (results) {
             logger.info('\n📊 API Test Results Summary:');
             logger.info(`   Total Features: ${results.features?.length || 0}`);
@@ -70,7 +58,6 @@ async function main(): Promise<void> {
             logger.info(`   Duration: ${results.duration || 0}ms`);
             logger.info(`   Environment: ${results.environment || 'unknown'}`);
             
-            // Exit with appropriate code
             const exitCode = (results.failed || 0) > 0 ? 1 : 0;
             process.exit(exitCode);
         } else {
@@ -84,19 +71,16 @@ async function main(): Promise<void> {
     }
 }
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
     process.exit(1);
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
     process.exit(1);
 });
 
-// Run the main function
 main().catch((error) => {
     console.error('Fatal error:', error);
     process.exit(1);

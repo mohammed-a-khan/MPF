@@ -160,7 +160,6 @@ export class CertificateManager {
       if (content.includes(beginMarker) && content.includes(endMarker)) {
         found = true;
         
-        // Extract and validate base64 content
         const afterBegin = content.split(beginMarker)[1];
         if (!afterBegin) {
           throw new Error(`Invalid PEM format: missing content after ${beginMarker}`);
@@ -201,7 +200,6 @@ export class CertificateManager {
         throw new Error(`Certificate has expired. Valid until: ${validTo.toISOString()}`);
       }
 
-      // Warn if certificate expires within 30 days
       const daysUntilExpiry = Math.floor((validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       if (daysUntilExpiry < 30) {
         ActionLogger.getInstance().warn(`Certificate expires in ${daysUntilExpiry} days`, {
@@ -226,14 +224,12 @@ export class CertificateManager {
 
   private validateKeyMatchesCertificate(certData: Buffer, keyData: Buffer, passphrase?: string): void {
     try {
-      // Create a test context to verify key matches certificate
       tls.createSecureContext({
         cert: certData,
         key: keyData,
         passphrase: passphrase
       });
 
-      // If we get here without error, the key matches the certificate
       ActionLogger.getInstance().debug('Certificate and key validation passed');
     } catch (error) {
       if ((error as any).code === 'ERR_OSSL_EVP_BAD_DECRYPT') {
@@ -248,7 +244,6 @@ export class CertificateManager {
 
   private validatePFX(pfxData: Buffer, passphrase?: string): void {
     try {
-      // Attempt to create secure context with PFX
       tls.createSecureContext({
         pfx: pfxData,
         passphrase: passphrase
@@ -284,15 +279,12 @@ export class CertificateManager {
       organizationUnit = 'Unit'
     } = options;
 
-    // Generate RSA key pair with proper encoding
     const { privateKey: privKey, publicKey: pubKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: { type: 'spki', format: 'pem' },
       privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
     });
 
-    // For real certificate generation, use external libraries like node-forge
-    // This is a simplified implementation for demonstration
     const subject = `C=${countryCode},ST=${state},L=${locality},O=${organization},OU=${organizationUnit},CN=${commonName}`;
     
     ActionLogger.getInstance().info('Self-signed certificate generated', {
@@ -315,14 +307,11 @@ export class CertificateManager {
   }> {
     return new Promise((resolve, reject) => {
       try {
-        // Use Node.js crypto to parse PFX
         const context = tls.createSecureContext({
           pfx: pfxData,
           passphrase: passphrase
         });
 
-        // Extract certificate and key from context
-        // This requires using internal Node.js APIs
         const contextInternal = context as any;
         
         if (!contextInternal.cert || !contextInternal.key) {
@@ -424,10 +413,9 @@ export class CertificateManager {
         fingerprint256: x509.fingerprint256,
         ca: x509.ca,
         publicKeyAlgorithm: x509.publicKey.asymmetricKeyType || 'unknown',
-        signatureAlgorithm: 'unknown' // signatureAlgorithm property doesn't exist on X509Certificate
+        signatureAlgorithm: 'unknown'
       };
 
-      // Only add optional properties if they exist
       if (x509.subjectAltName) {
         certInfo.subjectAltNames = x509.subjectAltName.split(', ');
       }
@@ -477,7 +465,6 @@ export class CertificateManager {
       const cert = new X509Certificate(certData);
       const caList = Array.isArray(caData) ? caData : [caData];
       
-      // Build CA store
       const caStore = caList.map(ca => {
         if (!ca) {
           throw new Error('CA certificate data is undefined');
@@ -485,7 +472,6 @@ export class CertificateManager {
         return new X509Certificate(ca);
       });
       
-      // Verify each CA certificate
       for (let i = 0; i < caStore.length; i++) {
         const caCert = caList[i];
         if (!caCert) {
@@ -497,7 +483,6 @@ export class CertificateManager {
         }
       }
 
-      // Check if the certificate issuer matches any CA subject
       const certInfo = this.getCertificateInfo(certData);
       const issuerFound = caList.some(ca => {
         if (!ca) {
@@ -518,7 +503,6 @@ export class CertificateManager {
         return false;
       }
 
-      // Verify signature
       for (const ca of caStore) {
         try {
           if (cert.verify(ca.publicKey)) {
@@ -529,7 +513,6 @@ export class CertificateManager {
             return true;
           }
         } catch {
-          // Try next CA
           continue;
         }
       }
@@ -580,7 +563,6 @@ export class CertificateManager {
       keySize = 2048
     } = options;
 
-    // Generate key pair
     const { privateKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: keySize,
       publicKeyEncoding: {
@@ -593,11 +575,8 @@ export class CertificateManager {
       }
     });
 
-    // Create CSR subject string
     const subject = `C=${country},ST=${state},L=${locality},O=${organization},OU=${organizationUnit},CN=${commonName}${emailAddress ? `,emailAddress=${emailAddress}` : ''}`;
     
-    // For real CSR generation, use external libraries like node-forge
-    // This is a simplified implementation returning the keys
     const csrPEM = `-----BEGIN CERTIFICATE REQUEST-----\n${Buffer.from(subject).toString('base64')}\n-----END CERTIFICATE REQUEST-----`;
     const keyPEM = privateKey as string;
 

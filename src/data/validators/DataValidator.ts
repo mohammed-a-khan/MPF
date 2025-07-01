@@ -3,10 +3,6 @@ import { ValidationResult, TestData } from '../types/data.types';
 import { ValidationRule, DataValidationOptions, ExtendedValidationResult, BuiltInValidationRule, ValidationRuleType } from './validation.types';
 import { logger } from '../../core/utils/Logger';
 
-/**
- * Validate test data against rules
- * Comprehensive validation for data quality
- */
 export class DataValidator {
     private readonly defaultOptions: DataValidationOptions = {
         stopOnFirstError: false,
@@ -31,9 +27,6 @@ export class DataValidator {
         this.initializeBuiltInRules();
     }
 
-    /**
-     * Validate test data
-     */
     async validate(
         data: TestData | TestData[],
         rules: Record<string, ValidationRule | ValidationRule[]>,
@@ -62,12 +55,10 @@ export class DataValidator {
         const errorsByType: Record<string, number> = {};
 
         try {
-            // Validate each record
             for (let index = 0; index < dataArray.length; index++) {
                 const record = dataArray[index];
                 const recordErrors: ExtendedValidationResult[] = [];
 
-                // Validate each field
                 for (const [field, fieldRules] of Object.entries(rules)) {
                     const rulesArray = Array.isArray(fieldRules) ? fieldRules : [fieldRules];
                     const value = record ? this.getFieldValue(record, field) : undefined;
@@ -110,7 +101,6 @@ export class DataValidator {
                                 recordErrors.push(result);
                                 this.errors.push(result);
 
-                                // Track errors by field and type
                                 errorsByField[field] = (errorsByField[field] || 0) + 1;
                                 errorsByType[rule.type] = (errorsByType[rule.type] || 0) + 1;
 
@@ -163,9 +153,6 @@ export class DataValidator {
         }
     }
 
-    /**
-     * Validate single field
-     */
     private async validateField(
         value: any,
         field: string,
@@ -176,12 +163,10 @@ export class DataValidator {
         options: DataValidationOptions
     ): Promise<ExtendedValidationResult> {
         try {
-            // Pre-process value
             if (options.trimStrings && typeof value === 'string') {
                 value = value.trim();
             }
 
-            // Check if rule should be applied
             if (rule.condition && !rule.condition(record, allRecords)) {
                 return { 
                     isValid: true, 
@@ -192,7 +177,6 @@ export class DataValidator {
                 } as ExtendedValidationResult;
             }
 
-            // Get validator
             const validator = this.getValidator(rule.type);
             if (!validator) {
                 return {
@@ -207,7 +191,6 @@ export class DataValidator {
                 } as ExtendedValidationResult;
             }
 
-            // Run validation
             const isValid = await validator.validate(value, rule, record, allRecords);
 
             if (!isValid) {
@@ -246,9 +229,6 @@ export class DataValidator {
         }
     }
 
-    /**
-     * Get field value using dot notation
-     */
     private getFieldValue(record: TestData, field: string): any {
         const parts = field.split('.');
         let value: any = record;
@@ -258,7 +238,6 @@ export class DataValidator {
                 return undefined;
             }
 
-            // Handle array notation
             const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
             if (arrayMatch && arrayMatch[1] && arrayMatch[2]) {
                 value = value[arrayMatch[1]];
@@ -275,16 +254,10 @@ export class DataValidator {
         return value;
     }
 
-    /**
-     * Get validator function
-     */
     private getValidator(type: ValidationRuleType): BuiltInValidationRule | undefined {
         return this.builtInValidators.get(type);
     }
 
-    /**
-     * Get default error message
-     */
     private getDefaultMessage(type: string, rule: ValidationRule, value: any): string {
         switch (type) {
             case 'required':
@@ -318,11 +291,7 @@ export class DataValidator {
         }
     }
 
-    /**
-     * Initialize built-in validation rules
-     */
     private initializeBuiltInRules(): void {
-        // Required field validation
         this.builtInValidators.set('required', {
             type: 'required',
             validate: async (value: any) => {
@@ -331,7 +300,6 @@ export class DataValidator {
             }
         });
 
-        // Type validation
         this.builtInValidators.set('type', {
             type: 'type',
             validate: async (value: any, rule: ValidationRule) => {
@@ -342,7 +310,6 @@ export class DataValidator {
             }
         });
 
-        // String length validations
         this.builtInValidators.set('minLength' as any, {
             type: 'minLength',
             validate: async (value: any, rule: ValidationRule) => {
@@ -361,7 +328,6 @@ export class DataValidator {
             }
         });
 
-        // Numeric range validations
         this.builtInValidators.set('min', {
             type: 'min' as any,
             validate: async (value: any, rule: ValidationRule) => {
@@ -382,7 +348,6 @@ export class DataValidator {
             }
         });
 
-        // Pattern validation
         this.builtInValidators.set('pattern', {
             type: 'pattern',
             validate: async (value: any, rule: ValidationRule) => {
@@ -392,7 +357,6 @@ export class DataValidator {
             }
         });
 
-        // Email validation
         this.builtInValidators.set('email', {
             type: 'email' as any,
             validate: async (value: any) => {
@@ -402,7 +366,6 @@ export class DataValidator {
             }
         });
 
-        // URL validation
         this.builtInValidators.set('url', {
             type: 'url' as any,
             validate: async (value: any) => {
@@ -416,7 +379,6 @@ export class DataValidator {
             }
         });
 
-        // Date validation
         this.builtInValidators.set('date', {
             type: 'date',
             validate: async (value: any, rule: ValidationRule) => {
@@ -425,7 +387,6 @@ export class DataValidator {
                 const date = new Date(value);
                 if (isNaN(date.getTime())) return false;
 
-                // Check date range if specified
                 if (rule.minDate) {
                     const minDate = new Date(rule.minDate);
                     if (date < minDate) return false;
@@ -440,7 +401,6 @@ export class DataValidator {
             }
         });
 
-        // Enum validation
         this.builtInValidators.set('enum', {
             type: 'enum',
             validate: async (value: any, rule: ValidationRule) => {
@@ -449,7 +409,6 @@ export class DataValidator {
             }
         });
 
-        // Unique validation
         this.builtInValidators.set('unique', {
             type: 'unique',
             validate: async (value: any, rule: ValidationRule, _record: TestData, allRecords?: TestData[]) => {
@@ -457,7 +416,6 @@ export class DataValidator {
                 
                 const field = rule.field || 'value';
                 const occurrences = (allRecords || []).filter(r => {
-                    // Simple field access without using this.getFieldValue
                     const parts = field.split('.');
                     let fieldValue: any = r;
                     for (const part of parts) {
@@ -475,7 +433,6 @@ export class DataValidator {
             }
         });
 
-        // Phone number validation
         this.builtInValidators.set('phone', {
             type: 'phone',
             validate: async (value: any) => {
@@ -485,7 +442,6 @@ export class DataValidator {
             }
         });
 
-        // Postal code validation
         this.builtInValidators.set('postalCode', {
             type: 'postalCode',
             validate: async (value: any, rule: ValidationRule) => {
@@ -508,7 +464,6 @@ export class DataValidator {
             }
         });
 
-        // Credit card validation
         this.builtInValidators.set('creditCard', {
             type: 'creditCard',
             validate: async (value: any) => {
@@ -517,7 +472,6 @@ export class DataValidator {
                 const cleaned = String(value).replace(/\s/g, '');
                 if (!/^\d{13,19}$/.test(cleaned)) return false;
 
-                // Luhn algorithm
                 let sum = 0;
                 let isEven = false;
 
@@ -539,7 +493,6 @@ export class DataValidator {
             }
         });
 
-        // Custom validation
         this.builtInValidators.set('custom', {
             type: 'custom',
             validate: async (value: any, rule: ValidationRule, record: TestData, allRecords?: TestData[]) => {
@@ -554,11 +507,9 @@ export class DataValidator {
             }
         });
 
-        // Relationship validation
         this.builtInValidators.set('relationship', {
             type: 'relationship',
             validate: async (value: any, rule: ValidationRule, record: TestData, _allRecords?: TestData[]) => {
-                // Use either the new relationship object or legacy fields
                 const relatedField = rule.relationship?.field || rule.relatedField;
                 const relationshipType = rule.relationship?.type || rule.relationshipType;
                 
@@ -584,7 +535,6 @@ export class DataValidator {
                     case 'exists':
                     case 'notExists':
                     case 'matches':
-                        // Handle the new relationship types
                         if (rule.relationship?.condition) {
                             return rule.relationship.condition(value, relatedValue);
                         }
@@ -595,7 +545,6 @@ export class DataValidator {
             }
         });
 
-        // Array validations
         this.builtInValidators.set('arrayLength', {
             type: 'arrayLength' as any,
             validate: async (value: any, rule: ValidationRule) => {
@@ -624,7 +573,6 @@ export class DataValidator {
             }
         });
 
-        // JSON validation
         this.builtInValidators.set('json', {
             type: 'json' as any,
             validate: async (value: any) => {
@@ -639,7 +587,6 @@ export class DataValidator {
             }
         });
 
-        // UUID validation
         this.builtInValidators.set('uuid', {
             type: 'uuid' as any,
             validate: async (value: any) => {
@@ -650,7 +597,6 @@ export class DataValidator {
             }
         });
 
-        // IP address validation
         this.builtInValidators.set('ipAddress', {
             type: 'ipAddress',
             validate: async (value: any, rule: ValidationRule) => {
@@ -673,17 +619,11 @@ export class DataValidator {
         });
     }
 
-    /**
-     * Register custom validation rule
-     */
     registerRule(name: string, rule: ValidationRule): void {
         this.customRules.set(name, rule);
         logger.debug(`Registered custom validation rule: ${name}`);
     }
 
-    /**
-     * Create validation schema from object
-     */
     createSchemaFromSample(
         sampleData: Record<string, any>,
         options?: {
@@ -703,48 +643,38 @@ export class DataValidator {
         for (const [field, value] of Object.entries(sampleData)) {
             const rules: ValidationRule[] = [];
 
-            // Required rule
             if (opts.requireAll) {
                 rules.push({ type: 'required', field });
             }
 
-            // Type rule
             if (opts.inferTypes) {
                 const type = Array.isArray(value) ? 'array' : typeof value;
                 rules.push({ type: 'type', field, dataType: type as any });
             }
 
-            // Pattern rules based on value
             if (opts.inferPatterns && typeof value === 'string') {
-                // Email pattern
                 if (value.includes('@') && value.includes('.')) {
                     rules.push({ type: 'email' as any, field });
                 }
-                // URL pattern
                 else if (value.startsWith('http://') || value.startsWith('https://')) {
                     rules.push({ type: 'url' as any, field });
                 }
-                // UUID pattern
                 else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
                     rules.push({ type: 'uuid' as any, field });
                 }
-                // Phone pattern
                 else if (/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{4,6}$/.test(value)) {
                     rules.push({ type: 'phone' as any, field });
                 }
-                // Length rules
                 else {
                     rules.push({ type: 'maxLength' as any, field, maxLength: value.length * 2 });
                 }
             }
 
-            // Numeric rules
             if (typeof value === 'number') {
                 rules.push({ type: 'min' as any, field, min: value * 0.5 });
                 rules.push({ type: 'max' as any, field, max: value * 1.5 });
             }
 
-            // Array rules
             if (Array.isArray(value)) {
                 rules.push({ type: 'arrayLength' as any, field, min: 0, max: value.length * 2 });
             }
@@ -755,9 +685,6 @@ export class DataValidator {
         return schema;
     }
 
-    /**
-     * Export validation report
-     */
     exportValidationReport(
         errors: ExtendedValidationResult[],
         format: 'json' | 'csv' | 'html' = 'json'
@@ -772,9 +699,6 @@ export class DataValidator {
         }
     }
 
-    /**
-     * Export errors as CSV
-     */
     private exportAsCSV(errors: ExtendedValidationResult[]): string {
         const headers = ['Record Index', 'Field', 'Value', 'Rule', 'Message', 'Severity'];
         const rows = errors.map(error => [
@@ -792,9 +716,6 @@ export class DataValidator {
         ].join('\n');
     }
 
-    /**
-     * Export errors as HTML
-     */
     private exportAsHTML(errors: ExtendedValidationResult[]): string {
         const errorsByRecord = errors.reduce((acc, error) => {
             const index = error.recordIndex ?? -1;

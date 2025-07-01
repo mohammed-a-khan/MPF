@@ -6,10 +6,8 @@ import { ActionLogger } from '../../logging/ActionLogger';
 export class SentenceParser {
   parseSentence(tokens: Token[]): ParseTree {
     try {
-      // Build parse tree
       const tree = this.buildParseTree(tokens);
       
-      // Extract components
       tree.subject = this.identifySubject(tokens, tree);
       tree.action = this.identifyAction(tokens, tree);
       tree.object = this.identifyObject(tokens, tree);
@@ -31,19 +29,15 @@ export class SentenceParser {
   }
   
   identifySubject(tokens: Token[], _tree?: ParseTree): string {
-    // In UI descriptions, subject is often implicit (user)
-    // Look for explicit subjects
     
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
       
       if (token) {
-        // Check for pronouns that indicate subject
         if (['i', 'user', 'we'].includes(token.value.toLowerCase())) {
           return token.value;
         }
         
-        // First noun before a verb is often the subject
         if (token.pos === 'NOUN') {
           const nextVerb = tokens.slice(i + 1).find(t => t.pos === 'VERB');
           if (nextVerb) {
@@ -53,20 +47,16 @@ export class SentenceParser {
       }
     }
     
-    // Default subject for UI actions
     return 'user';
   }
   
   identifyAction(tokens: Token[], _tree?: ParseTree): string {
-    // Find the main action verb
     const verbs = tokens.filter(t => t.pos === 'VERB');
     
     if (verbs.length === 0) {
-      // Try to infer action from context
       return this.inferAction(tokens);
     }
     
-    // Prioritize action verbs
     const actionVerbs = ['click', 'press', 'type', 'select', 'enter', 'navigate', 'find'];
     
     for (const verb of verbs) {
@@ -75,24 +65,20 @@ export class SentenceParser {
       }
     }
     
-    // Return first verb
     const firstVerb = verbs[0];
     return firstVerb ? firstVerb.value : 'interact';
   }
   
   identifyObject(tokens: Token[], tree?: ParseTree): string {
-    // Find what the action is performed on
     const actionIndex = tokens.findIndex(t => t.value === tree?.action);
     
     if (actionIndex >= 0) {
-      // Look for nouns after the action
       const afterAction = tokens.slice(actionIndex + 1);
       const objectNoun = afterAction.find(t => 
         t.pos === 'NOUN' && !t.isStopWord
       );
       
       if (objectNoun) {
-        // Include modifiers before the noun
         const objectIndex = tokens.indexOf(objectNoun);
         const modifiers = this.getModifiersBeforeNoun(tokens, objectIndex);
         
@@ -104,11 +90,10 @@ export class SentenceParser {
       }
     }
     
-    // Look for any significant noun
     const nouns = tokens.filter(t => t.pos === 'NOUN' && !t.isStopWord);
     if (nouns.length > 0) {
       const lastNoun = nouns[nouns.length - 1];
-      return lastNoun ? lastNoun.value : ''; // Last noun is often the target
+      return lastNoun ? lastNoun.value : '';
     }
     
     return '';
@@ -145,7 +130,6 @@ export class SentenceParser {
       modifiers: []
     };
     
-    // Build basic structure
     let currentPhrase: ParseNode | null = null;
     
     for (const token of tokens) {
@@ -188,7 +172,6 @@ export class SentenceParser {
   }
   
   private inferAction(tokens: Token[]): string {
-    // Infer action from context when no verb is present
     const tokenValues = tokens.map(t => t.value.toLowerCase());
     
     if (tokenValues.some(v => v.includes('button'))) {
@@ -220,10 +203,8 @@ export class SentenceParser {
         if (token.pos === 'ADJ' || token.type === 'modifier') {
           modifiers.unshift(token.value);
         } else if (token.pos === 'DET') {
-          // Skip determiners
           continue;
         } else {
-          // Stop at non-modifier
           break;
         }
       }
@@ -255,7 +236,6 @@ export class SentenceParser {
   }
   
   private findModifierTarget(tokens: Token[], modifierIndex: number): string {
-    // Find what the modifier is modifying
     for (let i = modifierIndex + 1; i < tokens.length; i++) {
       const token = tokens[i];
       if (token && token.pos === 'NOUN') {
@@ -263,7 +243,6 @@ export class SentenceParser {
       }
     }
     
-    // Look backwards if not found forward
     for (let i = modifierIndex - 1; i >= 0; i--) {
       const token = tokens[i];
       if (token && token.pos === 'NOUN') {
@@ -299,16 +278,12 @@ export class SentenceParser {
   private calculateTreeComplexity(tree: ParseTree): number {
     let complexity = 0;
     
-    // Base complexity on token count
     complexity += Math.min(tree.tokens.length / 20, 0.3);
     
-    // Add for phrases
     complexity += Math.min(tree.children.length * 0.1, 0.3);
     
-    // Add for modifiers
     complexity += Math.min(tree.modifiers.length * 0.1, 0.2);
     
-    // Add for nested structures
     const maxDepth = this.getMaxDepth(tree);
     complexity += Math.min(maxDepth * 0.1, 0.2);
     

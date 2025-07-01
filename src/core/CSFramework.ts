@@ -51,10 +51,6 @@ export interface FrameworkStatus {
     version: string;
 }
 
-/**
- * CSFramework - Main Orchestrator
- * Central framework controller managing all components and execution flow
- */
 export class CSFramework {
     private static instance: CSFramework | null = null;
     private static readonly version = '1.0.0';
@@ -64,15 +60,12 @@ export class CSFramework {
     private startTime?: Date;
     private currentEnvironment?: string;
     private currentProject?: string;
-    // private globalTimeout = 30000;
     private components = new Map<string, any>();
     private componentStatus: ComponentStatus[] = [];
     
-    // 🔥 MEMORY MANAGEMENT SYSTEM
     private memoryManager?: FrameworkMemoryManager;
     private memoryCleanupInterval?: NodeJS.Timeout | undefined;
     
-    // Framework components
     private configManager?: ConfigurationManager;
     private browserManager: BrowserManager | null = null;
     private browserPool: BrowserPool | null = null;
@@ -87,9 +80,6 @@ export class CSFramework {
         logger.info('Initializing CS Framework...');
     }
 
-    /**
-     * Get singleton instance
-     */
     static getInstance(): CSFramework {
         if (!this.instance) {
             this.instance = new CSFramework();
@@ -97,30 +87,23 @@ export class CSFramework {
         return this.instance;
     }
 
-    /**
-     * Initialize framework with project and environment - Implements parallel bootstrap for improved performance
-     */
     async initialize(project: string, environment: string, config?: Partial<FrameworkConfig>): Promise<void>;
     async initialize(environment: string, config?: Partial<FrameworkConfig>): Promise<void>;
     async initialize(projectOrEnvironment: string, environmentOrConfig?: string | Partial<FrameworkConfig>, config?: Partial<FrameworkConfig>): Promise<void> {
         const initStartTime = performance.now();
         
-        // Handle method overloading
         let project: string;
         let environment: string;
         let actualConfig: Partial<FrameworkConfig> | undefined;
 
         if (typeof environmentOrConfig === 'string') {
-            // New signature: initialize(project, environment, config?)
             project = projectOrEnvironment;
             environment = environmentOrConfig;
             actualConfig = config;
         } else {
-            // Legacy signature: initialize(environment, config?)
             environment = projectOrEnvironment;
             actualConfig = environmentOrConfig;
             
-            // Try to determine project from environment name or use default
             project = this.inferProjectFromEnvironment(environment);
             console.log(`🔄 Legacy mode: inferred project '${project}' for environment '${environment}'`);
         }
@@ -150,28 +133,19 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Infer project from environment name (for backward compatibility)
-     */
     private inferProjectFromEnvironment(environment: string): string {
-        // Check if environment contains project hints
         if (environment.includes('api') || environment === 'demo') {
             return 'api';
         }
         
-        // Default to saucedemo for most environments
         return 'saucedemo';
     }
 
-    /**
-     * Phase 1: Initialize core independent modules with configuration first
-     */
     private async initializeCoreModulesParallel(project: string, environment: string, config?: Partial<FrameworkConfig>): Promise<void> {
         await this.initializeConfigurationWithFallback(project, environment);
         this.updateComponentStatus('ConfigurationManager', true, true);
         logger.info('✅ Configuration loaded - proceeding with parallel initialization');
         
-        // Apply command-line configuration overrides
         if (config) {
             this.applyConfigurationOverrides(config);
         }
@@ -188,11 +162,7 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Apply configuration overrides from command line
-     */
     private applyConfigurationOverrides(config: Partial<FrameworkConfig>): void {
-        // Apply browser settings
         if (config.headless !== undefined) {
             ConfigurationManager.set('HEADLESS', String(config.headless));
             logger.debug(`Applied headless override: ${config.headless}`);
@@ -209,12 +179,8 @@ export class CSFramework {
         if (config.debug !== undefined) {
             ConfigurationManager.set('DEBUG_MODE', String(config.debug));
         }
-        // Add more configuration overrides as needed
     }
 
-    /**
-     * Phase 2: Initialize service modules in parallel based on configuration
-     */
     private async initializeServiceModulesParallel(config?: Partial<FrameworkConfig>): Promise<void> {
         const servicePromises: Promise<void>[] = [];
         const serviceNames: string[] = [];
@@ -251,26 +217,17 @@ export class CSFramework {
         this.handleModuleResults(serviceModules, serviceNames);
     }
 
-    /**
-     * Phase 3: Initialize dependent modules sequentially
-     */
     private async initializeDependentModules(config?: Partial<FrameworkConfig>): Promise<void> {
-        // BDD Runner depends on other modules being initialized
         await this.initializeBDDRunnerWithFallback();
         this.updateComponentStatus('CSBDDRunner', true, true);
         
-        // 🔥 INITIALIZE MEMORY MANAGEMENT SYSTEM
         this.initializeMemoryManagement();
         
-        // Use config for debugging
         if (config?.debug) {
             logger.debug('Dependent modules initialized with debug enabled');
         }
     }
 
-    /**
-     * Handle module initialization results with graceful fallbacks and error boundaries
-     */
     private handleModuleResults(results: PromiseSettledResult<void>[], moduleNames: string[]): void {
         const criticalModules = ['ConfigurationManager', 'BrowserManager'];
         const failedCriticalModules: string[] = [];
@@ -307,9 +264,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Execute multiple features with provided options
-     */
     async executeTests(featurePaths: string[], options?: Partial<ExecutionOptions>): Promise<TestResult> {
         this.validateInitialized();
         
@@ -325,7 +279,7 @@ export class CSFramework {
                 ...options,
                 project: this.currentProject,
                 environment: this.currentEnvironment,
-                paths: featurePaths,  // CSBDDRunner expects 'paths' not 'featurePaths'
+                paths: featurePaths,
                 adoEnabled: options?.skipADO !== true
             };
 
@@ -356,10 +310,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Execute single feature and return its result
-     * This will be implemented in future enhancements
-     */
     async executeFeature(feature: Feature): Promise<FeatureResult> {
         this.validateInitialized();
         
@@ -383,10 +333,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Execute single scenario and return its result
-     * This will be implemented in future enhancements
-     */
     async executeScenario(scenario: Scenario): Promise<ScenarioResult> {
         this.validateInitialized();
         
@@ -410,9 +356,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Validate framework configuration and return validation status
-     */
     async validateConfiguration(): Promise<boolean> {
         try {
             if (!this.configManager) {
@@ -427,9 +370,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Get execution summary with test run statistics and metadata
-     */
     getExecutionSummary(): ExecutionSummary {
         return {
             totalFeatures: 0,
@@ -455,21 +395,14 @@ export class CSFramework {
         };
     }
 
-    /**
-     * Enable parallel execution with specified number of workers
-     */
     enableParallelExecution(workers: number): void {
         if (workers <= 0) {
             throw new Error('Number of workers must be greater than 0');
         }
         
         logger.info(`Enabling parallel execution with ${workers} workers`);
-        // This would be passed to the BDD runner
     }
 
-    /**
-     * Set global timeout for all operations
-     */
     setGlobalTimeout(timeout: number): void {
         if (timeout <= 0) {
             throw new Error('Timeout must be greater than 0');
@@ -477,9 +410,6 @@ export class CSFramework {
         logger.info(`Global timeout set to ${timeout}ms`);
     }
 
-    /**
-     * Get current framework status including component health
-     */
     getStatus(): FrameworkStatus {
         return {
             initialized: this.isInitialized,
@@ -491,21 +421,16 @@ export class CSFramework {
         };
     }
 
-    /**
-     * Cleanup all framework resources in reverse initialization order
-     */
     async cleanup(): Promise<void> {
         try {
             logger.info('Starting framework cleanup...');
 
-            // Stop memory management
             if (this.memoryCleanupInterval) {
                 clearInterval(this.memoryCleanupInterval);
                 this.memoryCleanupInterval = undefined;
                 logger.info('Memory management stopped');
             }
 
-            // Cleanup ADO service first
             if (this.adoService) {
                 try {
                     await this.cleanupComponent('ADOIntegrationService', async () => {
@@ -515,11 +440,9 @@ export class CSFramework {
                     });
                 } catch (adoError) {
                     logger.error('Failed to cleanup ADO service:', adoError as Error);
-                    // Continue with cleanup even if ADO cleanup fails
                 }
             }
 
-            // Cleanup other components
             const cleanupPromises: Promise<void>[] = [];
             const componentNames: string[] = [];
 
@@ -575,11 +498,9 @@ export class CSFramework {
                 componentNames.push('CSBDDRunner');
             }
 
-            // Wait for all cleanup operations to complete
             const cleanupResults = await Promise.allSettled(cleanupPromises);
             this.handleModuleResults(cleanupResults, componentNames);
 
-            // Clear component maps and status
             this.components.clear();
             this.componentStatus = [];
             this.isInitialized = false;
@@ -592,13 +513,8 @@ export class CSFramework {
         }
     }
 
-    // Private methods
 
-    // ===== FALLBACK INITIALIZATION METHODS WITH ERROR RECOVERY =====
 
-    /**
-     * Initialize configuration manager with fallback to default configuration
-     */
     private async initializeConfigurationWithFallback(project: string, environment: string): Promise<void> {
         logger.info('Initializing configuration manager with fallback...');
         try {
@@ -620,9 +536,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Load default configuration values for required settings
-     */
     private loadDefaultConfiguration(): void {
         const defaults = {
             'BROWSER_TYPE': 'chromium',
@@ -642,9 +555,6 @@ export class CSFramework {
         });
     }
 
-    /**
-     * Initialize browser management with single browser instance
-     */
     private async initializeBrowserManagementWithFallback(): Promise<void> {
         logger.info('Initializing browser management with fallback...');
         try {
@@ -666,22 +576,14 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Initialize utility components
-     * This will be implemented in future enhancements
-     */
     private async initializeUtilitiesWithFallback(): Promise<void> {
         logger.info('Initializing utilities with fallback...');
         try {
-            // This will be implemented in future enhancements
         } catch (error) {
             logger.warn(`Utilities initialization failed: ${error} - continuing without utilities`);
         }
     }
 
-    /**
-     * Initialize proxy manager if enabled
-     */
     private async initializeProxyWithFallback(): Promise<void> {
         logger.info('Initializing proxy manager with fallback...');
         try {
@@ -691,9 +593,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Initialize debug mode if enabled
-     */
     private async initializeDebugModeWithFallback(): Promise<void> {
         logger.info('Initializing debug manager with fallback...');
         try {
@@ -703,9 +602,6 @@ export class CSFramework {
         }
     }
 
-    /**
-     * Initialize reporting system with fallback to basic reporting
-     */
     private async initializeReportingWithFallback(): Promise<void> {
         logger.info('Initializing reporting with fallback...');
         try {
@@ -720,12 +616,10 @@ export class CSFramework {
         try {
             logger.info('Initializing ADO integration service...');
             
-            // Reset any existing ADO service
             if (this.adoService) {
                 this.adoService.reset();
                 await this.adoService.initialize();
             } else {
-                // Initialize new ADO service
                 this.adoService = ADOIntegrationService.getInstance();
                 await this.adoService.initialize();
             }
@@ -744,7 +638,6 @@ export class CSFramework {
             await this.initializeBDDRunner();
         } catch (error) {
             logger.warn(`⚠️ BDD runner initialization failed: ${error} - using minimal BDD setup`);
-            // Initialize minimal BDD runner
             this.bddRunner = CSBDDRunner.getInstance();
             this.components.set('CSBDDRunner', this.bddRunner);
         }
@@ -764,7 +657,6 @@ export class CSFramework {
             port: ConfigurationManager.getInt('PROXY_PORT')
         };
         
-        // Only add auth if username is provided
         if (ConfigurationManager.get('PROXY_USERNAME')) {
             proxyServer.auth = {
                 username: ConfigurationManager.getRequired('PROXY_USERNAME'),
@@ -857,17 +749,12 @@ export class CSFramework {
         }
     }
 
-    // ===== MEMORY MANAGEMENT SYSTEM =====
 
-    /**
-     * Initialize memory management system to prevent memory exhaustion
-     */
     private initializeMemoryManagement(): void {
         logger.info('🧠 Initializing memory management system...');
         
         this.memoryManager = new FrameworkMemoryManager();
         
-        // Start periodic memory cleanup (every 5 minutes)
         this.memoryCleanupInterval = setInterval(async () => {
             try {
                 await this.memoryManager!.performCleanup();
@@ -875,14 +762,11 @@ export class CSFramework {
             } catch (error) {
                 logger.warn(`⚠️ Memory cleanup failed: ${error}`);
             }
-        }, 300000); // 5 minutes
+        }, 300000);
         
         logger.info('✅ Memory management system initialized');
     }
 
-    /**
-     * Log current memory usage for monitoring
-     */
     private logMemoryUsage(): void {
         const memUsage = process.memoryUsage();
         const rss = Math.round(memUsage.rss / 1024 / 1024);
@@ -891,8 +775,7 @@ export class CSFramework {
         
         logger.info(`📊 Memory: RSS ${rss}MB, Heap ${heapUsed}/${heapTotal}MB`);
         
-        // Warn if memory usage is high
-        if (rss > 512) { // 512MB threshold
+        if (rss > 512) {
             logger.warn(`⚠️ High memory usage detected: ${rss}MB RSS`);
         }
     }
@@ -900,14 +783,12 @@ export class CSFramework {
     reset(): void {
         logger.info('Resetting framework...');
 
-        // Reset ADO service if it exists
         if (this.adoService) {
             this.adoService.reset();
             this.adoService = null;
             this.components.delete('ADOIntegrationService');
         }
 
-        // Reset other components
         for (const [name, component] of this.components.entries()) {
             if (typeof component.reset === 'function') {
                 try {
@@ -926,21 +807,16 @@ export class CSFramework {
     }
 }
 
-/**
- * Unified Memory Optimizer to prevent memory exhaustion across all modules
- */
 class FrameworkMemoryManager {
     async performCleanup(): Promise<void> {
         logger.debug('🧹 Starting memory cleanup...');
         
         try {
-            // Force garbage collection if available
             if (global.gc) {
                 global.gc();
                 logger.debug('♻️ Forced garbage collection');
             }
 
-            // Cleanup component caches
             await this.cleanupComponentCaches();
             
             logger.debug('✅ Memory cleanup completed');
@@ -951,7 +827,6 @@ class FrameworkMemoryManager {
 
     private async cleanupComponentCaches(): Promise<void> {
         try {
-            // REAL IMPLEMENTATION: Clean up BDD Engine caches
             if (typeof require !== 'undefined') {
                 try {
                     const { bddEngine } = require('../../bdd/engine/CSBDDEngine');
@@ -964,7 +839,6 @@ class FrameworkMemoryManager {
                 }
             }
 
-            // REAL IMPLEMENTATION: Clean up AI pattern caches
             try {
                 const { VisualRecognitionEngine } = require('../ai/engine/VisualRecognitionEngine');
                 if (VisualRecognitionEngine) {
@@ -978,18 +852,14 @@ class FrameworkMemoryManager {
                 logger.debug('⚠️ Visual Recognition Engine not available for cache cleanup');
             }
 
-            // REAL IMPLEMENTATION: Clean up browser pool
             try {
                 const { BrowserPool } = require('../../core/browser/BrowserPool');
                 if (BrowserPool) {
                     const poolInstance = BrowserPool.getInstance();
                     if (poolInstance) {
-                        // Clear available browsers beyond minimum
                         const stats = poolInstance.getStatistics();
                         if (stats.available > 1) {
-                            // Force cleanup of excess browsers
                             logger.debug(`🌐 Cleaning up ${stats.available - 1} excess browsers`);
-                            // The pool's internal cleanup will handle this
                         }
                     }
                 }
@@ -997,7 +867,6 @@ class FrameworkMemoryManager {
                 logger.debug('⚠️ Browser Pool not available for cache cleanup');
             }
 
-            // REAL IMPLEMENTATION: Clean up storage managers
             try {
                 const { StorageManager } = require('../storage/StorageManager');
                 if (StorageManager) {
@@ -1011,18 +880,15 @@ class FrameworkMemoryManager {
                 logger.debug('⚠️ Storage Manager not available for cache cleanup');
             }
 
-            // REAL IMPLEMENTATION: Clean up network module caches
             try {
                 const { NetworkInterceptor } = require('../network/NetworkInterceptor');
                 if (NetworkInterceptor) {
-                    // NetworkInterceptor is page-specific, so we'll handle this differently
                     logger.debug('ℹ️ Network Interceptor cleanup handled per-page');
                 }
             } catch (error) {
                 logger.debug('⚠️ Network Interceptor not available for cache cleanup');
             }
 
-            // REAL IMPLEMENTATION: Clean up authentication caches
             try {
                 const { AuthenticationHandler } = require('../../api/client/AuthenticationHandler');
                 if (AuthenticationHandler) {
@@ -1036,7 +902,6 @@ class FrameworkMemoryManager {
                 logger.debug('⚠️ Authentication Handler not available for cache cleanup');
             }
 
-            // REAL IMPLEMENTATION: Clean up data provider caches
             try {
                 const { CSDataProvider } = require('../../data/provider/CSDataProvider');
                 if (CSDataProvider) {
@@ -1050,7 +915,6 @@ class FrameworkMemoryManager {
                 logger.debug('⚠️ Data Provider not available for cache cleanup');
             }
 
-            // REAL IMPLEMENTATION: Clean up reporting caches
             try {
                 const { ReportCollector } = require('../../reporting/core/ReportCollector');
                 if (ReportCollector) {
@@ -1064,7 +928,6 @@ class FrameworkMemoryManager {
                 logger.debug('⚠️ Report Collector not available for cache cleanup');
             }
 
-            // REAL IMPLEMENTATION: Force V8 garbage collection if available
             if (global.gc) {
                 const beforeGC = process.memoryUsage();
                 global.gc();
@@ -1079,5 +942,4 @@ class FrameworkMemoryManager {
     }
 }
 
-// Export default instance for convenience
 export const framework = CSFramework.getInstance();

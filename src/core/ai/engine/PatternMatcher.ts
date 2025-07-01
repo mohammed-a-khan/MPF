@@ -145,15 +145,13 @@ export class PatternMatcher {
   }
 
   matchPattern(element: Element, pattern: UIPattern): boolean {
-    // Check tag match
     if (!pattern.tags.includes(element.tagName.toLowerCase()) && 
         !pattern.tags.includes('*')) {
       return false;
     }
 
-    // Check attributes
     let attributeMatches = 0;
-    const requiredMatches = Math.ceil(pattern.attributes.length * 0.5); // At least 50% match
+    const requiredMatches = Math.ceil(pattern.attributes.length * 0.5);
 
     for (const attrPattern of pattern.attributes) {
       if (this.matchAttribute(element, attrPattern)) {
@@ -165,7 +163,6 @@ export class PatternMatcher {
       return false;
     }
 
-    // Check structure if defined
     if (pattern.structure) {
       if (pattern.structure.parent) {
         const parentMatch = element.closest(pattern.structure.parent);
@@ -184,7 +181,6 @@ export class PatternMatcher {
   }
 
   private matchAttribute(element: Element, attrPattern: string): boolean {
-    // Parse attribute pattern (e.g., "class*=btn", "type=submit", "href")
     if (attrPattern.includes('*=')) {
       const [attr, value] = attrPattern.split('*=');
       if (!attr || !value) return false;
@@ -195,7 +191,6 @@ export class PatternMatcher {
       if (!attr || !value) return false;
       return element.getAttribute(attr) === value;
     } else {
-      // Just check if attribute exists
       return element.hasAttribute(attrPattern);
     }
   }
@@ -218,7 +213,6 @@ export class PatternMatcher {
 
     if (matches.length === 0) return null;
 
-    // Return pattern with highest score
     matches.sort((a, b) => b.score - a.score);
     const bestMatch = matches[0];
     
@@ -226,7 +220,6 @@ export class PatternMatcher {
       return null;
     }
 
-    // Update stats
     const stats = this.patternStats.get(bestMatch.pattern.name);
     if (stats) {
       stats.matches++;
@@ -243,7 +236,6 @@ export class PatternMatcher {
 
   getPatternScore(element: Element, pattern?: UIPattern): number {
     if (!pattern) {
-      // Try to identify pattern
       const identified = this.identifyUIPattern(element);
       if (!identified) return 0;
       pattern = identified;
@@ -251,17 +243,14 @@ export class PatternMatcher {
 
     if (!this.matchPattern(element, pattern)) return 0;
 
-    // Calculate score based on match quality
     let score = pattern.weight;
 
-    // Boost score based on pattern success rate
     const stats = this.patternStats.get(pattern.name);
     if (stats && stats.matches > 0) {
       const successRate = stats.successes / stats.matches;
       score *= (0.5 + successRate * 0.5);
     }
 
-    // Additional scoring based on attribute matches
     let attributeScore = 0;
     for (const attrPattern of pattern.attributes) {
       if (this.matchAttribute(element, attrPattern)) {
@@ -283,19 +272,17 @@ export class PatternMatcher {
   }
 
   identifyPattern(features: ElementFeatures): string | null {
-    // Create a temporary element representation for pattern matching
     const mockElement = {
       tagName: features.structural.tagName,
       getAttribute: (name: string) => features.structural.attributes[name] || null,
       hasAttribute: (name: string) => name in features.structural.attributes,
       closest: (selector: string) => {
-        // Simple parent check based on features
         if (features.context.parentTag && selector.includes(features.context.parentTag)) {
           return true;
         }
         return null;
       },
-      querySelector: () => null // Simplified for feature-based matching
+      querySelector: () => null
     };
 
     for (const [name, pattern] of this.patterns) {
@@ -374,7 +361,6 @@ export class PatternMatcher {
       }
     }
 
-    // Sort by usage
     patternUsage.sort((a, b) => b.stats.matches - a.stats.matches);
     analysis.mostUsed = patternUsage.slice(0, 5).map(p => ({
       name: p.name,
@@ -382,10 +368,9 @@ export class PatternMatcher {
       successRate: p.successRate
     }));
 
-    // Sort by success rate
     patternUsage.sort((a, b) => b.successRate - a.successRate);
     analysis.mostSuccessful = patternUsage
-      .filter(p => p.stats.matches >= 10) // Minimum matches for significance
+      .filter(p => p.stats.matches >= 10)
       .slice(0, 5)
       .map(p => ({
         name: p.name,
@@ -416,17 +401,15 @@ export class PatternMatcher {
     const commonAttributes = new Map<string, number>();
     const tagCombinations = new Map<string, number>();
 
-    // Analyze common patterns in elements
     for (const features of elements) {
       if (!features.structural) continue;
       
       const tag = features.structural.tagName;
       tagCombinations.set(tag, (tagCombinations.get(tag) || 0) + 1);
 
-      // Count attribute patterns
       if (features.structural.attributes) {
         for (const [attr, value] of Object.entries(features.structural.attributes)) {
-          if (attr === 'id' || attr === 'style') continue; // Skip unique attributes
+          if (attr === 'id' || attr === 'style') continue;
           
           const pattern = value.length > 20 ? `${attr}` : `${attr}=${value}`;
           commonAttributes.set(pattern, (commonAttributes.get(pattern) || 0) + 1);
@@ -434,7 +417,6 @@ export class PatternMatcher {
       }
     }
 
-    // Find patterns that appear in at least 30% of elements
     const threshold = elements.length * 0.3;
     const significantAttributes = Array.from(commonAttributes.entries())
       .filter(([_, count]) => count >= threshold)
@@ -497,13 +479,9 @@ export class PatternMatcher {
     });
   }
 
-  /**
-   * Match features against patterns and keywords
-   */
   match(features: ElementFeatures, keywords: string[]): number {
     let score = 0;
     
-    // Try to identify a pattern from features
     const patternName = this.identifyPattern(features);
     if (patternName) {
       const pattern = this.patterns.get(patternName);
@@ -512,7 +490,6 @@ export class PatternMatcher {
       }
     }
     
-    // Match keywords against element text and attributes
     if (keywords.length > 0) {
       let keywordMatches = 0;
       const textLower = features.text.content.toLowerCase();

@@ -7,10 +7,6 @@ import { Readable } from 'stream';
 import { parse as csvParse } from 'csv-parse';
 import { stringify } from 'csv-stringify';
 
-/**
- * Parser for CSV files
- * Supports various delimiters and streaming for large files
- */
 export class CSVParser {
     private typeConverter: TypeConverter;
     
@@ -18,9 +14,6 @@ export class CSVParser {
         this.typeConverter = new TypeConverter();
     }
 
-    /**
-     * Parse CSV content
-     */
     async parse(content: string, options: ParserOptions = {}): Promise<{
         data: TestData[];
         metadata?: Record<string, any>;
@@ -31,43 +24,35 @@ export class CSVParser {
             const records: TestData[] = [];
             const parser = this.createParser(options);
             
-            // Parse configuration
             const delimiter = options.delimiter || ',';
             const hasHeaders = options.headers !== false;
             let headers: string[] = [];
             let rowCount = 0;
             let skippedRows = 0;
             
-            // Debug logging
             if (options.delimiter) {
                 ActionLogger.logDebug(`Using specified delimiter: "${delimiter}"`);
             }
             
-            // Setup parser event handlers
             parser.on('readable', async () => {
                 let record;
                 while ((record = parser.read()) !== null) {
                     rowCount++;
                     
-                    // Skip rows
                     if (options.skipRows && rowCount <= options.skipRows) {
                         skippedRows++;
                         continue;
                     }
                     
-                    // First row as headers
                     if (hasHeaders && headers.length === 0) {
                         headers = record.map((h: string) => h.trim());
                         continue;
                     }
                     
-                    // Convert to object
                     const row = this.createRecord(record, headers, hasHeaders);
                     
-                    // Apply type conversion
                     const converted = await this.convertTypes(row, options);
                     
-                    // Skip empty rows
                     if (options.skipEmptyRows !== false && this.isEmptyRow(converted)) {
                         skippedRows++;
                         continue;
@@ -75,7 +60,6 @@ export class CSVParser {
                     
                     records.push(converted);
                     
-                    // Check max rows
                     if (options.maxRows && records.length >= options.maxRows) {
                         parser.end();
                         break;
@@ -83,7 +67,6 @@ export class CSVParser {
                 }
             });
             
-            // Parse content
             await new Promise<void>((resolve, reject) => {
                 parser.on('error', reject);
                 parser.on('end', resolve);
@@ -118,9 +101,6 @@ export class CSVParser {
         }
     }
 
-    /**
-     * Stream parse CSV
-     */
     async streamParse(stream: Readable, options: StreamOptions): Promise<void> {
         return new Promise((resolve, reject) => {
             try {
@@ -135,29 +115,24 @@ export class CSVParser {
                     while ((record = parser.read()) !== null) {
                         rowCount++;
                         
-                        // Skip rows
                         if (options.skipRows && rowCount <= options.skipRows) {
                             continue;
                         }
                         
-                        // First row as headers
                         if (hasHeaders && headers.length === 0) {
                             headers = record.map((h: string) => h.trim());
                             continue;
                         }
                         
-                        // Convert to object
                         const row = this.createRecord(record, headers, hasHeaders);
                         const converted = await this.convertTypes(row, options);
                         
-                        // Skip empty rows
                         if (options.skipEmptyRows !== false && this.isEmptyRow(converted)) {
                             continue;
                         }
                         
                         batch.push(converted);
                         
-                        // Process batch
                         if (batch.length >= (options.batchSize || 1000)) {
                             parser.pause();
                             
@@ -174,7 +149,6 @@ export class CSVParser {
                             }
                         }
                         
-                        // Check max rows
                         if (options.maxRows && rowCount >= options.maxRows) {
                             parser.end();
                             break;
@@ -183,7 +157,6 @@ export class CSVParser {
                 });
                 
                 parser.on('end', async () => {
-                    // Process remaining batch
                     if (batch.length > 0 && options.onBatch) {
                         await options.onBatch(batch);
                     }
@@ -202,7 +175,6 @@ export class CSVParser {
                     reject(error);
                 });
                 
-                // Start streaming
                 stream.pipe(parser);
                 
             } catch (error) {
@@ -211,16 +183,12 @@ export class CSVParser {
         });
     }
 
-    /**
-     * Stream records one by one
-     */
     async *streamRecords(stream: Readable, options: StreamOptions): AsyncIterableIterator<TestData> {
         const parser = this.createParser(options);
         let headers: string[] = [];
         let rowCount = 0;
         const hasHeaders = options.headers !== false;
         
-        // Set up async iterator
         const records: TestData[] = [];
         let resolveNext: ((value: IteratorResult<TestData>) => void) | null = null;
         let rejectNext: ((error: Error) => void) | null = null;
@@ -231,22 +199,18 @@ export class CSVParser {
             while ((record = parser.read()) !== null) {
                 rowCount++;
                 
-                // Skip rows
                 if (options.skipRows && rowCount <= options.skipRows) {
                     continue;
                 }
                 
-                // First row as headers
                 if (hasHeaders && headers.length === 0) {
                     headers = record.map((h: string) => h.trim());
                     continue;
                 }
                 
-                // Convert to object
                 const row = this.createRecord(record, headers, hasHeaders);
                 const converted = await this.convertTypes(row, options);
                 
-                // Skip empty rows
                 if (options.skipEmptyRows !== false && this.isEmptyRow(converted)) {
                     continue;
                 }
@@ -275,17 +239,14 @@ export class CSVParser {
             }
         });
         
-        // Start streaming
         stream.pipe(parser);
         
-        // Yield records
         while (true) {
             if (records.length > 0) {
                 yield records.shift()!;
             } else if (ended) {
                 break;
             } else {
-                // Wait for next record
                 const result = await new Promise<IteratorResult<TestData>>((resolve, reject) => {
                     resolveNext = resolve;
                     rejectNext = reject;
@@ -297,9 +258,6 @@ export class CSVParser {
         }
     }
 
-    /**
-     * Infer schema from data
-     */
     async inferSchema(data: TestData[], options: {
         sampleSize?: number;
         detectTypes?: boolean;
@@ -308,7 +266,6 @@ export class CSVParser {
         const sample = data.slice(0, options.sampleSize || Math.min(100, data.length));
         const fieldAnalysis = new Map<string, any>();
         
-        // Analyze each field
         for (const record of sample) {
             for (const [key, value] of Object.entries(record)) {
                 if (!fieldAnalysis.has(key)) {
@@ -344,7 +301,6 @@ export class CSVParser {
             }
         }
         
-        // Convert to schema
         const fields = Array.from(fieldAnalysis.entries()).map(([key, analysis]) => {
             const field: any = {
                 name: key,
@@ -353,12 +309,10 @@ export class CSVParser {
                 unique: analysis.uniqueValues.size === analysis.values.length
             };
             
-            // Add format if consistent
             if (analysis.formats.size === 1) {
                 field.format = Array.from(analysis.formats)[0];
             }
             
-            // Add constraints
             if (field.type === 'string') {
                 const lengths = analysis.values.map((v: any) => String(v).length);
                 if (lengths.length > 0) {
@@ -373,7 +327,6 @@ export class CSVParser {
                 }
             }
             
-            // Add enum if limited unique values
             if (analysis.uniqueValues.size <= 10 && analysis.uniqueValues.size > 1) {
                 field.enum = Array.from(analysis.uniqueValues);
             }
@@ -387,9 +340,6 @@ export class CSVParser {
         };
     }
 
-    /**
-     * Export data to CSV
-     */
     async export(data: TestData[], options: ParserOptions = {}): Promise<string> {
         return new Promise((resolve, reject) => {
             const output: string[] = [];
@@ -413,7 +363,6 @@ export class CSVParser {
             stringifier.on('error', reject);
             stringifier.on('finish', () => resolve(output.join('')));
             
-            // Write data
             for (const record of data) {
                 stringifier.write(record);
             }
@@ -422,9 +371,6 @@ export class CSVParser {
         });
     }
 
-    /**
-     * Create CSV parser
-     */
     private createParser(options: ParserOptions | StreamOptions): any {
         const csvOptions = options as any;
         return csvParse({
@@ -435,17 +381,14 @@ export class CSVParser {
             relax_column_count: true,
             skip_empty_lines: csvOptions.skipEmptyRows !== false,
             trim: csvOptions.trimValues !== false,
-            columns: false, // We handle headers manually
-            cast: false, // We handle type conversion manually
-            comment: '', // Disable comment character to allow # in data
+            columns: false,
+            cast: false,
+            comment: '',
             bom: true,
             encoding: csvOptions.encoding || 'utf8'
         });
     }
 
-    /**
-     * Create record from array
-     */
     private createRecord(values: any[], headers: string[], hasHeaders: boolean): TestData {
         const record: TestData = {};
         
@@ -462,9 +405,6 @@ export class CSVParser {
         return record;
     }
 
-    /**
-     * Convert types in record
-     */
     private async convertTypes(record: TestData, options: ParserOptions | StreamOptions): Promise<TestData> {
         const csvOptions = options as any;
         if (csvOptions.parseNumbers === false && 
@@ -490,9 +430,6 @@ export class CSVParser {
         return converted;
     }
 
-    /**
-     * Check if row is empty
-     */
     private isEmptyRow(record: TestData): boolean {
         return Object.values(record).every(value => 
             value === null || 
@@ -502,25 +439,19 @@ export class CSVParser {
         );
     }
 
-    /**
-     * Detect data type
-     */
     private detectType(value: any): string {
         if (value === null || value === undefined) return 'null';
         
         const strValue = String(value).trim();
         
-        // Boolean
         if (['true', 'false', 'yes', 'no', '1', '0'].includes(strValue.toLowerCase())) {
             return 'boolean';
         }
         
-        // Number
         if (/^-?\d+(\.\d+)?$/.test(strValue)) {
             return 'number';
         }
         
-        // Date
         if (this.isDateFormat(strValue)) {
             return 'date';
         }
@@ -528,38 +459,29 @@ export class CSVParser {
         return 'string';
     }
 
-    /**
-     * Detect data format
-     */
     private detectFormat(value: any): string | null {
         const strValue = String(value).trim();
         
-        // Email
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strValue)) {
             return 'email';
         }
         
-        // URL
         if (/^https?:\/\/[^\s]+$/.test(strValue)) {
             return 'url';
         }
         
-        // Phone
         if (/^\+?\d{10,15}$/.test(strValue.replace(/[\s\-\(\)]/g, ''))) {
             return 'phone';
         }
         
-        // UUID
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(strValue)) {
             return 'uuid';
         }
         
-        // ISO Date
         if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/.test(strValue)) {
             return 'iso-date';
         }
         
-        // Currency
         if (/^[$€£¥]\s?\d+(\.\d{2})?$/.test(strValue)) {
             return 'currency';
         }
@@ -567,34 +489,26 @@ export class CSVParser {
         return null;
     }
 
-    /**
-     * Check if value is date format
-     */
     private isDateFormat(value: string): boolean {
         const datePatterns = [
-            /^\d{4}-\d{2}-\d{2}$/,                          // YYYY-MM-DD
-            /^\d{2}\/\d{2}\/\d{4}$/,                        // MM/DD/YYYY
-            /^\d{2}-\d{2}-\d{4}$/,                          // DD-MM-YYYY
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,        // ISO format
-            /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+\d{1,2}/i  // Day, Date
+            /^\d{4}-\d{2}-\d{2}$/,
+            /^\d{2}\/\d{2}\/\d{4}$/,
+            /^\d{2}-\d{2}-\d{4}$/,
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+            /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+\d{1,2}/i
         ];
         
         return datePatterns.some(pattern => pattern.test(value));
     }
 
-    /**
-     * Consolidate multiple types
-     */
     private consolidateTypes(types: string[]): string {
         if (types.length === 0) return 'string';
         if (types.length === 1) return types[0] || 'string';
         
-        // Remove null
         const nonNullTypes = types.filter(t => t !== 'null');
         if (nonNullTypes.length === 0) return 'string';
         if (nonNullTypes.length === 1) return nonNullTypes[0] || 'string';
         
-        // Priority order
         const priority = ['date', 'number', 'boolean', 'string'];
         for (const type of priority) {
             if (nonNullTypes.includes(type)) {
@@ -605,9 +519,6 @@ export class CSVParser {
         return 'string';
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, operation: string): Error {
         const message = error instanceof Error ? error.message : String(error);
         const enhancedError = new Error(

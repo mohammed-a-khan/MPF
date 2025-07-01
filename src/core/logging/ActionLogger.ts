@@ -1,18 +1,3 @@
-/**
- * CS Test Automation Framework - ActionLogger (Performance Optimized)
- * 
- * High-performance action logging system optimized for speed and minimal overhead.
- * 
- * Performance Optimizations:
- * - Lazy initialization to prevent blocking during imports
- * - Reduced buffer sizes for faster processing
- * - Performance mode for production use
- * - Optimized log processing with batching
- * - Memory-efficient buffering
- * 
- * @author CS Test Automation Team
- * @version 5.0.0 (Performance Optimized)
- */
 
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
@@ -51,16 +36,14 @@ import {
   LogIndex as ILogIndex
 } from './LogTypes';
 
-// PERFORMANCE MODE - Enabled by default for better user experience
-// Only disable if explicitly set to false
 const PERFORMANCE_MODE = process.env.PERFORMANCE_MODE !== 'false';
 
 export class ActionLogger extends EventEmitter {
   private static instance: ActionLogger;
   private static processHandlersRegistered: boolean = false;
   private config!: LoggerConfig;
-  private formatter: LogFormatter | null = null; // Lazy initialized
-  private collector: LogCollector | null = null; // Lazy initialized
+  private formatter: LogFormatter | null = null;
+  private collector: LogCollector | null = null;
   private transports: Map<string, LogTransport> = new Map();
   private buffer: LogBuffer;
   private stats: LogStats;
@@ -73,8 +56,8 @@ export class ActionLogger extends EventEmitter {
   private performanceMarks: Map<string, number> = new Map();
   private sessionId: string;
   private isInitialized: boolean = false;
-  private archiveManager: LogArchiveManager | null = null; // Lazy initialized
-  private metricsCollector: MetricsCollector | null = null; // Lazy initialized
+  private archiveManager: LogArchiveManager | null = null;
+  private metricsCollector: MetricsCollector | null = null;
 
   private constructor() {
     super();
@@ -82,13 +65,12 @@ export class ActionLogger extends EventEmitter {
     this.stats = this.initializeStats();
     this.buffer = this.initializeBuffer();
     
-    // PERFORMANCE OPTIMIZED: Minimal default config
     this.config = {
       level: PERFORMANCE_MODE ? LogLevel.WARN : LogLevel.INFO,
       logDirectory: './logs',
-      bufferSize: PERFORMANCE_MODE ? 50 : 100, // Reduced for performance
-      flushInterval: PERFORMANCE_MODE ? 10000 : 5000, // Less frequent flushing
-      maxBufferSize: PERFORMANCE_MODE ? 1024 * 1024 : 5 * 1024 * 1024, // Smaller buffer
+      bufferSize: PERFORMANCE_MODE ? 50 : 100,
+      flushInterval: PERFORMANCE_MODE ? 10000 : 5000,
+      maxBufferSize: PERFORMANCE_MODE ? 1024 * 1024 : 5 * 1024 * 1024,
       indexDirectory: './logs/indexes'
     };
   }
@@ -100,7 +82,6 @@ export class ActionLogger extends EventEmitter {
     return ActionLogger.instance;
   }
   
-  // PERFORMANCE OPTIMIZED: Only initialize components when actually needed
   private ensureComponentsInitialized(): void {
     if (!this.formatter) {
       this.formatter = new LogFormatter();
@@ -113,10 +94,9 @@ export class ActionLogger extends EventEmitter {
 
   async initialize(config: LoggerConfig): Promise<void> {
     if (this.isInitialized) {
-      return; // Skip re-initialization for performance
+      return;
     }
     
-    // PERFORMANCE MODE: Skip heavy initialization in production
     if (PERFORMANCE_MODE) {
       this.config = { ...this.config, ...config };
       this.currentContext = this.createDefaultContext();
@@ -124,41 +104,32 @@ export class ActionLogger extends EventEmitter {
       return;
     }
 
-    // Initialize deferred components only when needed
     this.ensureComponentsInitialized();
 
     this.config = this.validateConfig(config);
     this.currentContext = this.createDefaultContext();
 
-    // Initialize transports
     await this.initializeTransports();
 
-    // Setup log rotation if enabled
     if (this.config.rotation?.enabled) {
       this.setupLogRotation();
     }
 
-    // Setup buffer flushing
     this.setupBufferFlushing();
 
-    // Initialize log index
     await this.initializeLogIndex();
 
-    // Register process handlers
     this.registerProcessHandlers();
 
     this.isInitialized = true;
   }
 
-  // Core Logging Methods
 
   async logAction(action: string, details: any = {}, metadata?: LogMetadata): Promise<void> {
-    // Skip in performance mode for non-critical actions
     if (PERFORMANCE_MODE && !this.isCriticalAction(action)) {
       return;
     }
 
-    // Create more verbose description based on action type
     const verboseDetails = this.createVerboseDescription(action, details);
 
     const entry: ActionLogEntry = {
@@ -365,8 +336,8 @@ export class ActionLogger extends EventEmitter {
       context: { ...this.currentContext },
       method: requestOptions.method || 'GET',
       url: this.sanitizeUrl(requestOptions.url || requestOptions.uri || 'unknown'),
-      statusCode: 0, // Request not yet sent
-      duration: 0, // Will be updated in response
+      statusCode: 0,
+      duration: 0,
       metadata: this.enrichMetadata({ 
         ...metadata, 
         requestId,
@@ -464,7 +435,6 @@ export class ActionLogger extends EventEmitter {
       this.metricsCollector.recordError(error.name || 'APIError');
     }
     
-    // Emit error event for real-time monitoring
     this.emit('error', entry);
   }
 
@@ -586,15 +556,12 @@ export class ActionLogger extends EventEmitter {
         this.metricsCollector.recordError(error instanceof Error ? error.name : 'UnknownError');
       }
       
-      // Emit error event safely - prevent unhandled rejection crashes
       try {
         this.emit('error', entry);
       } catch (emitError) {
-        // If emit fails, just log to console to prevent crash
         console.error('Failed to emit error event:', emitError);
       }
     } catch (logError) {
-      // Fallback logging to prevent complete failure
       console.error('ActionLogger.logError failed:', logError);
       console.error('Original error:', error);
     }
@@ -733,7 +700,6 @@ export class ActionLogger extends EventEmitter {
     this.updateStats('console');
   }
 
-  // Context Management
 
   pushCorrelationContext(correlationId: string, metadata?: any): void {
     const context: CorrelationContext = {
@@ -753,7 +719,6 @@ export class ActionLogger extends EventEmitter {
       const duration = Date.now() - context.startTime;
       this.debug(`Popped correlation context: ${context.correlationId}`, { duration });
       
-      // Log correlation summary
       this.logCorrelationSummary(context, duration);
     }
     return context;
@@ -770,7 +735,6 @@ export class ActionLogger extends EventEmitter {
     this.debug('Context cleared', { clearedKeys: keys });
   }
 
-  // Performance Tracking
 
   startPerformanceMark(name: string): void {
     const markName = `${name}_${Date.now()}`;
@@ -794,7 +758,6 @@ export class ActionLogger extends EventEmitter {
     return duration;
   }
 
-  // Query and Analysis
 
   async query(query: LogQuery): Promise<LogEntry[]> {
     return this.collector ? this.collector.query(query) : [];
@@ -810,7 +773,6 @@ export class ActionLogger extends EventEmitter {
       try {
         indexSize = await this.logIndex.getSize();
       } catch (error) {
-        // Continue with 0 size if there's an error
       }
     }
     
@@ -823,16 +785,13 @@ export class ActionLogger extends EventEmitter {
   }
 
   getCurrentLogIndex(): number {
-    // Return the current number of entries as the index
     return this.buffer.entries.length;
   }
 
   getLogsInRange(startIndex: number, endIndex: number): LogEntry[] {
-    // Ensure we have valid indices
     const start = Math.max(0, startIndex);
     const end = Math.min(this.buffer.entries.length, endIndex);
     
-    // Return logs in the specified range
     if (start >= end) {
       return [];
     }
@@ -865,7 +824,6 @@ export class ActionLogger extends EventEmitter {
     };
   }
 
-  // Log Level Methods
 
   trace(message: string, context?: any): void {
     if (this.shouldLog(LogLevel.TRACE)) {
@@ -900,40 +858,32 @@ export class ActionLogger extends EventEmitter {
   fatal(message: string, error?: Error): void {
     if (this.shouldLog(LogLevel.FATAL)) {
       this.writeBasicLog(LogLevel.FATAL, message, { error: this.sanitizeError(error) });
-      // Force flush on fatal
       this.flush();
     }
   }
 
-  // Private Methods
 
   private async writeLog(entry: LogEntry): Promise<void> {
-    // Add to buffer
     this.buffer.entries.push(entry);
     this.buffer.size += this.estimateEntrySize(entry);
-    // Update buffer timestamp (property may not exist in interface)
     if ('lastUpdated' in this.buffer) {
       (this.buffer as any).lastUpdated = new Date();
     }
 
-    // PERFORMANCE MODE: Only flush when buffer is full
     if (PERFORMANCE_MODE) {
       if (this.buffer.entries.length >= this.config.bufferSize) {
         await this.flush();
       }
     } else {
-      // Regular mode: flush based on various conditions
       if (this.shouldFlushBuffer()) {
         await this.flush();
       }
     }
 
-    // Index the entry for quick retrieval
     if (this.logIndex) {
       await this.logIndex.index(entry);
     }
 
-    // Emit event for real-time monitoring (skip in performance mode)
     if (!PERFORMANCE_MODE) {
       this.emit('log', entry);
     }
@@ -967,7 +917,6 @@ export class ActionLogger extends EventEmitter {
     this.buffer.entries = [];
     this.buffer.size = 0;
 
-    // Write to all transports
     const promises = Array.from(this.transports.values()).map(transport =>
       this.writeToTransport(transport, entriesToFlush)
     );
@@ -1008,7 +957,7 @@ export class ActionLogger extends EventEmitter {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await this.delay(Math.pow(2, attempt) * 1000); // Exponential backoff
+        await this.delay(Math.pow(2, attempt) * 1000);
         await this.writeToTransport(transport, entries);
         return;
       } catch (error) {
@@ -1016,12 +965,10 @@ export class ActionLogger extends EventEmitter {
       }
     }
 
-    // All retries failed
     this.handleTransportFailure(transport, entries, lastError);
   }
 
   private handleTransportFailure(transport: LogTransport, entries: LogEntry[], error: any): void {
-    // Write to fallback location
     const fallbackPath = path.join(this.config.fallbackDirectory || './logs/fallback', `failed_${Date.now()}.log`);
     
     try {
@@ -1035,7 +982,6 @@ export class ActionLogger extends EventEmitter {
         error
       });
     } catch (fallbackError) {
-      // Last resort - emit critical error
       this.emit('criticalError', {
         message: 'Failed to write logs to fallback',
         transport: transport.name,
@@ -1064,22 +1010,18 @@ export class ActionLogger extends EventEmitter {
       });
     };
 
-    // Initial check
     checkRotation();
 
-    // Setup interval
     this.rotationTimer = setInterval(checkRotation, rotationConfig.checkInterval || 60000);
   }
 
   private shouldRotate(transport: LogTransport): boolean {
     const config = this.config.rotation!;
     
-    // Check size
     if (config.maxSize && transport.stats.size > config.maxSize) {
       return true;
     }
 
-    // Check age
     if (config.maxAge && transport.stats.created) {
       const age = Date.now() - transport.stats.created.getTime();
       if (age > config.maxAge) {
@@ -1092,16 +1034,12 @@ export class ActionLogger extends EventEmitter {
 
   private async rotateTransport(transport: LogTransport, name: string): Promise<void> {
     try {
-      // Flush any pending entries
       await this.flush();
 
-      // Close current transport
       await transport.close();
 
-      // Archive current file
       const archivePath = this.archiveManager ? await this.archiveManager.archive(transport.config.path!) : null;
 
-      // Create new transport
       const newTransport = await this.createTransport(name, transport.config);
       this.transports.set(name, newTransport);
 
@@ -1111,7 +1049,6 @@ export class ActionLogger extends EventEmitter {
         oldSize: transport.stats.size
       });
 
-      // Cleanup old archives
       if (this.archiveManager) {
         await this.archiveManager.cleanup(this.config.rotation!);
       }
@@ -1123,7 +1060,6 @@ export class ActionLogger extends EventEmitter {
   private createVerboseDescription(action: string, details: any): any {
     const enhancedDetails = { ...details };
     
-    // Add verbose descriptions based on action type
     switch (action.toLowerCase()) {
       case 'click':
       case 'element_action':
@@ -1140,7 +1076,6 @@ export class ActionLogger extends EventEmitter {
         if (details.element || details.description) {
           enhancedDetails.verboseDescription = `User entered text into "${details.element || details.description}" field`;
           if (details.value && typeof details.value === 'string') {
-            // Mask sensitive values
             const maskedValue = this.maskSensitiveValue(details.value, details.element || details.description || '');
             enhancedDetails.verboseDescription += ` with value "${maskedValue}"`;
           }
@@ -1171,7 +1106,6 @@ export class ActionLogger extends EventEmitter {
   }
 
   private maskSensitiveValue(value: string, fieldName: string): string {
-    // List of field names that might contain sensitive data
     const sensitiveFields = [
       /password/i,
       /pwd/i,
@@ -1188,15 +1122,12 @@ export class ActionLogger extends EventEmitter {
       /account/i
     ];
     
-    // Check if field name matches sensitive patterns
     const isSensitive = sensitiveFields.some(pattern => pattern.test(fieldName));
     
     if (isSensitive) {
-      // Return masked value with asterisks
       return '*'.repeat(value.length || 8);
     }
     
-    // For non-sensitive fields, return the actual value
     return value;
   }
 
@@ -1205,7 +1136,6 @@ export class ActionLogger extends EventEmitter {
       return data;
     }
 
-    // Handle circular references
     const seen = new WeakSet();
 
     const sensitivePatterns = [
@@ -1234,7 +1164,6 @@ export class ActionLogger extends EventEmitter {
         return obj;
       }
 
-      // Check for circular references
       if (seen.has(obj)) {
         return '[Circular Reference]';
       }
@@ -1248,11 +1177,9 @@ export class ActionLogger extends EventEmitter {
       for (const [key, value] of Object.entries(obj)) {
         const currentPath = path ? `${path}.${key}` : key;
         
-        // Check if key matches sensitive patterns
         const isSensitive = sensitivePatterns.some(pattern => pattern.test(key));
         
         if (isSensitive) {
-          // Mask with asterisks instead of [REDACTED]
           if (typeof value === 'string') {
             sanitized[key] = '*'.repeat(value.length || 8);
           } else if (typeof value === 'number') {
@@ -1279,7 +1206,6 @@ export class ActionLogger extends EventEmitter {
     try {
       const urlObj = new URL(url);
       
-      // Sanitize query parameters
       const params = new URLSearchParams(urlObj.search);
       const sensitiveParams = ['token', 'apikey', 'api_key', 'access_token', 'auth'];
       
@@ -1291,7 +1217,6 @@ export class ActionLogger extends EventEmitter {
       
       urlObj.search = params.toString();
       
-      // Sanitize basic auth in URL
       if (urlObj.username || urlObj.password) {
         urlObj.username = '[REDACTED]';
         urlObj.password = '[REDACTED]';
@@ -1299,7 +1224,6 @@ export class ActionLogger extends EventEmitter {
       
       return urlObj.toString();
     } catch {
-      // If not a valid URL, return as is
       return url;
     }
   }
@@ -1326,7 +1250,6 @@ export class ActionLogger extends EventEmitter {
   }
 
   private sanitizeQuery(query: string): string {
-    // Sanitize common patterns in SQL queries
     return query
       .replace(/password\s*=\s*'[^']*'/gi, "password='[REDACTED]'")
       .replace(/token\s*=\s*'[^']*'/gi, "token='[REDACTED]'")
@@ -1348,7 +1271,6 @@ export class ActionLogger extends EventEmitter {
       sanitized.stack = this.sanitizeStackTrace(error.stack);
     }
 
-    // Sanitize additional error properties
     const ignoredProps = ['name', 'message', 'stack', 'code', 'statusCode'];
     for (const [key, value] of Object.entries(error)) {
       if (!ignoredProps.includes(key)) {
@@ -1362,7 +1284,6 @@ export class ActionLogger extends EventEmitter {
   private sanitizeStackTrace(stack?: string): string {
     if (!stack) return '';
 
-    // Remove sensitive file paths
     return stack
       .replace(/\/home\/[^/]+/g, '/home/[USER]')
       .replace(/\/Users\/[^/]+/g, '/Users/[USER]')
@@ -1406,12 +1327,11 @@ export class ActionLogger extends EventEmitter {
   }
 
   private getThreadId(): string {
-    // In Node.js, we don't have true thread IDs, but we can use worker thread ID if available
     try {
       const { threadId } = require('worker_threads');
       return threadId.toString();
     } catch {
-      return '0'; // Main thread
+      return '0';
     }
   }
 
@@ -1433,7 +1353,6 @@ export class ActionLogger extends EventEmitter {
   }
 
   private shouldLog(level: LogLevel): boolean {
-    // If config is not initialized yet, allow all logs
     if (!this.config) {
       return true;
     }
@@ -1465,7 +1384,6 @@ export class ActionLogger extends EventEmitter {
   }
 
   private shouldWriteLog(entry: LogEntry): boolean {
-    // Apply filters
     if (this.config?.filters) {
       return this.config.filters.every(filter => this.applyFilter(filter, entry));
     }
@@ -1473,7 +1391,6 @@ export class ActionLogger extends EventEmitter {
   }
 
   private applyFilter(filter: LogFilter, entry: LogEntry): boolean {
-    // Implementation of various filter types
     if (filter.type === 'level' && entry.level) {
       return this.getLogLevelValue(entry.level) >= this.getLogLevelValue(filter.value as LogLevel);
     }
@@ -1497,12 +1414,11 @@ export class ActionLogger extends EventEmitter {
   private shouldFlushBuffer(): boolean {
     return (
       this.buffer.entries.length >= (this.config?.bufferSize || 100) ||
-      this.buffer.size >= (this.config?.maxBufferSize || 10 * 1024 * 1024) // 10MB default
+      this.buffer.size >= (this.config?.maxBufferSize || 10 * 1024 * 1024)
     );
   }
 
   private estimateEntrySize(entry: LogEntry): number {
-    // Rough estimation of entry size in bytes
     return JSON.stringify(entry).length;
   }
 
@@ -1644,7 +1560,6 @@ export class ActionLogger extends EventEmitter {
   }
 
   private createSyslogTransport(name: string, config: any): LogTransport {
-    // Simplified syslog implementation
     const dgram = require('dgram');
     const client = dgram.createSocket('udp4');
     
@@ -1723,7 +1638,6 @@ export class ActionLogger extends EventEmitter {
         try {
           instance.error('Unhandled promise rejection', { reason, promise });
         } catch (logError) {
-          // Prevent infinite loops - just log to console
           console.error('Failed to log unhandled rejection:', logError);
         }
       }
@@ -1731,7 +1645,6 @@ export class ActionLogger extends EventEmitter {
   }
 
   private validateConfig(config: LoggerConfig): LoggerConfig {
-    // Apply defaults and validate
     return {
       ...config,
       level: config.level || LogLevel.INFO,
@@ -1816,30 +1729,18 @@ export class ActionLogger extends EventEmitter {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // PERFORMANCE OPTIMIZATION: Check if action is critical and should be logged even in performance mode
   private isCriticalAction(action: string): boolean {
     const criticalActions = [
-      // Core critical actions
       'login', 'error', 'failure', 'crash', 'timeout', 'authentication', 'authorization',
-      // Navigation and page actions
       'navigate', 'navigation', 'page', 'goto', 'visit',
-      // User interactions
       'click', 'fill', 'type', 'enter', 'select', 'press', 'tap',
-      // Verification and validation
       'verify', 'validate', 'check', 'assert', 'expect',
-      // Wait and timing
       'wait', 'delay', 'pause',
-      // Form interactions
       'submit', 'upload', 'download',
-      // Element actions
       'element', 'locator', 'find',
-      // Performance and metrics
       'performance', 'metrics', 'measure',
-      // Initialization and setup
       'initialize', 'setup', 'start', 'begin',
-      // Completion and finish
       'complete', 'finish', 'end', 'done',
-      // API Testing actions
       'api', 'http', 'request', 'response', 'certificate', 'status', 'json', 'body',
       'context', 'base url', 'timeout', 'logging', 'path', 'validation', 'ready'
     ];
@@ -1849,7 +1750,6 @@ export class ActionLogger extends EventEmitter {
   private handleFlushError(error: any, entries: LogEntry[]): void {
     this.stats.errors++;
     
-    // Try to write to fallback
     try {
       const fallbackPath = path.join(
         this.config.fallbackDirectory || './logs/fallback',
@@ -1863,7 +1763,6 @@ export class ActionLogger extends EventEmitter {
       
       this.emit('flushError', { error, entriesCount: entries.length, fallbackPath });
     } catch (fallbackError) {
-      // Complete failure - data loss imminent
       this.emit('dataLoss', {
         error,
         fallbackError,
@@ -1935,7 +1834,6 @@ export class ActionLogger extends EventEmitter {
       metric.values.push(entry.value);
     });
     
-    // Calculate statistics
     Object.keys(metrics).forEach(key => {
       const metric = metrics[key];
       metric.average = metric.total / metric.count;
@@ -1945,7 +1843,7 @@ export class ActionLogger extends EventEmitter {
         metric.p95 = this.calculatePercentile(values, 95);
         metric.p99 = this.calculatePercentile(values, 99);
       }
-      delete metric.values; // Remove raw values to save space
+      delete metric.values;
     });
     
     return metrics;
@@ -2056,10 +1954,8 @@ export class ActionLogger extends EventEmitter {
   }
 
   async close(): Promise<void> {
-    // Flush any remaining logs
     await this.flush();
 
-    // Clear timers
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
     }
@@ -2068,31 +1964,26 @@ export class ActionLogger extends EventEmitter {
       clearInterval(this.rotationTimer);
     }
 
-    // Close all transports
     const closePromises = Array.from(this.transports.values()).map(transport =>
       transport.close()
     );
     
     await Promise.all(closePromises);
 
-    // Close log index
     if (this.logIndex) {
       await this.logIndex.close();
     }
 
-    // Final stats
     this.info('ActionLogger closing', await this.getStats());
     
     this.isInitialized = false;
   }
 
-  // Static convenience methods
   static logDebug(message: string, context?: any): void {
     const instance = ActionLogger.getInstance();
     if (instance.isInitialized) {
       instance.debug(message, context);
     } else {
-      // Fallback to console if not initialized
       console.debug(`[DEBUG] ${message}`, context);
     }
   }
@@ -2153,20 +2044,14 @@ export class ActionLogger extends EventEmitter {
     }
   }
 
-  /**
-   * Log element actions specifically with 'action' type for HTML report processing
-   */
   static async logElementAction(description: string, context?: any): Promise<void> {
     const instance = ActionLogger.getInstance();
     instance.ensureComponentsInitialized();
     
-    // Extract action details from context
     const { action, element, duration, error, ...otherContext } = context || {};
     
-    // Create a more verbose description based on the action
     let verboseDescription = description;
     
-    // Handle error cases
     if (error) {
       verboseDescription = `${description} - Failed with error: ${error.message || error}`;
       await instance.logError(`Action failed: ${action}`, error, {
@@ -2177,7 +2062,6 @@ export class ActionLogger extends EventEmitter {
       return;
     }
     
-    // Create verbose descriptions for successful actions
     if (action && element) {
       switch (action.toLowerCase()) {
         case 'click':
@@ -2188,7 +2072,6 @@ export class ActionLogger extends EventEmitter {
           if (otherContext.value !== undefined) {
             const maskedValue = instance.maskSensitiveValue(String(otherContext.value), element);
             verboseDescription = `Element filled: '${maskedValue}' filled in ${element}`;
-            // Store both original and masked value for proper logging
             otherContext.displayValue = maskedValue;
           } else if (otherContext.characters !== undefined) {
             verboseDescription = `Element filled: ${element} (${otherContext.characters} characters)`;
@@ -2229,7 +2112,6 @@ export class ActionLogger extends EventEmitter {
       }
     }
     
-    // Use logAction method which creates entries with type: 'action'
     await instance.logAction(action || 'element_action', {
       description: verboseDescription,
       element,
@@ -2238,7 +2120,6 @@ export class ActionLogger extends EventEmitter {
     });
   }
 
-  // Step-specific logging methods for BDD framework compatibility
   static logStepStart(stepText: string, location: string): void {
     ActionLogger.logInfo(`[STEP START] ${stepText}`, { location, type: 'step_start' });
   }
@@ -2330,7 +2211,6 @@ export class ActionLogger extends EventEmitter {
     });
   }
 
-  // BDD Context logging methods
   static logContextInitialization(contextType: string, data?: any): void {
     ActionLogger.logInfo(`[CONTEXT INIT] ${contextType} context initialized`, {
       contextType,
@@ -2450,87 +2330,45 @@ export class ActionLogger extends EventEmitter {
     });
   }
 
-  /**
-   * Log verification/assertion results
-   * @param description What is being verified
-   * @param expected Expected value
-   * @param actual Actual value
-   * @param passed Whether verification passed
-   */
   static async logVerification(description: string, expected: any, actual: any, passed: boolean): Promise<void> {
     const instance = ActionLogger.getInstance();
     await instance.logVerification(description, expected, actual, passed);
   }
 
-  /**
-   * Get recent log entries from buffer
-   * @param limit Maximum number of entries to return
-   * @returns Array of recent log entries
-   */
   public getRecentLogs(limit: number = PERFORMANCE_MODE ? 50 : 100): LogEntry[] {
     const recentEntries = this.buffer.entries.slice(-limit);
     return recentEntries;
   }
 
-  /**
-   * Get all buffered log entries
-   * @returns Array of all buffered log entries
-   */
   public getAllBufferedLogs(): LogEntry[] {
-    return [...this.buffer.entries]; // Return copy to prevent modification
+    return [...this.buffer.entries];
   }
 
-  /**
-   * Static method to get recent logs
-   */
   static getRecentLogs(limit: number = PERFORMANCE_MODE ? 50 : 100): LogEntry[] {
     return ActionLogger.getInstance().getRecentLogs(limit);
   }
   
-  /**
-   * Get all logs (alias for getAllBufferedLogs)
-   * @returns Array of all log entries
-   */
   public getAllLogs(): LogEntry[] {
     return this.getAllBufferedLogs();
   }
 
-  /**
-   * Static method to get all buffered logs
-   */
   static getAllBufferedLogs(): LogEntry[] {
     return ActionLogger.getInstance().getAllBufferedLogs();
   }
 
-  /**
-   * Get all console messages captured
-   * @returns Array of console messages including initialization logs
-   */
   public getConsoleMessages(): ConsoleMessage[] {
     return consoleCapture.getMessages();
   }
 
-  /**
-   * Get framework initialization console messages
-   * @returns Array of initialization-related console messages
-   */
   public getInitializationMessages(): ConsoleMessage[] {
     return consoleCapture.getInitializationLogs();
   }
 
-  /**
-   * Export console logs as text
-   * @returns Console logs formatted as text
-   */
   public exportConsoleLogsAsText(): string {
     const messages = this.getConsoleMessages();
     return messages.map(msg => `[${(msg as any).timestamp?.toISOString() || 'Unknown'}] [${(msg as any).type?.toUpperCase() || 'LOG'}] ${(msg as any).text || msg.toString()}`).join('\n');
   }
 
-  /**
-   * Export console logs as HTML
-   * @returns Console logs formatted as HTML
-   */
   public exportConsoleLogsAsHtml(): string {
     const messages = this.getConsoleMessages();
     const htmlLines = messages.map(msg => 
@@ -2554,15 +2392,10 @@ export class ActionLogger extends EventEmitter {
     }[m] || m));
   }
 
-  /**
-   * Get combined logs (ActionLogger + Console)
-   * @returns Combined log entries with console messages
-   */
   public getCombinedLogs(): Array<LogEntry | ConsoleMessage> {
     const logEntries = this.getAllBufferedLogs();
     const consoleMessages = this.getConsoleMessages();
     
-    // Combine and sort by timestamp
     const combined: Array<LogEntry | ConsoleMessage> = [
       ...logEntries,
       ...consoleMessages
@@ -2575,11 +2408,6 @@ export class ActionLogger extends EventEmitter {
     });
   }
 
-  /**
-   * Save console logs to file
-   * @param filePath Path to save the console logs
-   * @param format Format to save ('text' | 'json' | 'html')
-   */
   public async saveConsoleLogs(filePath: string, format: 'text' | 'json' | 'html' = 'text'): Promise<void> {
     let content: string;
     
@@ -2603,22 +2431,15 @@ export class ActionLogger extends EventEmitter {
     this.info(`Console logs saved to: ${filePath}`);
   }
 
-  /**
-   * Static method to get console messages
-   */
   static getConsoleMessages(): ConsoleMessage[] {
     return ActionLogger.getInstance().getConsoleMessages();
   }
 
-  /**
-   * Static method to save console logs
-   */
   static async saveConsoleLogs(filePath: string, format: 'text' | 'json' | 'html' = 'text'): Promise<void> {
     return ActionLogger.getInstance().saveConsoleLogs(filePath, format);
   }
 }
 
-// Helper Classes
 
 class LogIndex implements ILogIndex {
   private indexPath: string;
@@ -2629,30 +2450,24 @@ class LogIndex implements ILogIndex {
   }
 
   async initialize(): Promise<void> {
-    // Create index directory
     if (!fs.existsSync(this.indexPath)) {
       fs.mkdirSync(this.indexPath, { recursive: true });
     }
     
-    // Load existing index
     await this.loadIndex();
   }
 
   async index(entry: LogEntry): Promise<void> {
-    // Index by correlation ID
     if (entry.correlationId) {
       this.addToIndex('correlation', entry.correlationId, entry.id);
     }
     
-    // Index by type
     this.addToIndex('type', entry.type, entry.id);
     
-    // Index by level
     if (entry.level) {
       this.addToIndex('level', entry.level, entry.id);
     }
     
-    // Index by timestamp (hourly buckets)
     const hourBucket = new Date(entry.timestamp);
     hourBucket.setMinutes(0, 0, 0);
     this.addToIndex('time', hourBucket.toISOString(), entry.id);
@@ -2679,12 +2494,10 @@ class LogIndex implements ILogIndex {
   }
 
   private async loadIndex(): Promise<void> {
-    // Load from disk
     const indexFile = path.join(this.indexPath, 'index.json');
     if (fs.existsSync(indexFile)) {
       try {
         const data = JSON.parse(fs.readFileSync(indexFile, 'utf8'));
-        // Reconstruct index
         for (const [key, entries] of Object.entries(data)) {
           this.indexes.set(key, new Set(entries as string[]));
         }
@@ -2712,16 +2525,13 @@ class LogArchiveManager {
     const archiveName = `${path.basename(logPath, '.log')}_${timestamp}.log`;
     const archivePath = path.join(path.dirname(logPath), 'archive', archiveName);
     
-    // Create archive directory
     const archiveDir = path.dirname(archivePath);
     if (!fs.existsSync(archiveDir)) {
       fs.mkdirSync(archiveDir, { recursive: true });
     }
     
-    // Move file
     fs.renameSync(logPath, archivePath);
     
-    // Compress if large
     if (fs.statSync(archivePath).size > 10 * 1024 * 1024) {
       await this.compressFile(archivePath);
     }
@@ -2730,13 +2540,10 @@ class LogArchiveManager {
   }
 
   async cleanup(config: LogRotationConfig): Promise<void> {
-    // Implementation of cleanup based on retention policy
     if (config.maxFiles) {
-      // Keep only N most recent files
     }
     
     if (config.maxAge) {
-      // Delete files older than maxAge
     }
   }
 
@@ -2811,12 +2618,10 @@ class MetricsCollector {
 
   private recordMetric(key: string, data: any): void {
     const existing = this.metrics.get(key) || {};
-    // Merge metric data
     this.metrics.set(key, this.mergeMetrics(existing, data));
   }
 
   private mergeMetrics(existing: any, newData: any): any {
-    // Implementation of metric merging logic
     return { ...existing, ...newData };
   }
 
@@ -2843,5 +2648,4 @@ interface LogReport {
   validations: any;
 }
 
-// Export singleton instance
 export const actionLogger = ActionLogger.getInstance();

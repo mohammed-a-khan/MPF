@@ -10,7 +10,7 @@ interface Placeholder {
 export class ExamplesParser {
   private static instance: ExamplesParser;
   private readonly placeholderPattern = /<([^>]+)>/g;
-  private readonly maxExamplesPerScenario = 1000; // Safety limit
+  private readonly maxExamplesPerScenario = 1000;
   
   private constructor() {}
   
@@ -21,12 +21,7 @@ export class ExamplesParser {
     return ExamplesParser.instance;
   }
 
-  /**
-   * Parse examples and return scenarios
-   */
   parse(examples: Examples): Scenario[] {
-    // This method would be used when examples are parsed standalone
-    // For practical purposes, return empty array as examples need scenario context
     Logger.getInstance().debug(`Parsed examples table "${examples.name}" with ${examples.rows.length} rows`);
     return [];
   }
@@ -36,7 +31,6 @@ export class ExamplesParser {
       throw new Error('Examples section cannot be empty');
     }
     
-    // First line might be the Examples: keyword with optional description
     let startIndex = 0;
     let name = 'Examples';
     let description = '';
@@ -50,7 +44,6 @@ export class ExamplesParser {
       name = trimmedFirstLine.substring('Examples:'.length).trim() || 'Examples';
       startIndex = 1;
       
-      // Check for description lines
       while (startIndex < lines.length) {
         const currentLine = lines[startIndex];
         if (!currentLine) {
@@ -68,7 +61,6 @@ export class ExamplesParser {
       }
     }
     
-    // Parse the table
     const tableLines = lines.slice(startIndex);
     const dataTable = dataTableParser.parseTable(tableLines);
     
@@ -79,10 +71,10 @@ export class ExamplesParser {
     const examples: Examples = {
       name: name,
       description: description.trim(),
-      tags: [], // Tags will be set by parser
+      tags: [],
       header: dataTable.rows[0] || [],
       rows: dataTable.rows.slice(1),
-      line: 0 // Will be set by parser
+      line: 0
     };
     
     this.validateExamples(examples);
@@ -98,10 +90,8 @@ export class ExamplesParser {
       throw new Error(`Scenario Outline "${outline.name}" has no examples`);
     }
     
-    // Find all placeholders in the scenario
     const placeholders = this.findPlaceholders(outline);
     
-    // Expand for each examples table
     for (const examples of allExamples) {
       const expandedFromTable = this.expandWithExamples(outline, examples, placeholders);
       scenarios.push(...expandedFromTable);
@@ -122,19 +112,15 @@ export class ExamplesParser {
   ): Scenario[] {
     const scenarios: Scenario[] = [];
     
-    // Validate all placeholders exist in examples
     this.validatePlaceholders(outline, examples, placeholders);
     
-    // Create a scenario for each row
     examples.rows.forEach((row) => {
       const values = new Map<string, string>();
       
-      // Map headers to values
       examples.header.forEach((header, colIndex) => {
         values.set(header, row[colIndex] || '');
       });
       
-      // Create expanded scenario
       const scenario: Scenario = {
         type: 'scenario',
         name: this.expandText(outline.name, values),
@@ -156,15 +142,11 @@ export class ExamplesParser {
   private findPlaceholders(outline: ScenarioOutline): Map<string, Placeholder> {
     const placeholders = new Map<string, Placeholder>();
     
-    // Check scenario name
     this.extractPlaceholders(outline.name, -1, placeholders);
     
-    // Check steps
     outline.steps.forEach((step, stepIndex) => {
-      // Check step text
       this.extractPlaceholders(step.text, stepIndex, placeholders);
       
-      // Check data table
       if (step.dataTable) {
         step.dataTable.rows.forEach(row => {
           row.forEach(cell => {
@@ -173,7 +155,6 @@ export class ExamplesParser {
         });
       }
       
-      // Check doc string
       if (step.docString) {
         this.extractPlaceholders(step.docString.content, stepIndex, placeholders);
       }
@@ -188,7 +169,7 @@ export class ExamplesParser {
     placeholders: Map<string, Placeholder>
   ): void {
     let match;
-    this.placeholderPattern.lastIndex = 0; // Reset regex
+    this.placeholderPattern.lastIndex = 0;
     
     while ((match = this.placeholderPattern.exec(text)) !== null) {
       const name = match[1];
@@ -231,7 +212,6 @@ export class ExamplesParser {
       );
     }
     
-    // Warn about unused headers
     const unusedHeaders = examples.header.filter(header => !placeholders.has(header));
     if (unusedHeaders.length > 0) {
       Logger.getInstance().warn(
@@ -245,7 +225,6 @@ export class ExamplesParser {
       if (values.has(placeholder)) {
         return values.get(placeholder)!;
       }
-      // Keep original if no value found
       return match;
     });
   }
@@ -257,7 +236,6 @@ export class ExamplesParser {
         text: this.expandText(step.text, values)
       };
       
-      // Expand data table
       if (step.dataTable) {
         expandedStep.dataTable = {
           ...step.dataTable,
@@ -267,7 +245,6 @@ export class ExamplesParser {
         };
       }
       
-      // Expand doc string
       if (step.docString) {
         expandedStep.docString = {
           ...step.docString,
@@ -280,7 +257,6 @@ export class ExamplesParser {
   }
   
   private validateExamples(examples: Examples): void {
-    // Check for duplicate headers
     const headerSet = new Set<string>();
     const duplicates: string[] = [];
     
@@ -295,13 +271,11 @@ export class ExamplesParser {
       throw new Error(`Examples table has duplicate headers: ${duplicates.join(', ')}`);
     }
     
-    // Check for empty headers
     const emptyHeaders = examples.header.filter(h => !h || h.trim() === '');
     if (emptyHeaders.length > 0) {
       throw new Error('Examples table cannot have empty headers');
     }
     
-    // Validate each row has correct number of cells
     examples.rows.forEach((row, index) => {
       if (row.length !== examples.header.length) {
         throw new Error(
@@ -324,7 +298,6 @@ export class ExamplesParser {
       throw new Error('Examples table must have at least one data row');
     }
     
-    // Validate all rows have same number of cells as headers
     rows.forEach((row, index) => {
       if (row.length !== headers.length) {
         throw new Error(
@@ -346,21 +319,17 @@ export class ExamplesParser {
   }
   
   mergeExamples(examples1: Examples, examples2: Examples): Examples {
-    // Merge headers (union)
     const headerSet = new Set([...examples1.header, ...examples2.header]);
     const mergedHeaders = Array.from(headerSet);
     
-    // Create index maps
     const indexMap1 = new Map<string, number>();
     const indexMap2 = new Map<string, number>();
     
     examples1.header.forEach((h, i) => indexMap1.set(h, i));
     examples2.header.forEach((h, i) => indexMap2.set(h, i));
     
-    // Merge rows
     const mergedRows: string[][] = [];
     
-    // Add rows from examples1
     examples1.rows.forEach(row => {
       const newRow: string[] = new Array(mergedHeaders.length).fill('');
       
@@ -374,7 +343,6 @@ export class ExamplesParser {
       mergedRows.push(newRow);
     });
     
-    // Add rows from examples2
     examples2.rows.forEach(row => {
       const newRow: string[] = new Array(mergedHeaders.length).fill('');
       
@@ -416,7 +384,6 @@ export class ExamplesParser {
       Logger.getInstance().warn('Filter resulted in empty examples table');
     }
     
-    // Convert back to table format
     const filteredRows = filteredObjects.map(obj => {
       return examples.header.map(header => String(obj[header] ?? ''));
     });
@@ -428,5 +395,4 @@ export class ExamplesParser {
   }
 }
 
-// Export singleton instance
 export const examplesParser = ExamplesParser.getInstance();

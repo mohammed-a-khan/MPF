@@ -6,10 +6,6 @@ import { FileUtils } from '../../utils/FileUtils';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
-/**
- * Tracks healing attempts and success rates
- * Provides insights into element stability and strategy effectiveness
- */
 export class HealingHistory {
     private static instance: HealingHistory;
     private history: Map<string, HealingRecord[]> = new Map();
@@ -20,9 +16,8 @@ export class HealingHistory {
     private isDirty: boolean = false;
     private autoSaveInterval: NodeJS.Timeout | null = null;
     
-    // Configuration
     private readonly maxHistoryPerElement = 100;
-    private readonly autoSaveIntervalMs = 30000; // 30 seconds
+    private readonly autoSaveIntervalMs = 30000;
     private readonly historyRetentionDays = 30;
     
     private constructor() {
@@ -40,13 +35,10 @@ export class HealingHistory {
     
     private async initialize(): Promise<void> {
         try {
-            // Load existing history
             await this.loadHistory();
             
-            // Clean old records
             this.cleanOldRecords();
             
-            // Start auto-save
             this.startAutoSave();
             
             logger.info('HealingHistory initialized successfully');
@@ -56,9 +48,6 @@ export class HealingHistory {
         }
     }
     
-    /**
-     * Record a healing attempt
-     */
     async recordAttempt(
         elementId: string,
         strategy: string,
@@ -77,7 +66,6 @@ export class HealingHistory {
                 confidence: details?.confidence || 0
             };
             
-            // Add optional properties only if they exist
             if (details?.errorMessage !== undefined) {
                 record.errorMessage = details.errorMessage;
             }
@@ -94,7 +82,6 @@ export class HealingHistory {
                 record.pageUrl = details.pageUrl;
             }
             
-            // Add to element history
             if (!this.history.has(elementId)) {
                 this.history.set(elementId, []);
             }
@@ -102,19 +89,15 @@ export class HealingHistory {
             const elementHistory = this.history.get(elementId)!;
             elementHistory.push(record);
             
-            // Maintain history size limit
             if (elementHistory.length > this.maxHistoryPerElement) {
                 elementHistory.shift();
             }
             
-            // Update statistics
             this.updateStrategyStats(strategy, success, details?.duration);
             this.updateElementStats(elementId, success, strategy);
             
-            // Mark as dirty for persistence
             this.isDirty = true;
             
-            // Log the attempt
             ActionLogger.getInstance().logAction('Element Healing', {
                 elementId: record.elementId,
                 strategy: record.strategy,
@@ -139,16 +122,10 @@ export class HealingHistory {
         }
     }
     
-    /**
-     * Get healing history for an element
-     */
     getElementHistory(elementId: string): HealingRecord[] {
         return this.history.get(elementId) || [];
     }
     
-    /**
-     * Get all healing records
-     */
     getAllHistory(): HealingRecord[] {
         const allRecords: HealingRecord[] = [];
         
@@ -161,9 +138,6 @@ export class HealingHistory {
         );
     }
     
-    /**
-     * Get success rate for a strategy
-     */
     getSuccessRate(strategy: string): number {
         const stats = this.strategyStats.get(strategy);
         
@@ -174,16 +148,10 @@ export class HealingHistory {
         return stats.successCount / stats.totalAttempts;
     }
     
-    /**
-     * Get all strategy statistics
-     */
     getStrategyStatistics(): Map<string, StrategyStatistics> {
         return new Map(this.strategyStats);
     }
     
-    /**
-     * Get most successful strategy for an element type
-     */
     getMostSuccessfulStrategy(elementType: string): string | null {
         const strategies = this.getStrategiesForElementType(elementType);
         
@@ -191,7 +159,6 @@ export class HealingHistory {
             return null;
         }
         
-        // Sort by success rate
         strategies.sort((a, b) => {
             const rateA = this.getSuccessRate(a.strategy);
             const rateB = this.getSuccessRate(b.strategy);
@@ -201,30 +168,22 @@ export class HealingHistory {
         return strategies[0]?.strategy || null;
     }
     
-    /**
-     * Get element stability score (0-1, higher is more stable)
-     */
     getElementStability(elementId: string): number {
         const stats = this.elementStats.get(elementId);
         
         if (!stats || stats.totalHealingAttempts === 0) {
-            return 1; // No healing needed = stable
+            return 1;
         }
         
-        // Calculate stability based on healing frequency and success
         const healingFrequency = stats.totalHealingAttempts / Math.max(1, stats.daysTracked);
         const successRate = stats.successfulHealings / stats.totalHealingAttempts;
         
-        // Lower frequency and higher success = more stable
-        const frequencyScore = Math.exp(-healingFrequency / 5); // Decay function
+        const frequencyScore = Math.exp(-healingFrequency / 5);
         const successScore = successRate;
         
         return (frequencyScore * 0.7) + (successScore * 0.3);
     }
     
-    /**
-     * Get fragile elements (elements that frequently need healing)
-     */
     getFragileElements(threshold: number = 0.5): FragileElement[] {
         const fragileElements: FragileElement[] = [];
         
@@ -233,7 +192,7 @@ export class HealingHistory {
             
             if (stability < threshold) {
                 const recentHistory = this.getElementHistory(elementId)
-                    .slice(-10); // Last 10 attempts
+                    .slice(-10);
                 
                 fragileElements.push({
                     elementId,
@@ -247,19 +206,14 @@ export class HealingHistory {
             }
         }
         
-        // Sort by stability (least stable first)
         return fragileElements.sort((a, b) => a.stability - b.stability);
     }
     
-    /**
-     * Get healing trends over time
-     */
     getHealingTrends(days: number = 7): HealingTrend[] {
         const trends: Map<string, HealingTrend> = new Map();
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - days);
         
-        // Aggregate by day
         for (const records of this.history.values()) {
             for (const record of records) {
                 if (record.timestamp < cutoffDate) continue;
@@ -296,14 +250,10 @@ export class HealingHistory {
             }
         }
         
-        // Convert to array and sort by date
         return Array.from(trends.values())
             .sort((a, b) => a.date.localeCompare(b.date));
     }
     
-    /**
-     * Export healing history report
-     */
     async exportHistory(format: 'json' | 'html' = 'json'): Promise<string> {
         try {
             const report: HealingReport = {
@@ -340,9 +290,6 @@ export class HealingHistory {
         }
     }
     
-    /**
-     * Clear all history
-     */
     async clearHistory(): Promise<void> {
         this.history.clear();
         this.strategyStats.clear();
@@ -354,20 +301,15 @@ export class HealingHistory {
         logger.info('Healing history cleared');
     }
     
-    /**
-     * Get recommendations for improving element stability
-     */
     getRecommendations(): HealingRecommendation[] {
         const recommendations: HealingRecommendation[] = [];
         
-        // Analyze fragile elements
         const fragileElements = this.getFragileElements(0.5);
         
         for (const element of fragileElements) {
             const history = this.getElementHistory(element.elementId);
             const recentHistory = history.slice(-20);
             
-            // Analyze failure patterns
             const failurePatterns = this.analyzeFailurePatterns(recentHistory);
             
             if (failurePatterns.sameLocatorFailures > 0.5) {
@@ -401,7 +343,6 @@ export class HealingHistory {
             }
         }
         
-        // Analyze strategy performance
         for (const [strategy, stats] of this.strategyStats) {
             const successRate = this.getSuccessRate(strategy);
             
@@ -422,7 +363,6 @@ export class HealingHistory {
         });
     }
     
-    // Private helper methods
     
     private updateStrategyStats(strategy: string, success: boolean, duration?: number): void {
         if (!this.strategyStats.has(strategy)) {
@@ -482,7 +422,6 @@ export class HealingHistory {
         
         stats.strategiesUsed.add(strategy);
         
-        // Update days tracked
         const daysSinceFirst = Math.ceil(
             (new Date().getTime() - stats.firstSeen.getTime()) / 
             (1000 * 60 * 60 * 24)
@@ -608,8 +547,6 @@ export class HealingHistory {
     }
     
     private generateHTMLReport(report: HealingReport): string {
-        // Generate HTML report with charts and styling
-        // This is a simplified version - in production, use a templating engine
         return `
 <!DOCTYPE html>
 <html>
@@ -764,12 +701,10 @@ export class HealingHistory {
             
             const data = await FileUtils.readJSON(this.persistencePath);
             
-            // Restore history
             this.history = new Map(data.history);
             this.strategyStats = new Map(data.strategyStats);
             this.elementStats = new Map(data.elementStats);
             
-            // Convert date strings back to Date objects
             for (const records of this.history.values()) {
                 for (const record of records) {
                     record.timestamp = new Date(record.timestamp);
@@ -795,9 +730,6 @@ export class HealingHistory {
         }
     }
     
-    /**
-     * Cleanup and shutdown
-     */
     async shutdown(): Promise<void> {
         if (this.autoSaveInterval) {
             clearInterval(this.autoSaveInterval);
@@ -811,26 +743,18 @@ export class HealingHistory {
         logger.info('HealingHistory shutdown complete');
     }
 
-    /**
-     * Export raw history data for backup/restore
-     */
     exportHistoryData(): HealingRecord[] {
         const allRecords: HealingRecord[] = [];
         
-        // Flatten all records from the history map
         this.history.forEach((records) => {
             allRecords.push(...records);
         });
         
-        // Sort by timestamp (oldest first)
         allRecords.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
         
         return allRecords;
     }
 
-    /**
-     * Clear all healing history data
-     */
     clear(): void {
         this.history.clear();
         this.strategyStats.clear();
@@ -839,51 +763,38 @@ export class HealingHistory {
         ActionLogger.logInfo('Healing history cleared');
     }
 
-    /**
-     * Import healing history data
-     */
     importHistory(data: HealingRecord[]): void {
         if (!Array.isArray(data)) {
             throw new Error('Import data must be an array of HealingRecord objects');
         }
 
-        // Clear existing history
         this.history.clear();
         this.strategyStats.clear();
         this.elementStats.clear();
 
-        // Group records by elementId
         const recordsByElement = new Map<string, HealingRecord[]>();
         
-        // Import each record
         data.forEach(record => {
-            // Validate record structure
             if (!record.elementId || !record.strategy) {
                 ActionLogger.logWarn('Skipping invalid healing record during import', { record });
                 return;
             }
 
-            // Convert date strings back to Date objects
             if (typeof record.timestamp === 'string') {
                 record.timestamp = new Date(record.timestamp);
             }
 
-            // Group by elementId
             if (!recordsByElement.has(record.elementId)) {
                 recordsByElement.set(record.elementId, []);
             }
             recordsByElement.get(record.elementId)!.push(record);
 
-            // Update strategy stats
             this.updateStrategyStats(record.strategy, record.success, record.duration);
             
-            // Update element stats
             this.updateElementStats(record.elementId, record.success, record.strategy);
         });
 
-        // Add grouped records to history
         recordsByElement.forEach((records, elementId) => {
-            // Sort by timestamp (oldest first)
             records.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
             this.history.set(elementId, records);
         });
@@ -897,7 +808,6 @@ export class HealingHistory {
     }
 }
 
-// Type definitions
 interface HealingRecord {
     id: string;
     elementId: string;

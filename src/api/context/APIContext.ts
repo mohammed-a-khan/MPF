@@ -8,10 +8,6 @@ import {
 } from '../types/api.types';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * API test execution context
- * Maintains state for API tests including variables, responses, and configuration
- */
 export class APIContext {
     private data: APIContextData;
     private variables: Map<string, APIVariable> = new Map();
@@ -42,123 +38,75 @@ export class APIContext {
         ActionLogger.getInstance().debug(`API context created: ${name}`);
     }
 
-    /**
-     * Get base URL
-     */
     public getBaseUrl(): string {
         return this.data.baseUrl;
     }
 
-    /**
-     * Set base URL
-     */
     public setBaseUrl(url: string): void {
         this.data.baseUrl = url;
         ActionLogger.getInstance().debug(`Base URL set to: ${url}`);
     }
 
-    /**
-     * Get all headers
-     */
     public getHeaders(): Record<string, string> {
         return { ...this.data.headers };
     }
 
-    /**
-     * Get specific header
-     */
     public getHeader(name: string): string | undefined {
         return this.data.headers[name];
     }
 
-    /**
-     * Set header
-     */
     public setHeader(name: string, value: string): void {
         this.data.headers[name] = value;
         ActionLogger.getInstance().debug(`Header set: ${name} = ${value}`);
     }
 
-    /**
-     * Set multiple headers
-     */
     public setHeaders(headers: Record<string, string>): void {
         Object.assign(this.data.headers, headers);
         ActionLogger.getInstance().debug(`Headers set:`, headers);
     }
 
-    /**
-     * Remove header
-     */
     public removeHeader(name: string): void {
         delete this.data.headers[name];
         ActionLogger.getInstance().debug(`Header removed: ${name}`);
     }
 
-    /**
-     * Clear all headers
-     */
     public clearHeaders(): void {
         this.data.headers = {};
         ActionLogger.getInstance().debug('All headers cleared');
     }
 
-    /**
-     * Get timeout
-     */
     public getTimeout(): number {
         return this.data.timeout;
     }
 
-    /**
-     * Set timeout
-     */
     public setTimeout(timeout: number): void {
         this.data.timeout = timeout;
         ActionLogger.getInstance().debug(`Timeout set to: ${timeout}ms`);
     }
 
-    /**
-     * Get authentication config
-     */
     public getAuth(): AuthConfig | null {
         return this.data.auth;
     }
 
-    /**
-     * Set authentication
-     */
     public setAuth(auth: AuthConfig | null): void {
         this.data.auth = auth;
         ActionLogger.getInstance().debug(`Authentication configured: ${auth?.type || 'none'}`);
     }
 
-    /**
-     * Get proxy config
-     */
     public getProxy(): any {
         return this.data.proxy;
     }
 
-    /**
-     * Set proxy
-     */
     public setProxy(proxy: any): void {
         this.data.proxy = proxy;
         ActionLogger.getInstance().debug('Proxy configured');
     }
 
-    /**
-     * Get variable value
-     */
     public getVariable(name: string): any {
         const variable = this.variables.get(name);
         return variable?.value;
     }
 
-    /**
-     * Set variable
-     */
     public setVariable(name: string, value: any, metadata?: any): void {
         this.variables.set(name, {
             name,
@@ -170,9 +118,6 @@ export class APIContext {
         ActionLogger.getInstance().debug(`Variable set: ${name} = ${JSON.stringify(value)}`);
     }
 
-    /**
-     * Get all variables
-     */
     public getVariables(): Record<string, any> {
         const vars: Record<string, any> = {};
         for (const [name, variable] of this.variables) {
@@ -181,17 +126,11 @@ export class APIContext {
         return vars;
     }
 
-    /**
-     * Clear variables
-     */
     public clearVariables(): void {
         this.variables.clear();
         ActionLogger.getInstance().debug('All variables cleared');
     }
 
-    /**
-     * Store response
-     */
     public storeResponse(alias: string, response: Response, request?: RequestOptions): void {
         const apiResponse: APIResponse = {
             ...response,
@@ -199,7 +138,6 @@ export class APIContext {
             data: (response as any).data
         };
         
-        // Only assign request if it's provided
         if (request !== undefined) {
             (apiResponse as any).request = request;
         }
@@ -208,29 +146,19 @@ export class APIContext {
         ActionLogger.getInstance().debug(`Response stored with alias: ${alias}`);
     }
 
-    /**
-     * Get stored response
-     */
     public getResponse(alias: string): APIResponse | undefined {
         return this.responses.get(alias);
     }
 
-    /**
-     * Get response data
-     */
     public getResponseData(alias: string): any {
         const response = this.responses.get(alias);
         return response?.data || response?.body;
     }
 
-    /**
-     * Get response header
-     */
     public getResponseHeader(alias: string, headerName: string): string | undefined {
         const response = this.responses.get(alias);
         if (!response) return undefined;
 
-        // Header names are case-insensitive
         const lowerHeaderName = headerName.toLowerCase();
         for (const [key, value] of Object.entries(response.headers)) {
             if (key.toLowerCase() === lowerHeaderName) {
@@ -240,44 +168,28 @@ export class APIContext {
         return undefined;
     }
 
-    /**
-     * Clear responses
-     */
     public clearResponses(): void {
         this.responses.clear();
         ActionLogger.getInstance().debug('All responses cleared');
     }
 
-    /**
-     * Add request to history
-     */
     public addRequestToHistory(request: RequestOptions): void {
         this.requestHistory.push({ ...request });
         
-        // Limit history size
         if (this.requestHistory.length > this.maxHistorySize) {
             this.requestHistory.shift();
         }
     }
 
-    /**
-     * Get request history
-     */
     public getRequestHistory(): RequestOptions[] {
         return [...this.requestHistory];
     }
 
-    /**
-     * Clear request history
-     */
     public clearRequestHistory(): void {
         this.requestHistory = [];
         ActionLogger.getInstance().debug('Request history cleared');
     }
 
-    /**
-     * Get current state for request building
-     */
     public getCurrentState(): APIContextData {
         return {
             ...this.data,
@@ -285,9 +197,6 @@ export class APIContext {
         };
     }
 
-    /**
-     * Merge with request options
-     */
     public mergeWithRequest(requestOptions: Partial<RequestOptions>): RequestOptions {
         const contextState = this.getCurrentState();
         
@@ -304,7 +213,6 @@ export class APIContext {
             body: requestOptions.body
         };
         
-        // Handle auth separately to avoid null vs undefined issues
         if (requestOptions.auth !== undefined) {
             mergedRequest.auth = requestOptions.auth;
         } else if (contextState.auth !== null) {
@@ -314,17 +222,12 @@ export class APIContext {
         return mergedRequest;
     }
 
-    /**
-     * Extract value from response using JSONPath
-     */
     public extractFromResponse(alias: string, jsonPath: string): any {
         const response = this.getResponse(alias);
         if (!response || !response.data) {
             return undefined;
         }
 
-        // Simple JSONPath implementation for common cases
-        // In production, would use the JSONPathValidator
         const path = jsonPath.replace(/^\$\./, '').split('.');
         let value = response.data;
 
@@ -333,7 +236,6 @@ export class APIContext {
                 return undefined;
             }
 
-            // Handle array notation
             const arrayMatch = segment.match(/^(.+)\[(\d+)\]$/);
             if (arrayMatch) {
                 const [, prop, index] = arrayMatch;
@@ -357,31 +259,22 @@ export class APIContext {
         return value;
     }
 
-    /**
-     * Clone context
-     */
     public clone(newName: string): APIContext {
         const cloned = new APIContext(newName, this.data);
         
-        // Clone variables
         for (const [name, variable] of this.variables) {
             cloned.variables.set(name, { ...variable });
         }
         
-        // Clone responses
         for (const [alias, response] of this.responses) {
             cloned.responses.set(alias, { ...response });
         }
         
-        // Clone history
         cloned.requestHistory = [...this.requestHistory];
         
         return cloned;
     }
 
-    /**
-     * Reset context to initial state
-     */
     public reset(): void {
         this.clearHeaders();
         this.clearVariables();
@@ -393,9 +286,6 @@ export class APIContext {
         ActionLogger.getInstance().debug(`API context reset: ${this.name}`);
     }
 
-    /**
-     * Get context summary
-     */
     public getSummary(): any {
         return {
             name: this.name,
@@ -409,9 +299,6 @@ export class APIContext {
         };
     }
 
-    /**
-     * Export context state
-     */
     public export(): any {
         return {
             name: this.name,
@@ -431,9 +318,6 @@ export class APIContext {
         };
     }
 
-    /**
-     * Import context state
-     */
     public import(data: any): void {
         if (data.data) {
             this.data = { ...this.data, ...data.data };

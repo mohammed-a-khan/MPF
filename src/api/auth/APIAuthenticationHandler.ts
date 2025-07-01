@@ -1,18 +1,7 @@
-/**
- * CS Test Automation Framework
- * Enhanced API Authentication Handler
- * Manages all authentication types including OAuth2, AWS, Certificate, NTLM
- * 
- * @version 4.0.0
- * @author CS Test Automation Team
- */
 
 import { createHmac, createHash, randomBytes, createSign } from 'crypto';
 import { URL } from 'url';
 import { performance } from 'perf_hooks';
-
-// First, let's add the missing type definitions that need to be in auth.types.ts
-// These should be added to your auth.types.ts file:
 
 import {
   AuthenticationType,
@@ -42,7 +31,6 @@ import { ConfigurationManager } from '../../core/configuration/ConfigurationMana
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { RequestOptions } from '../types/api.types';
 
-// Extended type definitions that need to be added to auth.types.ts
 export enum AuthType {
   BASIC = 'basic',
   BEARER = 'bearer',
@@ -59,7 +47,7 @@ export enum AuthType {
 
 export interface AuthConfig {
   type: AuthType;
-  // Additional common properties
+
   enabled?: boolean;
 }
 
@@ -269,14 +257,12 @@ export interface ExtendedAuthenticationProvider extends AuthenticationProvider {
   lastUsed?: Date;
 }
 
-// NTLM Message Types
 enum NTLMMessageType {
   TYPE1 = 1,
   TYPE2 = 2,
   TYPE3 = 3
 }
 
-// NTLM Flags
 enum NTLMFlags {
   NEGOTIATE_UNICODE = 0x00000001,
   NEGOTIATE_OEM = 0x00000002,
@@ -301,9 +287,6 @@ enum NTLMFlags {
   NEGOTIATE_56 = 0x80000000
 }
 
-/**
- * Authentication Handler Implementation
- */
 export class APIAuthenticationHandler {
   private static instance: APIAuthenticationHandler;
   private readonly logger: Logger;
@@ -312,17 +295,14 @@ export class APIAuthenticationHandler {
   private readonly oauth2Handler: OAuth2Handler;
   private readonly awsHandler: AWSSignatureHandler;
 
-  // Caches
   private readonly tokenCache: Map<string, TokenCache> = new Map();
   private readonly nonceCache: Map<string, NonceCache> = new Map();
   private readonly sessionCache: Map<string, AuthenticationSession> = new Map();
   private readonly credentialStore: Map<string, ExtendedCredentialStore> = new Map();
 
-  // State management - removed unused authenticationState
   private readonly activeProviders: Map<string, ExtendedAuthenticationProvider> = new Map();
   private readonly rateLimiters: Map<string, RateLimitInfo> = new Map();
 
-  // Metrics - using extended type
   private readonly metrics: ExtendedAuthenticationMetrics = {
     totalRequests: 0,
     successfulAuthentications: 0,
@@ -343,7 +323,6 @@ export class APIAuthenticationHandler {
       'custom': 0
     },
     errorBreakdown: {},
-    // Extended properties
     totalAuthentications: 0,
     cacheHits: 0,
     cacheMisses: 0,
@@ -352,22 +331,20 @@ export class APIAuthenticationHandler {
     lastReset: new Date()
   };
 
-  // Security policies
   private readonly securityPolicies: Map<string, ExtendedSecurityPolicy> = new Map();
   private readonly auditLog: AuthenticationAudit[] = [];
 
-  // Configuration
   private readonly config = {
-    tokenCacheTTL: 3600000, // 1 hour
-    nonceCacheTTL: 300000, // 5 minutes
+    tokenCacheTTL: 3600000,
+    nonceCacheTTL: 300000,
     maxRetries: 3,
     retryDelay: 1000,
-    tokenRefreshBuffer: 300000, // 5 minutes before expiry
+    tokenRefreshBuffer: 300000,
     enableAudit: true,
     enableMetrics: true,
     maxConcurrentAuth: 10,
     rateLimit: {
-      windowMs: 60000, // 1 minute
+      windowMs: 60000,
       maxRequests: 100
     },
     secureCredentialStorage: true,
@@ -376,9 +353,6 @@ export class APIAuthenticationHandler {
     allowSelfSignedCerts: false
   };
 
-  /**
-   * Private constructor for singleton
-   */
   private constructor() {
     this.logger = Logger.getInstance();
     this.actionLogger = ActionLogger.getInstance();
@@ -391,9 +365,6 @@ export class APIAuthenticationHandler {
     this.loadSecurityPolicies();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): APIAuthenticationHandler {
     if (!APIAuthenticationHandler.instance) {
       APIAuthenticationHandler.instance = new APIAuthenticationHandler();
@@ -401,9 +372,6 @@ export class APIAuthenticationHandler {
     return APIAuthenticationHandler.instance;
   }
 
-  /**
-   * Apply authentication to request
-   */
   public async applyAuthentication(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -413,7 +381,6 @@ export class APIAuthenticationHandler {
     const correlationId = context?.correlationId || this.generateCorrelationId();
 
     try {
-      // Log authentication attempt
       this.actionLogger.logAction('api_authentication', {
         type: authConfig.type,
         url: request.url,
@@ -421,7 +388,6 @@ export class APIAuthenticationHandler {
         timestamp: new Date()
       });
 
-      // Validate authentication configuration
       const validationResult = await this.validateAuthConfig(authConfig);
       if (!validationResult.isValid) {
         throw new AuthenticationError(
@@ -430,13 +396,10 @@ export class APIAuthenticationHandler {
         );
       }
 
-      // Check rate limits
       await this.checkRateLimit(authConfig.type);
 
-      // Apply security policies
       await this.enforceSecurityPolicies(authConfig, request);
 
-      // Get authentication strategy
       const strategy = this.getAuthenticationStrategy(authConfig.type);
       if (!strategy) {
         throw new AuthenticationError(
@@ -445,7 +408,6 @@ export class APIAuthenticationHandler {
         );
       }
 
-      // Execute authentication
       const result = await strategy.authenticate(request, authConfig, {
         correlationId,
         ...(context?.sessionId && { sessionId: context.sessionId }),
@@ -453,10 +415,8 @@ export class APIAuthenticationHandler {
         maxRetries: this.config.maxRetries
       });
 
-      // Update metrics
       this.updateMetrics(authConfig.type, true, performance.now() - startTime);
 
-      // Audit successful authentication
       if (this.config.enableAudit) {
         this.auditAuthentication({
           type: 'auth.completed' as any,
@@ -473,10 +433,8 @@ export class APIAuthenticationHandler {
       return result;
 
     } catch (error) {
-      // Update metrics
       this.updateMetrics(authConfig.type, false, performance.now() - startTime);
 
-      // Log error
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('Authentication failed', {
         error: errorMessage,
@@ -484,7 +442,6 @@ export class APIAuthenticationHandler {
         correlationId
       });
 
-      // Audit failed authentication
       if (this.config.enableAudit) {
         this.auditAuthentication({
           type: 'auth.failed' as any,
@@ -503,9 +460,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Convert AuthType to AuthenticationType
-   */
   private convertToAuthenticationType(authType: AuthType): AuthenticationType {
     const mapping: Record<AuthType, AuthenticationType> = {
       [AuthType.BASIC]: 'basic' as AuthenticationType,
@@ -523,9 +477,6 @@ export class APIAuthenticationHandler {
     return mapping[authType] || 'none';
   }
 
-  /**
-   * Get authentication strategy for type
-   */
   private getAuthenticationStrategy(type: AuthType): AuthenticationStrategy | null {
     const strategies: Record<AuthType, AuthenticationStrategy> = {
       [AuthType.BASIC]: {
@@ -588,9 +539,6 @@ export class APIAuthenticationHandler {
     return strategies[type] || null;
   }
 
-  /**
-   * Apply Basic Authentication
-   */
   private async applyBasicAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -598,21 +546,17 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as ExtendedBasicAuthConfig;
 
-    // Validate credentials
     if (!config.username || !config.password) {
       throw new AuthenticationError('Username and password are required for Basic auth', 'MISSING_CREDENTIALS');
     }
 
-    // Encode credentials
     const credentials = Buffer.from(`${config.username}:${config.password}`).toString('base64');
 
-    // Apply to request
     if (!request.headers) {
       request.headers = {};
     }
     request.headers['Authorization'] = `Basic ${credentials}`;
 
-    // Store in secure credential store if enabled
     if (this.config.secureCredentialStorage) {
       await this.storeCredentials(options.correlationId, {
         type: AuthType.BASIC,
@@ -639,9 +583,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Apply Bearer Token Authentication
-   */
   private async applyBearerAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -649,7 +590,6 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as ExtendedBearerAuthConfig;
 
-    // Check token cache first
     const cacheKey = this.generateCacheKey(AuthType.BEARER, config);
     const cachedToken = this.getFromTokenCache(cacheKey);
 
@@ -669,18 +609,15 @@ export class APIAuthenticationHandler {
 
     this.metrics.cacheMisses++;
 
-    // Validate token
     if (!config.token) {
       throw new AuthenticationError('Bearer token is required', 'MISSING_TOKEN');
     }
 
-    // Apply to request
     if (!request.headers) {
       request.headers = {};
     }
     request.headers['Authorization'] = `Bearer ${config.token}`;
 
-    // Cache token if expiry is provided
     if (config.expiresAt) {
       this.addToTokenCache(cacheKey, {
         token: config.token,
@@ -701,9 +638,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Apply API Key Authentication
-   */
   private async applyAPIKeyAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -711,12 +645,10 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as ExtendedAPIKeyAuthConfig;
 
-    // Validate API key
     if (!config.apiKey) {
       throw new AuthenticationError('API key is required', 'MISSING_API_KEY');
     }
 
-    // Apply based on location
     switch (config.location) {
       case 'header':
         if (!request.headers) {
@@ -756,9 +688,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Apply OAuth2 Authentication
-   */
   private async applyOAuth2Auth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -766,10 +695,8 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as unknown as OAuth2Config;
 
-    // Delegate to OAuth2Handler
     const result = await this.oauth2Handler.authenticate(request, config, options);
 
-    // Cache the token
     if (result.accessToken) {
       const cacheKey = this.generateCacheKey(AuthType.OAUTH2, config);
       this.addToTokenCache(cacheKey, {
@@ -792,9 +719,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Apply Certificate Authentication
-   */
   private async applyCertificateAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -802,7 +726,6 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as CertificateAuthConfig;
 
-    // Delegate to CertificateManager
     const result = await this.certificateManager.applyCertificateAuth(request, config);
 
     return {
@@ -820,9 +743,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Apply NTLM Authentication
-   */
   private async applyNTLMAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -830,12 +750,10 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as unknown as NTLMAuthConfig;
 
-    // NTLM requires a multi-step handshake
     const sessionId = options.sessionId || this.generateSessionId();
     let session = this.sessionCache.get(sessionId);
 
     if (!session) {
-      // Start new NTLM session
       session = {
         id: sessionId,
         type: AuthType.NTLM,
@@ -861,24 +779,18 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Send NTLM Type 1 message
-   */
   private async sendNTLMType1(
     request: RequestOptions,
     config: NTLMAuthConfig,
     session: AuthenticationSession
   ): Promise<AuthenticationResult> {
-    // Build Type 1 message
     const type1Message = this.buildNTLMType1Message(config);
 
-    // Apply to request
     if (!request.headers) {
       request.headers = {};
     }
     request.headers['Authorization'] = `NTLM ${type1Message}`;
 
-    // Update session
     session.state = 'TYPE2';
     session.metadata.type1Sent = new Date();
 
@@ -897,23 +809,16 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Build NTLM Type 1 message
-   */
   private buildNTLMType1Message(config: NTLMAuthConfig): string {
     const domain = config.domain || '';
     const workstation = config.workstation || '';
 
-    // NTLM Type 1 message structure
     const type1 = Buffer.alloc(32 + domain.length + workstation.length);
 
-    // Signature
     type1.write('NTLMSSP\0', 0, 'ascii');
 
-    // Type
     type1.writeUInt32LE(NTLMMessageType.TYPE1, 8);
 
-    // Flags
     const flags = NTLMFlags.NEGOTIATE_UNICODE |
       NTLMFlags.NEGOTIATE_OEM |
       NTLMFlags.REQUEST_TARGET |
@@ -922,54 +827,44 @@ export class APIAuthenticationHandler {
       NTLMFlags.NEGOTIATE_EXTENDED_SECURITY;
     type1.writeUInt32LE(flags, 12);
 
-    // Domain
     let offset = 32;
     if (domain) {
-      type1.writeUInt16LE(domain.length, 16); // Domain length
-      type1.writeUInt16LE(domain.length, 18); // Domain max length
-      type1.writeUInt32LE(offset, 20); // Domain offset
+      type1.writeUInt16LE(domain.length, 16);
+      type1.writeUInt16LE(domain.length, 18);
+      type1.writeUInt32LE(offset, 20);
       type1.write(domain, offset, 'ascii');
       offset += domain.length;
     }
 
-    // Workstation
     if (workstation) {
-      type1.writeUInt16LE(workstation.length, 24); // Workstation length
-      type1.writeUInt16LE(workstation.length, 26); // Workstation max length
-      type1.writeUInt32LE(offset, 28); // Workstation offset
+      type1.writeUInt16LE(workstation.length, 24);
+      type1.writeUInt16LE(workstation.length, 26);
+      type1.writeUInt32LE(offset, 28);
       type1.write(workstation, offset, 'ascii');
     }
 
     return type1.toString('base64');
   }
 
-  /**
-   * Process NTLM Type 2 challenge and send Type 3 response
-   */
   private async sendNTLMType3(
     request: RequestOptions,
     config: NTLMAuthConfig,
     session: AuthenticationSession
   ): Promise<AuthenticationResult> {
-    // Get Type 2 challenge from previous response
     const challenge = session.metadata.challenge;
     if (!challenge) {
       throw new AuthenticationError('Missing NTLM Type 2 challenge', 'MISSING_CHALLENGE');
     }
 
-    // Parse Type 2 message
     const type2Data = this.parseNTLMType2Message(challenge);
 
-    // Build Type 3 response
     const type3Message = await this.buildNTLMType3Message(config, type2Data);
 
-    // Apply to request
     if (!request.headers) {
       request.headers = {};
     }
     request.headers['Authorization'] = `NTLM ${type3Message}`;
 
-    // Update session
     session.state = 'AUTHENTICATED';
     session.metadata.type3Sent = new Date();
     session.metadata.authenticated = true;
@@ -989,31 +884,24 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Parse NTLM Type 2 message
-   */
   private parseNTLMType2Message(challengeBase64: string): any {
     const challenge = Buffer.from(challengeBase64, 'base64');
 
-    // Verify signature
     const signature = challenge.toString('ascii', 0, 7);
     if (signature !== 'NTLMSSP') {
       throw new AuthenticationError('Invalid NTLM Type 2 signature', 'INVALID_SIGNATURE');
     }
 
-    // Verify type
     const type = challenge.readUInt32LE(8);
     if (type !== NTLMMessageType.TYPE2) {
       throw new AuthenticationError('Invalid NTLM message type', 'INVALID_TYPE');
     }
 
-    // Extract challenge data
     const targetNameLen = challenge.readUInt16LE(12);
     const targetNameOffset = challenge.readUInt32LE(16);
     const flags = challenge.readUInt32LE(20);
     const serverChallenge = challenge.slice(24, 32);
 
-    // Extract target info if present
     let targetInfo = null;
     if (flags & NTLMFlags.NEGOTIATE_TARGET_INFO) {
       const targetInfoLen = challenge.readUInt16LE(40);
@@ -1031,126 +919,94 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Build NTLM Type 3 message
-   */
   private async buildNTLMType3Message(config: NTLMAuthConfig, type2Data: any): Promise<string> {
     const username = config.username;
     const password = config.password;
     const domain = config.domain || '';
     const workstation = config.workstation || '';
 
-    // Generate responses
     const ntlmResponse = await this.generateNTLMResponse(password, type2Data.serverChallenge);
     const lmResponse = await this.generateLMResponse(password, type2Data.serverChallenge);
 
-    // Calculate offsets
-    let offset = 64; // Base size of Type 3 message
-    const domainLen = domain.length * 2; // Unicode
-    const userLen = username.length * 2; // Unicode
-    const workstationLen = workstation.length * 2; // Unicode
+    let offset = 64;
+    const domainLen = domain.length * 2;
+    const userLen = username.length * 2;
+    const workstationLen = workstation.length * 2;
     const ntlmResponseLen = ntlmResponse.length;
     const lmResponseLen = lmResponse.length;
-    const sessionKeyLen = 0; // Not using session key for simplicity
+    const sessionKeyLen = 0;
 
-    // Build Type 3 message
     const type3 = Buffer.alloc(offset + domainLen + userLen + workstationLen + lmResponseLen + ntlmResponseLen + sessionKeyLen);
 
-    // Signature
     type3.write('NTLMSSP\0', 0, 'ascii');
 
-    // Type
     type3.writeUInt32LE(NTLMMessageType.TYPE3, 8);
 
-    // LM Response
-    type3.writeUInt16LE(lmResponseLen, 12); // Length
-    type3.writeUInt16LE(lmResponseLen, 14); // Max length
-    type3.writeUInt32LE(offset, 16); // Offset
+    type3.writeUInt16LE(lmResponseLen, 12);
+    type3.writeUInt16LE(lmResponseLen, 14);
+    type3.writeUInt32LE(offset, 16);
     lmResponse.copy(type3, offset);
     offset += lmResponseLen;
 
-    // NTLM Response
-    type3.writeUInt16LE(ntlmResponseLen, 20); // Length
-    type3.writeUInt16LE(ntlmResponseLen, 22); // Max length
-    type3.writeUInt32LE(offset, 24); // Offset
+    type3.writeUInt16LE(ntlmResponseLen, 20);
+    type3.writeUInt16LE(ntlmResponseLen, 22);
+    type3.writeUInt32LE(offset, 24);
     ntlmResponse.copy(type3, offset);
     offset += ntlmResponseLen;
 
-    // Domain
-    type3.writeUInt16LE(domainLen, 28); // Length
-    type3.writeUInt16LE(domainLen, 30); // Max length
-    type3.writeUInt32LE(offset, 32); // Offset
+    type3.writeUInt16LE(domainLen, 28);
+    type3.writeUInt16LE(domainLen, 30);
+    type3.writeUInt32LE(offset, 32);
     if (domain) {
       type3.write(domain, offset, 'ucs2');
       offset += domainLen;
     }
 
-    // Username
-    type3.writeUInt16LE(userLen, 36); // Length
-    type3.writeUInt16LE(userLen, 38); // Max length
-    type3.writeUInt32LE(offset, 40); // Offset
+    type3.writeUInt16LE(userLen, 36);
+    type3.writeUInt16LE(userLen, 38);
+    type3.writeUInt32LE(offset, 40);
     type3.write(username, offset, 'ucs2');
     offset += userLen;
 
-    // Workstation
-    type3.writeUInt16LE(workstationLen, 44); // Length
-    type3.writeUInt16LE(workstationLen, 46); // Max length
-    type3.writeUInt32LE(offset, 48); // Offset
+    type3.writeUInt16LE(workstationLen, 44);
+    type3.writeUInt16LE(workstationLen, 46);
+    type3.writeUInt32LE(offset, 48);
     if (workstation) {
       type3.write(workstation, offset, 'ucs2');
       offset += workstationLen;
     }
 
-    // Session Key (empty)
-    type3.writeUInt16LE(sessionKeyLen, 52); // Length
-    type3.writeUInt16LE(sessionKeyLen, 54); // Max length
-    type3.writeUInt32LE(offset, 56); // Offset
+    type3.writeUInt16LE(sessionKeyLen, 52);
+    type3.writeUInt16LE(sessionKeyLen, 54);
+    type3.writeUInt32LE(offset, 56);
 
-    // Flags
     type3.writeUInt32LE(type2Data.flags, 60);
 
     return type3.toString('base64');
   }
 
-  /**
-   * Generate NTLM response
-   */
   private async generateNTLMResponse(password: string, serverChallenge: Buffer): Promise<Buffer> {
-    // Convert password to Unicode
     const unicodePwd = Buffer.from(password, 'ucs2');
 
-    // Generate MD4 hash of password
     const md4 = createHash('md4');
     md4.update(unicodePwd);
     const passwordHash = md4.digest();
 
-    // Generate NTLM response using password hash and server challenge
     const response = Buffer.alloc(24);
 
-    // This is a simplified NTLM response calculation
-    // Real implementation would use DES encryption
     const hmac = createHmac('md5', passwordHash);
     hmac.update(serverChallenge);
     const hash = hmac.digest();
 
-    // Copy first 24 bytes as response
     hash.copy(response, 0, 0, 24);
 
     return response;
   }
 
-  /**
-   * Generate LM response
-   */
   private async generateLMResponse(_password: string, _serverChallenge: Buffer): Promise<Buffer> {
-    // LM response is deprecated but still required for compatibility
-    // Return a null response (24 zero bytes)
     return Buffer.alloc(24);
   }
 
-  /**
-   * Apply AWS Signature Authentication
-   */
   private async applyAWSAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -1158,7 +1014,6 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as AWSAuthConfig;
 
-    // Delegate to AWSSignatureHandler
     const result = await this.awsHandler.signRequest(request, config);
 
     return {
@@ -1175,9 +1030,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Apply Digest Authentication
-   */
   private async applyDigestAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -1185,18 +1037,14 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as ExtendedDigestAuthConfig;
 
-    // Digest auth requires a challenge first
     if (!config.challenge) {
       throw new AuthenticationError('Digest authentication requires a challenge', 'MISSING_CHALLENGE');
     }
 
-    // Parse challenge
     const challengeParams = this.parseDigestChallenge(config.challenge);
 
-    // Generate response
     const response = await this.generateDigestResponse(request, config, challengeParams);
 
-    // Apply to request
     if (!request.headers) {
       request.headers = {};
     }
@@ -1215,16 +1063,11 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Parse Digest authentication challenge
-   */
   private parseDigestChallenge(challenge: string): any {
     const params: any = {};
 
-    // Remove "Digest " prefix if present
     const cleanChallenge = challenge.replace(/^Digest\s+/i, '');
 
-    // Parse key-value pairs
     const regex = /(\w+)=(?:"([^"]+)"|([^,\s]+))/g;
     let match;
 
@@ -1236,7 +1079,6 @@ export class APIAuthenticationHandler {
       }
     }
 
-    // Validate required parameters
     if (!params.realm || !params.nonce) {
       throw new AuthenticationError('Invalid Digest challenge', 'INVALID_CHALLENGE');
     }
@@ -1244,9 +1086,6 @@ export class APIAuthenticationHandler {
     return params;
   }
 
-  /**
-   * Generate Digest authentication response
-   */
   private async generateDigestResponse(
     request: RequestOptions,
     config: DigestAuthConfig,
@@ -1257,11 +1096,9 @@ export class APIAuthenticationHandler {
     const method = request.method || 'GET';
     const uri = new URL(request.url).pathname;
 
-    // Generate cnonce if qop is present
     const cnonce = challenge.qop ? randomBytes(16).toString('hex') : null;
-    const nc = '00000001'; // Nonce count
+    const nc = '00000001';
 
-    // Calculate HA1
     let ha1: string;
     if (challenge.algorithm === 'MD5-sess') {
       const ha1Base = createHash('md5')
@@ -1276,12 +1113,10 @@ export class APIAuthenticationHandler {
         .digest('hex');
     }
 
-    // Calculate HA2
     const ha2 = createHash('md5')
       .update(`${method}:${uri}`)
       .digest('hex');
 
-    // Calculate response
     let response: string;
     if (challenge.qop === 'auth' || challenge.qop === 'auth-int') {
       if (!cnonce) {
@@ -1296,7 +1131,6 @@ export class APIAuthenticationHandler {
         .digest('hex');
     }
 
-    // Build authorization header
     const authParams = [
       `username="${username}"`,
       `realm="${challenge.realm}"`,
@@ -1322,9 +1156,6 @@ export class APIAuthenticationHandler {
     return authParams.join(', ');
   }
 
-  /**
-   * Apply Hawk Authentication
-   */
   private async applyHawkAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -1332,12 +1163,10 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as HawkAuthConfig;
 
-    // Parse URL
     const url = new URL(request.url);
     const timestamp = Math.floor(Date.now() / 1000);
     const nonce = randomBytes(6).toString('base64');
 
-    // Build auth artifacts
     const artifacts = {
       ts: timestamp,
       nonce,
@@ -1351,7 +1180,6 @@ export class APIAuthenticationHandler {
       dlg: config.dlg
     };
 
-    // Calculate payload hash if needed
     if (request.body && config.includePayloadHash) {
       const payloadHash = createHash('sha256')
         .update(JSON.stringify(request.body))
@@ -1359,13 +1187,10 @@ export class APIAuthenticationHandler {
       artifacts.hash = payloadHash;
     }
 
-    // Generate MAC
     const mac = await this.generateHawkMAC(config.keyId, config.key, artifacts);
 
-    // Build authorization header
     const authHeader = this.buildHawkHeader(config.keyId, mac, artifacts);
 
-    // Apply to request
     if (!request.headers) {
       request.headers = {};
     }
@@ -1385,11 +1210,7 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Generate Hawk MAC
-   */
   private async generateHawkMAC(_keyId: string, key: string, artifacts: any): Promise<string> {
-    // Build normalized string
     const normalized = [
       'hawk.1.header',
       artifacts.ts,
@@ -1402,7 +1223,6 @@ export class APIAuthenticationHandler {
       artifacts.ext || ''
     ].join('\n') + '\n';
 
-    // Generate MAC
     const mac = createHmac('sha256', key)
       .update(normalized)
       .digest('base64');
@@ -1410,9 +1230,6 @@ export class APIAuthenticationHandler {
     return mac;
   }
 
-  /**
-   * Build Hawk authorization header
-   */
   private buildHawkHeader(keyId: string, mac: string, artifacts: any): string {
     const params = [
       `id="${keyId}"`,
@@ -1436,9 +1253,6 @@ export class APIAuthenticationHandler {
     return `Hawk ${params.join(', ')}`;
   }
 
-  /**
-   * Apply JWT Authentication
-   */
   private async applyJWTAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -1446,7 +1260,6 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as JWTAuthConfig;
 
-    // Check token cache
     const cacheKey = this.generateCacheKey(AuthType.JWT, config);
     const cachedToken = this.getFromTokenCache(cacheKey);
 
@@ -1465,7 +1278,6 @@ export class APIAuthenticationHandler {
       };
     }
 
-    // Generate or use provided token
     let token: string;
     if (config.token) {
       token = config.token;
@@ -1475,14 +1287,12 @@ export class APIAuthenticationHandler {
       throw new AuthenticationError('JWT token or generation parameters required', 'MISSING_TOKEN');
     }
 
-    // Apply to request
     if (!request.headers) {
       request.headers = {};
     }
     const headerName = config.headerName || 'Authorization';
     request.headers[headerName] = config.scheme ? `${config.scheme} ${token}` : token;
 
-    // Cache token
     if (config.expiresIn) {
       const expiresAt = new Date(Date.now() + config.expiresIn * 1000);
       this.addToTokenCache(cacheKey, {
@@ -1505,9 +1315,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Generate JWT token
-   */
   private async generateJWT(config: JWTAuthConfig): Promise<string> {
     const header = {
       alg: config.algorithm || 'RS256',
@@ -1521,11 +1328,9 @@ export class APIAuthenticationHandler {
       exp: Math.floor(Date.now() / 1000) + (config.expiresIn || 3600)
     };
 
-    // Encode header and payload
     const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
     const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
 
-    // Sign
     const signingInput = `${encodedHeader}.${encodedPayload}`;
     let signature: string;
 
@@ -1555,9 +1360,6 @@ export class APIAuthenticationHandler {
     return `${signingInput}.${signature}`;
   }
 
-  /**
-   * Apply Custom Authentication
-   */
   private async applyCustomAuth(
     request: RequestOptions,
     authConfig: AuthConfig,
@@ -1565,12 +1367,10 @@ export class APIAuthenticationHandler {
   ): Promise<AuthenticationResult> {
     const config = authConfig as ExtendedCustomAuthConfig;
 
-    // Execute custom authentication handler
     if (!config.handler || typeof config.handler !== 'function') {
       throw new AuthenticationError('Custom authentication handler function is required', 'MISSING_HANDLER');
     }
 
-    // Handle function handlers
     const handler = config.handler as Function;
     const result = await handler({
       method: request.method || 'GET',
@@ -1591,18 +1391,13 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Validate authentication configuration
-   */
   private async validateAuthConfig(authConfig: AuthConfig): Promise<AuthValidationResult> {
     const errors: string[] = [];
 
-    // Common validation
     if (!authConfig.type) {
       errors.push('Authentication type is required');
     }
 
-    // Type-specific validation
     switch (authConfig.type) {
       case AuthType.BASIC:
         const basicConfig = authConfig as unknown as BasicAuthConfig;
@@ -1685,20 +1480,13 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Validate Basic authentication
-   */
   private async validateBasicAuth(config: BasicAuthConfig): Promise<boolean> {
     return !!(config.username && config.password);
   }
 
-  /**
-   * Validate Bearer token
-   */
   private async validateBearerAuth(config: ExtendedBearerAuthConfig): Promise<boolean> {
     if (!config.token) return false;
 
-    // Check if token is expired
     if (config.expiresAt && new Date(config.expiresAt) < new Date()) {
       return false;
     }
@@ -1706,70 +1494,43 @@ export class APIAuthenticationHandler {
     return true;
   }
 
-  /**
-   * Validate API key
-   */
   private async validateAPIKey(config: ExtendedAPIKeyAuthConfig): Promise<boolean> {
     return !!(config.apiKey && config.location);
   }
 
-  /**
-   * Validate OAuth2
-   */
   private async validateOAuth2(config: OAuth2Config): Promise<boolean> {
     return await this.oauth2Handler.validateConfig(config);
   }
 
-  /**
-   * Validate Certificate
-   */
   private async validateCertificate(config: CertificateAuthConfig): Promise<boolean> {
     const result = await this.certificateManager.validateCertificate(config);
     return result.isValid;
   }
 
-  /**
-   * Validate NTLM
-   */
   private async validateNTLM(config: NTLMAuthConfig): Promise<boolean> {
     return !!(config.username && config.password);
   }
 
-  /**
-   * Validate AWS
-   */
   private async validateAWS(config: AWSAuthConfig): Promise<boolean> {
     return await this.awsHandler.validateConfig(config);
   }
 
-  /**
-   * Validate Digest
-   */
   private async validateDigest(config: DigestAuthConfig): Promise<boolean> {
     return !!(config.username && config.password);
   }
 
-  /**
-   * Validate Hawk
-   */
   private async validateHawk(config: HawkAuthConfig): Promise<boolean> {
     return !!(config.keyId && config.key);
   }
 
-  /**
-   * Validate JWT
-   */
   private async validateJWT(config: JWTAuthConfig): Promise<boolean> {
     if (config.token) {
-      // Validate token structure
       const parts = config.token.split('.');
       if (parts.length !== 3) return false;
 
       try {
-        // Decode and validate header and payload
         const payload = JSON.parse(Buffer.from(parts[1] || '', 'base64url').toString());
 
-        // Check expiration
         if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
           return false;
         }
@@ -1783,22 +1544,15 @@ export class APIAuthenticationHandler {
     return !!(config.privateKey && config.claims);
   }
 
-  /**
-   * Validate Custom auth
-   */
   private async validateCustom(config: ExtendedCustomAuthConfig): Promise<boolean> {
     return !!(config.handler && typeof config.handler === 'function');
   }
 
-  /**
-   * Refresh Bearer token
-   */
   private async refreshBearerToken(config: ExtendedBearerAuthConfig): Promise<TokenRefreshResult> {
     if (!config.refreshToken || !config.refreshUrl) {
       throw new AuthenticationError('Refresh token and URL required', 'MISSING_REFRESH_CONFIG');
     }
 
-    // Make refresh request
     const response = await this.makeRefreshRequest(config.refreshUrl, {
       refresh_token: config.refreshToken,
       grant_type: 'refresh_token'
@@ -1812,28 +1566,19 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Refresh OAuth2 token
-   */
   private async refreshOAuth2Token(config: OAuth2Config): Promise<TokenRefreshResult> {
     return await this.oauth2Handler.refreshToken(config);
   }
 
-  /**
-   * Refresh AWS credentials
-   */
   private async refreshAWSCredentials(config: AWSAuthConfig): Promise<TokenRefreshResult> {
     const result = await this.awsHandler.refreshCredentials(config);
     return {
       accessToken: result.accessKeyId || '',
       sessionToken: result.sessionToken || undefined,
-      expiresIn: 3600 // Default to 1 hour if not provided
+      expiresIn: 3600
     };
   }
 
-  /**
-   * Refresh JWT
-   */
   private async refreshJWT(config: JWTAuthConfig): Promise<TokenRefreshResult> {
     if (!config.privateKey || !config.claims) {
       throw new AuthenticationError('JWT generation parameters required for refresh', 'MISSING_CONFIG');
@@ -1847,9 +1592,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Refresh custom auth
-   */
   private async refreshCustom(config: ExtendedCustomAuthConfig): Promise<TokenRefreshResult> {
     if (!config.refreshHandler) {
       throw new AuthenticationError('Custom refresh handler not provided', 'MISSING_HANDLER');
@@ -1858,9 +1600,6 @@ export class APIAuthenticationHandler {
     return await config.refreshHandler(config.parameters || {});
   }
 
-  /**
-   * Make refresh token request
-   */
   private async makeRefreshRequest(url: string, body: any): Promise<any> {
     const https = require('https');
     const http = require('http');
@@ -1909,9 +1648,6 @@ export class APIAuthenticationHandler {
     });
   }
 
-  /**
-   * Check rate limit
-   */
   private async checkRateLimit(authType: AuthType): Promise<void> {
     const key = `ratelimit:${authType}`;
     const now = Date.now();
@@ -1926,14 +1662,12 @@ export class APIAuthenticationHandler {
       this.rateLimiters.set(key, rateLimitInfo);
     }
 
-    // Reset window if expired
     if (now > rateLimitInfo.windowEnd) {
       rateLimitInfo.requests = 0;
       rateLimitInfo.windowStart = now;
       rateLimitInfo.windowEnd = now + this.config.rateLimit.windowMs;
     }
 
-    // Check limit
     if (rateLimitInfo.requests >= this.config.rateLimit.maxRequests) {
       const waitTime = rateLimitInfo.windowEnd - now;
       throw new AuthenticationError(
@@ -1942,17 +1676,12 @@ export class APIAuthenticationHandler {
       );
     }
 
-    // Increment counter
     rateLimitInfo.requests++;
   }
 
-  /**
-   * Enforce security policies
-   */
   private async enforceSecurityPolicies(authConfig: AuthConfig, request: RequestOptions): Promise<void> {
     const url = new URL(request.url);
 
-    // Enforce HTTPS
     if (this.config.enforceHttps && url.protocol !== 'https:') {
       const policy = this.securityPolicies.get('enforce-https');
       if (policy && policy.enabled) {
@@ -1960,7 +1689,6 @@ export class APIAuthenticationHandler {
       }
     }
 
-    // Check allowed domains
     const domainPolicy = this.securityPolicies.get('allowed-domains');
     if (domainPolicy && domainPolicy.enabled) {
       const allowedDomains = domainPolicy.config.domains as string[];
@@ -1969,7 +1697,6 @@ export class APIAuthenticationHandler {
       }
     }
 
-    // Check authentication type restrictions
     const authTypePolicy = this.securityPolicies.get('auth-type-restrictions');
     if (authTypePolicy && authTypePolicy.enabled) {
       const restrictions = authTypePolicy.config.restrictions as Map<string, AuthType[]>;
@@ -1983,9 +1710,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Generate cache key
-   */
   private generateCacheKey(type: AuthType, config: any): string {
     const parts: string[] = [type];
 
@@ -2008,14 +1732,10 @@ export class APIAuthenticationHandler {
     return parts.join(':');
   }
 
-  /**
-   * Get from token cache
-   */
   private getFromTokenCache(key: string): TokenCache | null {
     const cached = this.tokenCache.get(key);
     if (!cached) return null;
 
-    // Check if expired
     if (this.isTokenExpired(cached)) {
       this.tokenCache.delete(key);
       return null;
@@ -2024,13 +1744,9 @@ export class APIAuthenticationHandler {
     return cached;
   }
 
-  /**
-   * Add to token cache
-   */
   private addToTokenCache(key: string, cache: TokenCache): void {
     this.tokenCache.set(key, cache);
 
-    // Schedule cleanup
     if (cache.expiresAt) {
       const ttl = new Date(cache.expiresAt).getTime() - Date.now();
       setTimeout(() => {
@@ -2039,9 +1755,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Check if token is expired
-   */
   private isTokenExpired(cache: TokenCache): boolean {
     if (!cache.expiresAt) return false;
 
@@ -2052,11 +1765,7 @@ export class APIAuthenticationHandler {
     return now.getTime() + buffer >= expiresAt.getTime();
   }
 
-  /**
-   * Store credentials securely
-   */
   private async storeCredentials(id: string, credentials: ExtendedCredentialStore): Promise<void> {
-    // Use static encrypt method from CryptoUtils with password
     const encrypted = await CryptoUtils.encrypt(JSON.stringify(credentials.credentials), 'default-password');
 
     this.credentialStore.set(id, {
@@ -2065,9 +1774,6 @@ export class APIAuthenticationHandler {
     });
   }
 
-  /**
-   * Update metrics
-   */
   private updateMetrics(type: AuthType, success: boolean, duration: number): void {
     if (!this.config.enableMetrics) return;
 
@@ -2079,18 +1785,13 @@ export class APIAuthenticationHandler {
       this.metrics.failedAuthentications++;
     }
 
-    // Update average time
     const totalTime = this.metrics.averageAuthTime * (this.metrics.totalAuthentications - 1) + duration;
     this.metrics.averageAuthTime = totalTime / this.metrics.totalAuthentications;
 
-    // Update by type
     const typeCount = this.metrics.authenticationsByType.get(type) || 0;
     this.metrics.authenticationsByType.set(type, typeCount + 1);
   }
 
-  /**
-   * Audit authentication
-   */
   private auditAuthentication(event: AuthenticationEvent): void {
     if (!this.config.enableAudit) return;
 
@@ -2116,7 +1817,6 @@ export class APIAuthenticationHandler {
 
     this.auditLog.push(auditEntry);
 
-    // Trim audit log if it exceeds maximum size
     const maxAuditLogSize = 10000;
     if (this.auditLog.length > maxAuditLogSize) {
       this.auditLog.splice(0, this.auditLog.length - maxAuditLogSize);
@@ -2140,11 +1840,7 @@ export class APIAuthenticationHandler {
     return mapping[type] || AuthType.CUSTOM;
   }
 
-  /**
-   * Initialize authentication providers
-   */
   private initializeProviders(): void {
-    // Helper function to create provider adapter
     const createProvider = (
       id: string,
       name: string,
@@ -2189,7 +1885,6 @@ export class APIAuthenticationHandler {
       };
     };
 
-    // Initialize built-in providers
     this.activeProviders.set('basic', createProvider(
       'basic',
       'Basic Authentication Provider',
@@ -2290,11 +1985,7 @@ export class APIAuthenticationHandler {
     ));
   }
 
-  /**
-   * Start cleanup timer
-   */
   private startCleanupTimer(): void {
-    // Clean up expired tokens every minute
     setInterval(() => {
       this.cleanupExpiredTokens();
       this.cleanupExpiredNonces();
@@ -2302,15 +1993,11 @@ export class APIAuthenticationHandler {
       this.cleanupRateLimiters();
     }, 60000);
 
-    // Reset metrics daily
     setInterval(() => {
       this.resetMetrics();
     }, 24 * 60 * 60 * 1000);
   }
 
-  /**
-   * Clean up expired tokens
-   */
   private cleanupExpiredTokens(): void {
     const now = Date.now();
     const expiredKeys: string[] = [];
@@ -2328,9 +2015,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Clean up expired nonces
-   */
   private cleanupExpiredNonces(): void {
     const now = Date.now();
     const expiredKeys: string[] = [];
@@ -2344,12 +2028,9 @@ export class APIAuthenticationHandler {
     expiredKeys.forEach(key => this.nonceCache.delete(key));
   }
 
-  /**
-   * Clean up expired sessions
-   */
   private cleanupExpiredSessions(): void {
     const now = Date.now();
-    const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+    const maxSessionAge = 24 * 60 * 60 * 1000;
     const expiredSessions: string[] = [];
 
     this.sessionCache.forEach((session, id) => {
@@ -2361,9 +2042,6 @@ export class APIAuthenticationHandler {
     expiredSessions.forEach(id => this.sessionCache.delete(id));
   }
 
-  /**
-   * Clean up rate limiters
-   */
   private cleanupRateLimiters(): void {
     const now = Date.now();
     const expiredKeys: string[] = [];
@@ -2377,11 +2055,7 @@ export class APIAuthenticationHandler {
     expiredKeys.forEach(key => this.rateLimiters.delete(key));
   }
 
-  /**
-   * Load security policies
-   */
   private loadSecurityPolicies(): void {
-    // HTTPS enforcement policy
     this.securityPolicies.set('enforce-https', {
       id: 'enforce-https',
       name: 'Enforce HTTPS',
@@ -2389,7 +2063,6 @@ export class APIAuthenticationHandler {
       config: {}
     });
 
-    // Allowed domains policy
     const allowedDomains = ConfigurationManager.getArray('AUTH_ALLOWED_DOMAINS');
     if (allowedDomains.length > 0) {
       this.securityPolicies.set('allowed-domains', {
@@ -2400,13 +2073,11 @@ export class APIAuthenticationHandler {
       });
     }
 
-    // Authentication type restrictions
     const restrictions = ConfigurationManager.getJSON<Record<string, string[]>>('AUTH_TYPE_RESTRICTIONS');
     if (restrictions) {
       const restrictionMap = new Map<string, AuthType[]>();
       Object.entries(restrictions).forEach(([domain, types]) => {
         const validTypes = types.map(t => {
-          // Ensure the type is a valid AuthType
           if (Object.values(AuthType).includes(t as AuthType)) {
             return t as AuthType;
           }
@@ -2423,7 +2094,6 @@ export class APIAuthenticationHandler {
       });
     }
 
-    // Certificate validation policy
     this.securityPolicies.set('validate-certificates', {
       id: 'validate-certificates',
       name: 'Validate Certificates',
@@ -2434,18 +2104,16 @@ export class APIAuthenticationHandler {
       }
     });
 
-    // Token expiry policy
     this.securityPolicies.set('token-expiry', {
       id: 'token-expiry',
       name: 'Token Expiry Policy',
       enabled: true,
       config: {
-        maxTokenAge: ConfigurationManager.getInt('AUTH_MAX_TOKEN_AGE', 86400000), // 24 hours
-        refreshBuffer: ConfigurationManager.getInt('AUTH_REFRESH_BUFFER', 300000) // 5 minutes
+        maxTokenAge: ConfigurationManager.getInt('AUTH_MAX_TOKEN_AGE', 86400000),
+        refreshBuffer: ConfigurationManager.getInt('AUTH_REFRESH_BUFFER', 300000)
       }
     });
 
-    // Password complexity policy
     this.securityPolicies.set('password-complexity', {
       id: 'password-complexity',
       name: 'Password Complexity',
@@ -2460,9 +2128,6 @@ export class APIAuthenticationHandler {
     });
   }
 
-  /**
-   * Reset metrics
-   */
   private resetMetrics(): void {
     this.metrics.totalAuthentications = 0;
     this.metrics.successfulAuthentications = 0;
@@ -2476,28 +2141,18 @@ export class APIAuthenticationHandler {
     this.metrics.lastReset = new Date();
   }
 
-  /**
-   * Generate correlation ID
-   */
   private generateCorrelationId(): string {
     return `auth-${Date.now()}-${randomBytes(8).toString('hex')}`;
   }
 
-  /**
-   * Generate session ID
-   */
   private generateSessionId(): string {
     return `session-${Date.now()}-${randomBytes(16).toString('hex')}`;
   }
 
-  /**
-   * Apply NTLM session authentication
-   */
   private async applyNTLMSessionAuth(
     request: RequestOptions,
     session: AuthenticationSession
   ): Promise<AuthenticationResult> {
-    // Session is already authenticated, just apply the stored credentials
     const credentials = session.metadata.credentials;
     if (!credentials) {
       throw new AuthenticationError('NTLM session credentials not found', 'MISSING_CREDENTIALS');
@@ -2521,9 +2176,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Handle authentication challenge response
-   */
   public async handleChallengeResponse(
     challenge: AuthenticationChallenge,
     authConfig: AuthConfig,
@@ -2557,9 +2209,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Handle WWW-Authenticate challenge
-   */
   private async handleWWWAuthenticate(
     challenge: AuthenticationChallenge,
     authConfig: AuthConfig,
@@ -2570,7 +2219,6 @@ export class APIAuthenticationHandler {
       throw new AuthenticationError('WWW-Authenticate header not found', 'MISSING_HEADER');
     }
 
-    // Parse authentication scheme
     const schemeMatch = authHeader.match(/^(\w+)\s+(.*)$/);
     if (!schemeMatch) {
       throw new AuthenticationError('Invalid WWW-Authenticate header format', 'INVALID_HEADER');
@@ -2610,7 +2258,6 @@ export class APIAuthenticationHandler {
         };
         
         if (schemeMatch && params && params.length > 100 && session) {
-          // This is likely a Type 2 challenge
           session.metadata.challenge = params;
           const ntlmAuthConfig: AuthConfig = { ...ntlmConfig, type: authConfig.type };
           const ntlmResult = await this.applyNTLMAuth(challenge.request, ntlmAuthConfig, { ...defaultOptions, sessionId });
@@ -2620,7 +2267,6 @@ export class APIAuthenticationHandler {
             sessionId: ntlmResult.sessionId || ''
           };
         } else {
-          // Start new NTLM handshake
           const ntlmAuthConfig: AuthConfig = { ...ntlmConfig, type: authConfig.type };
           const ntlmResult = await this.applyNTLMAuth(challenge.request, ntlmAuthConfig, { ...defaultOptions, sessionId });
           return {
@@ -2639,8 +2285,6 @@ export class APIAuthenticationHandler {
         };
 
       case 'negotiate':
-        // Negotiate typically means Kerberos or NTLM
-        // For now, fall back to NTLM
         return await this.handleWWWAuthenticate(
           { ...challenge, headers: { 'www-authenticate': 'NTLM' } },
           authConfig,
@@ -2652,9 +2296,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Handle Proxy-Authenticate challenge
-   */
   private async handleProxyAuthenticate(
     challenge: AuthenticationChallenge,
     authConfig: AuthConfig,
@@ -2665,14 +2306,12 @@ export class APIAuthenticationHandler {
       throw new AuthenticationError('Proxy-Authenticate header not found', 'MISSING_HEADER');
     }
 
-    // Similar to WWW-Authenticate but for proxy
     const response = await this.handleWWWAuthenticate(
       { ...challenge, headers: { 'www-authenticate': proxyAuthHeader } },
       authConfig,
       options
     );
 
-    // Convert Authorization to Proxy-Authorization
     const headers: any = {};
     if (response.headers['Authorization']) {
       headers['Proxy-Authorization'] = response.headers['Authorization'];
@@ -2684,9 +2323,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Handle AWS Security Token challenge
-   */
   private async handleAWSSecurityToken(
     challenge: AuthenticationChallenge,
     authConfig: AuthConfig,
@@ -2694,13 +2330,10 @@ export class APIAuthenticationHandler {
   ): Promise<ChallengeResponse> {
     const awsConfig = authConfig as AWSAuthConfig;
 
-    // Refresh AWS credentials if needed
     const refreshResult = await this.awsHandler.refreshCredentials(awsConfig);
 
-    // Update config with new credentials
     awsConfig.sessionToken = refreshResult.sessionToken;
 
-    // Re-sign the request
     const result = await this.awsHandler.signRequest(challenge.request, awsConfig);
 
     return {
@@ -2709,9 +2342,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Handle custom challenge
-   */
   private async handleCustomChallenge(
     challenge: AuthenticationChallenge,
     authConfig: AuthConfig,
@@ -2732,16 +2362,10 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Get authentication metrics
-   */
   public getMetrics(): ExtendedAuthenticationMetrics {
     return { ...this.metrics };
   }
 
-  /**
-   * Get audit log
-   */
   public getAuditLog(filter?: {
     startDate?: Date;
     endDate?: Date;
@@ -2772,9 +2396,6 @@ export class APIAuthenticationHandler {
     return logs;
   }
 
-  /**
-   * Export audit log
-   */
   public async exportAuditLog(format: 'json' | 'csv', path: string): Promise<void> {
     const logs = this.getAuditLog();
 
@@ -2788,9 +2409,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Convert audit log to CSV
-   */
   private convertAuditLogToCSV(logs: AuthenticationAudit[]): string {
     const headers = ['ID', 'Timestamp', 'Type', 'Success', 'Duration', 'Error', 'Correlation ID', 'Session ID', 'IP Address'];
     const rows = logs.map(log => [
@@ -2810,9 +2428,6 @@ export class APIAuthenticationHandler {
       .join('\n');
   }
 
-  /**
-   * Clear all caches
-   */
   public clearCaches(): void {
     this.tokenCache.clear();
     this.nonceCache.clear();
@@ -2821,9 +2436,6 @@ export class APIAuthenticationHandler {
     this.logger.info('All authentication caches cleared');
   }
 
-  /**
-   * Enable/disable authentication provider
-   */
   public setProviderEnabled(providerId: string, enabled: boolean): void {
     const provider = this.activeProviders.get(providerId);
     if (provider) {
@@ -2832,9 +2444,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Register custom authentication provider
-   */
   public registerProvider(provider: ExtendedAuthenticationProvider): void {
     if (this.activeProviders.has(provider.id)) {
       throw new Error(`Provider with ID ${provider.id} already exists`);
@@ -2844,9 +2453,6 @@ export class APIAuthenticationHandler {
     this.logger.info(`Registered custom authentication provider: ${provider.name}`);
   }
 
-  /**
-   * Update security policy
-   */
   public updateSecurityPolicy(policyId: string, config: Partial<ExtendedSecurityPolicy>): void {
     const policy = this.securityPolicies.get(policyId);
     if (!policy) {
@@ -2857,9 +2463,6 @@ export class APIAuthenticationHandler {
     this.logger.info(`Updated security policy: ${policyId}`);
   }
 
-  /**
-   * Test authentication configuration
-   */
   public async testAuthentication(
     authConfig: AuthConfig,
     testUrl?: string
@@ -2908,9 +2511,6 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Get provider status
-   */
   public getProviderStatus(): Map<string, {
     enabled: boolean;
     lastUsed?: Date;
@@ -2952,9 +2552,6 @@ export class APIAuthenticationHandler {
     return mapping[type] || AuthType.CUSTOM;
   }
 
-  /**
-   * Invalidate cached tokens for specific auth configuration
-   */
   public invalidateTokenCache(authConfig: AuthConfig): void {
     const cacheKey = this.generateCacheKey(authConfig.type, authConfig);
     if (this.tokenCache.has(cacheKey)) {
@@ -2963,16 +2560,10 @@ export class APIAuthenticationHandler {
     }
   }
 
-  /**
-   * Get active sessions
-   */
   public getActiveSessions(): Map<string, AuthenticationSession> {
     return new Map(this.sessionCache);
   }
 
-  /**
-   * Terminate session
-   */
   public terminateSession(sessionId: string): boolean {
     if (this.sessionCache.has(sessionId)) {
       this.sessionCache.delete(sessionId);
@@ -2982,23 +2573,14 @@ export class APIAuthenticationHandler {
     return false;
   }
 
-  /**
-   * Get security policy
-   */
   public getSecurityPolicy(policyId: string): ExtendedSecurityPolicy | undefined {
     return this.securityPolicies.get(policyId);
   }
 
-  /**
-   * Get all security policies
-   */
   public getAllSecurityPolicies(): Map<string, ExtendedSecurityPolicy> {
     return new Map(this.securityPolicies);
   }
 
-  /**
-   * Validate authentication provider configuration
-   */
   public async validateProviderConfig(providerId: string, config: any): Promise<boolean> {
     const provider = this.activeProviders.get(providerId);
     if (!provider || !provider.validate) {
@@ -3008,9 +2590,6 @@ export class APIAuthenticationHandler {
     return await provider.validate('', config);
   }
 
-  /**
-   * Force token refresh
-   */
   public async forceTokenRefresh(authConfig: AuthConfig): Promise<TokenRefreshResult> {
     const strategy = this.getAuthenticationStrategy(authConfig.type);
     if (!strategy || !strategy.refresh) {
@@ -3023,7 +2602,6 @@ export class APIAuthenticationHandler {
     this.metrics.tokenRefreshes++;
     const result = await strategy.refresh(authConfig);
 
-    // Update cache
     const cacheKey = this.generateCacheKey(authConfig.type, authConfig);
     if (result.accessToken) {
       this.addToTokenCache(cacheKey, {
@@ -3039,9 +2617,6 @@ export class APIAuthenticationHandler {
     return result;
   }
 
-  /**
-   * Get cache statistics
-   */
   public getCacheStats(): {
     tokenCacheSize: number;
     nonceCacheSize: number;
@@ -3061,9 +2636,6 @@ export class APIAuthenticationHandler {
     };
   }
 
-  /**
-   * Backup authentication configuration
-   */
   public async backupConfiguration(path: string): Promise<void> {
     const backup = {
       version: '1.0',
@@ -3079,35 +2651,26 @@ export class APIAuthenticationHandler {
     this.logger.info(`Authentication configuration backed up to ${path}`);
   }
 
-  /**
-   * Restore authentication configuration
-   */
   public async restoreConfiguration(path: string): Promise<void> {
     const fs = require('fs').promises;
     const data = await fs.readFile(path, 'utf8');
     const backup = JSON.parse(data);
 
-    // Restore providers
     backup.providers.forEach(([id, provider]: [string, any]) => {
       if (!this.activeProviders.has(id)) {
         this.activeProviders.set(id, provider);
       }
     });
 
-    // Restore security policies
     backup.securityPolicies.forEach(([id, policy]: [string, ExtendedSecurityPolicy]) => {
       this.securityPolicies.set(id, policy);
     });
 
-    // Restore config
     Object.assign(this.config, backup.config);
 
     this.logger.info(`Authentication configuration restored from ${path}`);
   }
 
-  /**
-   * Health check
-   */
   public async healthCheck(): Promise<{
     status: 'healthy' | 'degraded' | 'unhealthy';
     providers: Map<string, boolean>;
@@ -3116,7 +2679,6 @@ export class APIAuthenticationHandler {
     const issues: string[] = [];
     const providerHealth = new Map<string, boolean>();
 
-    // Check each provider
     for (const [id, provider] of this.activeProviders) {
       if (!provider.enabled) {
         providerHealth.set(id, false);
@@ -3124,7 +2686,6 @@ export class APIAuthenticationHandler {
       }
 
       try {
-        // Basic validation
         const isHealthy = typeof provider.authenticate === 'function' &&
           typeof provider.validate === 'function';
         providerHealth.set(id, isHealthy);
@@ -3138,7 +2699,6 @@ export class APIAuthenticationHandler {
       }
     }
 
-    // Check cache health
     if (this.tokenCache.size > 10000) {
       issues.push('Token cache size exceeds recommended limit');
     }
@@ -3147,7 +2707,6 @@ export class APIAuthenticationHandler {
       issues.push('Session cache size exceeds recommended limit');
     }
 
-    // Determine overall status
     const healthyProviders = Array.from(providerHealth.values()).filter(h => h).length;
     const totalProviders = providerHealth.size;
 

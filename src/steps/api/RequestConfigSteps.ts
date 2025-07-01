@@ -9,10 +9,6 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import { ValidationUtils } from '../../core/utils/ValidationUtils';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 
-/**
- * Step definitions for configuring API requests
- * Handles request setup, templates, and configuration options
- */
 @StepDefinitions
 export class RequestConfigSteps extends CSBDDBaseStepDefinition {
     private templateEngine: RequestTemplateEngine;
@@ -22,10 +18,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         this.templateEngine = RequestTemplateEngine.getInstance();
     }
 
-    /**
-     * Loads a request configuration from a file
-     * Example: Given user loads request from "templates/user-create.json" file
-     */
     @CSBDDStepDef("user loads request from {string} file")
     async loadRequestFromFile(filePath: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -34,23 +26,17 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Resolve file path
             const resolvedPath = await this.resolveFilePath(filePath);
             
-            // Check if file exists
             if (!await FileUtils.exists(resolvedPath)) {
                 throw new Error(`Request file not found: ${resolvedPath}`);
             }
             
-            // Read file content
             const fileContent = await FileUtils.readFile(resolvedPath);
             
-            // Determine file type and parse
             const requestConfig = await this.parseRequestFile(resolvedPath, fileContent.toString());
             
-            // Process template if needed
             const variables: Record<string, any> = {};
-            // Get stored variables from the BDD context
             const processedConfig = await this.templateEngine.processTemplate(
                 JSON.stringify(requestConfig),
                 variables
@@ -58,7 +44,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
             
             const finalConfig = JSON.parse(processedConfig);
             
-            // Apply configuration to context
             this.applyRequestConfig(currentContext, finalConfig);
             
             await actionLogger.logAction('requestFileLoaded', { 
@@ -72,10 +57,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets the request method
-     * Example: Given user sets request method to "POST"
-     */
     @CSBDDStepDef("user sets request method to {string}")
     async setRequestMethod(method: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -85,13 +66,11 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const upperMethod = method.toUpperCase();
             
-            // Validate method
             const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
             if (!validMethods.includes(upperMethod)) {
                 throw new Error(`Invalid HTTP method: ${method}. Valid methods are: ${validMethods.join(', ')}`);
             }
             
-            // Store method in context variables
             currentContext.setVariable('method', upperMethod);
             
             await actionLogger.logAction('requestMethodSet', { method: upperMethod });
@@ -101,10 +80,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets the request URL path
-     * Example: Given user sets request path to "/api/v1/users"
-     */
     @CSBDDStepDef("user sets request path to {string}")
     async setRequestPath(path: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -113,10 +88,8 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Interpolate variables
             const interpolatedPath = await this.interpolateValue(path);
             
-            // Store path in context variables
             currentContext.setVariable('path', interpolatedPath);
             
             await actionLogger.logAction('requestPathSet', { 
@@ -129,10 +102,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets a custom timeout for the current request
-     * Example: Given user sets request timeout to 30 seconds
-     */
     @CSBDDStepDef("user sets request timeout to {int} seconds")
     async setRequestTimeout(timeoutSeconds: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -146,7 +115,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const timeoutMs = timeoutSeconds * 1000;
             
-            // Store timeout in context variables
             currentContext.setVariable('requestTimeout', timeoutMs);
             
             await actionLogger.logAction('requestTimeoutSet', { 
@@ -159,10 +127,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Disables redirect following for the current request
-     * Example: Given user disables redirect following for request
-     */
     @CSBDDStepDef("user disables redirect following for request")
     async disableRequestRedirects(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -179,12 +143,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets query parameters from a data table
-     * Example: Given user sets query parameters:
-     *   | page | 1 |
-     *   | limit | 10 |
-     */
     @CSBDDStepDef("user sets query parameters:")
     async setQueryParameters(dataTable: any): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -194,7 +152,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const params: Record<string, string> = {};
             
-            // Parse data table
             const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
             
             for (const row of rows) {
@@ -205,12 +162,10 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
                     throw new Error('Query parameter key cannot be empty');
                 }
                 
-                // Interpolate value
                 const interpolatedValue = await this.interpolateValue(String(value));
                 params[key] = interpolatedValue;
             }
             
-            // Store query parameters in context variables
             const existingParams = currentContext.getVariable('queryParams') || {};
             currentContext.setVariable('queryParams', { ...existingParams, ...params });
             
@@ -221,10 +176,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets a single query parameter
-     * Example: Given user sets query parameter "page" to "1"
-     */
     @CSBDDStepDef("user sets query parameter {string} to {string}")
     async setQueryParameter(key: string, value: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -233,10 +184,8 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Interpolate value
             const interpolatedValue = await this.interpolateValue(value);
             
-            // Store query parameter in context variables
             const existingParams = currentContext.getVariable('queryParams') || {};
             existingParams[key] = interpolatedValue;
             currentContext.setVariable('queryParams', existingParams);
@@ -252,10 +201,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Removes a query parameter
-     * Example: Given user removes query parameter "debug"
-     */
     @CSBDDStepDef("user removes query parameter {string}")
     async removeQueryParameter(key: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -263,7 +208,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         
         try {
             const currentContext = this.getAPIContext();
-            // Remove query parameter from context variables
             const existingParams = currentContext.getVariable('queryParams') || {};
             delete existingParams[key];
             currentContext.setVariable('queryParams', existingParams);
@@ -275,10 +219,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Clears all query parameters
-     * Example: Given user clears all query parameters
-     */
     @CSBDDStepDef("user clears all query parameters")
     async clearQueryParameters(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -286,7 +226,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         
         try {
             const currentContext = this.getAPIContext();
-            // Clear all query parameters from context variables
             currentContext.setVariable('queryParams', {});
             
             await actionLogger.logAction('queryParametersCleared', {});
@@ -296,10 +235,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets request to use HTTP/2
-     * Example: Given user enables HTTP/2 for request
-     */
     @CSBDDStepDef("user enables HTTP/2 for request")
     async enableHTTP2(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -316,10 +251,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets request encoding
-     * Example: Given user sets request encoding to "gzip"
-     */
     @CSBDDStepDef("user sets request encoding to {string}")
     async setRequestEncoding(encoding: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -343,10 +274,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets maximum response size
-     * Example: Given user sets maximum response size to 10 MB
-     */
     @CSBDDStepDef("user sets maximum response size to {int} MB")
     async setMaxResponseSize(sizeMB: number): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -372,9 +299,6 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to get current API context
-     */
     private getAPIContext(): APIContext {
         const context = this.retrieve('currentAPIContext') as APIContext;
         if (!context) {
@@ -383,18 +307,13 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         return context;
     }
 
-    /**
-     * Helper method to resolve file paths
-     */
     private async resolveFilePath(filePath: string): Promise<string> {
         const path = await import('path');
         
-        // Check if absolute path
         if (path.isAbsolute(filePath)) {
             return filePath;
         }
         
-        // Try relative to test data directory
         const testDataPath = ConfigurationManager.get('TEST_DATA_PATH', './test-data');
         const resolvedPath = path.join(testDataPath, 'api', filePath);
         
@@ -402,13 +321,9 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
             return resolvedPath;
         }
         
-        // Try relative to project root
         return filePath;
     }
 
-    /**
-     * Helper method to parse request files
-     */
     private async parseRequestFile(filePath: string, content: string): Promise<any> {
         const path = await import('path');
         const extension = path.extname(filePath).toLowerCase();
@@ -419,11 +334,9 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
                 
             case '.yaml':
             case '.yml':
-                // For YAML, we would need a parser, but keeping it simple
                 throw new Error('YAML support not implemented. Please use JSON format');
                 
             default:
-                // Try to parse as JSON
                 try {
                     return JSON.parse(content);
                 } catch (error) {
@@ -432,24 +345,17 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to apply request configuration
-     */
     private applyRequestConfig(context: APIContext, config: any): void {
-        // Set method
         if (config.method) {
             context.setVariable('method', config.method.toUpperCase());
         }
         
-        // Set URL/path
         if (config.url) {
             if (ValidationUtils.isValidUrl(config.url)) {
-                // Full URL provided
                 const url = new URL(config.url);
                 context.setBaseUrl(`${url.protocol}//${url.host}`);
                 context.setVariable('path', url.pathname);
                 
-                // Extract query parameters
                 const queryParams: Record<string, string> = {};
                 url.searchParams.forEach((value, key) => {
                     queryParams[key] = value;
@@ -458,21 +364,18 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
                     context.setVariable('queryParams', queryParams);
                 }
             } else {
-                // Just a path
                 context.setVariable('path', config.url);
             }
         } else if (config.path) {
             context.setVariable('path', config.path);
         }
         
-        // Set headers
         if (config.headers) {
             Object.entries(config.headers).forEach(([key, value]) => {
                 context.setHeader(key, String(value));
             });
         }
         
-        // Set query parameters
         if (config.queryParameters || config.params) {
             const params = config.queryParameters || config.params;
             const queryParams: Record<string, string> = {};
@@ -482,22 +385,18 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
             context.setVariable('queryParams', queryParams);
         }
         
-        // Set body
         if (config.body) {
             context.setVariable('body', config.body);
         }
         
-        // Set options
         if (config.options) {
             Object.entries(config.options).forEach(([key, value]) => {
                 context.setVariable(key, value);
             });
         }
         
-        // Set authentication
         if (config.auth || config.authentication) {
             const auth = config.auth || config.authentication;
-            // Store authentication config in variables
             if (auth.type) context.setVariable('authType', auth.type);
             Object.entries(auth).forEach(([key, value]) => {
                 if (key !== 'type') {
@@ -507,15 +406,11 @@ export class RequestConfigSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to interpolate variables
-     */
     private async interpolateValue(value: string): Promise<string> {
         if (!value.includes('{{')) {
             return value;
         }
         
-        // Simple placeholder replacement for common variables
         let interpolated = value;
         interpolated = interpolated.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
             const varValue = this.retrieve(varName);

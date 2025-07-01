@@ -25,7 +25,6 @@ export class FrameSteps extends CSBDDBaseStepDefinition {
         try {
             const handler = this.getFrameHandler();
             
-            // Check if it's a number (frame index)
             const frameIndex = parseInt(frameIdentifier, 10);
             if (!isNaN(frameIndex)) {
                 await handler.switchToFrame(frameIndex);
@@ -98,15 +97,12 @@ export class FrameSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef('within frame {string}:')
     @CSBDDStepDef('inside frame {string}:')
     async executeWithinFrame(frameIdentifier: string): Promise<void> {
-        // This step is handled by the BDD framework
-        // It sets up context for subsequent steps to execute within the frame
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logAction('execute_within_frame_context', { frame: frameIdentifier });
         
         try {
             await this.switchToFrame(frameIdentifier);
             
-            // Store frame context for cleanup
             this.context.store('currentFrameContext', frameIdentifier);
             
             await actionLogger.logAction('frame_context_established', { frame: frameIdentifier, success: true });
@@ -150,9 +146,7 @@ export class FrameSteps extends CSBDDBaseStepDefinition {
         try {
             const handler = this.getFrameHandler();
             
-            // Try to switch to frame to verify it exists
             await handler.executeInFrame(frameIdentifier, async () => {
-                // Just being in the frame confirms it exists
                 return true;
             });
             
@@ -166,8 +160,6 @@ export class FrameSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef('user performs action in frame {string} and returns')
     @CSBDDStepDef('I temporarily switch to frame {string}')
     async executeInFrameTemporarily(frameIdentifier: string): Promise<void> {
-        // This is a marker step that indicates the next action should be performed in a frame
-        // then automatically return to the previous context
         const actionLogger = ActionLogger.getInstance();
         await actionLogger.logAction('setup_temporary_frame_context', { frame: frameIdentifier });
         
@@ -211,10 +203,8 @@ export class FrameSteps extends CSBDDBaseStepDefinition {
             const handler = this.getFrameHandler();
             const frames = framePath.split('>').map(f => f.trim());
             
-            // Start from main frame
             await handler.switchToMainFrame();
             
-            // Navigate through each frame in the path
             for (const frame of frames) {
                 await handler.switchToFrame(frame);
                 await actionLogger.logAction('entered_frame', { frame });
@@ -245,7 +235,6 @@ export class FrameSteps extends CSBDDBaseStepDefinition {
             
             await actionLogger.logAction('frame_tree_structure', { tree: treeString });
             
-            // Store for potential assertions
             this.context.store('frameTree', frameTree);
             
             await actionLogger.logAction('frame_tree_printed', { success: true });
@@ -265,7 +254,6 @@ export class FrameSteps extends CSBDDBaseStepDefinition {
         return result;
     }
 
-    // Cleanup method to be called after scenarios
     async cleanup(): Promise<void> {
         if (this.frameHandler) {
             try {

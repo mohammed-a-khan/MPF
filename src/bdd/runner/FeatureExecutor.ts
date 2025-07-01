@@ -30,10 +30,6 @@ import {
     FeatureStatus
 } from '../types/bdd.types';
 
-/**
- * Executes feature files by managing scenario execution
- * Handles background, hooks, parallel execution, and error recovery
- */
 export class FeatureExecutor {
     private scenarioExecutor: ScenarioExecutor;
     private hookExecutor: HookExecutor;
@@ -59,15 +55,11 @@ export class FeatureExecutor {
         this.loadExecutionConfig();
     }
 
-    /**
-     * Execute a feature file
-     */
     public async execute(feature: Feature): Promise<FeatureResult> {
         this.currentFeature = feature;
         this.featureStartTime = new Date();
         const startTime = this.featureStartTime;
 
-        // Initialize result
         const result: FeatureResult = {
             id: `feature-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             feature: feature,
@@ -90,7 +82,6 @@ export class FeatureExecutor {
         };
 
         try {
-            // Log feature start
             const logger = ActionLogger.getInstance();
             logger.info(`Feature started: ${feature.name}`, {
                 uri: result.uri,
@@ -99,36 +90,27 @@ export class FeatureExecutor {
                 hasBackground: !!feature.background
             });
 
-            // Notify execution monitor
             this.executionMonitor.emit('featureStart', feature);
 
-            // Initialize feature context
             this.featureContext = new FeatureContext(feature);
             await this.featureContext.initialize();
             
-            // Set the feature in BDDContext
             BDDContext.getInstance().setFeature(feature);
 
-            // Set up feature-level browser if needed
             if (this.executionConfig.browserPerFeature) {
                 await this.setupFeatureBrowser();
             }
 
-            // Load feature hooks
-            // Get hooks for the feature
             const beforeHooks = await this.hookExecutor.getHooks(HookType.Before, feature.tags);
             const afterHooks = await this.hookExecutor.getHooks(HookType.After, feature.tags);
             this.featureHooks = { before: beforeHooks, after: afterHooks };
 
-            // Execute before feature hooks
             await this.executeBeforeFeatureHooks(feature, result);
 
-            // Process background if exists
             if (feature.background) {
                 await this.processBackground(feature.background as Scenario, result);
             }
 
-            // Execute scenarios based on configuration
             if (this.executionConfig.parallel && feature.scenarios.length > 1 && !this.isBackgroundFailed) {
                 result.scenarios = await this.executeScenariosInParallel(feature.scenarios);
                 if (result.metadata) {
@@ -141,10 +123,8 @@ export class FeatureExecutor {
                 }
             }
 
-            // Calculate final status
             result.status = this.calculateFeatureStatus(result.scenarios);
 
-            // Update metrics
             this.updateFeatureMetrics(result);
 
         } catch (error) {
@@ -157,12 +137,10 @@ export class FeatureExecutor {
             if (!result.errors) result.errors = [];
             result.errors.push(this.createExecutionError(error as Error));
 
-            // Try to recover
             if (this.executionConfig.errorRecovery) {
                 await this.attemptErrorRecovery(error as Error, result);
             }
         } finally {
-            // Execute after feature hooks
             try {
                 await this.executeAfterFeatureHooks(feature, result);
             } catch (hookError) {
@@ -172,24 +150,19 @@ export class FeatureExecutor {
                 result.errors.push(this.createExecutionError(hookError as Error, 'teardown'));
             }
 
-            // Cleanup
             await this.cleanupFeature();
 
-            // Finalize result
             result.endTime = new Date();
             result.duration = result.endTime.getTime() - (result.startTime?.getTime() || this.featureStartTime?.getTime() || Date.now());
 
-            // Log feature completion
             this.logFeatureCompletion(result);
 
-            // Notify execution monitor
             this.executionMonitor.emit('featureEnd', {
                 feature,
                 duration: result.duration,
                 status: result.status
             });
 
-            // Save feature result if configured
             if (this.executionConfig.saveIntermediateResults) {
                 await this.saveFeatureResult(result);
             }
@@ -198,9 +171,6 @@ export class FeatureExecutor {
         return result;
     }
 
-    /**
-     * Process background steps
-     */
     private async processBackground(background: Scenario, featureResult: FeatureResult): Promise<void> {
         const backgroundStartTime = new Date();
         
@@ -209,10 +179,7 @@ export class FeatureExecutor {
             logger.info(`Processing background: ${background.name || 'Background'}`);
 
             // CRITICAL FIX: Do NOT execute background steps independently
-            // Only store them to be prepended to each scenario
             
-            // Convert background steps to StepResult format for compatibility
-            // but mark them as NOT executed yet
             this.backgroundSteps = background.steps.map(step => {
                 const stepResult: StepResult = {
                     id: `bg-step-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -225,7 +192,6 @@ export class FeatureExecutor {
                     endTime: backgroundStartTime
                 };
                 
-                // Only add optional properties if they exist
                 if (step.dataTable) {
                     stepResult.dataTable = step.dataTable;
                 }
@@ -238,7 +204,6 @@ export class FeatureExecutor {
             
             this.isBackgroundFailed = false;
 
-            // Update feature result to indicate background is ready (not executed)
             featureResult.background = {
                 name: background.name || 'Background',
                 description: background.description || '',
@@ -272,9 +237,6 @@ export class FeatureExecutor {
         }
     }
 
-    /**
-     * Execute scenarios sequentially
-     */
     private async executeScenariosSequentially(scenarios: Scenario[]): Promise<ScenarioResult[]> {
         const results: ScenarioResult[] = [];
         let shouldContinue = true;
@@ -284,32 +246,26 @@ export class FeatureExecutor {
             if (!scenario) continue;
             
             try {
-                // Check execution conditions
                 const skipReason = this.shouldSkipScenario(scenario);
                 if (skipReason) {
                     results.push(this.createSkippedResult(scenario, skipReason));
                     continue;
                 }
 
-                // Check if background failed
                 if (this.isBackgroundFailed && !this.executionConfig.continueOnBackgroundFailure) {
                     results.push(this.createSkippedResult(scenario, 'Background failed'));
                     continue;
                 }
 
-                // Prepare scenario with background steps
                 const scenarioWithBackground = await this.prepareScenarioWithBackground(scenario);
 
-                // Set scenario timeout if configured
                 const timeoutHandle = this.setScenarioTimeout(scenario.name || `scenario-${i}`);
 
-                // Execute scenario
                 const result = await this.scenarioExecutor.execute(
                     scenarioWithBackground, 
                     this.featureContext!
                 );
 
-                // Clear timeout
                 if (timeoutHandle) {
                     clearTimeout(timeoutHandle);
                     this.scenarioTimeouts.delete(scenario?.name || '');
@@ -317,13 +273,11 @@ export class FeatureExecutor {
 
                 results.push(result);
 
-                // Check if we should stop on failure
                 if (result.status === 'failed' && this.executionConfig.stopOnFirstFailure) {
                     const logger = Logger.getInstance('FeatureExecutor');
                     logger.warn('Stopping feature execution due to scenario failure');
                     shouldContinue = false;
                     
-                    // Mark remaining scenarios as skipped
                     for (let j = i + 1; j < scenarios.length; j++) {
                         const remainingScenario = scenarios[j];
                         if (remainingScenario) {
@@ -332,7 +286,6 @@ export class FeatureExecutor {
                     }
                 }
 
-                // Progress update
                 this.executionMonitor.emit('scenarioEnd', {
                     scenario,
                     duration: result.duration,
@@ -346,7 +299,6 @@ export class FeatureExecutor {
                 const errorResult = this.createErrorResult(scenario, error as Error);
                 results.push(errorResult);
 
-                // Handle timeout cleanup
                 const timeoutHandle = this.scenarioTimeouts.get(scenario?.name || '');
                 if (timeoutHandle) {
                     clearTimeout(timeoutHandle);
@@ -356,7 +308,6 @@ export class FeatureExecutor {
                 if (this.executionConfig.stopOnFirstFailure) {
                     shouldContinue = false;
                     
-                    // Mark remaining as skipped
                     for (let j = i + 1; j < scenarios.length; j++) {
                         const remainingScenario = scenarios[j];
                         if (remainingScenario) {
@@ -366,7 +317,6 @@ export class FeatureExecutor {
                 }
             }
 
-            // Delay between scenarios if configured
             if (i < scenarios.length - 1 && this.executionConfig.delayBetweenScenarios > 0) {
                 await this.delay(this.executionConfig.delayBetweenScenarios);
             }
@@ -375,18 +325,13 @@ export class FeatureExecutor {
         return results;
     }
 
-    /**
-     * Execute scenarios in parallel
-     */
     private async executeScenariosInParallel(scenarios: Scenario[]): Promise<ScenarioResult[]> {
         const maxParallel = this.executionConfig.maxParallelScenarios || 5;
         const results: ScenarioResult[] = new Array(scenarios.length);
         const executing: Promise<void>[] = [];
 
-        // Create a queue of scenarios
         const queue = scenarios.map((scenario, index) => ({ scenario, index }));
 
-        // Worker function
         const executeWorker = async (): Promise<void> => {
             while (queue.length > 0) {
                 const item = queue.shift();
@@ -395,23 +340,19 @@ export class FeatureExecutor {
                 const { scenario, index } = item;
 
                 try {
-                    // Check skip conditions
                     const skipReason = this.shouldSkipScenario(scenario);
                     if (skipReason) {
                         results[index] = this.createSkippedResult(scenario, skipReason);
                         continue;
                     }
 
-                    // Check background failure
                     if (this.isBackgroundFailed && !this.executionConfig.continueOnBackgroundFailure) {
                         results[index] = this.createSkippedResult(scenario, 'Background failed');
                         continue;
                     }
 
-                    // Execute scenario
                     const scenarioWithBackground = await this.prepareScenarioWithBackground(scenario);
                     
-                    // Create isolated context for parallel execution
                     const isolatedContext = await this.createIsolatedScenarioContext(scenario);
                     
                     const result = await this.scenarioExecutor.execute(
@@ -421,7 +362,6 @@ export class FeatureExecutor {
 
                     results[index] = result;
 
-                    // Cleanup isolated context
                     await isolatedContext.cleanup();
 
                 } catch (error) {
@@ -430,7 +370,6 @@ export class FeatureExecutor {
                     results[index] = this.createErrorResult(scenario, error as Error);
                 }
 
-                // Progress update
                 this.executionMonitor.emit('scenarioEnd', {
                     scenario,
                     duration: results[index].duration,
@@ -439,20 +378,15 @@ export class FeatureExecutor {
             }
         };
 
-        // Start workers
         for (let i = 0; i < Math.min(maxParallel, scenarios.length); i++) {
             executing.push(executeWorker());
         }
 
-        // Wait for all to complete
         await Promise.all(executing);
 
         return results;
     }
 
-    /**
-     * Execute before feature hooks
-     */
     private async executeBeforeFeatureHooks(_feature: Feature, result: FeatureResult): Promise<void> {
         const hooks = this.featureHooks.before.sort((a, b) => (a.order || 0) - (b.order || 0));
         
@@ -463,28 +397,22 @@ export class FeatureExecutor {
                 const actionLogger = ActionLogger.getInstance();
                 actionLogger.info(`Executing before-feature hook: ${hook.name || 'Anonymous'}`);
                 
-                // Set hook timeout
                 const timeoutPromise = this.createTimeoutPromise(
                     hook.timeout || this.executionConfig.hookTimeout,
                     `Before feature hook timeout: ${hook.name}`
                 );
 
-                // Create execution context for hook
                 const hookContext = new ExecutionContext(`hook-${hook.name}-${Date.now()}`);
                 await hookContext.initialize();
                 
-                // Initialize BDDContext with the execution context
                 BDDContext.getInstance().initialize(hookContext);
                 
-                // Execute hook (Before hooks only take ExecutionContext)
                 const hookFn = hook.fn || hook.implementation;
-                // Cast to BeforeHookFn since these are Before feature hooks
                 await Promise.race([
                     (hookFn as BeforeHookFn)(hookContext),
                     timeoutPromise
                 ]);
                 
-                // Cleanup hook context
                 await hookContext.cleanup();
 
                 const logger = ActionLogger.getInstance();
@@ -496,7 +424,6 @@ export class FeatureExecutor {
                 const actionLogger = ActionLogger.getInstance();
                 actionLogger.error(`Before-feature hook failed: ${hook.name || 'Anonymous'}`, error as Error);
                 
-                // Add to errors but don't stop execution based on config
                 if (!result.errors) result.errors = [];
                 result.errors.push(this.createExecutionError(error as Error, 'setup'));
                 
@@ -507,11 +434,7 @@ export class FeatureExecutor {
         }
     }
 
-    /**
-     * Execute after feature hooks
-     */
     private async executeAfterFeatureHooks(_feature: Feature, result: FeatureResult): Promise<void> {
-        // Execute in reverse order
         const hooks = this.featureHooks.after.sort((a, b) => (b.order || 0) - (a.order || 0));
         
         for (const hook of hooks) {
@@ -521,26 +444,21 @@ export class FeatureExecutor {
                 const actionLogger = ActionLogger.getInstance();
                 actionLogger.info(`Executing after-feature hook: ${hook.name || 'Anonymous'}`);
                 
-                // Create execution context for hook
                 const hookContext = new ExecutionContext(`hook-${hook.name}-${Date.now()}`);
                 await hookContext.initialize();
                 hookContext.setMetadata('featureResult', result);
 
-                // Set hook timeout
                 const timeoutPromise = this.createTimeoutPromise(
                     hook.timeout || this.executionConfig.hookTimeout,
                     `After feature hook timeout: ${hook.name}`
                 );
 
-                // Execute hook (After hooks only take ExecutionContext)
                 const hookFn = hook.fn || hook.implementation;
-                // Cast to AfterHookFn since these are After feature hooks
                 await Promise.race([
                     (hookFn as AfterHookFn)(hookContext),
                     timeoutPromise
                 ]);
                 
-                // Cleanup hook context
                 await hookContext.cleanup();
 
                 actionLogger.info(`After-feature hook completed: ${hook.name || 'Anonymous'} (${Date.now() - hookStartTime}ms)`);
@@ -551,35 +469,26 @@ export class FeatureExecutor {
                 const actionLogger = ActionLogger.getInstance();
                 actionLogger.error(`After-feature hook failed: ${hook.name || 'Anonymous'}`, error as Error);
                 
-                // After hooks should not fail the feature
                 if (!result.errors) result.errors = [];
                 result.errors.push(this.createExecutionError(error as Error, 'teardown'));
             }
         }
     }
 
-    /**
-     * Create execution context for background
-     */
     private async createBackgroundContext(): Promise<ExecutionContext> {
         const context = new ExecutionContext(`background-${Date.now()}`);
         await context.initialize();
         return context;
     }
 
-    /**
-     * Create isolated context for parallel scenario execution
-     */
     private async createIsolatedScenarioContext(_scenario: Scenario): Promise<FeatureContext> {
         const isolatedContext = new FeatureContext(this.currentFeature!);
         await isolatedContext.initialize();
 
-        // Copy shared data from main feature context
         if (this.featureContext) {
             isolatedContext.copySharedData(this.featureContext);
         }
 
-        // Set up isolated browser if needed
         if (this.executionConfig.browserPerScenario) {
             await isolatedContext.setupIsolatedBrowser();
         }
@@ -587,19 +496,14 @@ export class FeatureExecutor {
         return isolatedContext;
     }
 
-    /**
-     * Prepare scenario with background steps
-     */
     private async prepareScenarioWithBackground(scenario: Scenario): Promise<Scenario> {
         if (this.backgroundSteps.length === 0 || this.isBackgroundFailed) {
             return scenario;
         }
 
         // CRITICAL FIX: Use the original background steps from the feature
-        // not the already-executed step results
         const backgroundSteps = this.currentFeature?.background?.steps || [];
         
-        // Clone scenario to avoid modifying original
         const scenarioWithBackground: Scenario = {
             ...scenario,
             steps: [...backgroundSteps, ...scenario.steps]
@@ -608,9 +512,6 @@ export class FeatureExecutor {
         return scenarioWithBackground;
     }
 
-    /**
-     * Convert step results back to steps for re-execution
-     */
     private convertStepResultsToSteps(stepResults: StepResult[]): Step[] {
         return stepResults.map(result => ({
             keyword: result.keyword || 'Given',
@@ -621,9 +522,6 @@ export class FeatureExecutor {
         } as Step));
     }
 
-    /**
-     * Set scenario timeout
-     */
     private setScenarioTimeout(scenarioName: string): NodeJS.Timeout | null {
         if (!this.executionConfig.scenarioTimeout || this.executionConfig.scenarioTimeout <= 0) {
             return null;
@@ -635,17 +533,12 @@ export class FeatureExecutor {
             const actionLogger = ActionLogger.getInstance();
             actionLogger.error(`Scenario timeout: ${scenarioName} after ${this.executionConfig.scenarioTimeout}ms`);
             
-            // Force scenario to stop
-            // Scenario will be stopped by the executor
         }, this.executionConfig.scenarioTimeout);
 
         this.scenarioTimeouts.set(scenarioName, timeout);
         return timeout;
     }
 
-    /**
-     * Calculate overall feature status
-     */
     private calculateFeatureStatus(scenarios: ScenarioResult[]): FeatureStatus {
         if (scenarios.length === 0) {
             return FeatureStatus.SKIPPED;
@@ -659,34 +552,26 @@ export class FeatureExecutor {
         if (allPassed) return FeatureStatus.PASSED;
         if (allSkipped) return FeatureStatus.SKIPPED;
         
-        return FeatureStatus.FAILED; // Mixed results default to failed
+        return FeatureStatus.FAILED;
     }
 
-    /**
-     * Check if scenario should be skipped
-     */
     private shouldSkipScenario(scenario: Scenario): string | null {
-        // Check for @skip tag
         if (scenario.tags?.includes('@skip')) {
             return 'Marked with @skip tag';
         }
 
-        // Check for @ignore tag
         if (scenario.tags?.includes('@ignore')) {
             return 'Marked with @ignore tag';
         }
 
-        // Check for @manual tag
         if (scenario.tags?.includes('@manual')) {
             return 'Manual test - marked with @manual tag';
         }
 
-        // Check for @wip tag if not in WIP mode
         if (scenario.tags?.includes('@wip') && !this.executionConfig.executeWIP) {
             return 'Work in progress - marked with @wip tag';
         }
 
-        // Check for browser-specific tags
         if (this.executionConfig.currentBrowser) {
             const browserTags = [`@${this.executionConfig.currentBrowser}-only`, `@not-${this.executionConfig.currentBrowser}`];
             
@@ -702,15 +587,12 @@ export class FeatureExecutor {
             }
         }
 
-        // Check for environment-specific tags
         const currentEnv = ConfigurationManager.get('ENVIRONMENT', 'dev');
         if (scenario.tags?.includes(`@${currentEnv}-only`)) {
-            // This should run
         } else if (scenario.tags?.some(tag => tag.endsWith('-only') && !tag.includes(currentEnv))) {
             return `Not for ${currentEnv} environment`;
         }
 
-        // Check custom skip conditions
         if (this.executionConfig.skipCondition) {
             const skipResult = this.executionConfig.skipCondition(scenario);
             if (skipResult) {
@@ -721,9 +603,6 @@ export class FeatureExecutor {
         return null;
     }
 
-    /**
-     * Create skipped scenario result
-     */
     private createSkippedResult(scenario: Scenario, reason: string): ScenarioResult {
         const now = new Date();
         
@@ -756,9 +635,6 @@ export class FeatureExecutor {
         };
     }
 
-    /**
-     * Create error scenario result
-     */
     private createErrorResult(scenario: Scenario, error: Error): ScenarioResult {
         const now = new Date();
         
@@ -781,9 +657,6 @@ export class FeatureExecutor {
         };
     }
 
-    /**
-     * Create execution error object
-     */
     private createExecutionError(error: any, errorType?: 'setup' | 'execution' | 'teardown' | 'timeout' | 'assertion' | 'system'): ExecutionError {
         return {
             type: errorType || 'execution',
@@ -795,9 +668,6 @@ export class FeatureExecutor {
         };
     }
 
-    /**
-     * Find first error in steps
-     */
     private findFirstStepError(steps: StepResult[]): ExecutionError | null {
         for (const step of steps) {
             if (step.error) {
@@ -807,9 +677,6 @@ export class FeatureExecutor {
         return null;
     }
 
-    /**
-     * Initialize metrics
-     */
     private initializeMetrics(): FeatureMetrics {
         return {
             totalTime: 0,
@@ -834,22 +701,16 @@ export class FeatureExecutor {
         };
     }
 
-    /**
-     * Update feature metrics
-     */
     private updateFeatureMetrics(result: FeatureResult): void {
         const metrics = result.metrics!;
         
-        // Update total time
         metrics.totalTime = result.duration || 0;
         
-        // Count scenarios
         metrics.totalScenarios = result.scenarios.length;
         metrics.passedScenarios = result.scenarios.filter(s => s.status === ScenarioStatus.PASSED).length;
         metrics.failedScenarios = result.scenarios.filter(s => s.status === ScenarioStatus.FAILED || s.status === ScenarioStatus.ERROR).length;
         metrics.skippedScenarios = result.scenarios.filter(s => s.status === ScenarioStatus.SKIPPED).length;
 
-        // Count steps
         for (const scenario of result.scenarios) {
             if (scenario.steps && Array.isArray(scenario.steps)) {
                 metrics.totalSteps += scenario.steps.length;
@@ -859,7 +720,6 @@ export class FeatureExecutor {
             }
         }
 
-        // Calculate durations
         const scenarioDurations = result.scenarios
             .filter(s => s.status !== ScenarioStatus.SKIPPED)
             .map(s => s.duration);
@@ -867,7 +727,6 @@ export class FeatureExecutor {
         if (scenarioDurations.length > 0) {
             metrics.averageScenarioDuration = scenarioDurations.reduce((a, b) => a + b, 0) / scenarioDurations.length;
             
-            // Find extremes
             const sortedScenarios = result.scenarios
                 .filter(s => s.status !== 'skipped')
                 .sort((a, b) => a.duration - b.duration);
@@ -890,19 +749,16 @@ export class FeatureExecutor {
             }
         }
 
-        // Calculate error rate
         metrics.errorRate = metrics.totalScenarios > 0 
             ? (metrics.failedScenarios / metrics.totalScenarios) * 100 
             : 0;
             
-        // Calculate other metrics
         metrics.avgScenarioTime = metrics.averageScenarioDuration;
         metrics.avgStepTime = metrics.totalSteps > 0 ? metrics.totalTime / metrics.totalSteps : 0;
         metrics.successRate = metrics.totalScenarios > 0 
             ? (metrics.passedScenarios / metrics.totalScenarios) * 100 
             : 0;
 
-        // Tag statistics
         for (const scenario of result.scenarios) {
             for (const tag of scenario.tags || []) {
                 if (!metrics.tags[tag]) {
@@ -932,19 +788,14 @@ export class FeatureExecutor {
         }
     }
 
-    /**
-     * Attempt error recovery
-     */
     private async attemptErrorRecovery(_error: Error, result: FeatureResult): Promise<void> {
         try {
             const logger = Logger.getInstance('FeatureExecutor');
             logger.info('Attempting error recovery...');
             
-            // Take screenshot of error state
             const browserManager = BrowserManager.getInstance();
             const browser = await browserManager.getBrowser();
             if (browser) {
-                // Screenshot functionality will be handled by the page context
                 const screenshot = null; // TODO: Implement screenshot via page context
                 if (screenshot !== null && screenshot !== undefined) {
                     const errors = result.errors;
@@ -960,11 +811,9 @@ export class FeatureExecutor {
                 }
             }
 
-            // Clear any stuck resources
             const resourceManager = ResourceManager.getInstance();
             await resourceManager.forceCleanup();
 
-            // Reset browser state if needed
             if (this.executionConfig.resetBrowserOnError) {
                 await browserManager.restartBrowser();
             }
@@ -977,9 +826,6 @@ export class FeatureExecutor {
         }
     }
 
-    /**
-     * Setup feature-level browser
-     */
     private async setupFeatureBrowser(): Promise<void> {
         if (!this.featureContext) return;
 
@@ -994,31 +840,22 @@ export class FeatureExecutor {
         }
     }
 
-    /**
-     * Cleanup feature resources
-     */
     private async cleanupFeature(): Promise<void> {
         try {
-            // Clear all scenario timeouts
             for (const timeout of Array.from(this.scenarioTimeouts.values())) {
                 clearTimeout(timeout);
             }
             this.scenarioTimeouts.clear();
 
             // CRITICAL FIX: Cleanup shared execution context from scenario executor
-            // This ensures browser resources are properly released after all scenarios
             await this.scenarioExecutor.finalCleanup();
 
-            // Cleanup feature context
             if (this.featureContext) {
                 await this.featureContext.cleanup();
                 this.featureContext = null;
             }
 
-            // Cleanup background context - removed since we no longer create a separate context
-            // Background steps are now only executed as part of each scenario
 
-            // Reset state
             this.backgroundSteps = [];
             this.isBackgroundFailed = false;
             this.currentFeature = null;
@@ -1033,9 +870,6 @@ export class FeatureExecutor {
         }
     }
 
-    /**
-     * Save intermediate feature result
-     */
     private async saveFeatureResult(result: FeatureResult): Promise<void> {
         try {
             const fileName = `feature-result-${result.feature.name.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}.json`;
@@ -1052,9 +886,6 @@ export class FeatureExecutor {
         }
     }
 
-    /**
-     * Log feature completion
-     */
     private logFeatureCompletion(result: FeatureResult): void {
         const summary = {
             feature: result.feature,
@@ -1083,16 +914,12 @@ export class FeatureExecutor {
             actionLogger.error(`Feature failed: ${result.feature.name}`, summary);
         }
 
-        // Log detailed metrics if verbose
         if (this.executionConfig.verbose) {
             const logger = Logger.getInstance('FeatureExecutor');
             logger.info('Feature Metrics:', result.metrics);
         }
     }
 
-    /**
-     * Load execution configuration
-     */
     private loadExecutionConfig(): void {
         this.executionConfig = {
             stopOnFirstFailure: ConfigurationManager.getBoolean('STOP_ON_FIRST_FAILURE', false),
@@ -1101,8 +928,8 @@ export class FeatureExecutor {
             executeWIP: ConfigurationManager.getBoolean('EXECUTE_WIP', false),
             parallelScenarios: ConfigurationManager.getBoolean('PARALLEL_SCENARIOS', false),
             maxParallelScenarios: ConfigurationManager.getInt('MAX_PARALLEL_SCENARIOS', 5),
-            scenarioTimeout: ConfigurationManager.getInt('SCENARIO_TIMEOUT', 300000), // 5 minutes
-            hookTimeout: ConfigurationManager.getInt('HOOK_TIMEOUT', 30000), // 30 seconds
+            scenarioTimeout: ConfigurationManager.getInt('SCENARIO_TIMEOUT', 300000),
+            hookTimeout: ConfigurationManager.getInt('HOOK_TIMEOUT', 30000),
             delayBetweenScenarios: ConfigurationManager.getInt('DELAY_BETWEEN_SCENARIOS', 0),
             browserPerFeature: ConfigurationManager.getBoolean('BROWSER_PER_FEATURE', false),
             browserPerScenario: ConfigurationManager.getBoolean('BROWSER_PER_SCENARIO', false),
@@ -1112,29 +939,20 @@ export class FeatureExecutor {
             errorRecovery: ConfigurationManager.getBoolean('ERROR_RECOVERY', true),
             resetBrowserOnError: ConfigurationManager.getBoolean('RESET_BROWSER_ON_ERROR', false),
             verbose: ConfigurationManager.getBoolean('VERBOSE', false),
-            skipCondition: null // Can be set programmatically
+            skipCondition: null
         };
     }
 
-    /**
-     * Create timeout promise
-     */
     private createTimeoutPromise(timeout: number, message: string): Promise<never> {
         return new Promise((_, reject) => {
             setTimeout(() => reject(new Error(message)), timeout);
         });
     }
 
-    /**
-     * Delay utility
-     */
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /**
-     * Get default configuration
-     */
     private getDefaultConfig(): FeatureExecutionConfig {
         return {
             stopOnFirstFailure: false,
@@ -1159,7 +977,6 @@ export class FeatureExecutor {
     }
 }
 
-// Feature execution configuration interface
 interface FeatureExecutionConfig {
     stopOnFirstFailure: boolean;
     continueOnBackgroundFailure: boolean;
@@ -1180,4 +997,3 @@ interface FeatureExecutionConfig {
     verbose: boolean;
     skipCondition: ((scenario: Scenario) => boolean | string) | null;
 }
-

@@ -77,9 +77,6 @@ export class TestPlanManager {
     this.logger.info('TestPlanManager initialized');
   }
 
-  /**
-   * Get all test plans
-   */
   async getTestPlans(
     options?: {
       state?: 'Active' | 'Inactive';
@@ -112,9 +109,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Get test plan by ID
-   */
   async getTestPlan(planId: number, useCache: boolean = true): Promise<TestPlan> {
     try {
       if (useCache && this.planCache.has(planId)) {
@@ -137,9 +131,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Create test plan
-   */
   async createTestPlan(request: TestPlanCreateRequest): Promise<TestPlan> {
     try {
       this.logger.info(`Creating test plan: ${request.name}`);
@@ -168,9 +159,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Update test plan
-   */
   async updateTestPlan(planId: number, request: TestPlanUpdateRequest): Promise<TestPlan> {
     try {
       this.logger.info(`Updating test plan: ${planId}`);
@@ -196,9 +184,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Delete test plan
-   */
   async deleteTestPlan(planId: number): Promise<void> {
     try {
       this.logger.info(`Deleting test plan: ${planId}`);
@@ -215,9 +200,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Get test configurations for plan
-   */
   async getTestConfigurations(planId: number): Promise<TestConfiguration[]> {
     try {
       this.logger.info(`Fetching test configurations for plan: ${planId}`);
@@ -237,9 +219,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Create test configuration
-   */
   async createTestConfiguration(
     planId: number,
     config: {
@@ -275,9 +254,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Get test variables for plan
-   */
   async getTestVariables(planId: number): Promise<TestVariable[]> {
     try {
       this.logger.info(`Fetching test variables for plan: ${planId}`);
@@ -293,9 +269,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Create test variable
-   */
   async createTestVariable(
     planId: number,
     variable: {
@@ -318,9 +291,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Clone test plan
-   */
   async cloneTestPlan(
     sourcePlanId: number,
     options: {
@@ -366,9 +336,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Get clone operation status
-   */
   async getCloneOperationStatus(
     planId: number,
     operationId: string
@@ -384,9 +351,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Export test plan
-   */
   async exportTestPlan(
     planId: number,
     suiteIds?: number[]
@@ -409,9 +373,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Get test plan statistics
-   */
   async getTestPlanStatistics(planId: number): Promise<{
     totalTests: number;
     automatedTests: number;
@@ -439,9 +400,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Assign tester to test plan
-   */
   async assignTester(
     planId: number,
     suiteId: number,
@@ -470,9 +428,6 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Get test plan work items (requirements)
-   */
   async getTestPlanWorkItems(
     planId: number,
     options?: {
@@ -507,18 +462,12 @@ export class TestPlanManager {
     }
   }
 
-  /**
-   * Clear cache
-   */
   clearCache(): void {
     this.planCache.clear();
     this.configCache.clear();
     this.logger.debug('Test plan cache cleared');
   }
 
-  /**
-   * Get cache statistics
-   */
   getCacheStats(): { plans: number; configurations: number } {
     return {
       plans: this.planCache.size,

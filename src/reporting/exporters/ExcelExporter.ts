@@ -34,7 +34,7 @@ export class ExcelExporter {
   private logger = Logger.getInstance('ExcelExporter');
   private workbook: XLSX.WorkBook | null = null;
   private readonly brandColor = '#93186C';
-  private readonly maxCellLength = 32767; // Excel cell character limit
+  private readonly maxCellLength = 32767;
   
   async export(
     result: ExecutionResult,
@@ -46,7 +46,6 @@ export class ExcelExporter {
     try {
       this.logger.info('Starting Excel export', { outputPath, options });
 
-      // Create workbook with proper settings
       this.workbook = XLSX.utils.book_new();
       this.workbook.Props = {
         Title: 'CS Test Automation Report',
@@ -61,7 +60,6 @@ export class ExcelExporter {
         CreatedDate: new Date()
       };
 
-      // Add worksheets
       await this.addSummarySheet(result, options);
       await this.addDetailedResultsSheet(result, options);
       await this.addFeatureResultsSheet(result, options);
@@ -80,24 +78,20 @@ export class ExcelExporter {
         await this.addScreenshotsSheet(result, options);
       }
 
-      // Add charts sheet if requested
       if (options.includeCharts) {
         await this.addChartsSheet(result, options);
       }
 
-      // Write workbook with compression
       const buffer = XLSX.write(this.workbook, {
         bookType: 'xlsx',
-        bookSST: true, // Shared string table for better compression
+        bookSST: true,
         type: 'buffer',
-        compression: options.compression !== false, // Default true
+        compression: options.compression !== false,
         Props: this.workbook.Props
       });
 
-      // Ensure directory exists
       await FileUtils.ensureDir(path.dirname(outputPath));
       
-      // Write file
       await fs.promises.writeFile(outputPath, buffer);
 
       const fileStats = await fs.promises.stat(outputPath);
@@ -132,13 +126,11 @@ export class ExcelExporter {
     const ws = XLSX.utils.aoa_to_sheet([]);
     const data: any[][] = [];
     
-    // Title with merged cells
     data.push(['CS Test Automation Report']);
-    data.push(['']); // Empty row
+    data.push(['']);
     data.push(['Test Execution Summary']);
-    data.push(['']); // Empty row
+    data.push(['']);
 
-    // Overview section
     data.push(['Execution Overview']);
     data.push(['Metric', 'Value']);
     data.push(['Execution ID', result.executionId]);
@@ -149,63 +141,53 @@ export class ExcelExporter {
     data.push(['Total Features', result.totalFeatures]);
     data.push(['Total Scenarios', result.totalScenarios]);
     data.push(['Total Steps', result.totalSteps]);
-    data.push(['']); // Empty row
+    data.push(['']);
 
-    // Results section
     data.push(['Test Results']);
     data.push(['Status', 'Count', 'Percentage']);
-    const total = result.totalScenarios || 1; // Avoid division by zero
+    const total = result.totalScenarios || 1;
     data.push(['Passed', result.passedScenarios, result.passedScenarios / total]);
     data.push(['Failed', result.failedScenarios, result.failedScenarios / total]);
     data.push(['Skipped', result.skippedScenarios, result.skippedScenarios / total]);
-    data.push(['']); // Empty row
+    data.push(['']);
 
-    // Pass rate calculation
     data.push(['Overall Pass Rate', '', result.passedScenarios / total]);
-    data.push(['']); // Empty row
+    data.push(['']);
 
-    // Tags summary if available
     if (result.tags && result.tags.length > 0) {
       data.push(['Tag Summary']);
       data.push(['Tag', 'Count', 'Pass Rate']);
       result.tags.forEach(tag => {
-        data.push([tag, '', '']); // Tags in ExecutionResult are just strings
+        data.push([tag, '', '']);
       });
     }
 
-    // Convert array to sheet
     XLSX.utils.sheet_add_aoa(ws, data);
 
-    // Apply cell styles and formatting
     this.applySummaryFormatting(ws, data.length, options, data);
 
-    // Set column widths
     ws['!cols'] = [
-      { wch: 30 }, // Column A
-      { wch: 20 }, // Column B
-      { wch: 15 }  // Column C
+      { wch: 30 },
+      { wch: 20 },
+      { wch: 15 }
     ];
 
-    // Add to workbook
     XLSX.utils.book_append_sheet(this.workbook!, ws, 'Summary');
   }
 
   private applySummaryFormatting(ws: XLSX.WorkSheet, _rowCount: number, options: ExcelExportOptions, data: any[][]): void {
-    // Title formatting
     this.setCellStyle(ws, 'A1', {
       font: { bold: true, sz: 18, color: { rgb: this.brandColor.substring(1) } },
       alignment: { horizontal: 'center', vertical: 'center' }
     });
     this.mergeCells(ws, 'A1:C1');
 
-    // Section headers
     this.setCellStyle(ws, 'A3', {
       font: { bold: true, sz: 16, color: { rgb: this.brandColor.substring(1) } },
       alignment: { horizontal: 'center' }
     });
     this.mergeCells(ws, 'A3:C3');
 
-    // Table headers
     ['A5', 'A16'].forEach(cell => {
       if (ws[cell]) {
         this.setCellStyle(ws, cell, {
@@ -214,13 +196,11 @@ export class ExcelExporter {
           alignment: { horizontal: 'left' }
         });
         
-        // Merge header cells
         const row = parseInt(cell.substring(1));
         this.mergeCells(ws, `A${row}:C${row}`);
       }
     });
 
-    // Sub-headers
     this.setRangeStyle(ws, 'A6:B6', {
       font: { bold: true },
       fill: { fgColor: { rgb: 'E0E0E0' } },
@@ -243,16 +223,7 @@ export class ExcelExporter {
       }
     });
 
-    // Format dates - dates are now pre-formatted as strings
-    // for (let i = 7; i <= rowCount; i++) {
-    //   const cell = ws[`B${i}`];
-    //   if (cell && cell.v instanceof Date) {
-    //     cell.t = 'd';
-    //     cell.z = 'yyyy-mm-dd hh:mm:ss';
-    //   }
-    // }
 
-    // Format percentages
     for (let i = 18; i <= 20; i++) {
       const cell = ws[`C${i}`];
       if (cell && typeof cell.v === 'number') {
@@ -261,7 +232,6 @@ export class ExcelExporter {
       }
     }
 
-    // Overall pass rate formatting
     const passRateRow = data.findIndex((row: any[]) => row[0] === 'Overall Pass Rate') + 1;
     if (passRateRow > 0) {
       this.setCellStyle(ws, `A${passRateRow}`, {
@@ -274,7 +244,6 @@ export class ExcelExporter {
         passRateCell.t = 'n';
         passRateCell.z = '0.00%';
         
-        // Conditional formatting based on pass rate
         const passRate = passRateCell.v as number;
         if (passRate >= 0.95) {
           this.setCellStyle(ws, `C${passRateRow}`, {
@@ -295,7 +264,6 @@ export class ExcelExporter {
       }
     }
 
-    // Apply borders to data cells
     for (let row = 7; row <= 14; row++) {
       for (let col = 0; col < 2; col++) {
         const cellAddr = XLSX.utils.encode_cell({ r: row - 1, c: col });
@@ -314,12 +282,10 @@ export class ExcelExporter {
       }
     }
 
-    // Add auto filter if requested
     if (options.autoFilter) {
       ws['!autofilter'] = { ref: 'A17:C20' };
     }
 
-    // Freeze panes if requested
     if (options.freezePanes) {
       ws['!freeze'] = { xSplit: 0, ySplit: 6, topLeftCell: 'A7' };
     }
@@ -332,7 +298,6 @@ export class ExcelExporter {
     const headers = ['Feature', 'Scenario', 'Status', 'Duration', 'Start Time', 'End Time', 'Tags', 'Error Message'];
     const data: any[][] = [headers];
 
-    // Add scenario data
     result.features.forEach(feature => {
       feature.scenarios.forEach(scenario => {
         data.push([
@@ -340,36 +305,33 @@ export class ExcelExporter {
           scenario.name,
           scenario.status.toUpperCase(),
           this.formatDuration(scenario.duration),
-          '', // ScenarioSummary doesn't have startTime
-          '', // ScenarioSummary doesn't have endTime
-          '', // ScenarioSummary doesn't have tags
-          '' // ScenarioSummary doesn't have error
+          '',
+          '',
+          '',
+          ''
         ]);
       });
     });
 
     const ws = XLSX.utils.aoa_to_sheet(data);
 
-    // Apply formatting
     this.applyDetailedResultsFormatting(ws, data.length, options);
 
-    // Set column widths
     ws['!cols'] = [
-      { wch: 40 }, // Feature
-      { wch: 40 }, // Scenario
-      { wch: 10 }, // Status
-      { wch: 12 }, // Duration
-      { wch: 20 }, // Start Time
-      { wch: 20 }, // End Time
-      { wch: 30 }, // Tags
-      { wch: 50 }  // Error
+      { wch: 40 },
+      { wch: 40 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 50 }
     ];
 
     XLSX.utils.book_append_sheet(this.workbook!, ws, 'Detailed Results');
   }
 
   private applyDetailedResultsFormatting(ws: XLSX.WorkSheet, rowCount: number, options: ExcelExportOptions): void {
-    // Header row formatting
     this.setRangeStyle(ws, 'A1:H1', {
       font: { bold: true, color: { rgb: 'FFFFFF' } },
       fill: { fgColor: { rgb: this.brandColor.substring(1) } },
@@ -382,7 +344,6 @@ export class ExcelExporter {
       }
     });
 
-    // Apply status-based formatting
     for (let row = 2; row <= rowCount; row++) {
       const statusCell = ws[`C${row}`];
       if (statusCell) {
@@ -413,22 +374,12 @@ export class ExcelExporter {
         this.setCellStyle(ws, `C${row}`, style);
       }
 
-      // Format date cells - dates are now pre-formatted as strings
-      // ['E', 'F'].forEach(col => {
-      //   const cell = ws[`${col}${row}`];
-      //   if (cell && cell.v instanceof Date) {
-      //     cell.t = 'd';
-      //     cell.z = 'yyyy-mm-dd hh:mm:ss';
-      //   }
-      // });
 
-      // Add borders to all data cells
       for (let col = 0; col < 8; col++) {
         const cellAddr = XLSX.utils.encode_cell({ r: row - 1, c: col });
         this.addBorder(ws, cellAddr);
       }
 
-      // Wrap text for error messages
       const errorCell = ws[`H${row}`];
       if (errorCell) {
         this.setCellStyle(ws, `H${row}`, {
@@ -437,17 +388,14 @@ export class ExcelExporter {
       }
     }
 
-    // Add auto filter
     if (options.autoFilter) {
       ws['!autofilter'] = { ref: `A1:H${rowCount}` };
     }
 
-    // Freeze header row
     if (options.freezePanes) {
       ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2' };
     }
 
-    // Set row heights for wrapped text
     ws['!rows'] = [];
     for (let i = 0; i < rowCount; i++) {
       ws['!rows'][i] = { hpt: i === 0 ? 25 : 20 };
@@ -461,7 +409,6 @@ export class ExcelExporter {
     const headers = ['Feature', 'Total Scenarios', 'Passed', 'Failed', 'Skipped', 'Pass Rate', 'Avg Duration', 'Total Duration'];
     const data: any[][] = [headers];
 
-    // Calculate feature statistics
     result.features.forEach(feature => {
       const total = feature.scenarios.length;
       const passed = feature.scenarios.filter(s => s.status === 'passed').length;
@@ -483,7 +430,6 @@ export class ExcelExporter {
       ]);
     });
 
-    // Add totals row
     const totalScenarios = result.totalScenarios;
     const totalPassed = result.passedScenarios;
     const totalFailed = result.failedScenarios;
@@ -503,26 +449,23 @@ export class ExcelExporter {
 
     const ws = XLSX.utils.aoa_to_sheet(data);
 
-    // Apply formatting
     this.applyFeatureResultsFormatting(ws, data.length, options);
 
-    // Set column widths
     ws['!cols'] = [
-      { wch: 50 }, // Feature
-      { wch: 15 }, // Total
-      { wch: 10 }, // Passed
-      { wch: 10 }, // Failed
-      { wch: 10 }, // Skipped
-      { wch: 12 }, // Pass Rate
-      { wch: 15 }, // Avg Duration
-      { wch: 15 }  // Total Duration
+      { wch: 50 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 15 }
     ];
 
     XLSX.utils.book_append_sheet(this.workbook!, ws, 'Feature Results');
   }
 
   private applyFeatureResultsFormatting(ws: XLSX.WorkSheet, rowCount: number, options: ExcelExportOptions): void {
-    // Header formatting
     this.setRangeStyle(ws, 'A1:H1', {
       font: { bold: true, color: { rgb: 'FFFFFF' } },
       fill: { fgColor: { rgb: this.brandColor.substring(1) } },
@@ -535,15 +478,12 @@ export class ExcelExporter {
       }
     });
 
-    // Format data rows
     for (let row = 2; row < rowCount; row++) {
-      // Format pass rate as percentage
       const passRateCell = ws[`F${row}`];
       if (passRateCell && typeof passRateCell.v === 'number') {
         passRateCell.t = 'n';
         passRateCell.z = '0.00%';
         
-        // Apply conditional formatting
         const rate = passRateCell.v as number;
         if (rate >= 0.95) {
           this.setCellStyle(ws, `F${row}`, {
@@ -563,21 +503,18 @@ export class ExcelExporter {
         }
       }
 
-      // Center align numeric columns
       ['B', 'C', 'D', 'E'].forEach(col => {
         this.setCellStyle(ws, `${col}${row}`, {
           alignment: { horizontal: 'center' }
         });
       });
 
-      // Add borders
       for (let col = 0; col < 8; col++) {
         const cellAddr = XLSX.utils.encode_cell({ r: row - 1, c: col });
         this.addBorder(ws, cellAddr);
       }
     }
 
-    // Format totals row
     const totalRow = rowCount;
     this.setRangeStyle(ws, `A${totalRow}:H${totalRow}`, {
       font: { bold: true },
@@ -590,17 +527,13 @@ export class ExcelExporter {
       }
     });
 
-    // Format total pass rate
     const totalPassRateCell = ws[`F${totalRow}`];
     if (totalPassRateCell) {
       totalPassRateCell.t = 'n';
       totalPassRateCell.z = '0.00%';
     }
 
-    // Add data bars for visual comparison
     if (options.conditionalFormatting) {
-      // This would require extended Excel formatting which XLSX doesn't fully support
-      // But we can add visual indicators using cell colors
       for (let row = 2; row < rowCount; row++) {
         const passedCell = ws[`C${row}`];
         const failedCell = ws[`D${row}`];
@@ -626,12 +559,10 @@ export class ExcelExporter {
       }
     }
 
-    // Add auto filter
     if (options.autoFilter) {
       ws['!autofilter'] = { ref: `A1:H${rowCount - 1}` };
     }
 
-    // Freeze header
     if (options.freezePanes) {
       ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2' };
     }
@@ -645,11 +576,9 @@ export class ExcelExporter {
     const data: any[][] = [headers];
     let currentRow = 2;
 
-    // Add step data from scenarios if available
     const scenarios = result.scenarios || [];
     for (const scenario of scenarios) {
       if (scenario.steps && scenario.steps.length > 0) {
-        // Find the feature this scenario belongs to
         const feature = result.features.find(f => f.featureId === scenario.featureId);
         const featureName = feature?.feature || scenario.feature || 'Unknown Feature';
         
@@ -666,10 +595,8 @@ export class ExcelExporter {
           ]);
           currentRow++;
           
-          // Check if we need pagination
           if (options.maxRowsPerSheet && currentRow > options.maxRowsPerSheet) {
             this.createStepDetailsContinuation(data, currentRow);
-            // Reset for new sheet
             data.length = 1;
             data[0] = headers;
             currentRow = 2;
@@ -678,7 +605,6 @@ export class ExcelExporter {
       }
     }
 
-    // If no step data was added, add a placeholder row
     if (data.length === 1) {
       data.push(['No step details available', '', '', '', '', '', '', '']);
     }
@@ -687,14 +613,14 @@ export class ExcelExporter {
     this.applyStepDetailsFormatting(ws, data.length, options);
 
     ws['!cols'] = [
-      { wch: 40 }, // Feature
-      { wch: 40 }, // Scenario
-      { wch: 8 },  // Step #
-      { wch: 10 }, // Keyword
-      { wch: 60 }, // Step Text
-      { wch: 10 }, // Status
-      { wch: 12 }, // Duration
-      { wch: 50 }  // Error
+      { wch: 40 },
+      { wch: 40 },
+      { wch: 8 },
+      { wch: 10 },
+      { wch: 60 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 50 }
     ];
 
     XLSX.utils.book_append_sheet(this.workbook!, ws, 'Step Details');
@@ -712,7 +638,6 @@ export class ExcelExporter {
   }
 
   private applyStepDetailsFormatting(ws: XLSX.WorkSheet, rowCount: number, options: ExcelExportOptions): void {
-    // Header formatting
     this.setRangeStyle(ws, 'A1:H1', {
       font: { bold: true, color: { rgb: 'FFFFFF' } },
       fill: { fgColor: { rgb: this.brandColor.substring(1) } },
@@ -725,9 +650,7 @@ export class ExcelExporter {
       }
     });
 
-    // Format data rows
     for (let row = 2; row <= rowCount; row++) {
-      // Status formatting
       const statusCell = ws[`F${row}`];
       if (statusCell) {
         const status = statusCell.v as string;
@@ -763,12 +686,10 @@ export class ExcelExporter {
         this.setCellStyle(ws, `F${row}`, style);
       }
 
-      // Center align step number
       this.setCellStyle(ws, `C${row}`, {
         alignment: { horizontal: 'center' }
       });
 
-      // Keyword formatting
       const keywordCell = ws[`D${row}`];
       if (keywordCell) {
         this.setCellStyle(ws, `D${row}`, {
@@ -776,35 +697,30 @@ export class ExcelExporter {
         });
       }
 
-      // Wrap text for step text and error
       ['E', 'H'].forEach(col => {
         this.setCellStyle(ws, `${col}${row}`, {
           alignment: { wrapText: true, vertical: 'top' }
         });
       });
 
-      // Add borders
       for (let col = 0; col < 8; col++) {
         const cellAddr = XLSX.utils.encode_cell({ r: row - 1, c: col });
         this.addBorder(ws, cellAddr);
       }
     }
 
-    // Add filters
     if (options.autoFilter) {
       ws['!autofilter'] = { ref: `A1:H${rowCount}` };
     }
 
-    // Freeze panes
     if (options.freezePanes) {
       ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2' };
     }
 
-    // Set row heights
     ws['!rows'] = [];
-    ws['!rows'][0] = { hpt: 25 }; // Header row
+    ws['!rows'][0] = { hpt: 25 };
     for (let i = 1; i < rowCount; i++) {
-      ws['!rows'][i] = { hpt: 30 }; // Data rows with wrapped text
+      ws['!rows'][i] = { hpt: 30 };
     }
   }
 
@@ -814,11 +730,9 @@ export class ExcelExporter {
   ): Promise<void> {
     const data: any[][] = [];
     
-    // Title
     data.push(['Performance Metrics Analysis']);
     data.push([]);
     
-    // Basic execution metrics from available data
     data.push(['Execution Metrics']);
     data.push(['Metric', 'Value']);
     data.push(['Total Duration (ms)', result.duration]);
@@ -829,7 +743,6 @@ export class ExcelExporter {
     data.push(['Average Step Duration (ms)', result.totalSteps > 0 ? Math.round(result.duration / result.totalSteps) : 0]);
     data.push([]);
     
-    // Success metrics
     data.push(['Success Metrics']);
     data.push(['Metric', 'Count', 'Percentage']);
     data.push(['Passed Features', result.passedFeatures, result.totalFeatures > 0 ? (result.passedFeatures / result.totalFeatures * 100).toFixed(2) + '%' : '0%']);
@@ -837,7 +750,6 @@ export class ExcelExporter {
     data.push(['Passed Steps', result.passedSteps, result.totalSteps > 0 ? (result.passedSteps / result.totalSteps * 100).toFixed(2) + '%' : '0%']);
     data.push([]);
     
-    // Failure metrics
     data.push(['Failure Analysis']);
     data.push(['Metric', 'Count', 'Percentage']);
     data.push(['Failed Features', result.failedFeatures, result.totalFeatures > 0 ? (result.failedFeatures / result.totalFeatures * 100).toFixed(2) + '%' : '0%']);
@@ -848,7 +760,6 @@ export class ExcelExporter {
     data.push(['Skipped Steps', result.skippedSteps, result.totalSteps > 0 ? (result.skippedSteps / result.totalSteps * 100).toFixed(2) + '%' : '0%']);
     data.push([]);
     
-    // Environment info if available
     if (result.metadata) {
       data.push(['Environment Information']);
       data.push(['Property', 'Value']);
@@ -857,7 +768,6 @@ export class ExcelExporter {
       data.push(['Start Time', this.formatDateTime(result.startTime)]);
       data.push(['End Time', this.formatDateTime(result.endTime)]);
       
-      // Add any additional metadata
       Object.entries(result.metadata).forEach(([key, value]) => {
         if (typeof value === 'string' || typeof value === 'number') {
           data.push([key, value]);
@@ -879,17 +789,14 @@ export class ExcelExporter {
 
   private applyMetricsFormatting(ws: XLSX.WorkSheet, data: any[][], _options: ExcelExportOptions): void {
     
-    // Title formatting
     this.setCellStyle(ws, 'A1', {
       font: { bold: true, sz: 16, color: { rgb: this.brandColor.substring(1) } },
       alignment: { horizontal: 'center' }
     });
     this.mergeCells(ws, 'A1:H1');
     
-    // Find and format section headers
     data.forEach((row, index) => {
       if (row.length === 1 && row[0] && index > 0) {
-        // Section header
         const cellAddr = `A${index + 1}`;
         this.setCellStyle(ws, cellAddr, {
           font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } },
@@ -898,7 +805,6 @@ export class ExcelExporter {
         });
         this.mergeCells(ws, `A${index + 1}:H${index + 1}`);
       } else if (row[0] === 'Metric' && row.length > 2) {
-        // Table header
         const rowNum = index + 1;
         this.setRangeStyle(ws, `A${rowNum}:H${rowNum}`, {
           font: { bold: true },
@@ -908,15 +814,12 @@ export class ExcelExporter {
           }
         });
       } else if (row.length > 1 && typeof row[1] === 'number') {
-        // Data rows - format numbers
-        // const rowNum = index + 1; // Not needed
         for (let col = 1; col < row.length; col++) {
           const cellAddr = XLSX.utils.encode_cell({ r: index, c: col });
           if (ws[cellAddr] && typeof ws[cellAddr].v === 'number') {
             ws[cellAddr].t = 'n';
             ws[cellAddr].z = '#,##0.00';
             
-            // Add conditional formatting for performance thresholds
             if (row[0].includes('Page Load Time') || row[0].includes('FCP') || row[0].includes('LCP')) {
               const value = ws[cellAddr].v as number;
               if (value > 3000) {
@@ -946,14 +849,12 @@ export class ExcelExporter {
     const headers = ['Scenario', 'Feature', 'Duration (ms)', 'Status', 'Pass Rate', 'Retry Count', 'Tags', 'Error Count', 'Performance'];
     const data: any[][] = [headers];
 
-    // Analyze scenario performance from available data
     const scenarios = result.scenarios || [];
     
     for (const scenario of scenarios) {
       const feature = result.features.find(f => f.featureId === scenario.featureId);
       const featureName = feature?.feature || scenario.feature || 'Unknown';
       
-      // Calculate scenario-level metrics
       let errorCount = 0;
       let passRate = 0;
       
@@ -963,7 +864,6 @@ export class ExcelExporter {
         errorCount = scenario.steps.filter(s => s.status === TestStatus.FAILED).length;
       }
       
-      // Performance categorization based on duration
       let performance = 'Good';
       if (scenario.duration > 10000) performance = 'Slow';
       else if (scenario.duration > 5000) performance = 'Average';
@@ -982,7 +882,6 @@ export class ExcelExporter {
       ]);
     }
 
-    // If no scenarios, use feature summary data
     if (data.length === 1 && result.features.length > 0) {
       result.features.forEach(feature => {
         feature.scenarios.forEach(scenario => {
@@ -991,10 +890,10 @@ export class ExcelExporter {
             feature.feature,
             scenario.duration,
             scenario.status.toUpperCase(),
-            '0%', // No step data in ScenarioSummary
+            '0%',
             scenario.retryCount || 0,
-            '',   // No tags in ScenarioSummary
-            0,    // No error count available
+            '',
+            0,
             scenario.duration > 10000 ? 'Slow' : scenario.duration > 5000 ? 'Average' : scenario.duration < 1000 ? 'Excellent' : 'Good'
           ]);
         });
@@ -1009,15 +908,15 @@ export class ExcelExporter {
     this.applyPerformanceFormatting(ws, data.length, options);
 
     ws['!cols'] = [
-      { wch: 40 }, // Scenario
-      { wch: 30 }, // Feature
-      { wch: 15 }, // Duration
-      { wch: 10 }, // Status
-      { wch: 12 }, // Pass Rate
-      { wch: 12 }, // Retry Count
-      { wch: 20 }, // Tags
-      { wch: 12 }, // Error Count
-      { wch: 12 }  // Performance
+      { wch: 40 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 12 }
     ];
 
     XLSX.utils.book_append_sheet(this.workbook!, ws, 'Performance');
@@ -1025,7 +924,6 @@ export class ExcelExporter {
 
 
   private applyPerformanceFormatting(ws: XLSX.WorkSheet, rowCount: number, options: ExcelExportOptions): void {
-    // Header formatting
     this.setRangeStyle(ws, 'A1:I1', {
       font: { bold: true, color: { rgb: 'FFFFFF' } },
       fill: { fgColor: { rgb: this.brandColor.substring(1) } },
@@ -1036,25 +934,22 @@ export class ExcelExporter {
       }
     });
 
-    // Format data rows
     for (let row = 2; row <= rowCount; row++) {
-      // Format duration (column C)
       const durationCell = ws[`C${row}`];
       if (durationCell && typeof durationCell.v === 'number') {
         durationCell.t = 'n';
         durationCell.z = '#,##0';
         
         const duration = durationCell.v as number;
-        let color = '008000'; // Green
-        if (duration > 10000) color = 'FF0000'; // Red
-        else if (duration > 5000) color = 'FFA500'; // Orange
+        let color = '008000';
+        if (duration > 10000) color = 'FF0000';
+        else if (duration > 5000) color = 'FFA500';
         
         this.setCellStyle(ws, `C${row}`, {
           font: { color: { rgb: color } }
         });
       }
       
-      // Format status (column D)
       const statusCell = ws[`D${row}`];
       if (statusCell) {
         const status = statusCell.v as string;
@@ -1081,7 +976,6 @@ export class ExcelExporter {
         this.setCellStyle(ws, `D${row}`, style);
       }
       
-      // Format pass rate (column E)
       const passRateCell = ws[`E${row}`];
       if (passRateCell) {
         this.setCellStyle(ws, `E${row}`, {
@@ -1089,7 +983,6 @@ export class ExcelExporter {
         });
       }
       
-      // Format performance rating (column I)
       const perfCell = ws[`I${row}`];
       if (perfCell) {
         const perf = perfCell.v as string;
@@ -1119,19 +1012,16 @@ export class ExcelExporter {
         this.setCellStyle(ws, `I${row}`, style);
       }
       
-      // Add borders
       for (let col = 0; col < 9; col++) {
         const cellAddr = XLSX.utils.encode_cell({ r: row - 1, c: col });
         this.addBorder(ws, cellAddr);
       }
     }
 
-    // Add filters
     if (options.autoFilter) {
       ws['!autofilter'] = { ref: `A1:I${rowCount}` };
     }
 
-    // Freeze header
     if (options.freezePanes) {
       ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2' };
     }
@@ -1144,13 +1034,11 @@ export class ExcelExporter {
     const headers = ['Timestamp', 'Level', 'Source', 'Category', 'Message'];
     const data: any[][] = [headers];
     
-    // Extract error information from failed scenarios and steps
     const scenarios = result.scenarios || [];
     const maxLogs = options.maxRowsPerSheet || 50000;
     let logCount = 0;
     
     for (const scenario of scenarios) {
-      // Add scenario-level errors
       if (scenario.status === TestStatus.FAILED && scenario.error) {
         data.push([
           this.formatDateTime(scenario.startTime),
@@ -1164,7 +1052,6 @@ export class ExcelExporter {
         if (logCount >= maxLogs) break;
       }
       
-      // Add step-level errors if available
       if (scenario.steps) {
         for (const step of scenario.steps) {
           if (step.status === TestStatus.FAILED && step.result?.error) {
@@ -1185,7 +1072,6 @@ export class ExcelExporter {
       if (logCount >= maxLogs) break;
     }
     
-    // Add execution summary log
     data.push([
       this.formatDateTime(result.startTime),
       'INFO',
@@ -1202,7 +1088,6 @@ export class ExcelExporter {
       `Test execution completed: ${result.passedScenarios} passed, ${result.failedScenarios} failed, ${result.skippedScenarios} skipped`
     ]);
     
-    // If no logs were added, add a default message
     if (data.length === 1) {
       data.push([this.formatDateTime(new Date()), 'INFO', 'System', 'No Data', 'No error logs available for this execution']);
     }
@@ -1211,18 +1096,17 @@ export class ExcelExporter {
     this.applyLogsFormatting(ws, data.length, options);
 
     ws['!cols'] = [
-      { wch: 20 }, // Timestamp
-      { wch: 10 }, // Level
-      { wch: 25 }, // Source
-      { wch: 20 }, // Category
-      { wch: 100 } // Message
+      { wch: 20 },
+      { wch: 10 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 100 }
     ];
 
     XLSX.utils.book_append_sheet(this.workbook!, ws, 'Logs');
   }
 
   private applyLogsFormatting(ws: XLSX.WorkSheet, rowCount: number, options: ExcelExportOptions): void {
-    // Header formatting
     this.setRangeStyle(ws, 'A1:E1', {
       font: { bold: true, color: { rgb: 'FFFFFF' } },
       fill: { fgColor: { rgb: this.brandColor.substring(1) } },
@@ -1233,16 +1117,8 @@ export class ExcelExporter {
       }
     });
 
-    // Format data rows
     for (let row = 2; row <= rowCount; row++) {
-      // Format timestamp - timestamps are now pre-formatted as strings
-      // const timestampCell = ws[`A${row}`];
-      // if (timestampCell && timestampCell.v instanceof Date) {
-      //   timestampCell.t = 'd';
-      //   timestampCell.z = 'yyyy-mm-dd hh:mm:ss.000';
-      // }
       
-      // Format level with color coding
       const levelCell = ws[`B${row}`];
       if (levelCell) {
         const level = levelCell.v as string;
@@ -1272,33 +1148,28 @@ export class ExcelExporter {
         this.setCellStyle(ws, `B${row}`, style);
       }
       
-      // Wrap message text
       this.setCellStyle(ws, `E${row}`, {
         alignment: { wrapText: true, vertical: 'top' }
       });
       
-      // Add borders
       for (let col = 0; col < 5; col++) {
         const cellAddr = XLSX.utils.encode_cell({ r: row - 1, c: col });
         this.addBorder(ws, cellAddr);
       }
     }
 
-    // Add filters
     if (options.autoFilter) {
       ws['!autofilter'] = { ref: `A1:E${rowCount}` };
     }
 
-    // Freeze header
     if (options.freezePanes) {
       ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2' };
     }
 
-    // Set row heights
     ws['!rows'] = [];
     ws['!rows'][0] = { hpt: 25 };
     for (let i = 1; i < rowCount; i++) {
-      ws['!rows'][i] = { hpt: 40 }; // Accommodate wrapped text
+      ws['!rows'][i] = { hpt: 40 };
     }
   }
 
@@ -1309,7 +1180,6 @@ export class ExcelExporter {
     const headers = ['Feature', 'Scenario', 'Step', 'Type', 'Status', 'Timestamp', 'File Path', 'Description'];
     const data: any[][] = [headers];
 
-    // Create screenshot references for failed scenarios
     const scenarios = result.scenarios || [];
     const screenshotDir = ConfigurationManager.get('SCREENSHOT_PATH', './evidence/screenshots');
     
@@ -1317,7 +1187,6 @@ export class ExcelExporter {
       const feature = result.features.find(f => f.featureId === scenario.featureId);
       const featureName = feature?.feature || scenario.feature || 'Unknown';
       
-      // Add scenario-level screenshot references for failures
       if (scenario.status === TestStatus.FAILED) {
         const screenshotPath = path.join(screenshotDir, result.executionId, `${scenario.scenarioId}_failure.png`);
         data.push([
@@ -1332,7 +1201,6 @@ export class ExcelExporter {
         ]);
       }
       
-      // Add step-level screenshot references if steps are available
       if (scenario.steps) {
         scenario.steps.forEach((step, stepIndex) => {
           if (step.status === TestStatus.FAILED) {
@@ -1349,7 +1217,6 @@ export class ExcelExporter {
             ]);
           }
           
-          // Check for embeddings that might contain screenshots
           if (step.embeddings && step.embeddings.length > 0) {
             step.embeddings.forEach((embedding, embIndex) => {
               if (embedding.mimeType && embedding.mimeType.startsWith('image/')) {
@@ -1371,7 +1238,6 @@ export class ExcelExporter {
       }
     }
     
-    // If we have scenario summaries only, generate potential screenshot paths
     if (data.length === 1 && result.features.length > 0) {
       result.features.forEach(feature => {
         feature.scenarios.forEach(scenario => {
@@ -1400,37 +1266,28 @@ export class ExcelExporter {
     this.applyScreenshotsFormatting(ws, data.length, options);
 
     ws['!cols'] = [
-      { wch: 40 }, // Feature
-      { wch: 40 }, // Scenario
-      { wch: 50 }, // Step
-      { wch: 15 }, // Type
-      { wch: 10 }, // Status
-      { wch: 20 }, // Timestamp
-      { wch: 80 }, // File Path
-      { wch: 50 }  // Description
+      { wch: 40 },
+      { wch: 40 },
+      { wch: 50 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 80 },
+      { wch: 50 }
     ];
 
     XLSX.utils.book_append_sheet(this.workbook!, ws, 'Screenshots');
   }
 
   private applyScreenshotsFormatting(ws: XLSX.WorkSheet, rowCount: number, options: ExcelExportOptions): void {
-    // Header formatting
     this.setRangeStyle(ws, 'A1:H1', {
       font: { bold: true, color: { rgb: 'FFFFFF' } },
       fill: { fgColor: { rgb: this.brandColor.substring(1) } },
       alignment: { horizontal: 'center', vertical: 'center' }
     });
 
-    // Format data rows
     for (let row = 2; row <= rowCount; row++) {
-      // Format timestamp - timestamps are now pre-formatted as strings
-      // const timestampCell = ws[`F${row}`];
-      // if (timestampCell && timestampCell.v instanceof Date) {
-      //   timestampCell.t = 'd';
-      //   timestampCell.z = 'yyyy-mm-dd hh:mm:ss';
-      // }
       
-      // Format status
       const statusCell = ws[`E${row}`];
       if (statusCell) {
         const status = statusCell.v as string;
@@ -1454,10 +1311,8 @@ export class ExcelExporter {
         this.setCellStyle(ws, `E${row}`, style);
       }
       
-      // Make file path a hyperlink if it's a valid path
       const pathCell = ws[`G${row}`];
       if (pathCell && pathCell.v && typeof pathCell.v === 'string') {
-        // Create hyperlink
         ws[`G${row}`] = {
           v: pathCell.v,
           l: { Target: `file:///${pathCell.v.replace(/\\/g, '/')}` },
@@ -1467,19 +1322,16 @@ export class ExcelExporter {
         };
       }
       
-      // Add borders
       for (let col = 0; col < 8; col++) {
         const cellAddr = XLSX.utils.encode_cell({ r: row - 1, c: col });
         this.addBorder(ws, cellAddr);
       }
     }
 
-    // Add filters
     if (options.autoFilter) {
       ws['!autofilter'] = { ref: `A1:H${rowCount}` };
     }
 
-    // Freeze header
     if (options.freezePanes) {
       ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2' };
     }
@@ -1491,7 +1343,6 @@ export class ExcelExporter {
   ): Promise<void> {
     const data: any[][] = [];
     
-    // Chart 1: Test Results Summary
     data.push(['Test Results Summary']);
     data.push(['Status', 'Count']);
     data.push(['Passed', result.passedScenarios]);
@@ -1499,7 +1350,6 @@ export class ExcelExporter {
     data.push(['Skipped', result.skippedScenarios]);
     data.push([]);
     
-    // Chart 2: Feature Pass Rates
     data.push(['Feature Pass Rates']);
     data.push(['Feature', 'Pass Rate']);
     result.features.forEach(feature => {
@@ -1510,7 +1360,6 @@ export class ExcelExporter {
     });
     data.push([]);
     
-    // Chart 3: Execution Time by Feature
     data.push(['Execution Time by Feature']);
     data.push(['Feature', 'Duration (seconds)']);
     result.features.forEach(feature => {
@@ -1519,11 +1368,9 @@ export class ExcelExporter {
     });
     data.push([]);
     
-    // Chart 4: Test Execution Timeline
     data.push(['Test Execution Timeline']);
     data.push(['Time Period', 'Tests Run', 'Pass Rate']);
     
-    // Create hourly buckets if we have scenario data
     const scenarios = result.scenarios || [];
     if (scenarios.length > 0) {
       const hourlyData = new Map<number, { total: number; passed: number }>();
@@ -1547,7 +1394,6 @@ export class ExcelExporter {
           data.push([`${hour}:00-${hour + 1}:00`, stats.total, passRate]);
         });
     } else {
-      // Use start/end time for simple timeline
       try {
         const startHour = new Date(result.startTime).getHours();
         const endHour = new Date(result.endTime).getHours();
@@ -1560,7 +1406,6 @@ export class ExcelExporter {
     }
     data.push([]);
     
-    // Chart 5: Top 10 Slowest Scenarios
     data.push(['Top 10 Slowest Scenarios']);
     data.push(['Scenario', 'Duration (seconds)']);
     
@@ -1587,7 +1432,6 @@ export class ExcelExporter {
       { wch: 20 }
     ];
 
-    // Add instructions
     const instructions = 'To create charts: 1) Select data range 2) Insert > Charts 3) Choose chart type';
     ws['!margins'] = { footer: 0.5 };
     ws['!footer'] = { left: instructions };
@@ -1599,14 +1443,12 @@ export class ExcelExporter {
     
     data.forEach((row, index) => {
       if (row.length === 1) {
-        // Section headers
         const cellAddr = `A${index + 1}`;
         this.setCellStyle(ws, cellAddr, {
           font: { bold: true, sz: 14, color: { rgb: this.brandColor.substring(1) } }
         });
         this.mergeCells(ws, `A${index + 1}:B${index + 1}`);
       } else if (row[0] === 'Status' || row[0] === 'Feature' || row[0] === 'Metric') {
-        // Table headers
         const rowNum = index + 1;
         this.setRangeStyle(ws, `A${rowNum}:B${rowNum}`, {
           font: { bold: true },
@@ -1616,11 +1458,9 @@ export class ExcelExporter {
           }
         });
       } else if (row.length === 2 && typeof row[1] === 'number') {
-        // Format numbers
         const cellAddr = `B${index + 1}`;
         const cell = ws[cellAddr];
         if (cell) {
-          // Check if it's a percentage
           if (row[0].includes('Rate') && cell.v <= 1) {
             cell.t = 'n';
             cell.z = '0.00%';
@@ -1633,13 +1473,11 @@ export class ExcelExporter {
     });
   }
 
-  // Helper methods
   private setCellStyle(ws: XLSX.WorkSheet, cellAddr: string, style: any): void {
     if (!ws[cellAddr]) {
       ws[cellAddr] = { v: '' };
     }
     
-    // XLSX library uses 's' property for styles
     ws[cellAddr].s = {
       font: {
         name: style.font?.name || 'Calibri',
@@ -1725,12 +1563,10 @@ export class ExcelExporter {
     try {
       const dateObj = date instanceof Date ? date : new Date(date);
       
-      // Check if date is valid
       if (isNaN(dateObj.getTime())) {
-        return String(date); // Return original value if invalid
+        return String(date);
       }
       
-      // Format as ISO string for consistency
       return dateObj.toISOString().replace('T', ' ').substring(0, 19);
     } catch (error) {
       this.logger.warn(`Failed to format date: ${date}`, error as Error);
@@ -1742,17 +1578,14 @@ export class ExcelExporter {
     result: ExecutionResult,
     options: ExcelExportOptions = { format: ExportFormat.EXCEL }
   ): Promise<Readable> {
-    // Generate the Excel file in memory
     const buffer = await this.generateBuffer(result, options);
     
-    // Create readable stream from buffer
     const stream = new Readable({
       read() {}
     });
     
-    // Push buffer to stream
     stream.push(buffer);
-    stream.push(null); // Signal end of stream
+    stream.push(null);
     
     return stream;
   }
@@ -1761,7 +1594,6 @@ export class ExcelExporter {
     result: ExecutionResult,
     options: ExcelExportOptions
   ): Promise<Buffer> {
-    // Create workbook
     this.workbook = XLSX.utils.book_new();
     this.workbook.Props = {
       Title: 'CS Test Automation Report',
@@ -1776,7 +1608,6 @@ export class ExcelExporter {
       CreatedDate: new Date()
     };
 
-    // Add all sheets
     await this.addSummarySheet(result, options);
     await this.addDetailedResultsSheet(result, options);
     await this.addFeatureResultsSheet(result, options);
@@ -1799,7 +1630,6 @@ export class ExcelExporter {
       await this.addChartsSheet(result, options);
     }
 
-    // Generate buffer
     const buffer = XLSX.write(this.workbook, {
       bookType: 'xlsx',
       bookSST: true,
@@ -1821,7 +1651,6 @@ export class ExcelExporter {
     try {
       this.logger.info('Starting partial Excel export', { outputPath, sheets: sheetNames });
 
-      // Create workbook
       this.workbook = XLSX.utils.book_new();
       this.workbook.Props = {
         Title: 'CS Test Automation Report (Partial)',
@@ -1830,7 +1659,6 @@ export class ExcelExporter {
         CreatedDate: new Date()
       };
 
-      // Add only requested sheets
       for (const sheetName of sheetNames) {
         switch (sheetName.toLowerCase()) {
           case 'summary':
@@ -1875,7 +1703,6 @@ export class ExcelExporter {
         }
       }
 
-      // Write workbook
       const buffer = XLSX.write(this.workbook, {
         bookType: 'xlsx',
         bookSST: true,

@@ -1,10 +1,9 @@
-// Cookie types
 export interface Cookie {
     name: string;
     value: string;
     domain?: string;
     path?: string;
-    expires?: number;  // Unix timestamp in seconds, -1 for session cookie
+    expires?: number;
     size?: number;
     httpOnly?: boolean;
     secure?: boolean;
@@ -12,14 +11,12 @@ export interface Cookie {
     priority?: 'Low' | 'Medium' | 'High';
 }
 
-// Cookie options for operations
 export interface CookieOptions {
     url?: string;
     domain?: string;
     path?: string;
 }
 
-// Cookie filter for searching
 export interface CookieFilter {
     name?: string | RegExp;
     domain?: string;
@@ -30,7 +27,6 @@ export interface CookieFilter {
     expired?: boolean;
 }
 
-// Storage snapshot for backup/restore
 export interface StorageSnapshot {
     cookies: Cookie[];
     localStorage: Record<string, string>;
@@ -40,7 +36,6 @@ export interface StorageSnapshot {
     timestamp: Date;
 }
 
-// Storage export format
 export interface StorageExport {
     version: string;
     timestamp: Date;
@@ -52,7 +47,6 @@ export interface StorageExport {
     };
 }
 
-// Storage size information
 export interface StorageSize {
     cookies: number;
     localStorage: number;
@@ -61,7 +55,6 @@ export interface StorageSize {
     total: number;
 }
 
-// Storage quota information
 export interface StorageQuota {
     usage: number;
     quota: number;
@@ -75,7 +68,6 @@ export interface StorageQuota {
     };
 }
 
-// IndexedDB data structure
 export interface IndexedDBData {
     databases: Array<{
         name: string;
@@ -95,17 +87,15 @@ export interface IndexedDBData {
     }>;
 }
 
-// Storage manager options
 export interface StorageOptions {
     autoBackup?: boolean;
-    backupInterval?: number;  // milliseconds
+    backupInterval?: number;
     maxBackups?: number;
     compressBackups?: boolean;
     includeIndexedDB?: boolean;
     monitorChanges?: boolean;
 }
 
-// Storage item information
 export interface StorageItemInfo {
     key: string;
     value: string;
@@ -114,7 +104,6 @@ export interface StorageItemInfo {
     lastModified: Date;
 }
 
-// Storage change event
 export interface StorageChangeEvent {
     type: 'localStorage' | 'sessionStorage' | 'cookie';
     action: 'set' | 'remove' | 'clear';
@@ -125,38 +114,33 @@ export interface StorageChangeEvent {
     origin?: string;
 }
 
-// Storage monitoring options
 export interface StorageMonitorOptions {
     includeLocalStorage?: boolean;
     includeSessionStorage?: boolean;
     includeCookies?: boolean;
-    throttleInterval?: number;  // milliseconds
+    throttleInterval?: number;
 }
 
-// Storage migration
 export interface StorageMigration {
     fromVersion: string;
     toVersion: string;
     migrate: (data: StorageExport) => StorageExport | Promise<StorageExport>;
 }
 
-// Storage encryption options
 export interface StorageEncryptionOptions {
     enabled: boolean;
     algorithm?: string;
     key?: string;
-    excludeKeys?: string[];  // Keys to exclude from encryption
+    excludeKeys?: string[];
 }
 
-// Storage sync options
 export interface StorageSyncOptions {
     enabled: boolean;
-    syncInterval?: number;  // milliseconds
+    syncInterval?: number;
     syncUrl?: string;
     syncOnChange?: boolean;
 }
 
-// Storage validation
 export interface StorageValidation {
     maxKeyLength?: number;
     maxValueLength?: number;
@@ -165,7 +149,6 @@ export interface StorageValidation {
     validateValue?: (value: any) => boolean;
 }
 
-// Storage statistics
 export interface StorageStats {
     totalItems: number;
     totalSize: number;
@@ -176,7 +159,7 @@ export interface StorageStats {
     } | null;
     oldestItem: {
         key: string;
-        age: number;  // milliseconds
+        age: number;
     } | null;
     typeBreakdown: {
         string: number;
@@ -186,15 +169,13 @@ export interface StorageStats {
     };
 }
 
-// Storage cleanup options
 export interface StorageCleanupOptions {
-    maxAge?: number;  // milliseconds
-    maxSize?: number;  // bytes
+    maxAge?: number;
+    maxSize?: number;
     excludeKeys?: string[] | RegExp;
     dryRun?: boolean;
 }
 
-// Storage diff result
 export interface StorageDiff {
     added: Record<string, any>;
     modified: Record<string, { old: any; new: any }>;
@@ -202,13 +183,11 @@ export interface StorageDiff {
     unchanged: Record<string, any>;
 }
 
-// Storage merge options
 export interface StorageMergeOptions {
     strategy: 'overwrite' | 'merge' | 'keep-existing';
     conflictResolver?: (key: string, existing: any, incoming: any) => any;
 }
 
-// Cookie jar for import/export
 export interface CookieJar {
     version: string;
     cookies: Cookie[];
@@ -219,7 +198,6 @@ export interface CookieJar {
     };
 }
 
-// Storage operation result
 export interface StorageOperationResult {
     success: boolean;
     operation: string;
@@ -228,7 +206,6 @@ export interface StorageOperationResult {
     timestamp: Date;
 }
 
-// Storage health check
 export interface StorageHealthCheck {
     healthy: boolean;
     issues: Array<{
@@ -240,13 +217,12 @@ export interface StorageHealthCheck {
     recommendations: string[];
 }
 
-// Browser storage limits
 export const STORAGE_LIMITS = {
-    COOKIE_MAX_SIZE: 4096,  // 4KB per cookie
-    COOKIE_MAX_COUNT: 180,  // Typical browser limit
-    LOCAL_STORAGE_MAX_SIZE: 5 * 1024 * 1024,  // 5MB typical
-    SESSION_STORAGE_MAX_SIZE: 5 * 1024 * 1024,  // 5MB typical
-    INDEXED_DB_MAX_SIZE: -1,  // Browser dependent, usually 50% of free disk
-    COOKIE_NAME_VALUE_MAX_SIZE: 4093,  // Name + value combined
-    MAX_KEY_LENGTH: 1024,  // Reasonable limit for keys
+    COOKIE_MAX_SIZE: 4096,
+    COOKIE_MAX_COUNT: 180,
+    LOCAL_STORAGE_MAX_SIZE: 5 * 1024 * 1024,
+    SESSION_STORAGE_MAX_SIZE: 5 * 1024 * 1024,
+    INDEXED_DB_MAX_SIZE: -1,
+    COOKIE_NAME_VALUE_MAX_SIZE: 4093,
+    MAX_KEY_LENGTH: 1024,
 };

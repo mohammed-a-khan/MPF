@@ -1,20 +1,3 @@
-/**
- * CS Test Automation Framework - LogCollector
- * 
- * Advanced log collection and querying system that provides powerful
- * search, aggregation, and analysis capabilities for log entries.
- * 
- * Features:
- * - In-memory indexing with multiple access patterns
- * - Complex query support with filters and aggregations
- * - Time-series analysis
- * - Correlation tracking
- * - Statistical analysis
- * - Memory-efficient storage
- * 
- * @author CS Test Automation Team
- * @version 4.0.0
- */
 
 import {
   LogEntry,
@@ -39,13 +22,13 @@ import {
 export class LogCollector {
   private entries: Map<string, LogEntry> = new Map();
   private indexes: {
-    byTime: Map<number, Set<string>>;          // Hour buckets
+    byTime: Map<number, Set<string>>;
     byLevel: Map<LogLevel, Set<string>>;
     byType: Map<string, Set<string>>;
     byCorrelation: Map<string, Set<string>>;
     bySession: Map<string, Set<string>>;
-    byContext: Map<string, Set<string>>;       // Context key-value pairs
-    byError: Set<string>;                      // Error entries for quick access
+    byContext: Map<string, Set<string>>;
+    byError: Set<string>;
   };
   private config: CollectorConfig;
   private stats: {
@@ -90,37 +73,30 @@ export class LogCollector {
       avgQueryTime: 0
     };
 
-    // Start retention cleanup
     if (this.config.retentionHours > 0) {
       this.startRetentionCleanup();
     }
   }
 
   async collect(entry: LogEntry): Promise<void> {
-    // Check memory limits
     if (this.entries.size >= this.maxEntriesInMemory) {
       await this.evictOldestEntries();
     }
 
-    // Store entry
     this.entries.set(entry.id, entry);
 
-    // Update indexes
     if (this.config.indexingEnabled) {
       this.indexEntry(entry);
     }
 
-    // Update stats
     this.updateStats(entry);
 
-    // Clear query cache as data has changed
     this.queryCache.clear();
   }
 
   async query(query: LogQuery): Promise<LogEntry[]> {
     const startTime = performance.now();
 
-    // Check cache
     const cacheKey = this.generateQueryCacheKey(query);
     const cached = this.queryCache.get(cacheKey);
     if (cached && this.isCacheValid(cached)) {
@@ -128,35 +104,28 @@ export class LogCollector {
     }
 
     try {
-      // Get candidate entries
       let candidates = this.getCandidates(query);
 
-      // Apply filters
       if (query.filters) {
         candidates = this.applyQueryFilters(candidates, query.filters);
       }
 
-      // Apply time range
       if (query.timeRange) {
         candidates = this.filterByTimeRange(candidates, query.timeRange);
       }
 
-      // Apply text search
       if (query.search) {
         candidates = this.searchEntries(candidates, query.search);
       }
 
-      // Sort results
       if (query.sort) {
         candidates = this.sortEntries(candidates, query.sort);
       }
 
-      // Apply pagination
       if (query.limit || query.offset) {
         candidates = this.paginate(candidates, query.offset || 0, query.limit || 100);
       }
 
-      // Cache result
       const result: QueryResult = {
         entries: candidates,
         timestamp: new Date(),
@@ -164,7 +133,6 @@ export class LogCollector {
       };
       this.cacheQuery(cacheKey, result);
 
-      // Update query stats
       this.updateQueryStats(result.queryTime);
 
       return candidates;
@@ -177,7 +145,6 @@ export class LogCollector {
   async aggregate(aggregation: LogAggregation): Promise<AggregationResult> {
     const startTime = performance.now();
 
-    // Get base dataset
     const entries = aggregation.query 
       ? await this.query(aggregation.query)
       : Array.from(this.entries.values());
@@ -405,16 +372,15 @@ export class LogCollector {
     this.resetStats();
   }
 
-  // Private Methods
 
   private calculateMaxEntries(): number {
-    const avgEntrySize = 1024; // 1KB average per entry
+    const avgEntrySize = 1024;
     const maxBytes = this.config.maxMemoryMB * 1024 * 1024;
     return Math.floor(maxBytes / avgEntrySize);
   }
 
   private async evictOldestEntries(): Promise<void> {
-    const entriesToRemove = Math.floor(this.maxEntriesInMemory * 0.1); // Remove 10%
+    const entriesToRemove = Math.floor(this.maxEntriesInMemory * 0.1);
     const sorted = Array.from(this.entries.entries())
       .sort(([, a], [, b]) => a.timestamp.getTime() - b.timestamp.getTime());
 
@@ -434,14 +400,12 @@ export class LogCollector {
   }
 
   private indexEntry(entry: LogEntry): void {
-    // Time index (hourly buckets)
     const hourBucket = Math.floor(entry.timestamp.getTime() / (60 * 60 * 1000));
     if (!this.indexes.byTime.has(hourBucket)) {
       this.indexes.byTime.set(hourBucket, new Set());
     }
     this.indexes.byTime.get(hourBucket)!.add(entry.id);
 
-    // Level index
     if (entry.level) {
       if (!this.indexes.byLevel.has(entry.level)) {
         this.indexes.byLevel.set(entry.level, new Set());
@@ -449,25 +413,21 @@ export class LogCollector {
       this.indexes.byLevel.get(entry.level)!.add(entry.id);
     }
 
-    // Type index
     if (!this.indexes.byType.has(entry.type)) {
       this.indexes.byType.set(entry.type, new Set());
     }
     this.indexes.byType.get(entry.type)!.add(entry.id);
 
-    // Correlation index
     if (!this.indexes.byCorrelation.has(entry.correlationId)) {
       this.indexes.byCorrelation.set(entry.correlationId, new Set());
     }
     this.indexes.byCorrelation.get(entry.correlationId)!.add(entry.id);
 
-    // Session index
     if (!this.indexes.bySession.has(entry.sessionId)) {
       this.indexes.bySession.set(entry.sessionId, new Set());
     }
     this.indexes.bySession.get(entry.sessionId)!.add(entry.id);
 
-    // Context index
     if (entry.context) {
       for (const [key, value] of Object.entries(entry.context)) {
         const contextKey = `${key}:${value}`;
@@ -478,21 +438,18 @@ export class LogCollector {
       }
     }
 
-    // Error index
     if (entry.level === LogLevel.ERROR || entry.level === LogLevel.FATAL) {
       this.indexes.byError.add(entry.id);
     }
   }
 
   private removeFromIndexes(entry: LogEntry): void {
-    // Remove from time index
     const hourBucket = Math.floor(entry.timestamp.getTime() / (60 * 60 * 1000));
     this.indexes.byTime.get(hourBucket)?.delete(entry.id);
     if (this.indexes.byTime.get(hourBucket)?.size === 0) {
       this.indexes.byTime.delete(hourBucket);
     }
 
-    // Remove from other indexes
     if (entry.level) {
       this.indexes.byLevel.get(entry.level)?.delete(entry.id);
     }
@@ -500,7 +457,6 @@ export class LogCollector {
     this.indexes.byCorrelation.get(entry.correlationId)?.delete(entry.id);
     this.indexes.bySession.get(entry.sessionId)?.delete(entry.id);
 
-    // Remove from context index
     if (entry.context) {
       for (const [key, value] of Object.entries(entry.context)) {
         const contextKey = `${key}:${value}`;
@@ -508,7 +464,6 @@ export class LogCollector {
       }
     }
 
-    // Remove from error index
     if (entry.level === LogLevel.ERROR || entry.level === LogLevel.FATAL) {
       this.indexes.byError.delete(entry.id);
     }
@@ -530,20 +485,19 @@ export class LogCollector {
   }
 
   private estimateEntrySize(entry: LogEntry): number {
-    // Rough estimation of memory usage
-    return JSON.stringify(entry).length * 2; // UTF-16 characters
+    return JSON.stringify(entry).length * 2;
   }
 
   private calculateIndexSize(): number {
     let size = 0;
     
-    size += this.indexes.byTime.size * 100; // Estimate per bucket
+    size += this.indexes.byTime.size * 100;
     size += this.indexes.byLevel.size * 50;
     size += this.indexes.byType.size * 50;
     size += this.indexes.byCorrelation.size * 100;
     size += this.indexes.bySession.size * 100;
     size += this.indexes.byContext.size * 150;
-    size += this.indexes.byError.size * 8; // Set entries
+    size += this.indexes.byError.size * 8;
 
     return size;
   }
@@ -551,7 +505,6 @@ export class LogCollector {
   private getCandidates(query: LogQuery): LogEntry[] {
     let candidateIds: Set<string> | undefined;
 
-    // Use indexes to narrow down candidates
     if (query.level) {
       const levelIds = this.indexes.byLevel.get(query.level);
       candidateIds = levelIds ? new Set(levelIds) : new Set();
@@ -584,14 +537,12 @@ export class LogCollector {
       }
     }
 
-    // Get entries
     if (candidateIds) {
       return Array.from(candidateIds)
         .map(id => this.entries.get(id))
         .filter(entry => entry !== undefined) as LogEntry[];
     }
 
-    // No index matches, return all
     return Array.from(this.entries.values());
   }
 
@@ -727,7 +678,7 @@ export class LogCollector {
   }
 
   private isCacheValid(cached: QueryResult): boolean {
-    const maxAge = 5000; // 5 seconds
+    const maxAge = 5000;
     return Date.now() - cached.timestamp.getTime() < maxAge;
   }
 
@@ -946,7 +897,7 @@ export class LogCollector {
   }
 
   private aggregateTimeSeries(entries: LogEntry[], aggregation: LogAggregation): AggregationResult {
-    const interval = aggregation.interval || 60000; // Default 1 minute
+    const interval = aggregation.interval || 60000;
     const field = aggregation.field;
     
     const buckets = new Map<number, LogEntry[]>();
@@ -1368,7 +1319,7 @@ export class LogCollector {
   private startRetentionCleanup(): void {
     setInterval(() => {
       this.cleanupOldEntries();
-    }, 60 * 60 * 1000); // Run every hour
+    }, 60 * 60 * 1000);
   }
 
   private cleanupOldEntries(): void {

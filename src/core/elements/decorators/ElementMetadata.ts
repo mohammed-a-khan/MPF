@@ -125,13 +125,11 @@ export class ElementMetadata {
       const locatorValues = new Map<string, string[]>();
       
       for (const [propertyName, options] of classMetadata) {
-        // Check for duplicate property names
         if (propertyNames.has(propertyName)) {
           errors.push(`Duplicate property name '${propertyName}' in class '${className}'`);
         }
         propertyNames.add(propertyName);
         
-        // Check for duplicate locators within same class
         const locatorKey = `${options.locatorType}::${options.locatorValue}`;
         if (!locatorValues.has(locatorKey)) {
           locatorValues.set(locatorKey, []);
@@ -139,7 +137,6 @@ export class ElementMetadata {
         locatorValues.get(locatorKey)!.push(propertyName);
       }
       
-      // Report duplicate locators
       for (const [locatorKey, properties] of locatorValues) {
         if (properties.length > 1) {
           errors.push(
@@ -175,11 +172,9 @@ export class ElementMetadata {
       stats.totalElements += classMetadata.size;
       
       for (const options of classMetadata.values()) {
-        // Count locator types
         const count = stats.locatorTypeDistribution.get(options.locatorType) || 0;
         stats.locatorTypeDistribution.set(options.locatorType, count + 1);
         
-        // Count feature usage
         if (options.aiEnabled) stats.featuresUsage.aiEnabled++;
         if (options.fallbacks) stats.featuresUsage.fallbacks++;
         if (options.leftOf || options.rightOf || options.above || options.below || options.near) {

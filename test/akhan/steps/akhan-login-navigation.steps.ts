@@ -56,13 +56,11 @@ export class akhanLoginNavigationSteps extends CSBDDBaseStepDefinition {
 
     @CSBDDStepDef('user should see the following menu items')
     async verifyMenuItems(dataTable: DataTable) {
-        // First verify all menu items are present
         await this.navigationPage.verifyAllMenuItems();
 
         const rows = dataTable.raw();
         const menuItems = rows.map(row => row[0]?.trim() || '').filter(Boolean);
         
-        // Then verify each specific menu item from the data table
         for (const menuItem of menuItems) {
             await this.navigationPage.verifyMenuItem(menuItem);
         }
@@ -81,7 +79,6 @@ export class akhanLoginNavigationSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef('user is logged in to akhan application')
     @CSBDDStepDef('I am logged in to AKHAN application')
     async loginWithoutCredentials() {
-        // Login with default credentials from environment
         const defaultUsername = process.env['DEFAULT_USERNAME'] || 'Admin';
         const defaultPassword = process.env['DEFAULT_PASSWORD'] || 'admin123';
         await this.loginPage.navigateTo();
@@ -98,7 +95,6 @@ export class akhanLoginNavigationSteps extends CSBDDBaseStepDefinition {
     @CSBDDStepDef('user should see the {string} header of type {string}')
     @CSBDDStepDef('I should see the {string} header of type {string}')
     async verifyHeaderWithType(expectedHeader: string, headerType: string) {
-        // For now, just verify the header exists (headerType parameter is ignored)
         await this.navigationPage.verifyHeader(expectedHeader);
     }
 

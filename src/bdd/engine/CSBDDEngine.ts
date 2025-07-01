@@ -45,11 +45,6 @@ export interface StepValidationResult {
     missingDefinitions: string[];
 }
 
-/**
- * CSBDDEngine - Unified BDD Engine
- * Custom BDD parser with zero dependencies, handles all Gherkin syntax
- * Central coordinator for all BDD parsing and step matching operations
- */
 export class CSBDDEngine {
     private static instance: CSBDDEngine;
     
@@ -83,9 +78,6 @@ export class CSBDDEngine {
         };
     }
 
-    /**
-     * Get singleton instance
-     */
     static getInstance(): CSBDDEngine {
         if (!CSBDDEngine.instance) {
             CSBDDEngine.instance = new CSBDDEngine();
@@ -93,27 +85,19 @@ export class CSBDDEngine {
         return CSBDDEngine.instance;
     }
 
-    /**
-     * Initialize the BDD engine with configuration
-     */
     async initialize(config: Partial<BDDEngineConfig>): Promise<void> {
         logger.info('Initializing CSBDDEngine...');
         
         this.config = { ...this.config, ...config };
         
-        // Validate configuration
         await this.validateConfiguration();
         
-        // Clear caches
         this.featuresCache.clear();
         this.stepMatchCache.clear();
         
         logger.info('CSBDDEngine initialized successfully');
     }
 
-    /**
-     * Parse multiple feature files
-     */
     async parseFeatureFiles(paths: string[]): Promise<Feature[]> {
         logger.info(`Parsing ${paths.length} feature file(s)...`);
         
@@ -122,22 +106,18 @@ export class CSBDDEngine {
         
         for (const filePath of paths) {
             try {
-                // Check cache first
                 if (this.config.cacheFeatures && this.featuresCache.has(filePath)) {
                     const cachedFeature = this.featuresCache.get(filePath)!;
                     features.push(cachedFeature);
                     continue;
                 }
                 
-                // Parse the feature file
                 const feature = await this.featureFileParser.parseFile(filePath);
                 
-                // Process data annotations if enabled
                 if (this.config.enableDataAnnotations) {
                     await this.processFeatureDataAnnotations(feature);
                 }
                 
-                // Cache the feature
                 if (this.config.cacheFeatures) {
                     this.featuresCache.set(filePath, feature);
                 }
@@ -160,18 +140,12 @@ export class CSBDDEngine {
         return features;
     }
 
-    /**
-     * Parse single feature content
-     */
     async parseFeatureContent(content: string, filePath?: string): Promise<Feature> {
         try {
-            // Tokenize the content
             const tokens = this.lexer.tokenize(content, filePath || 'inline');
             
-            // Parse tokens into feature
             const feature = this.parser.parse(tokens, filePath || 'inline');
             
-            // Process data annotations if enabled
             if (this.config.enableDataAnnotations) {
                 await this.processFeatureDataAnnotations(feature);
             }
@@ -191,11 +165,7 @@ export class CSBDDEngine {
         }
     }
 
-    /**
-     * Find matching step definition for step text
-     */
     findMatchingStep(stepText: string): StepMatch {
-        // Check cache first
         if (this.stepMatchCache.has(stepText)) {
             return this.stepMatchCache.get(stepText)!;
         }
@@ -222,17 +192,12 @@ export class CSBDDEngine {
             };
         }
         
-        // Cache the result
         this.stepMatchCache.set(stepText, result);
         return result;
     }
 
-    /**
-     * Validate feature structure
-     */
     validateFeatureStructure(feature: Feature): boolean {
         try {
-            // Basic structure validation
             if (!feature.name || feature.name.trim() === '') {
                 logger.error('Feature must have a name');
                 return false;
@@ -242,7 +207,6 @@ export class CSBDDEngine {
                 logger.warn(`Feature "${feature.name}" has no scenarios`);
             }
             
-            // Validate scenarios
             for (const scenario of feature.scenarios) {
                 if (!this.validateScenarioStructure(scenario)) {
                     return false;
@@ -257,11 +221,7 @@ export class CSBDDEngine {
         }
     }
 
-    /**
-     * Extract feature annotations
-     */
     extractFeatureAnnotations(lines: string[]): Annotations {
-        // Use the tag parser for proper annotation processing
         const parsed = this.tagParser.parseAnnotations(lines);
         
         const annotations: Annotations = {
@@ -269,7 +229,6 @@ export class CSBDDEngine {
             metadata: parsed.metadata
         };
         
-        // Handle data source metadata
         if (parsed.metadata['dataSource']) {
             annotations.dataSource = parsed.metadata['dataSource'];
         }
@@ -281,9 +240,6 @@ export class CSBDDEngine {
         return annotations;
     }
 
-    /**
-     * Extract scenario outlines into scenarios
-     */
     extractScenarioOutlines(scenario: Scenario): Scenario[] {
         if (!scenario.examples || scenario.examples.length === 0) {
             return [scenario];
@@ -291,7 +247,6 @@ export class CSBDDEngine {
         
         const scenarios: Scenario[] = [];
         
-        // Use the examples parser to properly expand scenario outlines
         if (scenario.type === 'scenario_outline') {
             const expandedScenarios = this.examplesParser.expandScenarioOutline(scenario as any);
             scenarios.push(...expandedScenarios);
@@ -302,9 +257,6 @@ export class CSBDDEngine {
         return scenarios;
     }
 
-    /**
-     * Load feature test data from annotations
-     */
     async loadFeatureTestData(annotations: Annotations): Promise<any[]> {
         if (!annotations.dataSource) {
             return [];
@@ -315,15 +267,12 @@ export class CSBDDEngine {
             type: annotations.dataSource.type
         } as any);
         
-        // If the data contains table format, parse it using dataTableParser
         if (Array.isArray(rawData) && rawData.length > 0 && typeof rawData[0] === 'string') {
             try {
-                // Convert to string array for table parsing
                 const stringArray = rawData.map(item => String(item));
                 const dataTable = this.dataTableParser.parseTable(stringArray);
                 return dataTable.hashes();
             } catch (error) {
-                // If parsing fails, return raw data
                 return rawData;
             }
         }
@@ -331,17 +280,11 @@ export class CSBDDEngine {
         return rawData;
     }
 
-    /**
-     * Generate step parameters from step text and pattern
-     */
     generateStepParameters(stepText: string, pattern: RegExp): any[] {
         const match = stepText.match(pattern);
         return match ? match.slice(1) : [];
     }
 
-    /**
-     * Validate all step definitions
-     */
     async validateStepDefinitions(): Promise<ValidationResult> {
         if (!this.config.validateSteps) {
             return { valid: true, errors: [], warnings: [] };
@@ -352,7 +295,6 @@ export class CSBDDEngine {
         const errors: ValidationError[] = [];
         const allSteps = new Set<string>();
         
-        // Collect all steps from parsed features
         for (const feature of this.featuresCache.values()) {
             for (const scenario of feature.scenarios) {
                 for (const step of scenario.steps) {
@@ -361,7 +303,6 @@ export class CSBDDEngine {
             }
         }
         
-        // Check each step for matching definitions
         for (const stepText of allSteps) {
             const match = this.findMatchingStep(stepText);
             if (!match.matched) {
@@ -384,15 +325,11 @@ export class CSBDDEngine {
         };
     }
 
-    /**
-     * Generate missing steps report
-     */
     generateMissingStepsReport(): MissingStepsReport {
         const missingSteps: string[] = [];
         const ambiguousSteps: { step: string; matches: string[] }[] = [];
         const totalSteps = new Set<string>();
         
-        // Collect all unique steps
         for (const feature of this.featuresCache.values()) {
             for (const scenario of feature.scenarios) {
                 for (const step of scenario.steps) {
@@ -401,7 +338,6 @@ export class CSBDDEngine {
             }
         }
         
-        // Check each step
         for (const stepText of totalSteps) {
             const match = this.findMatchingStep(stepText);
             if (!match.matched) {
@@ -429,15 +365,11 @@ export class CSBDDEngine {
         };
     }
 
-    /**
-     * Discover and parse features from configured paths
-     */
     async discoverFeatures(): Promise<FeatureDiscoveryResult> {
         logger.info(`Discovering features from ${this.config.featurePaths.length} path(s)...`);
         
         const allFeaturePaths: string[] = [];
         
-        // Discover feature files
         for (const searchPath of this.config.featurePaths) {
             try {
                 const discoveredPaths = await this.featureFileParser.discoverFeatureFiles(searchPath);
@@ -449,7 +381,6 @@ export class CSBDDEngine {
         
         logger.info(`Discovered ${allFeaturePaths.length} feature file(s)`);
         
-        // Parse discovered features
         const features: Feature[] = [];
         const failedFiles: string[] = [];
         const validationErrors: ValidationError[] = [];
@@ -458,7 +389,6 @@ export class CSBDDEngine {
             try {
                 const feature = await this.featureFileParser.parseFile(filePath);
                 
-                // Validate feature structure
                 if (this.config.validateSteps && !this.validateFeatureStructure(feature)) {
                     failedFiles.push(filePath);
                     validationErrors.push({
@@ -492,9 +422,6 @@ export class CSBDDEngine {
         };
     }
 
-    /**
-     * Get engine statistics
-     */
     getStatistics() {
         return {
             cachedFeatures: this.featuresCache.size,
@@ -504,9 +431,6 @@ export class CSBDDEngine {
         };
     }
 
-    /**
-     * Clear all caches with size limits and reporting
-     */
     clearCaches(): void {
         const featureCount = this.featuresCache.size;
         const stepMatchCount = this.stepMatchCache.size;
@@ -517,14 +441,10 @@ export class CSBDDEngine {
         logger.info(`🧹 BDD Engine caches cleared: ${featureCount} features, ${stepMatchCount} step matches`);
     }
 
-    /**
-     * Limit cache sizes to prevent memory exhaustion
-     */
     limitCacheSizes(): void {
         const MAX_FEATURES = 1000;
         const MAX_STEP_MATCHES = 10000;
         
-        // Limit features cache
         if (this.featuresCache.size > MAX_FEATURES) {
             const toDelete = this.featuresCache.size - MAX_FEATURES;
             const keys = Array.from(this.featuresCache.keys()).slice(0, toDelete);
@@ -532,7 +452,6 @@ export class CSBDDEngine {
             logger.debug(`🗑️ Trimmed ${toDelete} old features from cache`);
         }
         
-        // Limit step matches cache
         if (this.stepMatchCache.size > MAX_STEP_MATCHES) {
             const toDelete = this.stepMatchCache.size - MAX_STEP_MATCHES;
             const keys = Array.from(this.stepMatchCache.keys()).slice(0, toDelete);
@@ -541,31 +460,25 @@ export class CSBDDEngine {
         }
     }
 
-    // Private methods
 
     private async validateConfiguration(): Promise<void> {
         if (!this.config.featurePaths || this.config.featurePaths.length === 0) {
             throw new Error('At least one feature path must be configured');
         }
         
-        // Validate feature paths exist
         for (const featurePath of this.config.featurePaths) {
-            // Path validation would go here
             logger.debug(`Validating feature path: ${featurePath}`);
         }
     }
 
     private async processFeatureDataAnnotations(feature: Feature): Promise<void> {
-        // Extract and process data annotations from feature tags
         const annotations = this.extractFeatureAnnotations(
             feature.tags.map(tag => `@${tag}`)
         );
         
-        // Load test data if data source annotation exists
         if (annotations.dataSource) {
             try {
                 const testData = await this.loadFeatureTestData(annotations);
-                // Store test data in feature metadata
                 (feature as any).testData = testData;
                 logger.debug(`Loaded ${testData.length} test data rows for feature: ${feature.name}`);
             } catch (error) {
@@ -588,5 +501,4 @@ export class CSBDDEngine {
     }
 }
 
-// Export singleton instance
 export const bddEngine = CSBDDEngine.getInstance();

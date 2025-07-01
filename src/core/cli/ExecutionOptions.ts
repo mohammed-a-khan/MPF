@@ -1,22 +1,13 @@
 // src/core/cli/ExecutionOptions.ts
 
-/**
-* Complete production-ready execution options interfaces and types
-* with full validation, type safety, and comprehensive configuration support
-*/
 
 import { ExecutionStatus } from '../../bdd/types/bdd.types';
 
-/**
-* Main execution options interface containing all possible configuration
-*/
 export interface ExecutionOptions {
- // Project and Environment Configuration
  project: string;
  environment: string;
  environmentVariables?: Record<string, string>;
  
- // Test Selection
  tags?: string;
  tagExpression?: ParsedTagExpression;
  features?: string[];
@@ -29,7 +20,6 @@ export interface ExecutionOptions {
  includeExamples?: string[];
  excludeExamples?: string[];
  
- // Execution Configuration
  parallel: boolean;
  workers: number;
  workerIdleMemoryLimit?: number;
@@ -53,7 +43,6 @@ export interface ExecutionOptions {
  randomize?: boolean;
  seed?: string;
  
- // Debug Configuration
  debug: boolean;
  debugPort?: number;
  breakpoint?: string;
@@ -63,12 +52,10 @@ export interface ExecutionOptions {
  noColors: boolean;
  preserveOutput?: boolean;
  
- // Logging Configuration
  logLevel?: string;
  logFile?: boolean;
  logPath?: string;
  
- // Evidence Collection
  video: boolean;
  videoOptions?: VideoOptions;
  trace: boolean;
@@ -78,7 +65,6 @@ export interface ExecutionOptions {
  updateSnapshots: boolean;
  snapshotPathTemplate?: string;
  
- // Reporting Configuration
  skipReport?: boolean;
  skipADO?: boolean;
  reportName: string;
@@ -90,7 +76,6 @@ export interface ExecutionOptions {
  publishResults?: boolean;
  publishOptions?: PublishOptions;
  
- // Configuration Files
  configFile?: string;
  profile?: string;
  testDataPath?: string;
@@ -98,25 +83,21 @@ export interface ExecutionOptions {
  stepsPath?: string;
  hooksPath?: string;
  
- // Service Overrides
  apiBaseUrl?: string;
  apiEndpoints?: Record<string, string>;
  dbConnection?: string;
  dbConnections?: Record<string, DatabaseConnection>;
  serviceUrls?: Record<string, string>;
  
- // Proxy Configuration
  proxy?: string;
  proxyAuth?: ProxyAuthentication;
  proxyBypass?: string[];
  proxyOptions?: ProxyOptions;
  
- // Authentication
  authProviders?: Record<string, AuthProvider>;
  credentials?: Record<string, Credential>;
  certificates?: Record<string, Certificate>;
  
- // CI/CD Configuration
  ci: boolean;
  ciProvider?: CIProvider;
  buildId?: string;
@@ -126,14 +107,12 @@ export interface ExecutionOptions {
  commitSha?: string;
  pullRequestId?: string;
  
- // Performance Configuration
  performanceMode?: PerformanceMode;
  memoryLimit?: number;
  cpuLimit?: number;
  networkThrottling?: NetworkProfile;
  cpuThrottling?: number;
  
- // Advanced Configuration
  locale?: string;
  timezone?: string;
  geolocation?: Geolocation;
@@ -149,7 +128,6 @@ export interface ExecutionOptions {
  reducedMotion?: ReducedMotion;
  forcedColors?: ForcedColors;
  
- // Storage Configuration
  storageState?: string;
  saveStorageState?: string;
  clearStorage?: boolean;
@@ -157,7 +135,6 @@ export interface ExecutionOptions {
  localStorage?: Record<string, string>;
  sessionStorage?: Record<string, string>;
  
- // Hooks Configuration
  globalSetup?: string;
  globalTeardown?: string;
  beforeAll?: string[];
@@ -165,18 +142,14 @@ export interface ExecutionOptions {
  beforeEach?: string[];
  afterEach?: string[];
  
- // Plugin Configuration
  plugins?: Plugin[];
  pluginOptions?: Record<string, any>;
  
- // Custom Configuration
  customOptions?: Record<string, any>;
  
- // CLI Options
  help?: boolean;
  version?: boolean;
  
- // Metadata
  executionId: string;
  startTime: Date;
  endTime?: Date;
@@ -186,9 +159,6 @@ export interface ExecutionOptions {
  metadata?: Record<string, any>;
 }
 
-/**
-* CLI argument definition with full validation support
-*/
 export interface CLIArgument {
  name: string;
  aliases?: string[];
@@ -212,9 +182,6 @@ export interface CLIArgument {
  hidden?: boolean;
 }
 
-/**
-* CLI flag definition (boolean options)
-*/
 export interface CLIFlag {
  name: string;
  aliases?: string[];
@@ -223,9 +190,6 @@ export interface CLIFlag {
  hidden?: boolean;
 }
 
-/**
-* CLI option type with additional metadata
-*/
 export interface CLIOption extends CLIArgument {
  group?: OptionGroup;
  priority?: number;
@@ -235,16 +199,10 @@ export interface CLIOption extends CLIArgument {
  accumulate?: boolean;
 }
 
-/**
-* Parsed command line arguments
-*/
 export interface ParsedArguments {
  [key: string]: any;
 }
 
-/**
-* Validation error with context
-*/
 export interface ValidationError {
  argument: string;
  message: string;
@@ -254,9 +212,6 @@ export interface ValidationError {
  code?: string;
 }
 
-/**
-* Configuration file structure
-*/
 export interface ConfigFile {
  version?: string;
  extends?: string | string[];
@@ -269,79 +224,34 @@ export interface ConfigFile {
  variables?: Record<string, any>;
 }
 
-/**
-* Browser type enumeration
-*/
 export type BrowserType = 'chromium' | 'firefox' | 'webkit' | 'chrome' | 'msedge';
 
-/**
-* Screenshot capture mode
-*/
 export type ScreenshotMode = 'always' | 'on-failure' | 'never' | 'manual';
 
-/**
-* Report format types
-*/
 export type ReportFormat = 'html' | 'pdf' | 'excel' | 'json' | 'xml' | 'markdown' | 'confluence' | 'slack';
 
-/**
-* Output format types for console/CI
-*/
 export type OutputFormat = 'tap' | 'teamcity' | 'github' | 'junit' | 'mocha' | 'spec' | 'json' | 'progress' | 'dot';
 
-/**
-* Argument value types
-*/
 export type ArgumentType = 'string' | 'number' | 'boolean' | 'array' | 'object' | 'path' | 'url' | 'regex' | 'json';
 
-/**
-* Option grouping for help display
-*/
 export type OptionGroup = 'Test Selection' | 'Execution' | 'Debug' | 'Reporting' | 'Configuration' | 'Network' | 'Advanced';
 
-/**
-* Validation error types
-*/
 export type ValidationErrorType = 'required' | 'type' | 'choice' | 'pattern' | 'range' | 'dependency' | 'conflict' | 'custom';
 
-/**
-* CI provider detection
-*/
 export type CIProvider = 'jenkins' | 'github' | 'gitlab' | 'azure' | 'circleci' | 'travis' | 'bitbucket' | 'teamcity' | 'bamboo' | 'custom';
 
-/**
-* Performance optimization mode
-*/
 export type PerformanceMode = 'default' | 'fast' | 'thorough' | 'memory-optimized' | 'cpu-optimized';
 
-/**
-* Execution mode for different contexts
-*/
 export type ExecutionMode = 'local' | 'ci' | 'debug' | 'profile' | 'record' | 'playback';
 
-/**
-* Verbose logging levels
-*/
 export type VerboseLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
-/**
-* Color scheme options
-*/
 export type ColorScheme = 'light' | 'dark' | 'no-preference';
 
-/**
-* Reduced motion options
-*/
 export type ReducedMotion = 'reduce' | 'no-preference';
 
-/**
-* Forced colors options
-*/
 export type ForcedColors = 'active' | 'none';
 
-/**
-* Retry strategy configuration
-*/
 export interface RetryStrategy {
  maxAttempts: number;
  delay?: number;
@@ -351,9 +261,6 @@ export interface RetryStrategy {
  jitter?: boolean;
 }
 
-/**
-* Backoff strategy for retries
-*/
 export interface BackoffStrategy {
  type: 'fixed' | 'linear' | 'exponential' | 'fibonacci';
  initialDelay: number;
@@ -361,9 +268,6 @@ export interface BackoffStrategy {
  factor?: number;
 }
 
-/**
-* Retry condition definition
-*/
 export interface RetryCondition {
  errorType?: string | RegExp;
  errorMessage?: string | RegExp;
@@ -372,9 +276,6 @@ export interface RetryCondition {
  custom?: (error: any) => boolean;
 }
 
-/**
-* Shard configuration for distributed execution
-*/
 export interface ShardConfig {
  current: number;
  total: number;
@@ -382,19 +283,10 @@ export interface ShardConfig {
  distribution?: ShardDistribution;
 }
 
-/**
-* Shard distribution key
-*/
 export type ShardKey = 'feature' | 'scenario' | 'tag' | 'hash' | 'round-robin';
 
-/**
-* Shard distribution strategy
-*/
 export type ShardDistribution = 'even' | 'weighted' | 'dynamic' | 'custom';
 
-/**
-* Video recording options
-*/
 export interface VideoOptions {
  dir?: string;
  size?: { width: number; height: number };
@@ -405,24 +297,12 @@ export interface VideoOptions {
  saveAs?: VideoSaveStrategy;
 }
 
-/**
-* Video codec options
-*/
 export type VideoCodec = 'h264' | 'vp8' | 'vp9' | 'av1';
 
-/**
-* Video quality presets
-*/
 export type VideoQuality = 'low' | 'medium' | 'high' | 'lossless';
 
-/**
-* Video save strategy
-*/
 export type VideoSaveStrategy = 'always' | 'on-failure' | 'on-retry' | 'manual';
 
-/**
-* Trace recording options
-*/
 export interface TraceOptions {
  dir?: string;
  screenshots?: boolean;
@@ -432,14 +312,8 @@ export interface TraceOptions {
  includeTestResults?: boolean;
 }
 
-/**
-* Trace categories
-*/
 export type TraceCategory = 'api' | 'browser' | 'navigation' | 'network' | 'console' | 'screencast';
 
-/**
-* Screenshot capture options
-*/
 export interface ScreenshotOptions {
  dir?: string;
  fullPage?: boolean;
@@ -453,9 +327,6 @@ export interface ScreenshotOptions {
  clip?: BoundingBox;
 }
 
-/**
-* Bounding box for screenshot clipping
-*/
 export interface BoundingBox {
  x: number;
  y: number;
@@ -463,9 +334,6 @@ export interface BoundingBox {
  height: number;
 }
 
-/**
-* Report generation options
-*/
 export interface ReportOptions {
  title?: string;
  logo?: string;
@@ -486,9 +354,6 @@ export interface ReportOptions {
  template?: string;
 }
 
-/**
-* Report theme configuration
-*/
 export interface ReportTheme {
  primaryColor?: string;
  secondaryColor?: string;
@@ -498,19 +363,10 @@ export interface ReportTheme {
  compact?: boolean;
 }
 
-/**
-* Report grouping options
-*/
 export type ReportGrouping = 'feature' | 'tag' | 'suite' | 'package' | 'none';
 
-/**
-* Report sorting options
-*/
 export type ReportSorting = 'name' | 'duration' | 'status' | 'timestamp';
 
-/**
-* Output formatting options
-*/
 export interface OutputOptions {
  colors?: boolean;
  timestamps?: boolean;
@@ -521,9 +377,6 @@ export interface OutputOptions {
  encoding?: BufferEncoding;
 }
 
-/**
-* Result publishing options
-*/
 export interface PublishOptions {
  target: PublishTarget;
  url?: string;
@@ -537,28 +390,16 @@ export interface PublishOptions {
  createNew?: boolean;
 }
 
-/**
-* Publish target systems
-*/
 export type PublishTarget = 'ado' | 'jira' | 'slack' | 'teams' | 'email' | 's3' | 'artifactory' | 'custom';
 
-/**
-* Link reference
-*/
 export interface Link {
  name: string;
  url: string;
  type?: LinkType;
 }
 
-/**
-* Link types
-*/
 export type LinkType = 'issue' | 'requirement' | 'documentation' | 'build' | 'other';
 
-/**
-* Attachment reference
-*/
 export interface Attachment {
  name: string;
  path: string;
@@ -566,9 +407,6 @@ export interface Attachment {
  encoding?: BufferEncoding;
 }
 
-/**
-* Database connection configuration
-*/
 export interface DatabaseConnection {
  type: DatabaseType;
  host: string;
@@ -583,14 +421,8 @@ export interface DatabaseConnection {
  options?: Record<string, any>;
 }
 
-/**
-* Database types
-*/
 export type DatabaseType = 'mssql' | 'mysql' | 'postgresql' | 'oracle' | 'mongodb' | 'redis' | 'cassandra' | 'dynamodb';
 
-/**
-* Database SSL configuration
-*/
 export interface DatabaseSSLConfig {
  ca?: string;
  cert?: string;
@@ -598,9 +430,6 @@ export interface DatabaseSSLConfig {
  rejectUnauthorized?: boolean;
 }
 
-/**
-* Proxy authentication
-*/
 export interface ProxyAuthentication {
  username: string;
  password: string;
@@ -608,9 +437,6 @@ export interface ProxyAuthentication {
  workstation?: string;
 }
 
-/**
-* Proxy configuration options
-*/
 export interface ProxyOptions {
  protocol?: ProxyProtocol;
  tunnel?: boolean;
@@ -620,28 +446,16 @@ export interface ProxyOptions {
  rejectUnauthorized?: boolean;
 }
 
-/**
-* Proxy protocols
-*/
 export type ProxyProtocol = 'http' | 'https' | 'socks4' | 'socks5';
 
-/**
-* Authentication provider configuration
-*/
 export interface AuthProvider {
  type: AuthType;
  config: AuthConfig;
  fallback?: string;
 }
 
-/**
-* Authentication types
-*/
 export type AuthType = 'basic' | 'bearer' | 'oauth2' | 'saml' | 'ldap' | 'kerberos' | 'ntlm' | 'apikey' | 'aws' | 'azure' | 'custom';
 
-/**
-* Authentication configuration
-*/
 export interface AuthConfig {
  url?: string;
  clientId?: string;
@@ -667,14 +481,8 @@ export interface AuthConfig {
  custom?: Record<string, any>;
 }
 
-/**
-* OAuth2 grant types
-*/
 export type OAuth2GrantType = 'authorization_code' | 'implicit' | 'password' | 'client_credentials' | 'refresh_token' | 'device_code';
 
-/**
-* Credential storage
-*/
 export interface Credential {
  id: string;
  type: CredentialType;
@@ -686,14 +494,8 @@ export interface Credential {
  metadata?: Record<string, any>;
 }
 
-/**
-* Credential types
-*/
 export type CredentialType = 'username-password' | 'token' | 'api-key' | 'certificate' | 'multi-factor';
 
-/**
-* Certificate configuration
-*/
 export interface Certificate {
  certPath?: string;
  keyPath?: string;
@@ -703,9 +505,6 @@ export interface Certificate {
  subject?: CertificateSubject;
 }
 
-/**
-* Certificate subject details
-*/
 export interface CertificateSubject {
  commonName?: string;
  organization?: string;
@@ -716,9 +515,6 @@ export interface CertificateSubject {
  email?: string;
 }
 
-/**
-* Network throttling profile
-*/
 export interface NetworkProfile {
  name?: string;
  downloadSpeed: number;
@@ -728,14 +524,8 @@ export interface NetworkProfile {
  connectionType?: ConnectionType;
 }
 
-/**
-* Connection types for network emulation
-*/
 export type ConnectionType = '2g' | '3g' | '4g' | '5g' | 'wifi' | 'ethernet' | 'offline';
 
-/**
-* Geolocation coordinates
-*/
 export interface Geolocation {
  latitude: number;
  longitude: number;
@@ -746,33 +536,21 @@ export interface Geolocation {
  speed?: number;
 }
 
-/**
-* Browser permissions
-*/
 export type Permission = 'geolocation' | 'notifications' | 'push' | 'camera' | 'microphone' | 
  'background-sync' | 'ambient-light-sensor' | 'accelerometer' | 'gyroscope' | 'magnetometer' |
  'accessibility-events' | 'clipboard-read' | 'clipboard-write' | 'payment-handler' | 'idle-detection' |
  'midi' | 'midi-sysex';
 
-/**
-* HTTP credentials for basic auth
-*/
 export interface HTTPCredentials {
  username: string;
  password: string;
 }
 
-/**
-* Viewport configuration
-*/
 export interface Viewport {
  width: number;
  height: number;
 }
 
-/**
-* Cookie definition
-*/
 export interface Cookie {
  name: string;
  value: string;
@@ -784,9 +562,6 @@ export interface Cookie {
  sameSite?: 'Strict' | 'Lax' | 'None';
 }
 
-/**
-* Plugin configuration
-*/
 export interface Plugin {
  name: string;
  enabled?: boolean;
@@ -795,9 +570,6 @@ export interface Plugin {
  hooks?: PluginHooks;
 }
 
-/**
-* Plugin hook definitions
-*/
 export interface PluginHooks {
  onBeforeRun?: string;
  onAfterRun?: string;
@@ -811,9 +583,6 @@ export interface PluginHooks {
  onReport?: string;
 }
 
-/**
-* Host information
-*/
 export interface HostInfo {
  hostname: string;
  platform: NodeJS.Platform;
@@ -825,9 +594,6 @@ export interface HostInfo {
  user?: string;
 }
 
-/**
-* Environment-specific configuration
-*/
 export interface EnvironmentConfig {
  name: string;
  displayName?: string;
@@ -838,9 +604,6 @@ export interface EnvironmentConfig {
  data?: Record<string, any>;
 }
 
-/**
-* Service configuration
-*/
 export interface ServiceConfig {
  url: string;
  auth?: AuthConfig;
@@ -850,9 +613,6 @@ export interface ServiceConfig {
  healthCheck?: HealthCheckConfig;
 }
 
-/**
-* Health check configuration
-*/
 export interface HealthCheckConfig {
  endpoint: string;
  method?: string;
@@ -862,16 +622,10 @@ export interface HealthCheckConfig {
  retries?: number;
 }
 
-/**
-* Feature flags
-*/
 export interface FeatureFlags {
  [key: string]: boolean | FeatureFlag;
 }
 
-/**
-* Feature flag configuration
-*/
 export interface FeatureFlag {
  enabled: boolean;
  rollout?: number;
@@ -879,18 +633,12 @@ export interface FeatureFlag {
  conditions?: FlagCondition[];
 }
 
-/**
-* Feature flag condition
-*/
 export interface FlagCondition {
  type: 'user' | 'group' | 'percentage' | 'date' | 'custom';
  value: any;
  operator?: 'equals' | 'contains' | 'greater' | 'less' | 'between';
 }
 
-/**
-* Profile configuration
-*/
 export interface ProfileConfig {
  name: string;
  description?: string;
@@ -899,9 +647,6 @@ export interface ProfileConfig {
  variables?: Record<string, any>;
 }
 
-/**
-* Hooks configuration
-*/
 export interface HooksConfig {
  globalSetup?: string | string[];
  globalTeardown?: string | string[];
@@ -920,9 +665,6 @@ export interface HooksConfig {
  onSkip?: string | string[];
 }
 
-/**
-* Paths configuration
-*/
 export interface PathsConfig {
  features?: string | string[];
  steps?: string | string[];
@@ -938,18 +680,12 @@ export interface PathsConfig {
  uploads?: string;
 }
 
-/**
-* Plugin configuration in config file
-*/
 export interface PluginConfig {
  use: string;
  options?: Record<string, any>;
  enabled?: boolean;
 }
 
-/**
-* Tag expression parser result
-*/
 export interface ParsedTagExpression {
  type: 'tag' | 'and' | 'or' | 'not';
  value?: string;
@@ -958,9 +694,6 @@ export interface ParsedTagExpression {
  operand?: ParsedTagExpression;
 }
 
-/**
-* Compiled pattern for matching
-*/
 export interface CompiledPattern {
  source: string;
  regex?: RegExp;
@@ -968,9 +701,6 @@ export interface CompiledPattern {
  matcher: (value: string) => boolean;
 }
 
-/**
-* Execution summary for reporting
-*/
 export interface ExecutionSummary {
  executionId: string;
  startTime: Date;
@@ -993,11 +723,7 @@ export interface ExecutionSummary {
  metadata?: Record<string, any>;
 }
 
-// ExecutionStatus is now imported from bdd.types.ts
 
-/**
-* Step execution timing
-*/
 export interface StepTiming {
  start: number;
  end: number;
@@ -1005,9 +731,6 @@ export interface StepTiming {
  breakdown?: TimingBreakdown;
 }
 
-/**
-* Timing breakdown for performance analysis
-*/
 export interface TimingBreakdown {
  wait?: number;
  action?: number;
@@ -1016,9 +739,6 @@ export interface TimingBreakdown {
  other?: number;
 }
 
-/**
-* Test result for reporting
-*/
 export interface TestResult {
  id: string;
  name: string;
@@ -1033,14 +753,8 @@ export interface TestResult {
  timestamp: Date;
 }
 
-/**
-* Test status enumeration
-*/
 export type TestStatus = 'passed' | 'failed' | 'skipped' | 'pending' | 'undefined' | 'ambiguous';
 
-/**
-* Test error details
-*/
 export interface TestError {
  name: string;
  message: string;
@@ -1053,9 +767,6 @@ export interface TestError {
  trace?: string;
 }
 
-/**
-* Test attachment
-*/
 export interface TestAttachment {
  name: string;
  type: AttachmentType;
@@ -1065,14 +776,8 @@ export interface TestAttachment {
  timestamp: Date;
 }
 
-/**
-* Attachment types
-*/
 export type AttachmentType = 'screenshot' | 'video' | 'trace' | 'log' | 'har' | 'coverage' | 'other';
 
-/**
-* Step result for reporting
-*/
 export interface StepResult {
  keyword: string;
  name: string;
@@ -1085,26 +790,17 @@ export interface StepResult {
  hidden?: boolean;
 }
 
-/**
-* Step embedding (screenshots, logs, etc.)
-*/
 export interface Embedding {
  data: string | Buffer;
  mimeType: string;
  name?: string;
 }
 
-/**
-* Step argument (data tables, doc strings)
-*/
 export interface StepArgument {
  type: 'DataTable' | 'DocString';
  content: any;
 }
 
-/**
-* Configuration validation result
-*/
 export interface ConfigValidationResult {
  valid: boolean;
  errors: ConfigValidationError[];
@@ -1112,9 +808,6 @@ export interface ConfigValidationResult {
  suggestions: ConfigSuggestion[];
 }
 
-/**
-* Configuration validation error
-*/
 export interface ConfigValidationError {
  path: string;
  message: string;
@@ -1122,18 +815,12 @@ export interface ConfigValidationError {
  expected?: any;
 }
 
-/**
-* Configuration validation warning
-*/
 export interface ConfigValidationWarning {
  path: string;
  message: string;
  impact?: string;
 }
 
-/**
-* Configuration suggestion
-*/
 export interface ConfigSuggestion {
  path: string;
  message: string;
@@ -1141,9 +828,6 @@ export interface ConfigSuggestion {
  reason?: string;
 }
 
-/**
-* Execution context for runtime
-*/
 export interface ExecutionContext {
  options: ExecutionOptions;
  environment: EnvironmentConfig;
@@ -1153,9 +837,6 @@ export interface ExecutionContext {
  temp: Map<string, any>;
 }
 
-/**
-* Runtime state management
-*/
 export interface RuntimeState {
  currentFeature?: string;
  currentScenario?: string;
@@ -1168,9 +849,6 @@ export interface RuntimeState {
  errors: Error[];
 }
 
-/**
-* Worker configuration for parallel execution
-*/
 export interface WorkerConfig {
  id: string;
  index: number;
@@ -1180,9 +858,6 @@ export interface WorkerConfig {
  env: Record<string, string>;
 }
 
-/**
-* Worker result after execution
-*/
 export interface WorkerResult {
  workerId: string;
  startTime: Date;
@@ -1193,9 +868,6 @@ export interface WorkerResult {
  errors?: Error[];
 }
 
-/**
-* Coverage data
-*/
 export interface CoverageData {
  lines: CoverageMetric;
  statements: CoverageMetric;
@@ -1204,9 +876,6 @@ export interface CoverageData {
  files: FileCoverage[];
 }
 
-/**
-* Coverage metric
-*/
 export interface CoverageMetric {
  total: number;
  covered: number;
@@ -1214,9 +883,6 @@ export interface CoverageMetric {
  percentage: number;
 }
 
-/**
-* File coverage data
-*/
 export interface FileCoverage {
  path: string;
  lines: CoverageMetric;
@@ -1226,9 +892,6 @@ export interface FileCoverage {
  uncoveredLines: number[];
 }
 
-/**
-* Memory usage statistics
-*/
 export interface MemoryUsage {
  rss: number;
  heapTotal: number;
@@ -1237,9 +900,6 @@ export interface MemoryUsage {
  arrayBuffers: number;
 }
 
-/**
-* Default values provider
-*/
 export class ExecutionOptionsDefaults {
  public static readonly DEFAULTS: Partial<ExecutionOptions> = {
    environment: 'dev',
@@ -1268,20 +928,13 @@ export class ExecutionOptionsDefaults {
    clearStorage: true
  };
 
- /**
-  * Get default value for option
-  */
  public static getDefault(option: keyof ExecutionOptions): any {
    return this.DEFAULTS[option];
  }
 
- /**
-  * Merge options with defaults
-  */
  public static mergeWithDefaults(options: Partial<ExecutionOptions>): ExecutionOptions {
    const merged = { ...this.DEFAULTS, ...options };
    
-   // Ensure required fields
    if (!merged.executionId) {
      merged.executionId = this.generateExecutionId();
    }
@@ -1297,9 +950,6 @@ export class ExecutionOptionsDefaults {
    return merged as ExecutionOptions;
  }
 
- /**
-  * Generate unique execution ID
-  */
  private static generateExecutionId(): string {
    const timestamp = Date.now();
    const random = Math.random().toString(36).substring(2, 8);
@@ -1309,19 +959,12 @@ export class ExecutionOptionsDefaults {
  }
 }
 
-/**
-* Options validator
-*/
 export class ExecutionOptionsValidator {
- /**
-  * Validate execution options
-  */
  public static validate(options: ExecutionOptions): ConfigValidationResult {
    const errors: ConfigValidationError[] = [];
    const warnings: ConfigValidationWarning[] = [];
    const suggestions: ConfigSuggestion[] = [];
 
-   // Validate environment
    if (!options.environment) {
      errors.push({
        path: 'environment',
@@ -1329,7 +972,6 @@ export class ExecutionOptionsValidator {
      });
    }
 
-   // Validate parallel execution
    if (options.parallel && options.workers < 1) {
      errors.push({
        path: 'workers',
@@ -1339,7 +981,6 @@ export class ExecutionOptionsValidator {
      });
    }
 
-   // Validate shard configuration
    if (options.shard) {
      if (options.shard.current < 1 || options.shard.current > options.shard.total) {
        errors.push({
@@ -1351,7 +992,6 @@ export class ExecutionOptionsValidator {
      }
    }
 
-   // Validate timeouts
    if (options.timeout < 1000) {
      warnings.push({
        path: 'timeout',
@@ -1360,7 +1000,6 @@ export class ExecutionOptionsValidator {
      });
    }
 
-   // Suggest optimizations
    if (options.parallel && options.workers > 16) {
      suggestions.push({
        path: 'workers',
@@ -1370,7 +1009,6 @@ export class ExecutionOptionsValidator {
      });
    }
 
-   // Validate paths
    if (options.reportPath && !this.isValidPath(options.reportPath)) {
      errors.push({
        path: 'reportPath',
@@ -1379,7 +1017,6 @@ export class ExecutionOptionsValidator {
      });
    }
 
-   // Check for deprecated options
    if (options.customOptions?.['legacyMode']) {
      warnings.push({
        path: 'customOptions.legacyMode',
@@ -1396,41 +1033,24 @@ export class ExecutionOptionsValidator {
    };
  }
 
- /**
-  * Check if path is valid
-  */
  private static isValidPath(path: string): boolean {
-   // Simple path validation
    const invalidChars = /[<>:"|?*\x00-\x1f]/;
    return !invalidChars.test(path);
  }
 }
 
-/**
-* Tag expression parser
-*/
 export class TagExpressionParser {
- /**
-  * Parse tag expression string
-  */
  public static parse(expression: string): ParsedTagExpression {
-   // Remove extra whitespace
    expression = expression.trim().replace(/\s+/g, ' ');
    
    return this.parseExpression(expression);
  }
 
- /**
-  * Parse expression recursively
-  */
  private static parseExpression(expr: string): ParsedTagExpression {
-   // Handle parentheses
    expr = expr.trim();
    
    if (expr.startsWith('(') && expr.endsWith(')')) {
-     // Find matching closing parenthesis
      let depth = 0;
-     // let matchingIndex = -1;
      
      for (let i = 0; i < expr.length; i++) {
        if (expr[i] === '(') depth++;
@@ -1443,7 +1063,6 @@ export class TagExpressionParser {
      }
    }
    
-   // Parse OR (lowest precedence)
    const orIndex = this.findOperator(expr, 'or');
    if (orIndex !== -1) {
      return {
@@ -1453,7 +1072,6 @@ export class TagExpressionParser {
      };
    }
    
-   // Parse AND
    const andIndex = this.findOperator(expr, 'and');
    if (andIndex !== -1) {
      return {
@@ -1463,7 +1081,6 @@ export class TagExpressionParser {
      };
    }
    
-   // Parse NOT
    if (expr.toLowerCase().startsWith('not ')) {
      return {
        type: 'not',
@@ -1471,7 +1088,6 @@ export class TagExpressionParser {
      };
    }
    
-   // Must be a tag
    if (!expr.startsWith('@')) {
      throw new Error(`Invalid tag expression: tags must start with @, got: ${expr}`);
    }
@@ -1482,9 +1098,6 @@ export class TagExpressionParser {
    };
  }
 
- /**
-  * Find operator position outside of parentheses
-  */
  private static findOperator(expr: string, operator: string): number {
    let depth = 0;
    const pattern = new RegExp(`\\b${operator}\\b`, 'i');
@@ -1506,9 +1119,6 @@ export class TagExpressionParser {
    return -1;
  }
 
- /**
-  * Evaluate tag expression against tags
-  */
  public static evaluate(expression: ParsedTagExpression, tags: string[]): boolean {
    switch (expression.type) {
      case 'tag':
@@ -1531,13 +1141,7 @@ export class TagExpressionParser {
  }
 }
 
-/**
-* Pattern compiler for glob and regex patterns
-*/
 export class PatternCompiler {
- /**
-  * Compile pattern string to matcher
-  */
  public static compile(pattern: string): CompiledPattern {
    const isGlob = pattern.includes('*') || pattern.includes('?') || 
                   pattern.includes('[') || pattern.includes('{');
@@ -1549,15 +1153,11 @@ export class PatternCompiler {
    }
  }
 
- /**
-  * Compile glob pattern
-  */
  private static compileGlob(pattern: string): CompiledPattern {
-   // Convert glob to regex
    let regex = pattern
-     .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // Escape regex special chars
-     .replace(/\*/g, '.*')                   // * -> .*
-     .replace(/\?/g, '.');                   // ? -> .
+     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+     .replace(/\*/g, '.*')
+     .replace(/\?/g, '.');
    
    const re = new RegExp(`^${regex}$`);
    
@@ -1569,9 +1169,6 @@ export class PatternCompiler {
    };
  }
 
- /**
-  * Compile literal pattern
-  */
  private static compileLiteral(pattern: string): CompiledPattern {
    return {
      source: pattern,
@@ -1580,13 +1177,7 @@ export class PatternCompiler {
  }
 }
 
-/**
-* Environment detector for CI systems
-*/
 export class CIEnvironmentDetector {
- /**
-  * Detect CI provider
-  */
  public static detect(): CIProvider | undefined {
    const env = process.env;
    
@@ -1633,9 +1224,6 @@ export class CIEnvironmentDetector {
    return undefined;
  }
 
- /**
-  * Get CI-specific information
-  */
  public static getCIInfo(): Partial<ExecutionOptions> {
    const provider = this.detect();
    const env = process.env;
@@ -1711,7 +1299,6 @@ export class CIEnvironmentDetector {
        }
        break;
        
-     // Add other CI providers...
    }
    
    return info;

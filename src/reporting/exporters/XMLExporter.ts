@@ -40,13 +40,11 @@ interface Logger {
   error(message: string, error?: Error): void;
 }
 
-// Simple logger implementation if not available
 const createLogger = (name: string): Logger => ({
   info: (message: string, data?: any) => console.log(`[${name}] INFO:`, message, data),
   error: (message: string, error?: Error) => console.error(`[${name}] ERROR:`, message, error)
 });
 
-// Define a simplified screenshot interface for scenarios
 interface ScenarioScreenshot {
   name?: string;
   path: string;
@@ -74,13 +72,10 @@ export class XMLExporter {
     try {
       this.logger.info('Starting XML export', { outputPath, options });
 
-      // Ensure directory exists
       await FileUtils.ensureDir(path.dirname(outputPath));
 
-      // Generate XML
       const xmlContent = await this.generateXML(result, options);
 
-      // Write to file
       let fileSize: number;
       let finalPath = outputPath;
 
@@ -184,7 +179,6 @@ export class XMLExporter {
       children: []
     };
 
-    // Add properties if requested
     if (options.includeProperties && result.metadata) {
       const properties: XMLElement = {
         name: 'properties',
@@ -202,7 +196,6 @@ export class XMLExporter {
       }
     }
 
-    // Add test suites (features)
     result.features.forEach(feature => {
       const testsuite: XMLElement = {
         name: 'testsuite',
@@ -221,7 +214,6 @@ export class XMLExporter {
         children: []
       };
 
-      // Add testsuite properties
       if (options.includeProperties && feature.tags && feature.tags.length > 0) {
         const properties: XMLElement = {
           name: 'properties',
@@ -236,7 +228,6 @@ export class XMLExporter {
         testsuite.children!.push(properties);
       }
 
-      // Add test cases (scenarios)
       feature.scenarios.forEach(scenario => {
         const testcase: XMLElement = {
           name: 'testcase',
@@ -249,7 +240,6 @@ export class XMLExporter {
           children: []
         };
 
-        // Add failure information
         if (scenario.status === TestStatus.FAILED && scenario.error) {
           const failure: XMLElement = {
             name: 'failure',
@@ -265,7 +255,6 @@ export class XMLExporter {
           testcase.children!.push(failure);
         }
 
-        // Add error information (for errors vs failures distinction)
         if (scenario.status === TestStatus.FAILED && scenario.error) {
           const error: XMLElement = {
             name: 'error',
@@ -281,7 +270,6 @@ export class XMLExporter {
           testcase.children!.push(error);
         }
 
-        // Add skipped information
         if (scenario.status === TestStatus.SKIPPED) {
           const skipped: XMLElement = {
             name: 'skipped',
@@ -293,7 +281,6 @@ export class XMLExporter {
           testcase.children!.push(skipped);
         }
 
-        // Add system error
         if (options.includeSystemErr && scenario.errorStack) {
           const systemErr: XMLElement = {
             name: 'system-err',
@@ -302,7 +289,6 @@ export class XMLExporter {
           testcase.children!.push(systemErr);
         }
 
-        // Add attachments as properties
         if (options.includeAttachments && scenario.screenshots && scenario.screenshots.length > 0) {
           scenario.screenshots.forEach((screenshot: ScenarioScreenshot, index: number) => {
             testcase.children!.push({
@@ -340,7 +326,6 @@ export class XMLExporter {
       children: []
     };
 
-    // Add reporter output
     const reporterOutput: XMLElement = {
       name: 'reporter-output',
       children: []
@@ -348,7 +333,6 @@ export class XMLExporter {
 
     testngResults.children!.push(reporterOutput);
 
-    // Add suite
     const suite: XMLElement = {
       name: 'suite',
       attributes: {
@@ -360,7 +344,6 @@ export class XMLExporter {
       children: []
     };
 
-    // Add test elements (features)
     result.features.forEach(feature => {
       const test: XMLElement = {
         name: 'test',
@@ -375,7 +358,6 @@ export class XMLExporter {
         children: []
       };
 
-      // Group scenarios by class (feature name)
       const testClass: XMLElement = {
         name: 'class',
         attributes: {
@@ -384,7 +366,6 @@ export class XMLExporter {
         children: []
       };
 
-      // Add test methods (scenarios)
       feature.scenarios.forEach(scenario => {
         const testMethod: XMLElement = {
           name: 'test-method',
@@ -402,7 +383,6 @@ export class XMLExporter {
           children: []
         };
 
-        // Add parameters if data-driven
         if (scenario.parameters && Object.keys(scenario.parameters).length > 0) {
           const params: XMLElement = {
             name: 'params',
@@ -418,7 +398,6 @@ export class XMLExporter {
           testMethod.children!.push(params);
         }
 
-        // Add groups (tags)
         if (scenario.tags && scenario.tags.length > 0) {
           const groups: XMLElement = {
             name: 'groups',
@@ -430,7 +409,6 @@ export class XMLExporter {
           testMethod.children!.push(groups);
         }
 
-        // Add exception for failures
         if (scenario.status === TestStatus.FAILED && scenario.error) {
           const exception: XMLElement = {
             name: 'exception',
@@ -492,13 +470,11 @@ export class XMLExporter {
       children: []
     };
 
-    // Add filter element
     testRun.children!.push({
       name: 'filter',
       children: []
     });
 
-    // Add test-suite hierarchy
     const testSuite: XMLElement = {
       name: 'test-suite',
       attributes: {
@@ -523,7 +499,6 @@ export class XMLExporter {
       children: []
     };
 
-    // Add environment
     const environment: XMLElement = {
       name: 'environment',
       attributes: {
@@ -542,7 +517,6 @@ export class XMLExporter {
     };
     testSuite.children!.push(environment);
 
-    // Add settings if any
     if (result.metadata && Object.keys(result.metadata).length > 0) {
       const settings: XMLElement = {
         name: 'settings',
@@ -557,7 +531,6 @@ export class XMLExporter {
       testSuite.children!.push(settings);
     }
 
-    // Add properties
     if (options.includeProperties) {
       const properties: XMLElement = {
         name: 'properties',
@@ -581,7 +554,6 @@ export class XMLExporter {
       testSuite.children!.push(properties);
     }
 
-    // Add failure element if there are failures
     if (result.failedScenarios > 0) {
       const failureMessages = new Set<string>();
       const stackTraces = new Set<string>();
@@ -617,7 +589,6 @@ export class XMLExporter {
       testSuite.children!.push(failure);
     }
 
-    // Add test fixtures (features)
     result.features.forEach((feature, featureIndex) => {
       const testFixture: XMLElement = {
         name: 'test-suite',
@@ -647,7 +618,6 @@ export class XMLExporter {
         children: []
       };
 
-      // Add test cases (scenarios)
       feature.scenarios.forEach((scenario, scenarioIndex) => {
         const testCase: XMLElement = {
           name: 'test-case',
@@ -670,7 +640,6 @@ export class XMLExporter {
           children: []
         };
 
-        // Add properties for parameters
         if (scenario.parameters && Object.keys(scenario.parameters).length > 0) {
           const properties: XMLElement = {
             name: 'properties',
@@ -685,7 +654,6 @@ export class XMLExporter {
           testCase.children!.push(properties);
         }
 
-        // Add failure info
         if (scenario.status === TestStatus.FAILED && scenario.error) {
           const failure: XMLElement = {
             name: 'failure',
@@ -707,7 +675,6 @@ export class XMLExporter {
           testCase.children!.push(failure);
         }
 
-        // Add reason for skipped
         if (scenario.status === TestStatus.SKIPPED) {
           const reason: XMLElement = {
             name: 'reason',
@@ -719,7 +686,6 @@ export class XMLExporter {
           testCase.children!.push(reason);
         }
 
-        // Add assertions
         const assertions: XMLElement = {
           name: 'assertions',
           children: (scenario.steps || []).map((step) => ({
@@ -742,7 +708,6 @@ export class XMLExporter {
           testCase.children!.push(assertions);
         }
 
-        // Add attachments
         if (options.includeAttachments && scenario.screenshots && scenario.screenshots.length > 0) {
           const attachments: XMLElement = {
             name: 'attachments',
@@ -803,13 +768,11 @@ export class XMLExporter {
       children: []
     };
 
-    // Add errors element (always empty for xUnit 2.0 compatibility)
     assembly.children!.push({
       name: 'errors',
       children: []
     });
 
-    // Add collection per feature
     result.features.forEach(feature => {
       const collection: XMLElement = {
         name: 'collection',
@@ -824,7 +787,6 @@ export class XMLExporter {
         children: []
       };
 
-      // Add tests
       feature.scenarios.forEach(scenario => {
         const test: XMLElement = {
           name: 'test',
@@ -839,7 +801,6 @@ export class XMLExporter {
           children: []
         };
 
-        // Add traits (tags)
         if (scenario.tags && scenario.tags.length > 0) {
           const traits: XMLElement = {
             name: 'traits',
@@ -854,7 +815,6 @@ export class XMLExporter {
           test.children!.push(traits);
         }
 
-        // Add failure
         if (scenario.status === TestStatus.FAILED && scenario.error) {
           const failure: XMLElement = {
             name: 'failure',
@@ -879,7 +839,6 @@ export class XMLExporter {
           test.children!.push(failure);
         }
 
-        // Add reason for skip
         if (scenario.status === TestStatus.SKIPPED) {
           const reason: XMLElement = {
             name: 'reason',
@@ -915,7 +874,6 @@ export class XMLExporter {
       children: []
     };
 
-    // Add TestSettings
     const testSettings: XMLElement = {
       name: 'TestSettings',
       attributes: {
@@ -937,7 +895,6 @@ export class XMLExporter {
     };
     testRun.children!.push(testSettings);
 
-    // Add Times
     const times: XMLElement = {
       name: 'Times',
       attributes: {
@@ -949,7 +906,6 @@ export class XMLExporter {
     };
     testRun.children!.push(times);
 
-    // Add ResultSummary
     const resultSummary: XMLElement = {
       name: 'ResultSummary',
       attributes: {
@@ -980,7 +936,6 @@ export class XMLExporter {
       ]
     };
 
-    // Add RunInfos if there are failures
     if (result.failedScenarios > 0) {
       const runInfos: XMLElement = {
         name: 'RunInfos',
@@ -1020,7 +975,6 @@ export class XMLExporter {
 
     testRun.children!.push(resultSummary);
 
-    // Add TestDefinitions
     const testDefinitions: XMLElement = {
       name: 'TestDefinitions',
       children: []
@@ -1063,7 +1017,6 @@ export class XMLExporter {
 
     testRun.children!.push(testDefinitions);
 
-    // Add TestLists
     const testLists: XMLElement = {
       name: 'TestLists',
       children: [
@@ -1085,7 +1038,6 @@ export class XMLExporter {
     };
     testRun.children!.push(testLists);
 
-    // Add TestEntries
     const testEntries: XMLElement = {
       name: 'TestEntries',
       children: unitTestDefinitions.map(def => ({
@@ -1099,7 +1051,6 @@ export class XMLExporter {
     };
     testRun.children!.push(testEntries);
 
-    // Add Results
     const results: XMLElement = {
       name: 'Results',
       children: []
@@ -1128,13 +1079,11 @@ export class XMLExporter {
         children: []
       };
 
-      // Add Output
       const output: XMLElement = {
         name: 'Output',
         children: []
       };
 
-      // Add ErrorInfo for failures
       if (scenario.status === TestStatus.FAILED && scenario.error) {
         output.children!.push({
           name: 'ErrorInfo',
@@ -1155,7 +1104,6 @@ export class XMLExporter {
         unitTestResult.children!.push(output);
       }
 
-      // Add ResultFiles for attachments
       if (scenario.screenshots && scenario.screenshots.length > 0) {
         const resultFiles: XMLElement = {
           name: 'ResultFiles',
@@ -1195,21 +1143,13 @@ export class XMLExporter {
   }
 
   private processTemplate(template: string, data: any): XMLElement {
-    // This is a comprehensive template processor that handles:
-    // {{variable}} - Variable substitution
-    // {{#each collection}} - Iteration
-    // {{#if condition}} - Conditionals
-    // {{#unless condition}} - Negative conditionals
-    // {{> partial}} - Partial templates
 
     const processValue = (tmpl: string, context: any): string => {
-      // Variable substitution
       tmpl = tmpl.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
         const value = this.resolvePath(context, path.trim());
         return value !== undefined ? String(value) : '';
       });
 
-      // Each loops
       tmpl = tmpl.replace(
         /\{\{#each\s+(\S+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
         (_, collectionPath, loopContent) => {
@@ -1230,7 +1170,6 @@ export class XMLExporter {
         }
       );
 
-      // If conditions
       tmpl = tmpl.replace(
         /\{\{#if\s+([^}]+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
         (_, condition, truthy, falsy = '') => {
@@ -1239,7 +1178,6 @@ export class XMLExporter {
         }
       );
 
-      // Unless conditions
       tmpl = tmpl.replace(
         /\{\{#unless\s+([^}]+)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
         (_, condition, content) => {
@@ -1267,7 +1205,6 @@ export class XMLExporter {
         return undefined;
       }
 
-      // Handle array access
       const arrayMatch = part.match(/^(\w+)\[(\d+)\]$/);
       if (arrayMatch) {
         const [, prop, index] = arrayMatch;
@@ -1283,9 +1220,7 @@ export class XMLExporter {
   }
 
   private parseTemplateResult(xmlString: string): XMLElement {
-    // Create a safe XML parsing implementation
     try {
-      // Simple XML to object parser without using dangerous regex on array access
       const stack: Array<{ element: XMLElement; tagName: string }> = [];
       let current: XMLElement | null = null;
       let root: XMLElement | null = null;
@@ -1296,7 +1231,6 @@ export class XMLExporter {
         const trimmed = line.trim();
         if (!trimmed) continue;
 
-        // Self-closing tag using safe parsing
         if (trimmed.match(/^<\w+[^>]*\/>$/)) {
           const tagMatch = trimmed.match(/^<(\w+)([^>]*)\/>$/);
           if (tagMatch) {
@@ -1320,7 +1254,6 @@ export class XMLExporter {
           continue;
         }
 
-        // Opening tag
         if (trimmed.match(/^<\w+[^>]*>[^<]*$/)) {
           const openMatch = trimmed.match(/^<(\w+)([^>]*)>(.*)$/);
           if (openMatch) {
@@ -1334,7 +1267,6 @@ export class XMLExporter {
                 attributes: this.parseAttributes(attrsString || '')
               };
 
-              // Check for inline closing
               if (content && content.includes(`</${tagName}>`)) {
                 const textContent = content.replace(new RegExp(`</${tagName}>.*$`), '');
                 if (textContent) {
@@ -1367,7 +1299,6 @@ export class XMLExporter {
           continue;
         }
 
-        // Closing tag
         if (trimmed.match(/^<\/\w+>$/)) {
           if (stack.length > 0) {
             stack.pop();
@@ -1376,7 +1307,6 @@ export class XMLExporter {
           continue;
         }
 
-        // Content - Fix for line 1597
         if (current && trimmed) {
           if (trimmed.includes('<![CDATA[')) {
             current.cdata = trimmed.replace(/<!\[CDATA\[(.*)\]\]>/, '$1');
@@ -1392,7 +1322,6 @@ export class XMLExporter {
 
       return root;
     } catch (error) {
-      // Fallback: create a simple element
       return {
         name: 'error',
         text: 'Failed to parse template result'
@@ -1406,7 +1335,6 @@ export class XMLExporter {
 
     let xml = `${indent}<${element.name}`;
 
-    // Add attributes
     if (element.attributes) {
       for (const [attributeKey, value] of Object.entries(element.attributes)) {
         if (value !== undefined && value !== null) {
@@ -1415,7 +1343,6 @@ export class XMLExporter {
       }
     }
 
-    // Self-closing tag
     if (!element.text && !element.cdata && !element.comment &&
       (!element.children || element.children.length === 0)) {
       xml += '/>';
@@ -1424,7 +1351,6 @@ export class XMLExporter {
 
     xml += '>';
 
-    // Add content
     if (element.comment) {
       xml += `<!-- ${element.comment} -->`;
     } else if (element.cdata) {
@@ -1448,11 +1374,8 @@ export class XMLExporter {
   private escapeXML(str: string): string {
     if (!str) return '';
 
-    // Always handle invalid XML characters for safety
-    // Remove or replace invalid XML 1.0 characters
     str = str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
 
-    // Standard XML escaping - Fix for line 1275
     return str.replace(/[&<>"']/g, (char) => {
       const key = char as keyof typeof this.xmlEntities;
       return this.xmlEntities[key] || char;
@@ -1471,15 +1394,12 @@ export class XMLExporter {
       const attrValue = match[2];
 
       if (attrName && attrValue !== undefined) {
-        // Try to parse as number
         if (!isNaN(Number(attrValue))) {
           attributes[attrName] = Number(attrValue);
         }
-        // Try to parse as boolean
         else if (attrValue === 'true' || attrValue === 'false') {
           attributes[attrName] = attrValue === 'true';
         }
-        // Otherwise keep as string
         else {
           attributes[attrName] = attrValue;
         }
@@ -1490,7 +1410,6 @@ export class XMLExporter {
   }
 
   private generateGuid(): string {
-    // Generate a GUID compatible with TRX format
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = Math.random() * 16 | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -1499,7 +1418,6 @@ export class XMLExporter {
   }
 
   private formatDuration(ms: number): string {
-    // Format duration for TRX (HH:MM:SS.mmm)
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -1518,7 +1436,6 @@ export class XMLExporter {
     });
 
     try {
-      // Generate XML content
       const xmlContent = await this.generateXML(result, options);
 
       if (options.compress) {
@@ -1528,7 +1445,7 @@ export class XMLExporter {
         stream.push(xmlContent, options.encoding || 'utf8');
       }
 
-      stream.push(null); // End stream
+      stream.push(null);
     } catch (error) {
       stream.destroy(error as Error);
     }
@@ -1591,7 +1508,7 @@ export class XMLExporter {
       throw new Error('No results to merge');
     }
 
-    const firstResult = results[0]!; // Non-null assertion since we checked length > 0
+    const firstResult = results[0]!;
 
     const mergedResult: ExecutionResult = {
       executionId: `merged-${Date.now()}`,
@@ -1621,7 +1538,6 @@ export class XMLExporter {
       }
     };
 
-    // Merge features using safe approach
     const featureMap = new Map<string, any>();
 
     for (const result of results) {
@@ -1632,7 +1548,6 @@ export class XMLExporter {
             if (featureKey) {
               if (featureMap.has(featureKey)) {
                 const existing = featureMap.get(featureKey);
-                // Fix for line 1373: Check if existing and existing.scenarios exist
                 if (existing?.scenarios && feature.scenarios) {
                   existing.scenarios.push(...feature.scenarios);
                 }
@@ -1651,7 +1566,6 @@ export class XMLExporter {
     mergedResult.features = Array.from(featureMap.values());
     const summaryData = this.recalculateSummary(mergedResult.features);
 
-    // Update merged result with calculated summary data using safe assignment
     mergedResult.totalFeatures = summaryData.totalFeatures || 0;
     mergedResult.totalScenarios = summaryData.totalScenarios || 0;
     mergedResult.totalSteps = summaryData.totalSteps || 0;
@@ -1665,7 +1579,6 @@ export class XMLExporter {
     mergedResult.skippedScenarios = summaryData.skippedScenarios || 0;
     mergedResult.skippedSteps = summaryData.skippedSteps || 0;
 
-    // Update duration and status
     mergedResult.duration = mergedResult.endTime.getTime() - mergedResult.startTime.getTime();
     mergedResult.status = mergedResult.failedScenarios > 0 ? ExecutionStatus.FAILED : ExecutionStatus.PASSED;
 

@@ -33,7 +33,7 @@ interface JSONExportOptions extends ExportOptions {
 
 export class JSONExporter {
   private logger = Logger.getInstance('JSONExporter');
-  private readonly memoryThreshold = 50 * 1024 * 1024; // 50MB
+  private readonly memoryThreshold = 50 * 1024 * 1024;
   
   async export(
     result: ExecutionResult,
@@ -45,13 +45,10 @@ export class JSONExporter {
     try {
       this.logger.info('Starting JSON export', { outputPath, options });
 
-      // Ensure directory exists
       await FileUtils.ensureDir(path.dirname(outputPath));
 
-      // Transform result based on schema
       const transformedResult = this.transformBySchema(result, options);
       
-      // Determine if streaming is needed
       const estimatedSize = this.estimateSize(transformedResult);
       const shouldStream = options.streaming || estimatedSize > this.memoryThreshold;
 
@@ -183,7 +180,6 @@ export class JSONExporter {
       })
     };
 
-    // Remove undefined values if excludeEmpty is true
     if (options.excludeEmpty) {
       return this.removeEmpty(transformed);
     }
@@ -383,7 +379,7 @@ export class JSONExporter {
           },
           name: step.text,
           result: {
-            duration: step.duration * 1000000, // Convert to nanoseconds
+            duration: step.duration * 1000000,
             status: step.status,
             ...(step.error && {
               error_message: step.error + (step.errorStack ? '\n' + step.errorStack : '')
@@ -540,7 +536,6 @@ export class JSONExporter {
     }
 
     if (typeof schema === 'object' && schema !== null) {
-      // JSONPath-based transformation
       const result: any = {};
       
       for (const [targetKey, sourcePath] of Object.entries(schema)) {
@@ -558,7 +553,6 @@ export class JSONExporter {
   }
 
   private extractByPath(data: any, path: string): any {
-    // Simple JSONPath implementation
     if (path.startsWith('$')) {
       path = path.substring(1);
     }
@@ -575,7 +569,6 @@ export class JSONExporter {
         return undefined;
       }
 
-      // Handle array notation
       const arrayMatch = part.match(/^(\w+)\[(\d+)\]$/);
       if (arrayMatch) {
         const [, propertyName, index] = arrayMatch;
@@ -583,7 +576,6 @@ export class JSONExporter {
           current = current[propertyName]?.[parseInt(index, 10)];
         }
       } else if (part === '*' && Array.isArray(current)) {
-        // Wildcard for arrays
         return current.map(item => this.extractByPath(item, parts.slice(parts.indexOf(part) + 1).join('.')));
       } else {
         current = current[part];
@@ -623,7 +615,6 @@ export class JSONExporter {
       let totalSize = 0;
       const writeStream = fs.createWriteStream(outputPath);
       
-      // Create JSON stringifier transform stream
       const jsonStream = new Transform({
         writableObjectMode: true,
         transform(chunk, _encoding, callback) {
@@ -641,7 +632,6 @@ export class JSONExporter {
         }
       });
 
-      // Setup pipeline
       const streams: any[] = [jsonStream];
       
       if (options.compress) {
@@ -654,7 +644,6 @@ export class JSONExporter {
       
       streams.push(writeStream);
 
-      // Handle errors
       const cleanup = () => {
         streams.forEach(stream => {
           if (stream && typeof stream.destroy === 'function') {
@@ -668,7 +657,6 @@ export class JSONExporter {
         reject(error);
       };
 
-      // Pipe streams
       let currentStream = jsonStream;
       for (let i = 1; i < streams.length; i++) {
         currentStream = currentStream.pipe(streams[i]);
@@ -678,7 +666,6 @@ export class JSONExporter {
       writeStream.on('finish', () => resolve(totalSize));
       writeStream.on('error', handleError);
 
-      // Start streaming data
       this.streamObject(data, jsonStream, options);
     });
   }
@@ -747,14 +734,12 @@ export class JSONExporter {
   }
 
   private formatDate(date: Date | string | number | undefined | null, options: JSONExportOptions): string {
-    // Handle undefined, null, or invalid dates
     if (!date) {
       return '';
     }
     
     const dateObj = date instanceof Date ? date : new Date(date);
     
-    // Check if the date is valid
     if (isNaN(dateObj.getTime())) {
       this.logger.warn(`Invalid date value: ${date}`);
       return '';
@@ -775,7 +760,6 @@ export class JSONExporter {
   }
 
   private estimateSize(obj: any): number {
-    // Rough estimation of JSON size
     const sample = JSON.stringify(obj).substring(0, 1000);
     const avgCharSize = Buffer.byteLength(sample) / sample.length;
     return this.countChars(obj) * avgCharSize;
@@ -860,7 +844,7 @@ export class JSONExporter {
   }
 
   private transformLogs(logs: any[], options: JSONExportOptions): any[] {
-    const maxLogs = 10000; // Prevent huge files
+    const maxLogs = 10000;
     const processedLogs = logs.slice(0, maxLogs);
     
     return processedLogs.map(log => ({
@@ -962,7 +946,6 @@ export class JSONExporter {
       }
     };
 
-    // Merge features
     const featureMap = new Map<string, FeatureReport>();
     
     for (const result of results) {
@@ -998,7 +981,6 @@ export class JSONExporter {
     ).length;
     mergedResult.duration = mergedResult.endTime.getTime() - mergedResult.startTime.getTime();
 
-    // Merge tags
     const tagMap = new Map<string, any>();
     for (const result of results) {
       if (result.tags) {

@@ -12,10 +12,6 @@ import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 
-/**
- * Base class for all step definition classes
- * Provides common utilities and context access
- */
 export abstract class CSBDDBaseStepDefinition {
   protected logger: Logger;
   private pageInstances: Map<string, CSBasePage> = new Map();
@@ -24,56 +20,40 @@ export abstract class CSBDDBaseStepDefinition {
     this.logger = Logger.getInstance(this.constructor.name);
   }
 
-  /**
-   * Get browser management strategy - read fresh to ensure latest config
-   */
   private getBrowserManagementStrategy(): string {
     return ConfigurationManager.get('BROWSER_MANAGEMENT_STRATEGY', 'reuse-browser');
   }
   
-  /**
-   * Initialize all @PageObject decorated properties
-   * Called automatically by the framework
-   */
   public async initializePageObjects(): Promise<void> {
-    // Try to get metadata from both the instance and its prototype
     let pageProperties = Reflect.getMetadata('page:properties', this) || [];
     if (pageProperties.length === 0) {
-      // Try the prototype
       pageProperties = Reflect.getMetadata('page:properties', Object.getPrototypeOf(this)) || [];
     }
     
-    // Get current page from BDDContext
     const currentPage = BDDContext.getCurrentPage();
     
-    // Check if the current page is closed
     if (!currentPage || currentPage.isClosed()) {
       throw new Error(`Cannot initialize page objects - no valid page available in BDDContext`);
     }
     
-    // For new-per-scenario, always clear cached instances to force reinitialization
     const browserStrategy = this.getBrowserManagementStrategy();
     
     this.logger.debug(`initializePageObjects called for ${this.constructor.name} with strategy: ${browserStrategy}`);
     this.logger.debug(`Current page URL: ${currentPage?.url() || 'N/A'}, isClosed: ${currentPage?.isClosed() || false}`);
     this.logger.debug(`Page properties count: ${pageProperties.length}, properties: ${JSON.stringify(pageProperties)}`);
     
-    // Always check if existing page objects need reinitialization
     for (const propertyKey of pageProperties) {
       const existingPageObject = (this as any)[propertyKey];
       if (existingPageObject && existingPageObject.currentPage) {
         try {
-          // If the existing page object's page is closed or different, we need to reinitialize
           if (existingPageObject.currentPage.isClosed() || existingPageObject.currentPage !== currentPage) {
             this.logger.debug(`Page object ${propertyKey} has a closed or different page, will reinitialize`);
-            // Clear the page object
             if (typeof existingPageObject.cleanup === 'function') {
               await existingPageObject.cleanup();
             }
             (this as any)[propertyKey] = undefined;
           }
         } catch (error) {
-          // If we can't check, clear it to be safe
           this.logger.debug(`Error checking page object ${propertyKey}, will reinitialize`);
           (this as any)[propertyKey] = undefined;
         }
@@ -83,23 +63,19 @@ export abstract class CSBDDBaseStepDefinition {
     if (browserStrategy === 'new-per-scenario') {
       this.logger.debug(`Clearing page instances for new-per-scenario strategy`);
       this.clearPageInstances();
-      // Also clear the property references
       for (const propertyKey of pageProperties) {
         this.logger.debug(`Clearing property ${propertyKey}`);
         (this as any)[propertyKey] = undefined;
       }
     }
     
-    // Initialize page objects
     for (const propertyKey of pageProperties) {
       let PageClass = Reflect.getMetadata('page:class', this, propertyKey);
       if (!PageClass) {
-        // Try the prototype
         PageClass = Reflect.getMetadata('page:class', Object.getPrototypeOf(this), propertyKey);
       }
       
       if (PageClass) {
-        // Always create new instance for new-per-scenario or if not exists
         if (browserStrategy === 'new-per-scenario' || !(this as any)[propertyKey]) {
           this.logger.debug(`Creating new instance of ${PageClass.name} for property ${propertyKey}`);
           const pageInstance = new PageClass();
@@ -108,7 +84,6 @@ export abstract class CSBDDBaseStepDefinition {
           this.pageInstances.set(PageClass.name, pageInstance);
           this.logger.debug(`Initialized page object: ${propertyKey} (${PageClass.name})`);
         } else {
-          // For reuse-browser, check if the page object needs reinitialization
           const existingInstance = (this as any)[propertyKey];
           if (existingInstance && existingInstance.currentPage !== currentPage) {
             this.logger.debug(`Reinitializing ${PageClass.name} for property ${propertyKey} with new page`);
@@ -123,29 +98,19 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Get current page
-   */
   protected get page(): Page {
     const currentPage = BDDContext.getCurrentPage();
-    // Ensure all page objects are using the current page
     const pageProperties = Reflect.getMetadata('page:properties', this) || 
                            Reflect.getMetadata('page:properties', Object.getPrototypeOf(this)) || [];
     for (const propertyKey of pageProperties) {
       const pageObject = (this as any)[propertyKey];
       if (pageObject && pageObject.currentPage !== currentPage) {
-        // Update the page reference if it has changed
         pageObject.page = currentPage;
       }
     }
     return currentPage;
   }
 
-  /**
-   * Wait for a specific URL pattern
-   * @param urlPattern - URL string or regex pattern to wait for
-   * @param options - Wait options
-   */
   protected async waitForURL(urlPattern: string | RegExp, options?: { timeout?: number }): Promise<void> {
     const patternStr = urlPattern instanceof RegExp ? urlPattern.toString() : urlPattern;
     const timeout = options?.timeout || 30000;
@@ -177,11 +142,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Wait for the page to reach a specific load state
-   * @param state - The load state to wait for
-   * @param options - Wait options
-   */
   protected async waitForLoadState(state?: 'load' | 'domcontentloaded' | 'networkidle', options?: { timeout?: number }): Promise<void> {
     const loadState = state || 'load';
     const timeout = options?.timeout || 30000;
@@ -213,37 +173,22 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Get BDD context
-   */
   protected get context(): BDDContext {
     return BDDContext.getInstance();
   }
 
-  /**
-   * Get scenario context
-   */
   protected get scenarioContext(): ScenarioContext {
     return this.context.getScenarioContext();
   }
 
-  /**
-   * Get step context
-   */
   protected get stepContext(): StepContext {
     return this.context.getStepContext();
   }
 
-  /**
-   * Get test data
-   */
   protected get testData(): any {
     return this.context.getTestData();
   }
 
-  /**
-   * Create page object
-   */
   protected async createPage<T extends CSBasePage>(
     PageClass: new() => T
   ): Promise<T> {
@@ -251,38 +196,23 @@ export abstract class CSBDDBaseStepDefinition {
   }
 
 
-  /**
-   * Store value in scenario context
-   */
   protected store(key: string, value: any): void {
     this.scenarioContext.set(key, value);
     ActionLogger.logContextStorage(key, typeof value);
   }
 
-  /**
-   * Retrieve value from scenario context
-   */
   protected retrieve<T = any>(key: string, defaultValue?: T): T {
     return this.scenarioContext.get<T>(key, defaultValue);
   }
 
-  /**
-   * Check if key exists in context
-   */
   protected has(key: string): boolean {
     return this.scenarioContext.has(key);
   }
 
-  /**
-   * Clear scenario context
-   */
   protected clearContext(): void {
     this.scenarioContext.clear();
   }
 
-  /**
-   * Wait for condition
-   */
   protected async waitFor(
     condition: () => Promise<boolean>,
     options?: {
@@ -324,42 +254,27 @@ export abstract class CSBDDBaseStepDefinition {
     throw error;
   }
 
-  /**
-   * Take screenshot
-   */
   protected async takeScreenshot(name: string): Promise<void> {
     const fileName = `${name}_${Date.now()}.png`;
     await this.page.screenshot({ path: `./screenshots/${fileName}` });
     ActionLogger.logScreenshot(fileName);
   }
 
-  /**
-   * Log step info
-   */
   protected logInfo(message: string): void {
     this.logger.info(message);
     ActionLogger.logInfo(`[STEP] ${message}`);
   }
 
-  /**
-   * Log step warning
-   */
   protected logWarning(message: string): void {
     this.logger.warn(message);
     ActionLogger.logWarn(`[STEP] ${message}`);
   }
 
-  /**
-   * Log step error
-   */
   protected logError(message: string, error?: Error): void {
     this.logger.error(message, error);
     ActionLogger.logError(`[STEP] ${message}`, error);
   }
 
-  /**
-   * Assert condition
-   */
   protected assert(
     condition: boolean,
     message: string
@@ -375,9 +290,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Soft assert (non-failing)
-   */
   protected softAssert(
     condition: boolean,
     message: string
@@ -394,9 +306,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert equals
-   */
   protected assertEquals<T>(
     actual: T,
     expected: T,
@@ -416,9 +325,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert contains
-   */
   protected assertContains(
     text: string,
     substring: string,
@@ -438,9 +344,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert matches pattern
-   */
   protected assertMatches(
     text: string,
     pattern: RegExp,
@@ -460,9 +363,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert true
-   */
   protected assertTrue(
     condition: boolean,
     message?: string
@@ -478,9 +378,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert false
-   */
   protected assertFalse(
     condition: boolean,
     message?: string
@@ -497,9 +394,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert not null
-   */
   protected assertNotNull<T>(
     value: T | null | undefined,
     message?: string
@@ -516,9 +410,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert array contains
-   */
   protected assertArrayContains<T>(
     array: T[],
     item: T,
@@ -538,9 +429,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Assert in range
-   */
   protected assertInRange(
     value: number,
     min: number,
@@ -561,12 +449,7 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Get element by description
-   */
   protected async getElement(description: string): Promise<CSWebElement> {
-    // This would integrate with AI element identification
-    // For now, return a basic implementation
     const element = new CSWebElement();
     element.page = this.page;
     element.options = {
@@ -578,9 +461,6 @@ export abstract class CSBDDBaseStepDefinition {
     return element;
   }
 
-  /**
-   * Execute JavaScript
-   */
   protected async executeScript<T = any>(
     script: string | Function,
     ...args: any[]
@@ -588,23 +468,14 @@ export abstract class CSBDDBaseStepDefinition {
     return await this.page.evaluate(script as any, ...args);
   }
 
-  /**
-   * Get current URL
-   */
   protected async getCurrentUrl(): Promise<string> {
     return this.page.url();
   }
 
-  /**
-   * Get page title
-   */
   protected async getPageTitle(): Promise<string> {
     return await this.page.title();
   }
 
-  /**
-   * Format currency
-   */
   protected formatCurrency(amount: number, currency: string = 'USD'): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -612,11 +483,7 @@ export abstract class CSBDDBaseStepDefinition {
     }).format(amount);
   }
 
-  /**
-   * Format date
-   */
   protected formatDate(date: Date, format: string = 'YYYY-MM-DD'): string {
-    // Simple date formatting - can be enhanced
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -627,9 +494,6 @@ export abstract class CSBDDBaseStepDefinition {
       .replace('DD', day);
   }
 
-  /**
-   * Generate random string
-   */
   protected generateRandomString(length: number = 10): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -641,25 +505,16 @@ export abstract class CSBDDBaseStepDefinition {
     return result;
   }
 
-  /**
-   * Generate random number
-   */
   protected generateRandomNumber(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  /**
-   * Generate random email
-   */
   protected generateRandomEmail(domain: string = 'test.com'): string {
     const username = this.generateRandomString(8).toLowerCase();
     const timestamp = Date.now();
     return `${username}_${timestamp}@${domain}`;
   }
 
-  /**
-   * Parse JSON safely
-   */
   protected parseJSON<T = any>(json: string): T | null {
     try {
       return JSON.parse(json);
@@ -669,9 +524,6 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
 
-  /**
-   * Retry operation
-   */
   protected async retry<T>(
     operation: () => Promise<T>,
     options?: {
@@ -702,9 +554,6 @@ export abstract class CSBDDBaseStepDefinition {
     throw lastError!;
   }
 
-  /**
-   * Measure execution time
-   */
   protected async measureTime<T>(
     operation: () => Promise<T>,
     label: string
@@ -726,36 +575,25 @@ export abstract class CSBDDBaseStepDefinition {
     }
   }
   
-  /**
-   * Get or create a page object with automatic initialization
-   */
   protected async getPage<T extends CSBasePage>(PageClass: new () => T): Promise<T> {
     const className = PageClass.name;
     const currentPage = BDDContext.getCurrentPage();
     
-    // For reuse-browser strategy, return cached instance if available
     const browserStrategy = this.getBrowserManagementStrategy();
     if (browserStrategy === 'reuse-browser' && this.pageInstances.has(className)) {
       return this.pageInstances.get(className) as T;
     }
     
-    // Create and initialize new instance
     const pageInstance = new PageClass();
     await pageInstance.initialize(currentPage);
     
-    // Cache for future use
     this.pageInstances.set(className, pageInstance);
     
     this.logger.debug(`Page object initialized: ${className}`);
     return pageInstance;
   }
   
-  /**
-   * Clear all cached page instances
-   * Called automatically when scenario ends
-   */
   protected clearPageInstances(): void {
-    // Clear all property references first
     const pageProperties = Reflect.getMetadata('page:properties', this) || [];
     for (const propertyKey of pageProperties) {
       const pageObject = (this as any)[propertyKey];
@@ -768,7 +606,6 @@ export abstract class CSBDDBaseStepDefinition {
       }
       (this as any)[propertyKey] = undefined;
     }
-    // Then clear the map
     this.pageInstances.clear();
   }
 }

@@ -23,7 +23,6 @@ export class TransactionSteps extends CSBDDBaseStepDefinition {
         await actionLogger.logDatabase('begin_transaction', '', 0);
 
         try {
-            // Check if transaction already active
             if (this.activeTransaction) {
                 throw new Error('A transaction is already active. Commit or rollback before starting a new one');
             }
@@ -217,7 +216,6 @@ export class TransactionSteps extends CSBDDBaseStepDefinition {
             const adapter = this.databaseContext.getActiveAdapter();
             await adapter.rollbackToSavepoint(transaction.connection, savepointName);
             
-            // Remove savepoints created after this one
             const index = this.savepoints.indexOf(savepointName);
             this.savepoints = this.savepoints.slice(0, index + 1);
 
@@ -302,7 +300,6 @@ export class TransactionSteps extends CSBDDBaseStepDefinition {
             const adapter = this.databaseContext.getActiveAdapter();
             const startTime = Date.now();
             
-            // Execute query within transaction context
             const result = await adapter.query(transaction.connection, interpolatedQuery);
             const executionTime = Date.now() - startTime;
 
@@ -335,7 +332,6 @@ export class TransactionSteps extends CSBDDBaseStepDefinition {
         try {
             const transaction = this.getActiveTransaction();
             
-            // Set timeout on the transaction
             transaction.timeout = timeout * 1000;
             
             await actionLogger.logDatabase('transaction_timeout_set', '', 0, undefined, {
@@ -349,7 +345,6 @@ export class TransactionSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    // Helper methods
     private getActiveConnection(): any {
         const connectionField = 'activeConnection';
         const connection = (this.databaseContext as any)[connectionField];

@@ -11,10 +11,6 @@ import { parameterTypeRegistry } from './ParameterTypeRegistry';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Matches step text to step definitions and extracts parameters
- * Handles ambiguous matches and provides detailed match information
- */
 export class StepMatcher {
   private static instance: StepMatcher;
   private readonly logger: Logger;
@@ -27,9 +23,6 @@ export class StepMatcher {
     this.parameterExtractionCache = new Map();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): StepMatcher {
     if (!StepMatcher.instance) {
       StepMatcher.instance = new StepMatcher();
@@ -37,11 +30,7 @@ export class StepMatcher {
     return StepMatcher.instance;
   }
 
-  /**
-   * Match step text to a step definition
-   */
   public match(stepText: string): MatchResult | null {
-    // Check cache
     const cached = this.matchCache.get(stepText);
     if (cached !== undefined) {
       return cached;
@@ -50,7 +39,6 @@ export class StepMatcher {
     const startTime = Date.now();
 
     try {
-      // Find matching step definition
       const stepDefinition = stepRegistry.findStepDefinition(stepText);
       
       if (!stepDefinition) {
@@ -58,11 +46,9 @@ export class StepMatcher {
         return null;
       }
 
-      // Extract parameters
       const parameters = this.extractParameters(stepText, stepDefinition);
       const parameterInfo = this.extractParameterInfo(stepText, stepDefinition, parameters);
 
-      // Calculate match score
       const score = this.calculateMatchScore(stepText, stepDefinition);
 
       const matchResult: MatchResult = {
@@ -73,7 +59,6 @@ export class StepMatcher {
         duration: Date.now() - startTime
       };
 
-      // Cache result
       this.matchCache.set(stepText, matchResult);
       
       ActionLogger.logInfo(`Step matched: "${stepText}" -> "${stepDefinition.patternString}" (${matchResult.duration}ms)`);
@@ -85,13 +70,9 @@ export class StepMatcher {
     }
   }
 
-  /**
-   * Extract parameters from step text
-   */
   public extractParameters(stepText: string, stepDefinition: StepDefinition): any[] {
     const cacheKey = `${stepText}::${stepDefinition.patternString}`;
     
-    // Check cache
     const cached = this.parameterExtractionCache.get(cacheKey);
     if (cached !== undefined) {
       return cached;
@@ -105,15 +86,12 @@ export class StepMatcher {
         return [];
       }
 
-      // Extract captured groups (skip full match at index 0)
       const rawParameters = match.slice(1);
 
-      // Transform parameters based on type
       const transformedParameters = rawParameters.map((value, index) => {
         return this.transformParameterValue(value, index, stepDefinition.patternString);
       });
 
-      // Cache result
       this.parameterExtractionCache.set(cacheKey, transformedParameters);
 
       return transformedParameters;
@@ -123,9 +101,6 @@ export class StepMatcher {
     }
   }
 
-  /**
-   * Find all matching step definitions
-   */
   public findAllMatches(stepText: string): MatchResult[] {
     const matches: MatchResult[] = [];
     const stepDefinitions = stepRegistry.getAllStepDefinitions();
@@ -151,15 +126,11 @@ export class StepMatcher {
       }
     }
 
-    // Sort by score (highest first)
     matches.sort((a, b) => b.score - a.score);
 
     return matches;
   }
 
-  /**
-   * Check if matches are ambiguous
-   */
   public isAmbiguous(matches: MatchResult[]): boolean {
     if (matches.length < 2) {
       return false;
@@ -168,13 +139,9 @@ export class StepMatcher {
     const first = matches[0];
     const second = matches[1];
     
-    // Check if top matches have same score
     return first !== undefined && second !== undefined && first.score === second.score;
   }
 
-  /**
-   * Calculate match score
-   */
   private calculateMatchScore(stepText: string, stepDefinition: StepDefinition): number {
     const scoreDetails: StepMatchScore = {
       total: 0,
@@ -184,21 +151,16 @@ export class StepMatcher {
       specificity: 0
     };
 
-    // Exact match bonus
     if (stepDefinition.patternString === stepText) {
       scoreDetails.exactMatch = 1000;
     }
 
-    // Pattern length score (longer patterns are more specific)
     scoreDetails.patternLength = stepDefinition.patternString.length;
 
-    // Parameter count score (fewer parameters = more specific)
     scoreDetails.parameterCount = 100 - (stepDefinition.parameterCount * 10);
 
-    // Pattern specificity score
     scoreDetails.specificity = this.calculateSpecificityScore(stepDefinition.pattern);
 
-    // Calculate total
     scoreDetails.total = 
       scoreDetails.exactMatch +
       scoreDetails.patternLength +
@@ -208,32 +170,23 @@ export class StepMatcher {
     return scoreDetails.total;
   }
 
-  /**
-   * Calculate pattern specificity score
-   */
   private calculateSpecificityScore(pattern: string | RegExp): number {
     const regex = this.ensureRegExp(pattern);
     const source = regex.source;
     let score = 0;
 
-    // Literal characters are more specific
     const literalCount = (source.match(/[a-zA-Z0-9\s]/g) || []).length;
     score += literalCount * 2;
 
-    // Special regex characters reduce specificity
     const specialCount = (source.match(/[.*+?^${}()|[\]\\]/g) || []).length;
     score -= specialCount;
 
-    // Word boundaries add specificity
     const boundaryCount = (source.match(/\\b/g) || []).length;
     score += boundaryCount * 5;
 
     return Math.max(0, score);
   }
 
-  /**
-   * Extract parameter information
-   */
   private extractParameterInfo(
     stepText: string,
     stepDefinition: StepDefinition,
@@ -247,7 +200,6 @@ export class StepMatcher {
       return parameterInfo;
     }
 
-    // Track positions of captured groups
     let currentIndex = 0;
     
     for (let i = 1; i < match.length; i++) {
@@ -270,23 +222,18 @@ export class StepMatcher {
     return parameterInfo;
   }
 
-  /**
-   * Transform parameter value based on detected type
-   */
   private transformParameterValue(value: string, index: number, pattern: string): any {
     if (!value) {
       return value;
     }
 
     try {
-      // Try to detect parameter type from pattern hints
       const typeHint = this.extractTypeHint(pattern, index);
       
       if (typeHint) {
         return this.transformParameter(value, typeHint);
       }
 
-      // Auto-detect type
       const detectedType = this.detectParameterType(value);
       if (detectedType) {
         return this.transformParameter(value, detectedType);
@@ -299,11 +246,7 @@ export class StepMatcher {
     }
   }
 
-  /**
-   * Extract type hint from pattern
-   */
   private extractTypeHint(pattern: string, index: number): string | null {
-    // Look for Cucumber expression types like {int}, {float}, {string}
     const typeMatches = pattern.match(/\{(\w+)\}/g);
     
     if (typeMatches && typeMatches[index]) {
@@ -317,16 +260,10 @@ export class StepMatcher {
     return null;
   }
 
-  /**
-   * Detect parameter type from value
-   */
   private detectParameterType(value: string): string | null {
     return parameterTypeRegistry.detectType(value);
   }
 
-  /**
-   * Transform parameter using type registry
-   */
   private transformParameter(value: string, typeName: string): any {
     try {
       return parameterTypeRegistry.transform(value, typeName);
@@ -335,25 +272,16 @@ export class StepMatcher {
     }
   }
 
-  /**
-   * Ensure pattern is RegExp
-   */
   private ensureRegExp(pattern: string | RegExp): RegExp {
     return typeof pattern === 'string' ? new RegExp(pattern) : pattern;
   }
 
-  /**
-   * Clear caches
-   */
   public clearCache(): void {
     this.matchCache.clear();
     this.parameterExtractionCache.clear();
     this.logger.debug('Match caches cleared');
   }
 
-  /**
-   * Get ambiguous match details
-   */
   public getAmbiguousMatchDetails(matches: MatchResult[]): string {
     if (matches.length < 2) {
       return 'No ambiguous matches';
@@ -361,7 +289,6 @@ export class StepMatcher {
 
     const names: string[] = [];
     
-    // Find all matches with the same top score
     if (matches[0] && matches[1] && matches[0].score === matches[1].score) {
       matches.forEach((match) => {
         if (matches[0] && matches[0].score === match.score) {
@@ -373,9 +300,6 @@ export class StepMatcher {
     return `Ambiguous step definitions:\n${names.map(n => `  - ${n}`).join('\n')}`;
   }
 
-  /**
-   * Get match statistics
-   */
   public getMatchStats(): {
     cacheSize: number;
     parameterCacheSize: number;
@@ -384,13 +308,10 @@ export class StepMatcher {
     return {
       cacheSize: this.matchCache.size,
       parameterCacheSize: this.parameterExtractionCache.size,
-      hitRate: 0 // Would need to track hits/misses for this
+      hitRate: 0
     };
   }
 
-  /**
-   * Validate step has unique match
-   */
   public validateUniqueMatch(stepText: string): void {
     const matches = this.findAllMatches(stepText);
     
@@ -403,15 +324,11 @@ export class StepMatcher {
     }
   }
 
-  /**
-   * Get best match score from multiple matches
-   */
   public getBestMatchScore(matches: MatchResult[]): number {
     if (matches.length === 0) {
       return 0;
     }
 
-    // Group by score
     const scoreGroups = new Map<number, MatchResult[]>();
     
     matches.forEach((match) => {
@@ -422,7 +339,6 @@ export class StepMatcher {
       scoreGroups.get(score)?.push(match);
     });
 
-    // Check for ambiguous top scores
     const topScore = Math.max(...Array.from(scoreGroups.keys()));
     const topMatches = scoreGroups.get(topScore) || [];
     
@@ -445,5 +361,4 @@ export class StepMatcher {
   }
 }
 
-// Export singleton instance
 export const stepMatcher = StepMatcher.getInstance();

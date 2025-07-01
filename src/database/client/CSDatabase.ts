@@ -25,12 +25,7 @@ import { RedisAdapter } from '../adapters/RedisAdapter';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
-// import { CryptoUtils } from '../../core/utils/CryptoUtils';
 
-/**
- * Factory and facade for database operations
- * Provides unified interface across all database types
- */
 export class CSDatabase {
   private static instances: Map<string, CSDatabase> = new Map();
   private adapter: DatabaseAdapter;
@@ -52,9 +47,6 @@ export class CSDatabase {
     this.resultSetParser = new ResultSetParser(this.adapter);
   }
 
-  /**
-   * Create or get database instance
-   */
   static async getInstance(alias: string = 'default'): Promise<CSDatabase> {
     if (!this.instances.has(alias)) {
       const config = await this.loadDatabaseConfig(alias);
@@ -63,9 +55,6 @@ export class CSDatabase {
     return this.instances.get(alias)!;
   }
 
-  /**
-   * Connect to database using connection string
-   */
   static async connectWithConnectionString(connectionString: string, alias: string = 'default'): Promise<CSDatabase> {
     const config = this.parseConnectionString(connectionString);
     const instance = new CSDatabase(config, alias);
@@ -74,9 +63,6 @@ export class CSDatabase {
     return instance;
   }
 
-  /**
-   * Connect to database
-   */
   async connect(): Promise<DatabaseConnection> {
     try {
       const actionLogger = ActionLogger.getInstance();
@@ -85,7 +71,6 @@ export class CSDatabase {
       const connection = await this.connectionManager.connect(this.config);
       this.connected = true;
 
-      // Set session parameters if configured
       if (this.config.sessionParameters) {
         await this.setSessionParameters(connection, this.config.sessionParameters);
       }
@@ -106,16 +91,10 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Execute query (alias for query method)
-   */
   async execute(sql: string, params?: any[]): Promise<ResultSet> {
     return this.query(sql, params);
   }
 
-  /**
-   * Execute query with execution plan
-   */
   async executeWithPlan(sql: string, params?: any[]): Promise<ResultSet> {
     try {
       this.validateConnection();
@@ -124,10 +103,8 @@ export class CSDatabase {
       await actionLogger.logDatabase('queryWithPlan', sql, 0, undefined, { alias: this.connectionAlias, params });
       const startTime = Date.now();
 
-      // Get the current connection
       const connection = await this.connectionManager.getConnection();
 
-      // First, get the execution plan
       let executionPlan: string = '';
       const dbType = this.config.type.toLowerCase();
 
@@ -161,7 +138,6 @@ export class CSDatabase {
             executionPlan = this.formatExecutionPlan(oraclePlan);
             break;
           default:
-            // Try generic EXPLAIN
             const defaultPlan = await this.queryExecutor.execute(connection, `EXPLAIN ${sql}`, params);
             executionPlan = this.formatExecutionPlan(defaultPlan);
         }
@@ -170,7 +146,6 @@ export class CSDatabase {
         logger.warn(`Failed to get execution plan: ${(planError as Error).message}`);
       }
 
-      // Execute the actual query
       const result = await this.queryExecutor.execute(connection, sql, params);
 
       const duration = Date.now() - startTime;
@@ -179,14 +154,12 @@ export class CSDatabase {
         executionPlan,
       });
 
-      // Store execution plan in result metadata
       if (result['metadata']) {
         result['metadata'].executionPlan = executionPlan;
       } else {
         result['metadata'] = { executionPlan };
       }
 
-      // Store for chaining
       this.storeResultForChaining(result);
 
       return result;
@@ -201,9 +174,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Format execution plan from query result
-   */
   private formatExecutionPlan(result: ResultSet): string {
     if (!result || !result.rows || result.rows.length === 0) {
       return 'No execution plan available';
@@ -214,7 +184,6 @@ export class CSDatabase {
     if (Array.isArray(result.rows)) {
       result.rows.forEach((row: any, index: number) => {
         if (typeof row === 'object') {
-          // Handle different column names used by different databases
           const planText =
             row['QUERY PLAN'] ||
             row['QueryPlan'] ||
@@ -234,9 +203,6 @@ export class CSDatabase {
     return plan || 'Execution plan format not recognized';
   }
 
-  /**
-   * Execute query with parameters
-   */
   async query<T = any>(sql: string, params?: any[], options?: QueryOptions): Promise<ResultSet> {
     try {
       this.validateConnection();
@@ -252,7 +218,6 @@ export class CSDatabase {
       const duration = Date.now() - startTime;
       await actionLogger.logDatabase('queryResult', sql, duration, result.rowCount, { alias: this.connectionAlias });
 
-      // Store for chaining
       this.storeResultForChaining(result);
 
       return result;
@@ -267,9 +232,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Execute query from predefined queries
-   */
   async queryByName(queryName: string, params?: any[], options?: QueryOptions): Promise<ResultSet> {
     const sql = ConfigurationManager.get(`DATABASE_QUERY_${queryName.toUpperCase()}`);
     if (!sql) {
@@ -281,9 +243,6 @@ export class CSDatabase {
     return this.query(sql, params, options);
   }
 
-  /**
-   * Execute query from file
-   */
   async queryFromFile(filePath: string, params?: any[], options?: QueryOptions): Promise<ResultSet> {
     try {
       const fs = await import('fs/promises');
@@ -300,9 +259,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Execute stored procedure
-   */
   async executeStoredProcedure(procedureName: string, params?: any[], options?: QueryOptions): Promise<ResultSet> {
     try {
       this.validateConnection();
@@ -327,9 +283,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Execute function
-   */
   async executeFunction(functionName: string, params?: any[], options?: QueryOptions): Promise<any> {
     try {
       this.validateConnection();
@@ -351,9 +304,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Begin transaction
-   */
   async beginTransaction(options?: TransactionOptions): Promise<void> {
     try {
       this.validateConnection();
@@ -372,9 +322,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Commit transaction
-   */
   async commitTransaction(): Promise<void> {
     try {
       this.validateConnection();
@@ -393,9 +340,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Rollback transaction
-   */
   async rollbackTransaction(savepoint?: string): Promise<void> {
     try {
       this.validateConnection();
@@ -414,9 +358,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Create savepoint
-   */
   async createSavepoint(name: string): Promise<void> {
     try {
       this.validateConnection();
@@ -435,9 +376,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Execute batch operations
-   */
   async executeBatch(operations: BulkOperation[]): Promise<ResultSet[]> {
     try {
       this.validateConnection();
@@ -449,7 +387,6 @@ export class CSDatabase {
       const connection = await this.connectionManager.getConnection();
       const results: ResultSet[] = [];
 
-      // Execute in transaction for consistency
       await this.beginTransaction();
 
       try {
@@ -486,9 +423,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Bulk insert data
-   */
   async bulkInsert(table: string, data: any[], options?: { batchSize?: number }): Promise<number> {
     try {
       this.validateConnection();
@@ -504,7 +438,6 @@ export class CSDatabase {
       const connection = await this.connectionManager.getConnection();
       let totalInserted = 0;
 
-      // Process in batches
       for (let i = 0; i < data.length; i += batchSize) {
         const batch = data.slice(i, i + batchSize);
         const inserted = await this.adapter.bulkInsert(connection, table, batch);
@@ -529,9 +462,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Prepare statement for repeated execution
-   */
   async prepare(sql: string): Promise<PreparedStatement> {
     try {
       this.validateConnection();
@@ -550,9 +480,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Get database metadata
-   */
   async getMetadata(): Promise<DatabaseMetadata> {
     try {
       this.validateConnection();
@@ -571,9 +498,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Get table information
-   */
   async getTableInfo(tableName: string): Promise<any> {
     try {
       this.validateConnection();
@@ -593,9 +517,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Export query result
-   */
   async exportResult(
     result: ResultSet,
     format: 'csv' | 'json' | 'xml' | 'excel' | 'text',
@@ -617,9 +538,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Import data
-   */
   async importData(
     table: string,
     filePath: string,
@@ -644,9 +562,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Close database connection
-   */
   async disconnect(): Promise<void> {
     try {
       if (!this.connected) return;
@@ -657,7 +572,6 @@ export class CSDatabase {
       await this.connectionManager.disconnect();
       this.connected = false;
 
-      // Remove from instances
       CSDatabase.instances.delete(this.connectionAlias);
     } catch (error) {
       const actionLogger = ActionLogger.getInstance();
@@ -668,52 +582,31 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Get connection status
-   */
   isConnected(): boolean {
     return this.connected && this.connectionManager.isHealthy();
   }
 
-  /**
-   * Get database type
-   */
   getType(): DatabaseType {
     return this.config.type;
   }
 
-  /**
-   * Get connection alias
-   */
   getAlias(): string {
     return this.connectionAlias;
   }
 
-  /**
-   * Get connection pool stats
-   */
   getPoolStats(): any {
     return this.connectionManager.getPoolStats();
   }
 
-  /**
-   * Get the database adapter
-   */
   getAdapter(): DatabaseAdapter {
     return this.adapter;
   }
 
-  /**
-   * Get the current connection
-   */
   async getConnection(): Promise<DatabaseConnection> {
     this.validateConnection();
     return this.connectionManager.getConnection();
   }
 
-  /**
-   * Load database configuration
-   */
   private static async loadDatabaseConfig(alias: string): Promise<DatabaseConfig> {
     const config: DatabaseConfig = {
       type: ConfigurationManager.get(`DB_${alias.toUpperCase()}_TYPE`, 'sqlserver') as DatabaseType,
@@ -730,7 +623,6 @@ export class CSDatabase {
       options: {},
     };
 
-    // Load additional options
     const optionsPrefix = `DB_${alias.toUpperCase()}_OPTION_`;
     const allKeys = ConfigurationManager.getAllKeys();
 
@@ -744,9 +636,6 @@ export class CSDatabase {
     return config;
   }
 
-  /**
-   * Parse connection string
-   */
   private static parseConnectionString(connectionString: string): DatabaseConfig {
     const config: DatabaseConfig = {
       type: 'sqlserver' as DatabaseType,
@@ -757,7 +646,6 @@ export class CSDatabase {
       options: {},
     };
 
-    // Detect database type
     if (connectionString.toLowerCase().includes('mysql://')) {
       config.type = 'mysql';
       config.port = 3306;
@@ -778,7 +666,6 @@ export class CSDatabase {
       config.port = 1521;
     }
 
-    // Parse common patterns
     const serverMatch = connectionString.match(/(?:server|host)=([^;]+)/i);
     if (serverMatch && serverMatch[1]) config.host = serverMatch[1];
 
@@ -794,30 +681,22 @@ export class CSDatabase {
     const portMatch = connectionString.match(/(?:port)=(\d+)/i);
     if (portMatch && portMatch[1]) config.port = parseInt(portMatch[1]);
 
-    // Ensure username and password are strings
     if (!config.username) config.username = '';
     if (!config.password) config.password = '';
 
     return config;
   }
 
-  /**
-   * Process configuration (decrypt passwords, etc)
-   */
   private processConfig(config: DatabaseConfig): DatabaseConfig {
     const processed = { ...config };
 
-    // Decrypt password if encrypted
     if (processed.password && processed.password.startsWith('enc:')) {
-      // For now, just remove the enc: prefix - proper decryption would need salt, iv, tag
       processed.password = processed.password.substring(4);
     }
 
-    // Process connection string password
     if (processed.connectionString && processed.connectionString.includes('password=enc:')) {
       const encMatch = processed.connectionString.match(/password=enc:([^;]+)/i);
       if (encMatch) {
-        // For now, just use the encrypted value - proper decryption would need salt, iv, tag
         const decrypted = encMatch[1];
         processed.connectionString = processed.connectionString.replace(
           `password=enc:${encMatch[1]}`,
@@ -829,9 +708,6 @@ export class CSDatabase {
     return processed;
   }
 
-  /**
-   * Create adapter based on database type
-   */
   private createAdapter(type: DatabaseType): DatabaseAdapter {
     switch (type) {
       case 'sqlserver':
@@ -851,9 +727,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Validate connection
-   */
   private validateConnection(): void {
     if (!this.connected) {
       throw new Error('Database not connected. Call connect() first.');
@@ -864,9 +737,6 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Set session parameters
-   */
   private async setSessionParameters(connection: DatabaseConnection, parameters: Record<string, any>): Promise<void> {
     for (const [key, value] of Object.entries(parameters)) {
       try {
@@ -878,18 +748,11 @@ export class CSDatabase {
     }
   }
 
-  /**
-   * Store result for chaining
-   */
   private storeResultForChaining(result: ResultSet): void {
-    // Store in BDD context for chaining
     const BDDContext = require('../../bdd/context/BDDContext').BDDContext;
     BDDContext.setDatabaseResult(this.connectionAlias, result);
   }
 
-  /**
-   * Enhance error with context
-   */
   private enhanceError(error: Error, code: string, context?: any): Error {
     const enhanced = new Error(`[${code}] ${error.message}`);
     (enhanced as any).code = code;
@@ -897,7 +760,6 @@ export class CSDatabase {
     (enhanced as any).database = this.connectionAlias;
     (enhanced as any).context = context;
 
-    // Add troubleshooting hints
     if (code === 'CONNECTION_FAILED') {
       enhanced.message +=
         '\n\nTroubleshooting:\n' +
@@ -915,9 +777,6 @@ export class CSDatabase {
     return enhanced;
   }
 
-  /**
-   * Disconnect all instances (for cleanup)
-   */
   static async disconnectAll(): Promise<void> {
     const promises = Array.from(this.instances.values()).map(db => db.disconnect());
     await Promise.all(promises);

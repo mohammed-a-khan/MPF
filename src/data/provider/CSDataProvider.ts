@@ -18,10 +18,6 @@ import { ColumnNormalizer } from '../utils/ColumnNormalizer';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
-/**
- * Main data provider orchestrator
- * Manages loading, caching, and providing test data from multiple sources
- */
 export class CSDataProvider {
     private static instance: CSDataProvider;
     private cache: DataCache;
@@ -50,7 +46,6 @@ export class CSDataProvider {
         this.config = this.createDefaultConfig();
         this.initializeConfig();
         
-        // Initialize data encryption manager
         DataEncryptionManager.initialize({
             enableAutoDecryption: true
         });
@@ -58,15 +53,12 @@ export class CSDataProvider {
         this.testData = new Map();
     }
 
-    /**
-     * Create default configuration
-     */
     private createDefaultConfig(): DataProviderConfig {
         return {
             cacheEnabled: true,
-            cacheTTL: 3600000, // 1 hour
+            cacheTTL: 3600000,
             defaultDataPath: './test-data',
-            streamingThreshold: 10485760, // 10MB
+            streamingThreshold: 10485760,
             maxRetries: 3,
             retryDelay: 1000,
             variablePrefix: '${',
@@ -76,9 +68,6 @@ export class CSDataProvider {
         };
     }
 
-    /**
-     * Get singleton instance
-     */
     static getInstance(): CSDataProvider {
         if (!CSDataProvider.instance) {
             CSDataProvider.instance = new CSDataProvider();
@@ -86,15 +75,12 @@ export class CSDataProvider {
         return CSDataProvider.instance;
     }
 
-    /**
-     * Initialize configuration
-     */
     private initializeConfig(): void {
         this.config = {
             cacheEnabled: ConfigurationManager.getBoolean('DATA_PROVIDER_CACHE_ENABLED', true),
-            cacheTTL: ConfigurationManager.getInt('DATA_PROVIDER_CACHE_TTL', 3600000), // 1 hour
+            cacheTTL: ConfigurationManager.getInt('DATA_PROVIDER_CACHE_TTL', 3600000),
             defaultDataPath: ConfigurationManager.get('DEFAULT_DATA_PATH', './test-data'),
-            streamingThreshold: ConfigurationManager.getInt('DATA_STREAMING_THRESHOLD', 10485760), // 10MB
+            streamingThreshold: ConfigurationManager.getInt('DATA_STREAMING_THRESHOLD', 10485760),
             maxRetries: ConfigurationManager.getInt('DATA_PROVIDER_MAX_RETRIES', 3),
             retryDelay: ConfigurationManager.getInt('DATA_PROVIDER_RETRY_DELAY', 1000),
             variablePrefix: ConfigurationManager.get('DATA_VARIABLE_PREFIX', '${'),
@@ -104,16 +90,11 @@ export class CSDataProvider {
         };
     }
 
-    /**
-     * Load test data based on options
-     * Main entry point for data loading
-     */
     async loadData(options: DataProviderOptions): Promise<TestData[]> {
         const startTime = Date.now();
         ActionLogger.logInfo('Data provider operation: load', { operation: 'load', options });
         
         try {
-            // Check cache first if enabled
             if (this.config.cacheEnabled) {
                 const cached = this.cache.get(this.generateCacheKey(options));
                 if (cached) {
@@ -122,30 +103,23 @@ export class CSDataProvider {
                 }
             }
 
-            // Parse options from @DataProvider tag
             const parsedOptions = await this.parseDataProviderOptions(options);
             
-            // Load data from source
             let data = await this.loadFromSource(parsedOptions);
             logger.debug(`Loaded ${data.length} rows from source`);
             
-            // Apply transformations
             data = await this.applyTransformations(data, parsedOptions);
             logger.debug(`After transformations: ${data.length} rows`);
             
-            // Filter by execution flag
             data = await this.filterByExecutionFlag(data, parsedOptions);
             logger.debug(`After execution flag filter: ${data.length} rows`);
             
-            // Validate data
             await this.validateData(data, parsedOptions);
             
-            // Cache if enabled
             if (this.config.cacheEnabled) {
                 this.cache.set(this.generateCacheKey(options), data, this.config.cacheTTL);
             }
             
-            // Store for cleanup
             const dataId = this.generateDataId(options);
             this.loadedData.set(dataId, data);
             this.cleanupManager.registerData(dataId, data);
@@ -170,17 +144,12 @@ export class CSDataProvider {
         }
     }
 
-    /**
-     * Parse @DataProvider tag options
-     */
     private async parseDataProviderOptions(options: DataProviderOptions): Promise<DataProviderOptions> {
-        // Parse tag format: @DataProvider(source="file.xlsx", sheet="TestData", filter="Status=Active")
         if (options.tagValue) {
             const parsed = this.parseTagValue(options.tagValue);
             return { ...options, ...parsed };
         }
         
-        // Apply defaults
         return {
             ...options,
             source: options.source || await this.resolveDataSource(options),
@@ -190,33 +159,30 @@ export class CSDataProvider {
         };
     }
 
-    /**
-     * Parse @DataProvider tag value
-     */
     private parseTagValue(tagValue: string): Partial<DataProviderOptions> {
         const options: Partial<DataProviderOptions> = {};
         
         logger.debug(`Parsing @DataProvider tag value: ${tagValue}`);
-        console.log(`🔍 DEBUG parseTagValue: Input tagValue = "${tagValue}"`);
+        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Input tagValue = "${tagValue}"`);
         
-        // Parse key=value pairs - handle both quoted and unquoted values
-        // Use a more robust parsing approach for complex values like JSONPath
         const attributes: Array<{key: string, value: string}> = [];
         let currentPos = 0;
         
         while (currentPos < tagValue.length) {
-            // Find the next key
             const keyMatch = tagValue.substring(currentPos).match(/^(\w+)="/);
             if (!keyMatch) break;
             
             const key = keyMatch[1];
-            if (!key) continue; // Skip if key is somehow undefined
+            if (!key) continue;
             currentPos += keyMatch[0].length;
             
-            // Extract the value, handling nested quotes
             let value = '';
             let inEscape = false;
             let depth = 0;
+            let inSingleQuote = false;
+            
+            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Extracting value for key="${key}" starting at pos ${currentPos}`);
+            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Remaining string: "${tagValue.substring(currentPos, currentPos + 100)}..."`);
             
             for (let i = currentPos; i < tagValue.length; i++) {
                 const char = tagValue[i];
@@ -233,31 +199,48 @@ export class CSDataProvider {
                     continue;
                 }
                 
-                if (char === '"' && depth === 0) {
-                    // End of value
+                if (char === "'" && !inEscape) {
+                    inSingleQuote = !inSingleQuote;
+                    value += char;
+                    continue;
+                }
+                
+                if (char === '"' && depth === 0 && !inSingleQuote) {
                     currentPos = i + 1;
+                    if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Found end quote at position ${i}, depth=${depth}`);
                     break;
                 }
                 
-                if (char === '[' || char === '{' || char === '(') depth++;
-                if (char === ']' || char === '}' || char === ')') depth--;
+                if (!inSingleQuote) {
+                    if (char === '[' || char === '{' || char === '(') {
+                        depth++;
+                        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Opening bracket '${char}' at pos ${i}, depth now ${depth}`);
+                    }
+                    if (char === ']' || char === '}' || char === ')') {
+                        depth--;
+                        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Closing bracket '${char}' at pos ${i}, depth now ${depth}`);
+                    }
+                }
                 
                 value += char;
             }
             
-            attributes.push({ key, value });
-            console.log(`🔍 DEBUG parseTagValue: Extracted ${key}="${value}"`);
+            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Final value for ${key} = "${value}", depth=${depth}`);
+            if (depth !== 0) {
+                console.warn(`⚠️ WARNING: Bracket depth is ${depth} after parsing, brackets may be unbalanced`);
+            }
             
-            // Skip comma and whitespace
+            attributes.push({ key, value });
+            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Extracted ${key}="${value}"`);
+            
             while (currentPos < tagValue.length && (tagValue[currentPos] === ',' || tagValue[currentPos] === ' ')) {
                 currentPos++;
             }
         }
         
-        // Process the extracted attributes
         for (const { key, value } of attributes) {
             logger.debug(`Extracted key="${key}", value="${value}"`);
-            console.log(`🔍 DEBUG parseTagValue: Processing ${key}="${value}"`);
+            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Processing ${key}="${value}"`);
             
             switch (key) {
                 case 'source':
@@ -279,8 +262,6 @@ export class CSDataProvider {
                     options.query = value || '';
                     break;
                 case 'filter':
-                    // Filter values are already captured correctly by the regex
-                    // The value contains the full filter string
                     options.filter = this.parseFilter(value || '');
                     break;
                 case 'schema':
@@ -296,7 +277,6 @@ export class CSDataProvider {
                     options.skipExecutionFlag = value === 'true';
                     break;
                 case 'delimiter':
-                    // Store delimiter for CSV handler
                     (options as any).delimiter = value;
                     break;
                 case 'headers':
@@ -312,28 +292,23 @@ export class CSDataProvider {
                     (options as any).parseDates = value === 'true';
                     break;
                 case 'jsonPath':
-                    // Store JSONPath for JSON handler
                     (options as any).jsonPath = value;
-                    console.log(`🔍 DEBUG parseTagValue: jsonPath = "${value}"`);
+                    if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: jsonPath = "${value}"`);
                     break;
             }
         }
         
-        console.log(`🔍 DEBUG parseTagValue: Total attributes found = ${attributes.length}`);
+        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Total attributes found = ${attributes.length}`);
         logger.debug(`Parsed tag options: ${JSON.stringify(options)}`);
-        console.log(`🔍 DEBUG parseTagValue: Final parsed options = ${JSON.stringify(options)}`);
+        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseTagValue: Final parsed options = ${JSON.stringify(options)}`);
         return options;
     }
 
-    /**
-     * Parse filter expression
-     */
     private parseFilter(filterStr: string): Record<string, any> {
         const filter: Record<string, any> = {};
         
         logger.debug(`Parsing filter string: "${filterStr}"`);
         
-        // Parse simple key=value filters
         const parts = filterStr.split(',');
         for (const part of parts) {
             const splitParts = part.split('=').map(s => s.trim());
@@ -344,7 +319,7 @@ export class CSDataProvider {
                     const parsedValue = this.parseFilterValue(value || '');
                     filter[key] = parsedValue;
                     logger.debug(`Filter parsed: ${key} = ${parsedValue} (type: ${typeof parsedValue})`);
-                    console.log(`🔍 DEBUG parseFilter: ${key} = "${value}" -> ${parsedValue} (type: ${typeof parsedValue})`);
+                    if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG parseFilter: ${key} = "${value}" -> ${parsedValue} (type: ${typeof parsedValue})`);
                 }
             }
         }
@@ -353,21 +328,15 @@ export class CSDataProvider {
         return filter;
     }
 
-    /**
-     * Parse filter value
-     */
     private parseFilterValue(value: string): any {
-        // Number
         if (/^\d+(\.\d+)?$/.test(value)) {
             return parseFloat(value);
         }
         
-        // Boolean - handle Y/N and other common boolean values
         const lowerValue = value.toLowerCase();
         if (lowerValue === 'true' || lowerValue === 'false') {
             return lowerValue === 'true';
         }
-        // Handle Y/N values that TypeConverter converts to boolean
         if (lowerValue === 'y' || lowerValue === 'yes' || lowerValue === '1' || 
             lowerValue === 'on' || lowerValue === 'enabled' || lowerValue === 'active') {
             return true;
@@ -377,21 +346,16 @@ export class CSDataProvider {
             return false;
         }
         
-        // Date
         if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
             return new Date(value);
         }
         
-        // String (remove quotes if present)
         return value.replace(/^["']|["']$/g, '');
     }
 
-    /**
-     * Load data from source
-     */
     private async loadFromSource(options: DataProviderOptions): Promise<TestData[]> {
         logger.debug(`loadFromSource called with options: ${JSON.stringify(options)}`);
-        console.log(`🔍 DEBUG loadFromSource: options = ${JSON.stringify(options, null, 2)}`);
+        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG loadFromSource: options = ${JSON.stringify(options, null, 2)}`);
         const handler = this.factory.createHandler(options.type!);
         
         let attempt = 0;
@@ -400,18 +364,16 @@ export class CSDataProvider {
         while (attempt < this.config.maxRetries) {
             try {
                 logger.debug(`Loading data from source: ${options.source}, type: ${options.type}`);
-                console.log(`🔍 DEBUG loadFromSource: Calling handler.load with source=${options.source}`);
+                if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG loadFromSource: Calling handler.load with source=${options.source}`);
                 const result = await handler.load(options);
-                console.log(`🔍 DEBUG loadFromSource: Handler returned ${result.data.length} rows`);
+                if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG loadFromSource: Handler returned ${result.data.length} rows`);
                 logger.debug(`Handler returned ${result.data.length} rows`);
                 
-                // Normalize column names to handle variations
                 const normalizedData = ColumnNormalizer.normalizeData(result.data);
                 
-                // Log first few rows for debugging
                 if (normalizedData.length > 0) {
-                    console.log(`🔍 DEBUG loadFromSource: First row (before normalization) = ${JSON.stringify(result.data[0])}`);
-                    console.log(`🔍 DEBUG loadFromSource: First row (after normalization) = ${JSON.stringify(normalizedData[0])}`);
+                    if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG loadFromSource: First row (before normalization) = ${JSON.stringify(result.data[0])}`);
+                    if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG loadFromSource: First row (after normalization) = ${JSON.stringify(normalizedData[0])}`);
                 }
                 
                 return normalizedData;
@@ -430,32 +392,24 @@ export class CSDataProvider {
         throw lastError || new Error('Failed to load data after retries');
     }
 
-    /**
-     * Apply transformations to data
-     */
     private async applyTransformations(
         data: TestData[], 
         options: DataProviderOptions
     ): Promise<TestData[]> {
-        // Apply automatic decryption for encrypted values
         data = await DataEncryptionManager.processTestData(data);
         
-        // Apply filter if specified
         if (options.filter) {
             data = this.applyFilter(data, options.filter);
         }
         
-        // Apply transformations
         if (options.transformations) {
             data = await this.transformer.transform(data, options.transformations);
         }
         
-        // Interpolate variables
         if (options.interpolateVariables !== false) {
             data = await this.interpolator.interpolateArray(data, options.variables || {});
         }
         
-        // Merge with additional data sources
         if (options.mergeSources) {
             for (const mergeSource of options.mergeSources) {
                 const mergeData = await this.loadFromSource({
@@ -470,19 +424,14 @@ export class CSDataProvider {
         return data;
     }
 
-    /**
-     * Apply filter to data
-     */
     private applyFilter(data: TestData[], filter: Record<string, any>): TestData[] {
         logger.debug(`Applying filter: ${JSON.stringify(filter)} to ${data.length} rows`);
-        console.log(`🔍 DEBUG applyFilter: filter = ${JSON.stringify(filter)}, data.length = ${data.length}`);
+        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: filter = ${JSON.stringify(filter)}, data.length = ${data.length}`);
         
-        // Log first row to see column names
         if (data.length > 0 && data[0]) {
-            console.log(`🔍 DEBUG applyFilter: First row keys = ${Object.keys(data[0]).join(', ')}`);
-            console.log(`🔍 DEBUG applyFilter: First row = ${JSON.stringify(data[0])}`);
+            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: First row keys = ${Object.keys(data[0]).join(', ')}`);
+            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: First row = ${JSON.stringify(data[0])}`);
             
-            // Check if filter columns exist in the data
             const availableColumns = Object.keys(data[0]);
             const filterColumns = Object.keys(filter);
             const missingColumns = filterColumns.filter(col => !availableColumns.includes(col));
@@ -497,21 +446,19 @@ export class CSDataProvider {
         const filtered = data.filter((row, index) => {
             let rowMatches = true;
             for (const [key, value] of Object.entries(filter)) {
-                // Check if the key exists in the row
                 if (!(key in row)) {
                     if (index < 3) {
-                        console.log(`🔍 DEBUG applyFilter: Row ${index} - key "${key}" not found in row`);
+                        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: Row ${index} - key "${key}" not found in row`);
                     }
                     rowMatches = false;
                     break;
                 }
                 
-                // Handle undefined values
                 if (row[key] === undefined || row[key] === null) {
                     const matches = value === undefined || value === null || value === 'undefined' || value === 'null';
                     if (!matches) {
                         if (index < 3) {
-                            console.log(`🔍 DEBUG applyFilter: Row ${index} filtered out - ${key}=undefined/null !== "${value}"`);
+                            if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: Row ${index} filtered out - ${key}=undefined/null !== "${value}"`);
                         }
                         rowMatches = false;
                         break;
@@ -519,14 +466,13 @@ export class CSDataProvider {
                     continue;
                 }
                 
-                // Convert both values to strings for comparison to handle type mismatches
                 const rowValue = String(row[key]);
                 const filterValue = String(value);
                 
                 if (rowValue !== filterValue) {
-                    if (index < 3) { // Only log first few rows to avoid spam
+                    if (index < 3) {
                         logger.debug(`Row ${index} filtered out: ${key}=${rowValue} (type: ${typeof row[key]}) does not match ${filterValue} (type: ${typeof value})`);
-                        console.log(`🔍 DEBUG applyFilter: Row ${index} filtered out - ${key}="${rowValue}" !== "${filterValue}"`);
+                        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: Row ${index} filtered out - ${key}="${rowValue}" !== "${filterValue}"`);
                     }
                     rowMatches = false;
                     break;
@@ -534,21 +480,18 @@ export class CSDataProvider {
             }
             
             if (rowMatches && index < 3) {
-                console.log(`🔍 DEBUG applyFilter: Row ${index} MATCHED filter`);
+                if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: Row ${index} MATCHED filter`);
             }
             
             return rowMatches;
         });
         
         logger.debug(`Filter result: ${filtered.length} rows matched out of ${data.length} total`);
-        console.log(`🔍 DEBUG applyFilter: Final result = ${filtered.length} rows matched out of ${data.length} total`);
+        if (process.env.DEBUG === 'true') console.log(`🔍 DEBUG applyFilter: Final result = ${filtered.length} rows matched out of ${data.length} total`);
         logger.info(`Final data loaded: ${filtered.length} rows for ${data.length > 0 ? 'data source' : 'empty data'}`);
         return filtered;
     }
 
-    /**
-     * Filter data by execution flag
-     */
     async filterByExecutionFlag(
         data: TestData[], 
         options: DataProviderOptions
@@ -559,11 +502,9 @@ export class CSDataProvider {
         
         const columnName = options.executionFlagColumn || this.config.executionFlagColumn;
         
-        // Look for common execution flag column names
         const possibleColumns = ['executeTest', 'ExecuteTest', 'ExecutionFlag', 'executionFlag', 'Execute', 'execute'];
         let actualColumn = columnName;
         
-        // Find the actual column name in the data
         if (data.length > 0) {
             const firstRow = data[0];
             if (firstRow) {
@@ -587,7 +528,6 @@ export class CSDataProvider {
             trimValues: true
         });
         
-        // Also set _execute property for backward compatibility
         for (const row of filtered) {
             row._execute = true;
         }
@@ -597,14 +537,9 @@ export class CSDataProvider {
         return filtered;
     }
 
-    /**
-     * Validate test data
-     */
     private async validateData(data: TestData[], options: DataProviderOptions): Promise<void> {
-        // Basic validation
         const validationRules: Record<string, any> = {};
         
-        // Build validation rules from options
         if (options.requiredFields) {
             for (const field of options.requiredFields) {
                 validationRules[field] = { type: 'required', field };
@@ -648,7 +583,6 @@ export class CSDataProvider {
             throw new Error(`Data validation failed: ${errorMessages.join(', ')}`);
         }
         
-        // Schema validation if specified
         if (options.schemaPath) {
             const schema = await this.loadSchema(options.schemaPath);
             const schemaResult = await this.schemaValidator.validate(data, schema);
@@ -659,9 +593,6 @@ export class CSDataProvider {
         }
     }
 
-    /**
-     * Create iterator for test data
-     */
     createIterator(dataId: string): DataIterator {
         const data = this.loadedData.get(dataId);
         if (!data) {
@@ -671,17 +602,10 @@ export class CSDataProvider {
         return new DataIterator(data);
     }
 
-    /**
-     * Get data by ID
-     */
     getData(dataId: string): TestData[] | undefined {
         return this.loadedData.get(dataId);
     }
 
-    /**
-     * Get data by source - simplified interface for test files
-     * @param options Simplified data source options
-     */
     async getDataBySource(options: {
         type: 'csv' | 'json' | 'excel' | 'xml';
         path?: string;
@@ -704,15 +628,11 @@ export class CSDataProvider {
         return await this.loadData(dataOptions);
     }
 
-    /**
-     * REAL IMPLEMENTATION: Clear cached data and loaded data to prevent memory leaks
-     */
     clearCache(pattern?: string): void {
         const loadedDataCount = this.loadedData.size;
         
         if (pattern) {
             this.cache.clearPattern(pattern);
-            // Clear matching loaded data entries
             for (const [key, data] of this.loadedData.entries()) {
                 if (key.includes(pattern)) {
                     this.loadedData.delete(key);
@@ -735,9 +655,6 @@ export class CSDataProvider {
         });
     }
 
-    /**
-     * Cleanup loaded data
-     */
     async cleanup(dataId?: string): Promise<void> {
         if (dataId) {
             this.loadedData.delete(dataId);
@@ -748,9 +665,6 @@ export class CSDataProvider {
         }
     }
 
-    /**
-     * Get statistics
-     */
     getStatistics(): DataProviderResult {
         const cacheStats = this.cache.getStatistics();
         const cleanupStats = this.cleanupManager.getStatistics();
@@ -768,11 +682,7 @@ export class CSDataProvider {
         };
     }
 
-    /**
-     * Resolve data source path
-     */
     private async resolveDataSource(options: DataProviderOptions): Promise<string> {
-        // Try feature-relative path first
         if (options.featurePath) {
             const featureDir = path.dirname(options.featurePath);
             const featureDataPath = path.join(featureDir, 'data', `${options.scenarioName}.xlsx`);
@@ -782,7 +692,6 @@ export class CSDataProvider {
             }
         }
         
-        // Try default data path
         const defaultPath = path.join(
             this.config.defaultDataPath,
             `${options.scenarioName || 'test-data'}.xlsx`
@@ -795,9 +704,6 @@ export class CSDataProvider {
         throw new Error(`Could not resolve data source for scenario: ${options.scenarioName}`);
     }
 
-    /**
-     * Detect source type from path/source
-     */
     private detectSourceType(source?: string): DataSource {
         if (!source) return 'excel';
         
@@ -813,7 +719,6 @@ export class CSDataProvider {
             case '.xml':
                 return 'xml';
             default:
-                // Check if it's a database connection string
                 if (source.includes('://') || source.includes('server=')) {
                     return 'database';
                 }
@@ -821,9 +726,6 @@ export class CSDataProvider {
         }
     }
 
-    /**
-     * Load schema from file
-     */
     private async loadSchema(schemaPath: string): Promise<any> {
         const absolutePath = path.isAbsolute(schemaPath) 
             ? schemaPath 
@@ -833,23 +735,14 @@ export class CSDataProvider {
         return JSON.parse(content);
     }
 
-    /**
-     * Generate cache key
-     */
     private generateCacheKey(options: DataProviderOptions): string {
         return `${options.source}_${options.type}_${JSON.stringify(options.filter || {})}`;
     }
 
-    /**
-     * Generate data ID
-     */
     private generateDataId(options: DataProviderOptions): string {
         return `${options.scenarioName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
-    /**
-     * Check if file exists
-     */
     private async fileExists(filePath: string): Promise<boolean> {
         try {
             await fs.access(filePath);
@@ -859,16 +752,10 @@ export class CSDataProvider {
         }
     }
 
-    /**
-     * Delay execution
-     */
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, options: DataProviderOptions): Error {
         const message = error instanceof Error ? error.message : String(error);
         const enhancedError = new Error(
@@ -884,14 +771,10 @@ export class CSDataProvider {
         return enhancedError;
     }
     
-    /**
-     * REAL IMPLEMENTATION: Limit cache sizes to prevent memory exhaustion
-     */
     limitCacheSizes(): void {
         const MAX_LOADED_DATA_SOURCES = 50;
         const MAX_RECORDS_PER_SOURCE = 10000;
         
-        // Limit number of loaded data sources
         if (this.loadedData.size > MAX_LOADED_DATA_SOURCES) {
             const toDelete = this.loadedData.size - MAX_LOADED_DATA_SOURCES;
             const keys = Array.from(this.loadedData.keys()).slice(0, toDelete);
@@ -905,7 +788,6 @@ export class CSDataProvider {
             ActionLogger.logDebug(`Trimmed ${toDelete} old data sources from loaded data`);
         }
         
-        // Limit records per source
         let totalRecordsTrimmed = 0;
         for (const [key, data] of this.loadedData.entries()) {
             if (data.length > MAX_RECORDS_PER_SOURCE) {
@@ -919,13 +801,10 @@ export class CSDataProvider {
             ActionLogger.logDebug(`Trimmed ${totalRecordsTrimmed} excess records from data sources`);
         }
         
-        // Cache instance handles its own size limiting internally
     }
 
     async loadTestData(scenarioId: string): Promise<TestData[]> {
         try {
-            // For now, just return empty array
-            // In the future, implement actual test data loading
             return [];
         } catch (error) {
             ActionLogger.logError(`Failed to load test data for scenario: ${scenarioId}`, error as Error);
@@ -945,13 +824,8 @@ export class CSDataProvider {
         this.testData.clear();
     }
 
-    /**
-     * Load data from @DataProvider tag
-     */
     async loadFromTag(tag: string): Promise<TestData[]> {
         try {
-            // Extract options from tag
-            // Example: @DataProvider(source="test/data.csv",type="csv",headers="true")
             const optionsMatch = tag.match(/@DataProvider\((.*)\)/);
             if (!optionsMatch || !optionsMatch[1]) {
                 throw new Error(`Invalid @DataProvider tag format: ${tag}`);
@@ -962,7 +836,6 @@ export class CSDataProvider {
             
             ActionLogger.logDebug('DataProvider', `Parsed options from tag: ${JSON.stringify(options)}`);
             
-            // Load data using the parsed options
             return await this.loadData(options);
         } catch (error) {
             ActionLogger.logError('Failed to load data from tag', error as Error);

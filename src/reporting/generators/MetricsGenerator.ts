@@ -20,9 +20,6 @@ export class MetricsGenerator {
     this.theme = theme;
   }
 
-  /**
-   * Generate comprehensive metrics dashboard
-   */
   async generateMetrics(data: MetricsData): Promise<string> {
     MetricsGenerator.logger.info('Generating metrics dashboard');
 
@@ -44,37 +41,29 @@ export class MetricsGenerator {
     `;
   }
 
-  /**
-   * Calculate performance metrics
-   */
   private calculatePerformanceMetrics(data: MetricsData): PerformanceMetrics {
     const scenarios = data.scenarios || [];
     const durations = scenarios.map((s: any) => s.duration);
     
-    // Calculate percentiles
     const sortedDurations = [...durations].sort((a, b) => a - b);
     const p50Index = Math.floor(sortedDurations.length * 0.5);
     const p90Index = Math.floor(sortedDurations.length * 0.9);
     const p95Index = Math.floor(sortedDurations.length * 0.95);
     const p99Index = Math.floor(sortedDurations.length * 0.99);
 
-    // Step performance
     const allSteps = scenarios.flatMap((s: any) => s.steps || []);
     const stepDurations = allSteps.map((s: any) => s.duration);
     const avgStepDuration = stepDurations.reduce((sum: number, d: number) => sum + d, 0) / stepDurations.length;
 
-    // Network performance
     const networkRequests = data.networkData || [];
     const avgResponseTime = networkRequests.length > 0
       ? networkRequests.reduce((sum: number, r: any) => sum + r.duration, 0) / networkRequests.length
       : 0;
 
-    // Browser metrics
     const browserMetrics = data.browserMetrics || [];
     let avgPageLoadTime = 0;
     
     if (Array.isArray(browserMetrics)) {
-      // browserMetrics is [string, BrowserMetrics[]][]
       const allMetrics: BrowserMetrics[] = [];
       (browserMetrics as [string, BrowserMetrics[]][]).forEach(([_, metrics]) => {
         allMetrics.push(...metrics);
@@ -106,7 +95,6 @@ export class MetricsGenerator {
         .sort((a: any, b: any) => b.duration - a.duration)
         .slice(0, 10)
         .map((s: any) => ({ text: s.text, duration: s.duration })),
-      // Add missing properties for PerformanceMetrics
       navigationTimings: [],
       resourceTimings: [],
       userTimings: [],
@@ -118,15 +106,11 @@ export class MetricsGenerator {
     } as PerformanceMetrics;
   }
 
-  /**
-   * Calculate execution metrics
-   */
   private calculateExecutionMetrics(data: MetricsData): ExecutionMetrics {
     const scenarios = data.scenarios || [];
     const features = data.features || [];
     const allSteps = scenarios.flatMap((s: any) => s.steps || []);
     
-    // Parallel execution metrics
     const parallelData = data.parallelExecutions || [];
     const maxConcurrency = parallelData.length;
     const workerUtilization = parallelData.map((w: any) => {
@@ -135,21 +119,9 @@ export class MetricsGenerator {
       return (activeTime / totalTime) * 100;
     });
 
-    // Retry metrics
     const totalRetries = scenarios.reduce((sum: number, s: any) => sum + (s.retryCount || 0), 0);
-    // const scenariosWithRetries = scenarios.filter((s: any) => (s.retryCount || 0) > 0).length;
 
-    // Feature distribution
-    // const featureDistribution = features.map((f: any) => ({
-    //   name: f.name,
-    //   scenarios: f.scenarios.length,
-    //   passed: f.passed,
-    //   failed: f.failed,
-    //   skipped: f.skipped,
-    //   duration: f.duration
-    // }));
 
-    // Tags analysis
     const tagDistribution = new Map<string, number>();
     scenarios.forEach((s: any) => {
       (s.tags || []).forEach((tag: string) => {
@@ -179,9 +151,6 @@ export class MetricsGenerator {
     };
   }
 
-  /**
-   * Calculate quality metrics
-   */
   private calculateQualityMetrics(data: MetricsData): QualityMetrics {
     const scenarios = data.scenarios || [];
     const steps = scenarios.flatMap((s: any) => s.steps || []);
@@ -191,11 +160,7 @@ export class MetricsGenerator {
     const skippedScenarios = scenarios.filter((s: any) => s.status === 'skipped').length;
 
     const passedSteps = steps.filter((s: any) => s.status === 'passed').length;
-    // These are calculated but not used - remove if not needed
-    // const failedSteps = steps.filter((s: any) => s.status === 'failed').length;
-    // const skippedSteps = steps.filter((s: any) => s.status === 'skipped').length;
 
-    // Failure analysis
     const failuresByType = new Map<string, number>();
     const failuresByStep = new Map<string, number>();
     
@@ -203,14 +168,12 @@ export class MetricsGenerator {
       const errorType = this.classifyError(step.error);
       failuresByType.set(errorType, (failuresByType.get(errorType) || 0) + 1);
       
-      const stepType = step.text.split(' ')[0]; // Get first word (Given/When/Then)
+      const stepType = step.text.split(' ')[0];
       failuresByStep.set(stepType, (failuresByStep.get(stepType) || 0) + 1);
     });
 
-    // Flaky test detection
     const flakyTests = this.detectFlakyTests(data);
 
-    // Coverage metrics
     const elementCoverage = this.calculateElementCoverage(data);
     const apiCoverage = this.calculateAPICoverage(data);
 
@@ -249,12 +212,7 @@ export class MetricsGenerator {
     };
   }
 
-  /**
-   * Calculate trend data
-   */
   private calculateTrends(data: MetricsData): TrendData {
-    // This would typically compare with historical data
-    // For now, we'll simulate trends based on current data
     const scenarios = data.scenarios || [];
     const hourlyData = this.groupByHour(scenarios);
     
@@ -269,9 +227,6 @@ export class MetricsGenerator {
     };
   }
 
-  /**
-   * Generate metrics HTML
-   */
   private generateMetricsHTML(
     performance: PerformanceMetrics,
     execution: ExecutionMetrics,
@@ -556,9 +511,6 @@ export class MetricsGenerator {
     `;
   }
 
-  /**
-   * Generate metrics CSS
-   */
   private generateMetricsCSS(): string {
     return `
       .cs-metrics-dashboard {
@@ -588,7 +540,6 @@ export class MetricsGenerator {
         color: ${this.theme.colors?.textLight || this.theme.textColor};
       }
 
-      /* KPI Grid */
       .kpi-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -679,7 +630,6 @@ export class MetricsGenerator {
         color: ${this.theme.colors?.textLight || this.theme.textColor};
       }
 
-      /* Metrics Sections */
       .metrics-section {
         margin-bottom: 32px;
       }
@@ -714,7 +664,6 @@ export class MetricsGenerator {
         margin-bottom: 16px;
       }
 
-      /* Charts */
       .percentile-chart,
       .response-time-chart,
       .feature-chart,
@@ -730,7 +679,6 @@ export class MetricsGenerator {
         height: 300px;
       }
 
-      /* Stats */
       .percentile-stats,
       .response-stats,
       .parallel-stats {
@@ -779,7 +727,6 @@ export class MetricsGenerator {
         color: ${this.theme.colors?.text || this.theme.textColor};
       }
 
-      /* Slow Items List */
       .slow-items-list {
         display: flex;
         flex-direction: column;
@@ -818,7 +765,6 @@ export class MetricsGenerator {
         color: ${this.theme.colors?.textLight || this.theme.textColor};
       }
 
-      /* Tag Cloud */
       .tag-cloud {
         display: flex;
         flex-wrap: wrap;
@@ -846,7 +792,6 @@ export class MetricsGenerator {
         transform: scale(1.05);
       }
 
-      /* Flaky Tests */
       .flaky-tests-list {
         display: flex;
         flex-direction: column;
@@ -880,7 +825,6 @@ export class MetricsGenerator {
         color: ${this.theme.colors?.warning || this.theme.warningColor};
       }
 
-      /* Coverage */
       .coverage-stats {
         display: flex;
         flex-direction: column;
@@ -920,7 +864,6 @@ export class MetricsGenerator {
         text-align: right;
       }
 
-      /* Comparison Table */
       .comparison-table {
         overflow-x: auto;
       }
@@ -958,7 +901,6 @@ export class MetricsGenerator {
         font-weight: 600;
       }
 
-      /* No Data */
       .no-data {
         text-align: center;
         padding: 40px;
@@ -966,7 +908,6 @@ export class MetricsGenerator {
         font-size: 13px;
       }
 
-      /* Responsive */
       @media (max-width: 768px) {
         .kpi-grid {
           grid-template-columns: 1fr;
@@ -991,15 +932,11 @@ export class MetricsGenerator {
     `;
   }
 
-  /**
-   * Generate metrics JavaScript
-   */
   private generateMetricsJS(): string {
     return `
       (function() {
         const metrics = window.metricsData;
         
-        // Initialize all charts
         function initMetricsCharts() {
           drawPercentileChart();
           drawResponseTimeChart();
@@ -1009,7 +946,6 @@ export class MetricsGenerator {
           drawTrendChart();
         }
         
-        // Draw percentile chart
         function drawPercentileChart() {
           const canvas = document.getElementById('percentileCanvas');
           if (!canvas) return;
@@ -1033,30 +969,25 @@ export class MetricsGenerator {
           const barSpacing = barWidth;
           const chartHeight = canvas.height - 40;
           
-          // Draw bars
           data.forEach((item, index) => {
             const x = index * (barWidth + barSpacing) + barSpacing / 2;
             const barHeight = (item.value / maxValue) * chartHeight;
             const y = canvas.height - barHeight - 20;
             
-            // Bar
             ctx.fillStyle = '${this.theme.colors?.primary || this.theme.primaryColor}';
             ctx.fillRect(x, y, barWidth, barHeight);
             
-            // Label
             ctx.fillStyle = '${this.theme.colors?.textLight || this.theme.textColor}';
             ctx.font = '11px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText(item.label, x + barWidth / 2, canvas.height - 5);
             
-            // Value
             ctx.fillStyle = '${this.theme.colors?.text || this.theme.textColor}';
             ctx.font = '10px sans-serif';
             ctx.fillText(formatDuration(item.value), x + barWidth / 2, y - 5);
           });
         }
         
-        // Draw response time chart
         function drawResponseTimeChart() {
           const canvas = document.getElementById('responseCanvas');
           if (!canvas) return;
@@ -1066,13 +997,11 @@ export class MetricsGenerator {
           canvas.width = rect.width;
           canvas.height = rect.height;
           
-          // Simulate response time distribution
           const buckets = 10;
           const maxResponseTime = metrics.performance.avgResponseTime * 3;
           const bucketSize = maxResponseTime / buckets;
           const distribution = new Array(buckets).fill(0);
           
-          // Generate distribution (normal distribution simulation)
           for (let i = 0; i < 1000; i++) {
             const time = gaussianRandom() * metrics.performance.avgResponseTime + metrics.performance.avgResponseTime;
             const bucket = Math.floor(time / bucketSize);
@@ -1085,7 +1014,6 @@ export class MetricsGenerator {
           const barWidth = (canvas.width - 40) / buckets;
           const chartHeight = canvas.height - 40;
           
-          // Draw histogram
           distribution.forEach((count, index) => {
             const x = 20 + index * barWidth;
             const barHeight = (count / maxCount) * chartHeight;
@@ -1095,7 +1023,6 @@ export class MetricsGenerator {
             ctx.fillRect(x, y, barWidth - 2, barHeight);
           });
           
-          // Draw axes
           ctx.strokeStyle = '${this.theme.colors?.border || '#E1E4E8'}';
           ctx.beginPath();
           ctx.moveTo(20, 20);
@@ -1104,7 +1031,6 @@ export class MetricsGenerator {
           ctx.stroke();
         }
         
-        // Draw feature distribution chart
         function drawFeatureChart() {
           const canvas = document.getElementById('featureCanvas');
           if (!canvas) return;
@@ -1125,7 +1051,6 @@ export class MetricsGenerator {
           features.forEach((feature, index) => {
             const sliceAngle = (feature.scenarios / total) * 2 * Math.PI;
             
-            // Draw slice
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
             ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
@@ -1135,7 +1060,6 @@ export class MetricsGenerator {
             ctx.fillStyle = colors[index % colors.length];
             ctx.fill();
             
-            // Draw label
             const labelAngle = currentAngle + sliceAngle / 2;
             const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
             const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
@@ -1150,7 +1074,6 @@ export class MetricsGenerator {
           });
         }
         
-        // Draw utilization chart
         function drawUtilizationChart() {
           const canvas = document.getElementById('utilizationCanvas');
           if (!canvas) return;
@@ -1166,14 +1089,12 @@ export class MetricsGenerator {
           const radius = Math.min(centerX, centerY) - 20;
           const lineWidth = 20;
           
-          // Background circle
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
           ctx.strokeStyle = '${this.theme.colors?.background || this.theme.backgroundColor}';
           ctx.lineWidth = lineWidth;
           ctx.stroke();
           
-          // Utilization arc
           const startAngle = -Math.PI / 2;
           const endAngle = startAngle + (utilization / 100) * 2 * Math.PI;
           
@@ -1184,7 +1105,6 @@ export class MetricsGenerator {
           ctx.lineCap = 'round';
           ctx.stroke();
           
-          // Center text
           ctx.fillStyle = '${this.theme.colors?.text || this.theme.textColor}';
           ctx.font = 'bold 24px sans-serif';
           ctx.textAlign = 'center';
@@ -1192,7 +1112,6 @@ export class MetricsGenerator {
           ctx.fillText(utilization.toFixed(0) + '%', centerX, centerY);
         }
         
-        // Draw failure analysis chart
         function drawFailureChart() {
           const canvas = document.getElementById('failureCanvas');
           if (!canvas) return;
@@ -1221,24 +1140,20 @@ export class MetricsGenerator {
             const y = index * (barHeight + barSpacing) + 20;
             const barWidth = (failure.count / maxCount) * chartWidth;
             
-            // Bar
             ctx.fillStyle = '${this.theme.colors?.error || this.theme.failureColor}';
             ctx.fillRect(100, y, barWidth, barHeight);
             
-            // Label
             ctx.fillStyle = '${this.theme.colors?.text || this.theme.textColor}';
             ctx.font = '12px sans-serif';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'middle';
             ctx.fillText(failure.type, 95, y + barHeight / 2);
             
-            // Count
             ctx.textAlign = 'left';
             ctx.fillText(failure.count.toString(), 105 + barWidth, y + barHeight / 2);
           });
         }
         
-        // Draw trend chart
         function drawTrendChart() {
           const canvas = document.getElementById('trendCanvas');
           if (!canvas) return;
@@ -1252,7 +1167,6 @@ export class MetricsGenerator {
           const chartWidth = canvas.width - padding * 2;
           const chartHeight = canvas.height - padding * 2;
           
-          // Draw axes
           ctx.strokeStyle = '${this.theme.colors?.border || '#E1E4E8'}';
           ctx.beginPath();
           ctx.moveTo(padding, padding);
@@ -1260,7 +1174,6 @@ export class MetricsGenerator {
           ctx.lineTo(canvas.width - padding, canvas.height - padding);
           ctx.stroke();
           
-          // Draw trend lines
           const trendData = [
             { data: (typeof metrics.trends.passRateTrend === 'object' && metrics.trends.passRateTrend.data) || [], color: '${this.theme.colors?.success || this.theme.successColor}', label: 'Pass Rate' },
             { data: (typeof metrics.trends.failureRateTrend === 'object' && metrics.trends.failureRateTrend.data) || [], color: '${this.theme.colors?.error || this.theme.failureColor}', label: 'Failure Rate' },
@@ -1284,7 +1197,6 @@ export class MetricsGenerator {
                 ctx.lineTo(x, y);
               }
               
-              // Draw point
               ctx.fillStyle = trend.color;
               ctx.beginPath();
               ctx.arc(x, y, 3, 0, 2 * Math.PI);
@@ -1293,7 +1205,6 @@ export class MetricsGenerator {
             
             ctx.stroke();
             
-            // Draw label
             ctx.fillStyle = trend.color;
             ctx.font = '11px sans-serif';
             ctx.textAlign = 'left';
@@ -1301,7 +1212,6 @@ export class MetricsGenerator {
           });
         }
         
-        // Utility functions
         function formatDuration(ms) {
           if (ms < 1000) return ms + 'ms';
           if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
@@ -1315,7 +1225,6 @@ export class MetricsGenerator {
           return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
         }
         
-        // Handle window resize
         let resizeTimeout;
         window.addEventListener('resize', () => {
           clearTimeout(resizeTimeout);
@@ -1324,15 +1233,11 @@ export class MetricsGenerator {
           }, 250);
         });
         
-        // Initialize on load
         setTimeout(initMetricsCharts, 100);
       })();
     `;
   }
 
-  /**
-   * Helper methods for metrics calculation
-   */
   private classifyError(error?: Error): string {
     if (!error) return 'Unknown';
     const message = error.message.toLowerCase();
@@ -1348,8 +1253,6 @@ export class MetricsGenerator {
   }
 
   private detectFlakyTests(data: MetricsData): Array<{name: string; flakyRate: number}> {
-    // In a real implementation, this would analyze historical runs
-    // For now, we'll identify tests that have both passed and failed
     const testResults = new Map<string, {passed: number; failed: number}>();
     
     (data.scenarios || []).forEach((scenario: any) => {
@@ -1376,14 +1279,12 @@ export class MetricsGenerator {
   }
 
   private calculateElementCoverage(data: MetricsData): number {
-    // Calculate percentage of page elements interacted with
     const totalElements = data.elementStats?.totalElements || 100;
     const interactedElements = data.elementStats?.interactedElements || 75;
     return (interactedElements / totalElements) * 100;
   }
 
   private calculateAPICoverage(data: MetricsData): number {
-    // Calculate percentage of API endpoints tested
     const totalEndpoints = data.apiStats?.totalEndpoints || 50;
     const testedEndpoints = data.apiStats?.testedEndpoints || 40;
     return (testedEndpoints / totalEndpoints) * 100;
@@ -1405,30 +1306,9 @@ export class MetricsGenerator {
   }
 
 
-  // private generateExecutionTimeline(data: MetricsData): Array<{time: string; value: number}> {
-  //   // Generate timeline data points
-  //   const timeline: Array<{time: string; value: number}> = [];
-  //   const duration = (data.endTime || 0) - (data.startTime || 0);
-  //   const intervals = 20;
-  //   const intervalSize = duration / intervals;
     
-  //   for (let i = 0; i <= intervals; i++) {
-  //     const time = new Date((data.startTime || 0) + (i * intervalSize));
-  //     const activeScenarios = (data.scenarios || []).filter((s: any) => {
-  //       const start = new Date(s.startTime).getTime();
-  //       const end = new Date(s.endTime).getTime();
-  //       const currentTime = time.getTime();
-  //       return start <= currentTime && end >= currentTime;
-  //     }).length;
       
-  //     timeline.push({
-  //       time: time.toLocaleTimeString(),
-  //       value: activeScenarios
-  //     });
-  //   }
     
-  //   return timeline;
-  // }
 
   private groupByHour(scenarios: any[]): Array<{hour: string; passRate: number; avgDuration: number; failureRate: number; throughput: number}> {
     const hourlyData = new Map<string, {passed: number; failed: number; durations: number[]; count: number}>();
@@ -1483,13 +1363,11 @@ export class MetricsGenerator {
   }
 
   private generateStabilityTrend(data: MetricsData): {data: number[]; change: number; direction: 'up' | 'down' | 'stable'} {
-    // Simulate stability trend over time
     const stabilityData = [85, 87, 86, 88, 90, 89, 91, 92, 91, this.calculateStabilityScore(data)];
     return this.generateTrendLine(stabilityData);
   }
 
   private generateHistoricalComparison(data: MetricsData): Array<{metric: string; current: string; previous: string; change: number}> {
-    // In a real implementation, this would compare with historical data
     const scenarios = data.scenarios || [];
     const passedScenarios = scenarios.filter((s: any) => s.status === 'passed').length;
     const passRate = scenarios.length > 0 ? (passedScenarios / scenarios.length * 100) : 0;
@@ -1571,7 +1449,7 @@ export class MetricsGenerator {
     const minCount = Math.min(...counts);
     const range = maxCount - minCount || 1;
     const normalized = (count - minCount) / range;
-    return 12 + (normalized * 12); // Font size between 12px and 24px
+    return 12 + (normalized * 12);
   }
 
   private calculateStabilityScore(data: MetricsData): number {
@@ -1583,14 +1461,13 @@ export class MetricsGenerator {
     const avgDuration = scenarios.reduce((sum: number, s: any) => sum + s.duration, 0) / (scenarios.length || 1);
     const consistencyScore = scenarios.filter((s: any) => {
       const deviation = Math.abs(s.duration - avgDuration) / avgDuration;
-      return deviation < 0.5; // Within 50% of average
+      return deviation < 0.5;
     }).length / (scenarios.length || 1) * 100;
 
-    // Calculate stability score based on multiple factors
     const stabilityScore = (
-      (passedOnFirstTry / (scenarios.length || 1)) * 40 + // 40% weight for first-try pass rate
-      (100 - flakyRate) * 30 / 100 + // 30% weight for non-flaky tests
-      consistencyScore * 30 / 100 // 30% weight for timing consistency
+      (passedOnFirstTry / (scenarios.length || 1)) * 40 +
+      (100 - flakyRate) * 30 / 100 +
+      consistencyScore * 30 / 100
     );
 
     return stabilityScore;

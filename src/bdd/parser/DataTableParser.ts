@@ -68,7 +68,6 @@ export class DataTableParser {
     const delimiter = options.delimiter || '|';
     const cells: string[] = [];
     
-    // Remove leading and trailing delimiters
     let trimmedLine = line.trim();
     if (trimmedLine.startsWith(delimiter)) {
       trimmedLine = trimmedLine.substring(1);
@@ -77,7 +76,6 @@ export class DataTableParser {
       trimmedLine = trimmedLine.substring(0, trimmedLine.length - 1);
     }
     
-    // Split by delimiter
     const parts = this.smartSplit(trimmedLine, delimiter);
     
     for (const part of parts) {
@@ -87,12 +85,10 @@ export class DataTableParser {
         cell = cell.trim();
       }
       
-      // Handle empty cells
       if (cell === '' && options.emptyValue !== undefined) {
         cell = options.emptyValue === null ? '' : options.emptyValue;
       }
       
-      // Convert types if requested
       if (options.convertTypes && cell !== '') {
         cell = this.convertType(cell);
       }
@@ -146,31 +142,25 @@ export class DataTableParser {
   }
   
   private convertType(value: string): string {
-    // Remove quotes if present
     if ((value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))) {
       return value.substring(1, value.length - 1);
     }
     
-    // Check for special values
     const trimmed = value.trim();
     
-    // Boolean
     if (trimmed.toLowerCase() === 'true' || trimmed.toLowerCase() === 'false') {
       return trimmed.toLowerCase();
     }
     
-    // Null
     if (trimmed.toLowerCase() === 'null' || trimmed === '') {
       return '';
     }
     
-    // Number
     if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
       return trimmed;
     }
     
-    // Date (ISO format)
     if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?/.test(trimmed)) {
       return trimmed;
     }
@@ -252,7 +242,6 @@ export class DataTableParser {
     
     const objects: any[] = [];
     
-    // Validate headers
     const headerSet = new Set<string>();
     for (const header of headers) {
       if (!header) {
@@ -264,7 +253,6 @@ export class DataTableParser {
       headerSet.add(header);
     }
     
-    // Convert rows to objects
     for (let i = 1; i < rawRows.length; i++) {
       const row = rawRows[i];
       if (!row) continue;
@@ -281,7 +269,6 @@ export class DataTableParser {
         
         if (!header) continue;
         
-        // Handle nested properties
         if (header.includes('.')) {
           this.setNestedProperty(obj, header, value !== undefined ? value : '');
         } else {
@@ -393,7 +380,6 @@ export class DataTableParser {
       return false;
     }
     
-    // Number
     if (/^-?\d+$/.test(value)) {
       return parseInt(value, 10);
     }
@@ -402,21 +388,17 @@ export class DataTableParser {
       return parseFloat(value);
     }
     
-    // Array
     if (value.startsWith('[') && value.endsWith(']')) {
       try {
         return JSON.parse(value);
       } catch {
-        // If JSON parse fails, treat as string
       }
     }
     
-    // Object
     if (value.startsWith('{') && value.endsWith('}')) {
       try {
         return JSON.parse(value);
       } catch {
-        // If JSON parse fails, treat as string
       }
     }
     
@@ -438,19 +420,14 @@ export class DataTableParser {
   }
   
   private registerDefaultTransforms(): void {
-    // Objects transform
     this.registerTransform('objects', (table) => this.tableToObjects(table));
     
-    // Map transform
     this.registerTransform('map', (table) => this.tableToMap(table));
     
-    // Arrays transform
     this.registerTransform('arrays', (table) => this.tableToArrays(table));
     
-    // Transpose transform
     this.registerTransform('transpose', (table) => this.transpose(table));
     
-    // Vertical map transform (first column as keys)
     this.registerTransform('verticalMap', (table) => {
       const map = new Map<string, any>();
       const rawRows = table.raw();
@@ -470,7 +447,6 @@ export class DataTableParser {
       return map;
     });
     
-    // Horizontal map transform (headers as keys)
     this.registerTransform('horizontalMap', (table) => {
       const rawRows = table.raw();
       
@@ -508,7 +484,6 @@ export class DataTableParser {
       errors.push('Table must have at least one row');
     }
     
-    // Check consistent column count
     let columnCount: number | null = null;
     
     rawRows.forEach((row, index) => {
@@ -530,7 +505,6 @@ export class DataTableParser {
     const alignments = options?.alignments || [];
     const rawRows = table.raw();
     
-    // Calculate column widths
     const columnWidths: number[] = [];
     
     rawRows.forEach(row => {
@@ -544,7 +518,6 @@ export class DataTableParser {
       });
     });
     
-    // Format rows
     const formattedRows: string[] = [];
     
     rawRows.forEach(row => {
@@ -579,5 +552,4 @@ export class DataTableParser {
   }
 }
 
-// Export singleton instance
 export const dataTableParser = DataTableParser.getInstance();

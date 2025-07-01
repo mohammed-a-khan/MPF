@@ -6,23 +6,14 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import { TypeConverter } from '../transformers/TypeConverter';
 import { createReadStream } from 'fs';
 
-/**
- * Parser for Excel files using xlsx library
- * Supports .xlsx, .xls, .xlsm, .xlsb formats
- */
 export class ExcelParser {
     private typeConverter: TypeConverter;
     
     constructor() {
         this.typeConverter = new TypeConverter();
         
-        // Configure XLSX settings - removed deprecated methods
-        // Modern versions of xlsx don't need set_fs or set_readable
     }
 
-    /**
-     * Parse Excel file
-     */
     async parse(buffer: Buffer, options: ParserOptions = {}): Promise<{
         data: TestData[];
         metadata?: Record<string, any>;
@@ -30,7 +21,6 @@ export class ExcelParser {
         const startTime = Date.now();
         
         try {
-            // Read workbook
             const workbook = XLSX.read(buffer, {
                 type: 'buffer',
                 cellFormula: options.formulaValues !== false,
@@ -42,13 +32,10 @@ export class ExcelParser {
                 password: (options as any).password
             });
             
-            // Get worksheet
             const worksheet = this.getWorksheet(workbook, options);
             
-            // Parse data
             const data = await this.parseWorksheet(worksheet, options);
             
-            // Get metadata
             const metadata = this.getWorkbookMetadata(workbook, worksheet);
             metadata['parseTime'] = Date.now() - startTime;
             
@@ -67,9 +54,6 @@ export class ExcelParser {
         }
     }
 
-    /**
-     * Parse Excel file partially
-     */
     async parsePartial(buffer: Buffer, options: ParserOptions & {
         offset: number;
         limit: number;
@@ -78,7 +62,6 @@ export class ExcelParser {
         metadata?: Record<string, any>;
     }> {
         try {
-            // Read workbook with minimal options for performance
             const workbook = XLSX.read(buffer, {
                 type: 'buffer',
                 sheetRows: options.offset + options.limit + (options.headerRow || 1),
@@ -86,19 +69,15 @@ export class ExcelParser {
                 cellStyles: false
             });
             
-            // Get worksheet
             const worksheet = this.getWorksheet(workbook, options);
             
-            // Get range
             const range = worksheet['!ref'] ? XLSX.utils.decode_range(worksheet['!ref']) : null;
             if (!range) {
                 return { data: [] };
             }
             
-            // Parse headers
             const headers = this.parseHeaders(worksheet, options);
             
-            // Parse data rows
             const data: TestData[] = [];
             const startRow = (options.headerRow || 1) + options.offset;
             const endRow = Math.min(startRow + options.limit - 1, range.e.r);
@@ -125,9 +104,6 @@ export class ExcelParser {
         }
     }
 
-    /**
-     * Stream Excel file
-     */
     async stream(filePath: string, options: StreamOptions): Promise<void> {
         return new Promise((resolve, reject) => {
             try {
@@ -147,23 +123,19 @@ export class ExcelParser {
                 workbookStream.on('data', (row: any) => {
                     rowCount++;
                     
-                    // Skip header rows
                     if (options.skipRows && rowCount <= options.skipRows) {
                         return;
                     }
                     
-                    // First data row as headers
                     if (options.headers !== false && !headers) {
                         headers = Object.values(row);
                         return;
                     }
                     
-                    // Convert row to record
                     const record = this.convertStreamRow(row, headers);
                     if (record) {
                         batch.push(record);
                         
-                        // Process batch
                         if (batch.length >= (options.batchSize || 1000)) {
                             if (options.onBatch) {
                                 options.onBatch(batch).catch(reject);
@@ -174,7 +146,6 @@ export class ExcelParser {
                 });
                 
                 workbookStream.on('end', async () => {
-                    // Process remaining batch
                     if (batch.length > 0 && options.onBatch) {
                         await options.onBatch(batch);
                     }
@@ -193,7 +164,6 @@ export class ExcelParser {
                     reject(error);
                 });
                 
-                // Start streaming
                 stream.pipe(workbookStream);
                 
             } catch (error) {
@@ -202,16 +172,12 @@ export class ExcelParser {
         });
     }
 
-    /**
-     * Stream Excel file in batches
-     */
     async *streamBatches(filePath: string, options: StreamOptions): AsyncIterableIterator<TestData[]> {
         const batches: TestData[][] = [];
         let resolveBatch: ((batch: TestData[]) => void) | null = null;
         let rejectError: ((error: Error) => void) | null = null;
         let streamEnded = false;
         
-        // Set up streaming with batch collection
         const streamPromise = this.stream(filePath, {
             ...options,
             onBatch: async (batch: TestData[]) => {
@@ -237,14 +203,12 @@ export class ExcelParser {
             }
         });
         
-        // Yield batches as they become available
         while (true) {
             if (batches.length > 0) {
                 yield batches.shift()!;
             } else if (streamEnded) {
                 break;
             } else {
-                // Wait for next batch
                 const batch = await new Promise<TestData[]>((resolve, reject) => {
                     resolveBatch = resolve;
                     rejectError = reject;
@@ -253,18 +217,14 @@ export class ExcelParser {
                 if (batch.length > 0) {
                     yield batch;
                 } else {
-                    break; // Stream ended
+                    break;
                 }
             }
         }
         
-        // Ensure stream completes
         await streamPromise;
     }
 
-    /**
-     * Extract schema from Excel file
-     */
     async extractSchema(buffer: Buffer, options: {
         sheetName?: string;
         sampleSize?: number;
@@ -286,17 +246,10 @@ export class ExcelParser {
         }
     }
 
-    /**
-     * Parse XSD schema
-     */
     async parseXSD(_content: string): Promise<DataSchema> {
-        // Excel doesn't use XSD, but we can parse Excel schema XML if present
         throw new Error('XSD parsing not applicable for Excel files');
     }
 
-    /**
-     * Get Excel file metadata
-     */
     async getMetadata(buffer: Buffer): Promise<Record<string, any>> {
         try {
             const workbook = XLSX.read(buffer, {
@@ -312,7 +265,6 @@ export class ExcelParser {
                 properties: {}
             };
             
-            // Workbook properties
             if (workbook.Props) {
                 metadata['properties'] = {
                     title: workbook.Props.Title,
@@ -325,7 +277,6 @@ export class ExcelParser {
                 };
             }
             
-            // Sheet information
             metadata['sheets'] = workbook.SheetNames.map(name => {
                 const sheet = workbook.Sheets[name];
                 const range = sheet && sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : null;
@@ -346,9 +297,6 @@ export class ExcelParser {
         }
     }
 
-    /**
-     * Infer schema from data
-     */
     inferSchema(data: TestData[], options: {
         sampleSize?: number;
         detectTypes?: boolean;
@@ -358,7 +306,6 @@ export class ExcelParser {
         const sample = data.slice(0, options.sampleSize || 100);
         const fieldMap = new Map<string, any>();
         
-        // Analyze sample data
         for (const record of sample) {
             for (const [key, value] of Object.entries(record)) {
                 if (!fieldMap.has(key)) {
@@ -383,7 +330,6 @@ export class ExcelParser {
             }
         }
         
-        // Convert to schema
         const fields = Array.from(fieldMap.entries()).map(([key, analysis]) => {
             const field: any = {
                 name: key,
@@ -395,7 +341,6 @@ export class ExcelParser {
                 field.unique = analysis.values.size === analysis.totalCount - analysis.nullCount;
             }
             
-            // Add constraints based on values
             if (field.type === 'string') {
                 const lengths = Array.from(analysis.values).map((v: any) => String(v).length);
                 if (lengths.length > 0) {
@@ -419,9 +364,6 @@ export class ExcelParser {
         };
     }
 
-    /**
-     * Get worksheet from workbook
-     */
     private getWorksheet(workbook: XLSX.WorkBook, options: ParserOptions): XLSX.WorkSheet {
         let sheetName: string;
         
@@ -445,16 +387,11 @@ export class ExcelParser {
         return worksheet;
     }
 
-    /**
-     * Parse worksheet data
-     */
     private async parseWorksheet(worksheet: XLSX.WorkSheet, options: ParserOptions): Promise<TestData[]> {
-        // Apply range if specified
         if (options.range) {
             worksheet['!ref'] = options.range;
         }
         
-        // Convert to JSON
         const sheetOptions: any = {
             raw: false,
             defval: null,
@@ -469,13 +406,11 @@ export class ExcelParser {
         
         let data = XLSX.utils.sheet_to_json(worksheet, sheetOptions) as TestData[];
         
-        // Apply type conversion
         const parseOptions = options as any;
         if (parseOptions.parseNumbers !== false || parseOptions.parseDates !== false) {
             data = await Promise.all(data.map(row => this.convertTypes(row as TestData, options)));
         }
         
-        // Trim values if specified
         if ((options as any).trimValues !== false) {
             data = data.map(row => this.trimValues(row as TestData));
         }
@@ -483,9 +418,6 @@ export class ExcelParser {
         return data as TestData[];
     }
 
-    /**
-     * Parse headers from worksheet
-     */
     private parseHeaders(worksheet: XLSX.WorkSheet, options: ParserOptions): string[] {
         const headerRow = options.headerRow || 1;
         const range = worksheet['!ref'] ? XLSX.utils.decode_range(worksheet['!ref']) : null;
@@ -508,9 +440,6 @@ export class ExcelParser {
         return headers;
     }
 
-    /**
-     * Parse single row
-     */
     private parseRow(worksheet: XLSX.WorkSheet, row: number, headers: string[], maxCol: number): TestData | null {
         const record: TestData = {};
         let hasData = false;
@@ -529,28 +458,20 @@ export class ExcelParser {
         return hasData ? record : null;
     }
 
-    /**
-     * Get cell value
-     */
     private getCellValue(cell: XLSX.CellObject): any {
-        if (cell.t === 'n') return cell.v; // Number
-        if (cell.t === 'b') return cell.v; // Boolean
-        if (cell.t === 'd') return cell.v; // Date
-        if (cell.t === 'e') return null; // Error
+        if (cell.t === 'n') return cell.v;
+        if (cell.t === 'b') return cell.v;
+        if (cell.t === 'd') return cell.v;
+        if (cell.t === 'e') return null;
         
-        // String or formula result
         return cell.w || cell.v;
     }
 
-    /**
-     * Convert stream row to record
-     */
     private convertStreamRow(row: any, headers?: string[]): TestData | null {
         const record: TestData = {};
         let hasData = false;
         
         if (headers) {
-            // Map to headers
             Object.values(row).forEach((value, index) => {
                 if (index < headers.length && headers[index]) {
                     record[headers[index]] = value;
@@ -560,7 +481,6 @@ export class ExcelParser {
                 }
             });
         } else {
-            // Use as-is
             Object.assign(record, row);
             hasData = Object.values(row).some(v => v !== null && v !== undefined);
         }
@@ -568,9 +488,6 @@ export class ExcelParser {
         return hasData ? record : null;
     }
 
-    /**
-     * Convert types in record
-     */
     private async convertTypes(record: TestData, options: ParserOptions): Promise<TestData> {
         const converted: TestData = {};
         const parseOptions = options as any;
@@ -588,9 +505,6 @@ export class ExcelParser {
         return converted;
     }
 
-    /**
-     * Trim values in record
-     */
     private trimValues(record: TestData): TestData {
         const trimmed: TestData = {};
         
@@ -601,9 +515,6 @@ export class ExcelParser {
         return trimmed;
     }
 
-    /**
-     * Detect data type
-     */
     private detectType(value: any): string {
         if (value === null || value === undefined) return 'null';
         if (typeof value === 'number') return 'number';
@@ -613,25 +524,17 @@ export class ExcelParser {
         return 'string';
     }
 
-    /**
-     * Consolidate multiple types
-     */
     private consolidateTypes(types: string[]): string {
         if (types.length === 0) return 'string';
         if (types.length === 1) return types[0] || 'string';
         
-        // Remove null from types
         const nonNullTypes = types.filter(t => t !== 'null');
         if (nonNullTypes.length === 0) return 'string';
         if (nonNullTypes.length === 1) return nonNullTypes[0] || 'string';
         
-        // If mixed types, prefer string
         return 'string';
     }
 
-    /**
-     * Get workbook metadata
-     */
     private getWorkbookMetadata(workbook: XLSX.WorkBook, worksheet: XLSX.WorkSheet): Record<string, any> {
         const range = worksheet['!ref'] ? XLSX.utils.decode_range(worksheet['!ref']) : null;
         
@@ -644,9 +547,6 @@ export class ExcelParser {
         };
     }
 
-    /**
-     * Check if worksheet has formulas
-     */
     private hasFormulas(worksheet: XLSX.WorkSheet): boolean {
         for (const cellAddress in worksheet) {
             if (cellAddress[0] === '!') continue;
@@ -660,9 +560,6 @@ export class ExcelParser {
         return false;
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, operation: string): Error {
         const message = error instanceof Error ? error.message : String(error);
         const enhancedError = new Error(

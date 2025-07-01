@@ -1,28 +1,8 @@
-/**
- * CS Test Automation Framework - ProxyManager
- * 
- * Enterprise-grade proxy management with support for HTTP, HTTPS, SOCKS5,
- * and PAC files. Includes authentication, bypass rules, and automatic failover.
- * 
- * Features:
- * - Multiple proxy protocol support
- * - Authentication (Basic, NTLM, Kerberos)
- * - PAC file execution
- * - Automatic proxy detection
- * - Connection pooling
- * - Failover and retry logic
- * - Performance monitoring
- * 
- * @author CS Test Automation Team
- * @version 4.0.0
- */
 
 import * as http from 'http';
 import * as https from 'https';
 import * as net from 'net';
 import * as tls from 'tls';
-// import * as url from 'url';  // Not used
-// import * as fs from 'fs';  // Not used
 import * as dns from 'dns';
 import * as crypto from 'crypto';
 import { EventEmitter } from 'events';
@@ -36,14 +16,11 @@ import {
   ProxyPool,
   ProxyTunnel,
   PACScript,
-  // NTLMAuth,  // Only used in type annotation of commented method
-  // ProxyRotation,  // Not used, ProxyConfig has its own rotation property
   ProxyHealth,
   ProxyMetrics,
   ConnectionOptions,
   TunnelOptions,
   ProxyBypassRule,
-  // ProxyCertificate,  // Not used
   ProxyServer,
   ProxyConfig as ProxyConfigInterface
 } from './proxy.types';
@@ -60,7 +37,6 @@ export class ProxyManager extends EventEmitter {
   private healthChecker: HealthChecker;
   private metricsCollector: MetricsCollector;
   private authHandlers: Map<string, AuthenticationHandler> = new Map();
-  // private certificates: Map<string, ProxyCertificate> = new Map();  // Not used
   private bypassRules: ProxyBypassRule[] = [];
   private isInitialized: boolean = false;
 
@@ -86,12 +62,10 @@ export class ProxyManager extends EventEmitter {
       return null;
     }
 
-    // Check if URL should bypass proxy
     if (instance.shouldBypassProxy(targetUrl)) {
       return null;
     }
 
-    // Return the configured proxy for the target URL
     return instance.config;
   }
 
@@ -103,28 +77,22 @@ export class ProxyManager extends EventEmitter {
 
     this.config = this.validateConfig(config);
 
-    // Initialize proxy pools
     await this.initializeProxyPools();
 
-    // Load PAC scripts if configured
     if (this.config.pacUrl || this.config.pacScript) {
       await this.loadPACScript();
     }
 
-    // Setup bypass rules
     this.setupBypassRules();
 
-    // Initialize health checking
     if (this.config.healthCheck?.enabled) {
       this.startHealthChecking();
     }
 
-    // Initialize metrics collection
     if (this.config.metrics?.enabled) {
       this.startMetricsCollection();
     }
 
-    // Setup rotation if configured
     if (this.config.rotation?.enabled) {
       await this.setupRotation();
     }
@@ -138,18 +106,15 @@ export class ProxyManager extends EventEmitter {
     const startTime = Date.now();
 
     try {
-      // Check bypass rules
       if (this.shouldBypass(targetUrl)) {
         return this.createDirectConnection(targetUrl, connectionId, options);
       }
 
-      // Select proxy
       const proxy = await this.selectProxy(targetUrl);
       if (!proxy) {
         throw new ProxyError('No available proxy for ' + targetUrl);
       }
 
-      // Create connection based on protocol
       let connection: ProxyConnection;
       
       switch (proxy.protocol) {
@@ -170,10 +135,8 @@ export class ProxyManager extends EventEmitter {
           throw new ProxyError(`Unsupported proxy protocol: ${proxy.protocol}`);
       }
 
-      // Store connection
       this.connections.set(connectionId, connection);
 
-      // Update stats
       this.stats.totalConnections++;
       this.stats.activeConnections++;
       this.metricsCollector.recordConnection(proxy, Date.now() - startTime, true);
@@ -201,24 +164,19 @@ export class ProxyManager extends EventEmitter {
     const startTime = Date.now();
 
     try {
-      // Check bypass rules
       if (this.shouldBypass(`${targetHost}:${targetPort}`)) {
         return this.createDirectTunnel(targetHost, targetPort, tunnelId, options);
       }
 
-      // Select proxy
       const proxy = await this.selectProxy(`https://${targetHost}:${targetPort}`);
       if (!proxy) {
         throw new ProxyError('No available proxy for tunnel');
       }
 
-      // Create CONNECT tunnel
       const tunnel = await this.createConnectTunnel(proxy, targetHost, targetPort, tunnelId, options);
 
-      // Store tunnel
       this.tunnels.set(tunnelId, tunnel);
 
-      // Update stats
       this.stats.activeTunnels++;
       
       this.emit('tunnelCreated', { 
@@ -266,17 +224,14 @@ export class ProxyManager extends EventEmitter {
   }
 
   getContextProxy(): ProxySettings | undefined {
-    // Same as browser proxy but may have different configuration
     return this.getBrowserProxy();
   }
 
   async getProxyForURL(targetUrl: string): Promise<ProxySettings | null> {
-    // Check bypass rules
     if (this.shouldBypass(targetUrl)) {
       return null;
     }
 
-    // Check PAC script
     if (this.pacScripts.size > 0) {
       const pacResult = await this.evaluatePAC(targetUrl);
       if (pacResult === 'DIRECT') {
@@ -285,7 +240,6 @@ export class ProxyManager extends EventEmitter {
       return this.parsePACResult(pacResult);
     }
 
-    // Use configured proxy
     const proxy = await this.selectProxy(targetUrl);
     if (!proxy) {
       return null;
@@ -302,7 +256,6 @@ export class ProxyManager extends EventEmitter {
     return settings;
   }
 
-  // HTTP/HTTPS Proxy Implementation
 
   private async createHTTPConnection(
     proxy: ProxyServer,
@@ -327,7 +280,6 @@ export class ProxyManager extends EventEmitter {
     };
 
     if (isHTTPS) {
-      // Create CONNECT tunnel for HTTPS
       const tunnel = await this.createConnectTunnel(
         proxy,
         targetUrlObj.hostname,
@@ -339,13 +291,11 @@ export class ProxyManager extends EventEmitter {
       connection.socket = tunnel.socket;
       connection.state = 'connected';
     } else {
-      // Direct HTTP proxy connection
       const socket = await this.connectToProxy(proxy, options);
       connection.socket = socket;
       connection.state = 'connected';
     }
 
-    // Setup connection monitoring
     this.monitorConnection(connection);
 
     return connection;
@@ -371,7 +321,6 @@ export class ProxyManager extends EventEmitter {
         }
       };
 
-      // Add proxy authentication
       if (proxy.auth) {
         const authHeader = this.getAuthHeader(proxy.auth);
         if (authHeader) {
@@ -402,7 +351,6 @@ export class ProxyManager extends EventEmitter {
           }
         };
 
-        // Setup TLS if needed
         if (options?.tls) {
           const tlsSocket = tls.connect({
             socket,
@@ -423,12 +371,10 @@ export class ProxyManager extends EventEmitter {
 
       request.on('error', reject);
       
-      // const startTime = Date.now();  // Not used
       request.end();
     });
   }
 
-  // SOCKS4 Implementation
 
   private async createSOCKS4Connection(
     proxy: ProxyServer,
@@ -442,7 +388,6 @@ export class ProxyManager extends EventEmitter {
 
     const socket = await this.connectToProxy(proxy, options);
     
-    // SOCKS4 handshake
     await this.performSOCKS4Handshake(socket, targetHost, targetPort, proxy.auth);
 
     const connection: ProxyConnection = {
@@ -459,7 +404,6 @@ export class ProxyManager extends EventEmitter {
       }
     };
 
-    // Setup TLS if HTTPS
     if (targetUrlObj.protocol === 'https:') {
       const tlsSocket = tls.connect({
         socket,
@@ -485,10 +429,8 @@ export class ProxyManager extends EventEmitter {
     auth?: ProxyAuthentication
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      // SOCKS4 request
       const userId = auth?.username ? Buffer.from(auth.username) : Buffer.alloc(0);
       
-      // Resolve host to IP for SOCKS4
       dns.lookup(host, 4, (err, address) => {
         if (err) {
           reject(new ProxyError('Failed to resolve host for SOCKS4'));
@@ -498,13 +440,13 @@ export class ProxyManager extends EventEmitter {
         const ipParts = address.split('.').map(n => parseInt(n));
         const request = Buffer.concat([
           Buffer.from([
-            0x04, // SOCKS version
-            0x01, // CONNECT command
-            port >> 8, port & 0xFF, // Port (big-endian)
-            ...ipParts // IP address
+            0x04,
+            0x01,
+            port >> 8, port & 0xFF,
+            ...ipParts
           ]),
           userId,
-          Buffer.from([0x00]) // Null terminator
+          Buffer.from([0x00])
         ]);
 
         socket.write(request);
@@ -536,7 +478,6 @@ export class ProxyManager extends EventEmitter {
     });
   }
 
-  // SOCKS5 Implementation
 
   private async createSOCKS5Connection(
     proxy: ProxyServer,
@@ -550,10 +491,8 @@ export class ProxyManager extends EventEmitter {
 
     const socket = await this.connectToProxy(proxy, options);
     
-    // SOCKS5 handshake
     await this.performSOCKS5Handshake(socket, proxy.auth);
     
-    // SOCKS5 connect request
     await this.sendSOCKS5ConnectRequest(socket, targetHost, targetPort);
 
     const connection: ProxyConnection = {
@@ -570,7 +509,6 @@ export class ProxyManager extends EventEmitter {
       }
     };
 
-    // Setup TLS if HTTPS
     if (targetUrlObj.protocol === 'https:') {
       const tlsSocket = tls.connect({
         socket,
@@ -591,14 +529,13 @@ export class ProxyManager extends EventEmitter {
 
   private async performSOCKS5Handshake(socket: net.Socket, auth?: ProxyAuthentication): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Send greeting
-      const methods = [0x00]; // NO AUTHENTICATION REQUIRED
+      const methods = [0x00];
       if (auth) {
-        methods.push(0x02); // USERNAME/PASSWORD
+        methods.push(0x02);
       }
 
       const greeting = Buffer.from([
-        0x05, // SOCKS version
+        0x05,
         methods.length,
         ...methods
       ]);
@@ -619,7 +556,6 @@ export class ProxyManager extends EventEmitter {
         }
 
         if (method === 0x02 && auth) {
-          // Username/password authentication
           await this.performSOCKS5Auth(socket, auth);
         }
 
@@ -636,7 +572,7 @@ export class ProxyManager extends EventEmitter {
       const password = Buffer.from(auth.password);
       
       const authRequest = Buffer.concat([
-        Buffer.from([0x01]), // Version
+        Buffer.from([0x01]),
         Buffer.from([username.length]),
         username,
         Buffer.from([password.length]),
@@ -662,20 +598,18 @@ export class ProxyManager extends EventEmitter {
       let addressType: number;
       let addressBuffer: Buffer;
 
-      // Check if IP address
       if (net.isIP(host)) {
         if (net.isIPv4(host)) {
-          addressType = 0x01; // IPv4
+          addressType = 0x01;
           addressBuffer = Buffer.from(host.split('.').map(n => parseInt(n)));
         } else {
-          addressType = 0x04; // IPv6
+          addressType = 0x04;
           addressBuffer = Buffer.from(host.split(':').flatMap(part => {
             const num = parseInt(part, 16);
             return [num >> 8, num & 0xFF];
           }));
         }
       } else {
-        // Domain name
         addressType = 0x03;
         addressBuffer = Buffer.concat([
           Buffer.from([host.length]),
@@ -688,9 +622,9 @@ export class ProxyManager extends EventEmitter {
 
       const request = Buffer.concat([
         Buffer.from([
-          0x05, // SOCKS version
-          0x01, // CONNECT command
-          0x00  // Reserved
+          0x05,
+          0x01,
+          0x00
         ]),
         Buffer.from([addressType]),
         addressBuffer,
@@ -730,222 +664,14 @@ export class ProxyManager extends EventEmitter {
     });
   }
 
-  // NTLM Authentication Implementation - Currently unused but kept for future implementation
-  /* Commented out for future implementation
-  private async performNTLMAuth(socket: net.Socket, auth: NTLMAuth): Promise<void> {
-    // Type 1 message (Negotiate)
-    const type1 = this.createNTLMType1Message(auth.domain, auth.workstation);
-    const authHeader = `NTLM ${type1.toString('base64')}`;
-    
-    // Send initial request with Type 1
-    await this.sendProxyAuthRequest(socket, authHeader);
-    
-    // Receive Type 2 challenge
-    const challenge = await this.receiveNTLMChallenge(socket);
-    
-    // Create Type 3 response
-    const type3 = this.createNTLMType3Message(
-      auth.username,
-      auth.password,
-      auth.domain,
-      auth.workstation,
-      challenge
-    );
-    
-    // Send Type 3 authentication
-    const finalAuthHeader = `NTLM ${type3.toString('base64')}`;
-    await this.sendProxyAuthRequest(socket, finalAuthHeader);
-  }
 
-  private createNTLMType1Message(_domain?: string, _workstation?: string): Buffer {
-    const NTLMSSP_NEGOTIATE = 0x00000001;
-    const NTLM_NEGOTIATE_OEM = 0x00000002;
-    const NTLM_NEGOTIATE_UNICODE = 0x00000001;
-    const NTLM_NEGOTIATE_NTLM = 0x00000200;
-    const NTLM_NEGOTIATE_ALWAYS_SIGN = 0x00008000;
-    const NTLM_NEGOTIATE_NTLM2_KEY = 0x00080000;
-
-    const flags = NTLMSSP_NEGOTIATE | NTLM_NEGOTIATE_OEM | NTLM_NEGOTIATE_UNICODE |
-                  NTLM_NEGOTIATE_NTLM | NTLM_NEGOTIATE_ALWAYS_SIGN | NTLM_NEGOTIATE_NTLM2_KEY;
-
-    const type1 = Buffer.allocUnsafe(32);
-    let offset = 0;
-
-    // Signature
-    type1.write('NTLMSSP\0', offset, 'ascii');
-    offset += 8;
-
-    // Type
-    type1.writeUInt32LE(1, offset);
-    offset += 4;
-
-    // Flags
-    type1.writeUInt32LE(flags, offset);
-    offset += 4;
-
-    // Domain (empty)
-    type1.writeUInt16LE(0, offset); // Length
-    type1.writeUInt16LE(0, offset + 2); // Max length
-    type1.writeUInt32LE(0, offset + 4); // Offset
-    offset += 8;
-
-    // Workstation (empty)
-    type1.writeUInt16LE(0, offset); // Length
-    type1.writeUInt16LE(0, offset + 2); // Max length
-    type1.writeUInt32LE(0, offset + 4); // Offset
-
-    return type1;
-  }
-
-  private createNTLMType3Message(
-    username: string,
-    password: string,
-    domain: string,
-    workstation: string,
-    challenge: Buffer
-  ): Buffer {
-    // This is a simplified implementation
-    // Real NTLM involves complex cryptographic operations
-    const ntlmHash = this.createNTLMHash(password);
-    const ntlmv2Hash = this.createNTLMv2Hash(ntlmHash, username, domain);
-    
-    // Extract server challenge from Type 2 message
-    const serverChallenge = challenge.slice(24, 32);
-    
-    // Generate client challenge
-    const clientChallenge = crypto.randomBytes(8);
-    
-    // Calculate response
-    const ntlmv2Response = this.calculateNTLMv2Response(
-      ntlmv2Hash,
-      serverChallenge,
-      clientChallenge
-    );
-
-    // Build Type 3 message
-    const type3 = Buffer.allocUnsafe(1024); // Allocate enough space
-    let offset = 0;
-
-    // Signature
-    type3.write('NTLMSSP\0', offset, 'ascii');
-    offset += 8;
-
-    // Type
-    type3.writeUInt32LE(3, offset);
-    offset += 4;
-
-    // LM response (not used in NTLMv2)
-    offset = this.writeSecurityBuffer(type3, offset, Buffer.alloc(0));
-
-    // NTLM response
-    offset = this.writeSecurityBuffer(type3, offset, ntlmv2Response);
-
-    // Domain
-    const domainBuffer = Buffer.from(domain, 'utf16le');
-    offset = this.writeSecurityBuffer(type3, offset, domainBuffer);
-
-    // Username
-    const usernameBuffer = Buffer.from(username, 'utf16le');
-    offset = this.writeSecurityBuffer(type3, offset, usernameBuffer);
-
-    // Workstation
-    const workstationBuffer = Buffer.from(workstation, 'utf16le');
-    offset = this.writeSecurityBuffer(type3, offset, workstationBuffer);
-
-    // Session key (empty for now)
-    offset = this.writeSecurityBuffer(type3, offset, Buffer.alloc(0));
-
-    // Flags
-    type3.writeUInt32LE(0x00008201, offset);
-    offset += 4;
-
-    return type3.slice(0, offset);
-  }
-
-  private createNTLMHash(password: string): Buffer {
-    // Convert password to uppercase Unicode
-    const unicodePassword = Buffer.from(password.toUpperCase(), 'utf16le');
-    
-    // MD4 hash
-    const md4 = crypto.createHash('md4');
-    md4.update(unicodePassword);
-    return md4.digest();
-  }
-
-  private createNTLMv2Hash(ntlmHash: Buffer, username: string, domain: string): Buffer {
-    const usernameUpper = username.toUpperCase();
-    const identity = Buffer.from(usernameUpper + domain, 'utf16le');
-    
-    const hmac = crypto.createHmac('md5', ntlmHash);
-    hmac.update(identity);
-    return hmac.digest();
-  }
-
-  private calculateNTLMv2Response(
-    ntlmv2Hash: Buffer,
-    serverChallenge: Buffer,
-    clientChallenge: Buffer
-  ): Buffer {
-    const timestamp = this.getNTLMTimestamp();
-    
-    // Build blob
-    const blob = Buffer.concat([
-      Buffer.from([0x01, 0x01, 0x00, 0x00]), // Blob signature
-      Buffer.from([0x00, 0x00, 0x00, 0x00]), // Reserved
-      timestamp,
-      clientChallenge,
-      Buffer.from([0x00, 0x00, 0x00, 0x00]), // Unknown
-      Buffer.from([0x00, 0x00, 0x00, 0x00])  // Target info terminator
-    ]);
-
-    // Calculate response
-    const hmac = crypto.createHmac('md5', ntlmv2Hash);
-    hmac.update(serverChallenge);
-    hmac.update(blob);
-    const proof = hmac.digest();
-
-    return Buffer.concat([proof, blob]);
-  }
-
-  private getNTLMTimestamp(): Buffer {
-    // Windows FILETIME (100-nanosecond intervals since January 1, 1601)
-    const EPOCH_DIFFERENCE = 11644473600000; // milliseconds
-    const timestamp = Date.now() + EPOCH_DIFFERENCE;
-    const filetime = timestamp * 10000; // Convert to 100-nanosecond intervals
-    
-    const buffer = Buffer.allocUnsafe(8);
-    // Write as two 32-bit integers for compatibility
-    const low = filetime & 0xFFFFFFFF;
-    const high = Math.floor(filetime / 0x100000000);
-    buffer.writeUInt32LE(low, 0);
-    buffer.writeUInt32LE(high, 4);
-    return buffer;
-  }
-
-  private writeSecurityBuffer(target: Buffer, offset: number, data: Buffer): number {
-    const length = data.length;
-    
-    // Length
-    target.writeUInt16LE(length, offset);
-    // Max length
-    target.writeUInt16LE(length, offset + 2);
-    // Offset (will be updated later)
-    target.writeUInt32LE(0, offset + 4);
-    
-    return offset + 8;
-  }
-  */
-
-  // PAC Script Implementation
 
   private async loadPACScript(): Promise<void> {
     let pacContent: string;
 
     if (this.config.pacUrl) {
-      // Download PAC script
       pacContent = await this.downloadPAC(this.config.pacUrl);
     } else if (this.config.pacScript) {
-      // Use provided PAC script
       pacContent = this.config.pacScript;
     } else {
       return;
@@ -962,7 +688,6 @@ export class ProxyManager extends EventEmitter {
       pacScript.url = this.config.pacUrl;
     }
 
-    // Validate and compile PAC script
     this.compilePACScript(pacScript);
 
     this.pacScripts.set(pacScript.id, pacScript);
@@ -994,9 +719,7 @@ export class ProxyManager extends EventEmitter {
   }
 
   private compilePACScript(pacScript: PACScript): void {
-    // Create PAC sandbox environment
     const sandbox = {
-      // PAC script functions
       isPlainHostName: (host: string) => !host.includes('.'),
       
       dnsDomainIs: (host: string, domain: string) => {
@@ -1008,7 +731,6 @@ export class ProxyManager extends EventEmitter {
       },
       
       isResolvable: (_host: string) => {
-        // Simplified implementation - in production, use async DNS
         return true;
       },
       
@@ -1052,17 +774,14 @@ export class ProxyManager extends EventEmitter {
       },
       
       dateRange: (..._args: any[]) => {
-        // Complex date range implementation
-        return true; // Simplified
+        return true;
       },
       
       timeRange: (..._args: any[]) => {
-        // Time range implementation
-        return true; // Simplified
+        return true;
       }
     };
 
-    // Compile PAC function
     try {
       const vm = eval('require')('vm');
       const script = new vm.Script(`
@@ -1080,16 +799,14 @@ export class ProxyManager extends EventEmitter {
   private async evaluatePAC(targetUrl: string): Promise<string> {
     const urlObj = new URL(targetUrl);
     
-    // Check cache first
     const pacScripts = Array.from(this.pacScripts.values());
     for (const pacScript of pacScripts) {
       const cached = pacScript.cache?.get(targetUrl);
-      if (cached && Date.now() - cached.timestamp < 300000) { // 5 minute cache
+      if (cached && Date.now() - cached.timestamp < 300000) {
         return cached.result;
       }
     }
 
-    // Evaluate PAC script
     let result = 'DIRECT';
     
     const pacScripts2 = Array.from(this.pacScripts.values());
@@ -1098,7 +815,6 @@ export class ProxyManager extends EventEmitter {
         try {
           result = pacScript.findProxyForURL(targetUrl, urlObj.hostname);
           
-          // Cache result
           pacScript.cache?.set(targetUrl, {
             result,
             timestamp: Date.now()
@@ -1141,15 +857,12 @@ export class ProxyManager extends EventEmitter {
     return null;
   }
 
-  // Proxy Selection and Rotation
 
   private async selectProxy(targetUrl: string): Promise<ProxyServer | null> {
-    // Check if rotation is enabled
     if (this.config.rotation?.enabled) {
       return this.rotationManager.getNextProxy();
     }
 
-    // Check PAC script result
     if (this.pacScripts.size > 0) {
       const pacResult = await this.evaluatePAC(targetUrl);
       if (pacResult !== 'DIRECT') {
@@ -1160,7 +873,6 @@ export class ProxyManager extends EventEmitter {
       }
     }
 
-    // Return default proxy
     return this.getDefaultProxy();
   }
 
@@ -1169,14 +881,12 @@ export class ProxyManager extends EventEmitter {
       return null;
     }
 
-    // Find first healthy proxy
     for (const server of this.config.servers) {
       if (this.healthChecker.isHealthy(server)) {
         return server;
       }
     }
 
-    // If no healthy proxy, return first one
     return this.config.servers[0] || null;
   }
 
@@ -1200,7 +910,6 @@ export class ProxyManager extends EventEmitter {
     return server;
   }
 
-  // Bypass Rules
 
   private setupBypassRules(): void {
     this.bypassRules = [];
@@ -1214,7 +923,6 @@ export class ProxyManager extends EventEmitter {
       }
     }
 
-    // Add default bypass rules
     this.bypassRules.push(
       { pattern: 'localhost', regex: /^localhost$/i },
       { pattern: '127.0.0.1', regex: /^127\.0\.0\.1$/ },
@@ -1224,7 +932,6 @@ export class ProxyManager extends EventEmitter {
   }
 
   private createBypassRegex(pattern: string): RegExp {
-    // Convert wildcard pattern to regex
     const regexPattern = pattern
       .replace(/\./g, '\\.')
       .replace(/\*/g, '.*')
@@ -1250,7 +957,6 @@ export class ProxyManager extends EventEmitter {
     }
   }
 
-  // Connection Management
 
   private async connectToProxy(proxy: ProxyServer, options?: ConnectionOptions): Promise<net.Socket> {
     return new Promise((resolve, reject) => {
@@ -1310,7 +1016,6 @@ export class ProxyManager extends EventEmitter {
       }
     };
 
-    // Setup TLS if HTTPS
     if (urlObj.protocol === 'https:') {
       const tlsSocket = tls.connect({
         socket,
@@ -1381,12 +1086,10 @@ export class ProxyManager extends EventEmitter {
     const socket = connection.socket;
     if (!socket) return;
 
-    // Monitor data transfer
     socket.on('data', (data) => {
       connection.stats.bytesReceived += data.length;
     });
 
-    // Monitor socket closure
     socket.once('close', () => {
       connection.state = 'closed';
       this.connections.delete(connection.id);
@@ -1398,7 +1101,6 @@ export class ProxyManager extends EventEmitter {
       });
     });
 
-    // Monitor errors
     socket.once('error', (error) => {
       connection.stats.errorCount++;
       connection.state = 'error';
@@ -1410,10 +1112,8 @@ export class ProxyManager extends EventEmitter {
     });
   }
 
-  // Authentication Handlers
 
   private registerDefaultAuthHandlers(): void {
-    // Basic authentication
     this.authHandlers.set('basic', {
       createHeader: (auth: ProxyAuthentication) => {
         const credentials = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
@@ -1421,18 +1121,14 @@ export class ProxyManager extends EventEmitter {
       }
     });
 
-    // NTLM authentication
     this.authHandlers.set('ntlm', {
       createHeader: (_auth: ProxyAuthentication) => {
-        // NTLM requires special handling, return empty for now
         return '';
       }
     });
 
-    // Digest authentication
     this.authHandlers.set('digest', {
       createHeader: (auth: ProxyAuthentication, challenge?: string) => {
-        // Simplified digest implementation
         return this.createDigestAuthHeader(auth, challenge);
       }
     });
@@ -1447,7 +1143,6 @@ export class ProxyManager extends EventEmitter {
 
     const result = handler.createHeader(auth);
     if (result instanceof Promise) {
-      // For async auth handlers, return empty string and handle separately
       return '';
     }
     return result || '';
@@ -1458,10 +1153,8 @@ export class ProxyManager extends EventEmitter {
       return '';
     }
 
-    // Parse challenge
     const params = this.parseDigestChallenge(challenge);
     
-    // Generate response
     const ha1 = this.md5(`${auth.username}:${params.realm}:${auth.password}`);
     const ha2 = this.md5(`CONNECT:${params.uri}`);
     const response = this.md5(`${ha1}:${params.nonce}:${ha2}`);
@@ -1490,10 +1183,8 @@ export class ProxyManager extends EventEmitter {
     return crypto.createHash('md5').update(data).digest('hex');
   }
 
-  // Utility Methods
 
   private resolveHost(_host: string): string | null {
-    // Simplified implementation - in production, use async DNS
     return '127.0.0.1';
   }
 
@@ -1541,7 +1232,6 @@ export class ProxyManager extends EventEmitter {
       throw new ProxyError('At least one proxy server must be configured');
     }
 
-    // Validate each server
     for (const server of config.servers) {
       if (!server.host || !server.port) {
         throw new ProxyError('Proxy server must have host and port');
@@ -1563,7 +1253,6 @@ export class ProxyManager extends EventEmitter {
       }
     }
 
-    // Set defaults if not provided
     if (!config.rotation) {
       config.rotation = { enabled: false, strategy: 'round-robin', servers: [] };
     }
@@ -1620,7 +1309,6 @@ export class ProxyManager extends EventEmitter {
 
       this.pools.set(poolId, pool);
       
-      // Start pool maintenance
       this.startPoolMaintenance(pool);
     }
   }
@@ -1640,75 +1328,11 @@ export class ProxyManager extends EventEmitter {
       for (const id of toRemove) {
         this.removeFromPool(pool, id);
       }
-    }, 30000); // Check every 30 seconds
+    }, 30000);
   }
 
-  // Currently not used but kept for future connection pooling implementation
-  /*
-  private async getPooledConnection(proxy: ProxyServer, targetUrl: string): Promise<ProxyConnection | null> {
-    const poolId = `${proxy.host}:${proxy.port}`;
-    const pool = this.pools.get(poolId);
-    
-    if (!pool) {
-      return null;
-    }
 
-    // Find idle connection
-    const connections = Array.from(pool.connections.entries());
-    for (const [_id, conn] of connections) {
-      if (conn.state === 'idle' && this.canReuseConnection(conn, targetUrl)) {
-        conn.state = 'connected';
-        conn.target = targetUrl;
-        pool.stats.active++;
-        pool.stats.idle--;
-        return conn;
-      }
-    }
 
-    // Create new connection if pool not full
-    if (pool.connections.size < pool.maxSize) {
-      return null; // Let caller create new connection
-    }
-
-    // Pool is full, wait or reject
-    throw new ProxyError('Connection pool is full');
-  }
-  */
-
-  // Currently not used but kept for future connection pooling implementation
-  /*
-  private canReuseConnection(connection: ProxyConnection, targetUrl: string): boolean {
-    if (!connection.socket || connection.socket.destroyed) {
-      return false;
-    }
-
-    // For HTTPS connections, we need exact host match
-    try {
-      const currentUrl = new URL(connection.target);
-      const newUrl = new URL(targetUrl);
-      
-      return currentUrl.host === newUrl.host && 
-             currentUrl.protocol === newUrl.protocol;
-    } catch {
-      return false;
-    }
-  }
-  */
-
-  // Currently not used but kept for future connection pooling implementation
-  /*
-  private addToPool(pool: ProxyPool, connection: ProxyConnection): void {
-    pool.connections.set(connection.id, connection);
-    pool.stats.total++;
-    pool.stats.created++;
-    
-    if (connection.state === 'connected') {
-      pool.stats.active++;
-    } else {
-      pool.stats.idle++;
-    }
-  }
-  */
 
   private removeFromPool(pool: ProxyPool, connectionId: string): void {
     const connection = pool.connections.get(connectionId);
@@ -1725,7 +1349,6 @@ export class ProxyManager extends EventEmitter {
     
     pool.stats.destroyed++;
 
-    // Close socket
     if (connection.socket && !connection.socket.destroyed) {
       connection.socket.destroy();
     }
@@ -1740,7 +1363,6 @@ export class ProxyManager extends EventEmitter {
       }
     }, interval);
     
-    // Initial check
     for (const server of this.config.servers) {
       this.healthChecker.checkProxy(server);
     }
@@ -1751,11 +1373,10 @@ export class ProxyManager extends EventEmitter {
       this.emit('metrics', metrics);
     });
 
-    // Periodic metrics emission
     setInterval(() => {
       const metrics = this.getMetrics();
       this.emit('metrics', metrics);
-    }, 60000); // Every minute
+    }, 60000);
   }
 
   private async setupRotation(): Promise<void> {
@@ -1779,55 +1400,10 @@ export class ProxyManager extends EventEmitter {
     });
   }
 
-  // Currently not used but kept for future NTLM implementation
-  /*
-  private async sendProxyAuthRequest(socket: net.Socket, authHeader: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const request = `CONNECT proxy-authorization: ${authHeader}\r\n\r\n`;
-      
-      socket.write(request, (error) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve();
-        }
-      });
-    });
-  }
-  */
 
-  // Currently not used but kept for future NTLM implementation
-  /*
-  private async receiveNTLMChallenge(socket: net.Socket): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      socket.once('data', (data) => {
-        // Parse HTTP response
-        const response = data.toString();
-        const match = response.match(/Proxy-Authenticate: NTLM (.+)\r?\n/);
-        
-        if (!match) {
-          reject(new ProxyError('No NTLM challenge received'));
-          return;
-        }
-        
-        const authData = match[1];
-        if (!authData) {
-          reject(new ProxyError('Invalid NTLM challenge format'));
-          return;
-        }
-        const challenge = Buffer.from(authData, 'base64');
-        resolve(challenge);
-      });
 
-      socket.once('error', reject);
-    });
-  }
-  */
-
-  // Public Methods
 
   async close(): Promise<void> {
-    // Close all connections
     const connections = Array.from(this.connections.values());
     for (const connection of connections) {
       if (connection.socket && !connection.socket.destroyed) {
@@ -1836,7 +1412,6 @@ export class ProxyManager extends EventEmitter {
     }
     this.connections.clear();
 
-    // Close all tunnels
     const tunnels = Array.from(this.tunnels.values());
     for (const tunnel of tunnels) {
       if (tunnel.socket && !tunnel.socket.destroyed) {
@@ -1845,7 +1420,6 @@ export class ProxyManager extends EventEmitter {
     }
     this.tunnels.clear();
 
-    // Clear pools
     const pools = Array.from(this.pools.values());
     for (const pool of pools) {
       const connections = Array.from(pool.connections.values());
@@ -1858,12 +1432,10 @@ export class ProxyManager extends EventEmitter {
     }
     this.pools.clear();
 
-    // Stop health checker
     if (this.healthChecker) {
       this.healthChecker.stop();
     }
 
-    // Stop metrics collector
     if (this.metricsCollector) {
       this.metricsCollector.stop();
     }
@@ -1893,17 +1465,11 @@ export class ProxyManager extends EventEmitter {
     return Array.from(this.tunnels.values());
   }
 
-  /**
-   * Check if proxy is enabled and configured
-   */
   isEnabled(): boolean {
     return this.isInitialized && this.config && this.config.enabled && 
            this.config.servers && this.config.servers.length > 0;
   }
 
-  /**
-   * Get the current proxy configuration
-   */
   getProxyConfig(): ProxyConfig | null {
     return this.isInitialized ? this.config : null;
   }
@@ -1944,14 +1510,12 @@ export class ProxyManager extends EventEmitter {
       const hostname = parsedUrl.hostname;
       const port = parsedUrl.port;
 
-      // Check bypass rules
       for (const rule of this.bypassRules) {
         if (this.matchesBypassRule(hostname, port, rule)) {
           return true;
         }
       }
 
-      // Check common bypass patterns
       const localPatterns = [
         'localhost',
         '127.0.0.1',
@@ -1985,13 +1549,11 @@ export class ProxyManager extends EventEmitter {
         return hostname === pattern;
       });
     } catch (error) {
-      // If URL parsing fails, don't bypass
       return false;
     }
   }
 
   private matchesBypassRule(hostname: string, port: string, rule: ProxyBypassRule): boolean {
-    // Check hostname pattern
     if (rule.pattern) {
       const regex = new RegExp(rule.pattern);
       if (!regex.test(hostname)) {
@@ -1999,7 +1561,6 @@ export class ProxyManager extends EventEmitter {
       }
     }
 
-    // Check port range
     if (rule.ports && port) {
       const portNum = parseInt(port, 10);
       if (!rule.ports.includes(portNum)) {
@@ -2010,9 +1571,6 @@ export class ProxyManager extends EventEmitter {
     return true;
   }
 
-  /**
-   * Stop proxy operations
-   */
   stop(): void {
     if (this.healthChecker) {
       this.healthChecker.stop();
@@ -2022,50 +1580,39 @@ export class ProxyManager extends EventEmitter {
     }
   }
 
-  /**
-   * Cleanup proxy resources
-   */
   async cleanup(): Promise<void> {
     try {
-      // Stop proxy operations
       this.stop();
       
-      // Close all connections
       for (const connection of this.connections.values()) {
         try {
           if (connection.socket && !connection.socket.destroyed) {
             connection.socket.destroy();
           }
         } catch (error) {
-          // Ignore cleanup errors
         }
       }
       this.connections.clear();
       
-      // Close all tunnels
       for (const tunnel of this.tunnels.values()) {
         try {
           if (tunnel.socket && !tunnel.socket.destroyed) {
             tunnel.socket.destroy();
           }
         } catch (error) {
-          // Ignore cleanup errors
         }
       }
       this.tunnels.clear();
       
-      // Clear pools and scripts
       this.pools.clear();
       this.pacScripts.clear();
       
     } catch (error) {
-      // Ignore cleanup errors
     }
   }
 
 }
 
-// Helper Classes
 
 interface ProxyRotationConfig {
   servers: ProxyServer[];
@@ -2170,7 +1717,6 @@ class RotationManager extends EventEmitter {
   }
 
   private leastConnections(): ProxyServer {
-    // This would need connection tracking from ProxyManager
     return this.roundRobin();
   }
 
@@ -2185,20 +1731,17 @@ class RotationManager extends EventEmitter {
 
   private startStickyCleanup(): void {
     setInterval(() => {
-      // const now = Date.now();  // Not used in simplified implementation
       const toRemove: string[] = [];
       
-      // This is simplified - in production, we'd track expiry times
       const clientIds = Array.from(this.stickyMap.keys());
       for (const clientId of clientIds) {
-        // Check if expired - for now just clear all
         toRemove.push(clientId);
       }
       
       for (const clientId of toRemove) {
         this.stickyMap.delete(clientId);
       }
-    }, 60000); // Every minute
+    }, 60000);
   }
 }
 
@@ -2210,7 +1753,6 @@ class HealthChecker extends EventEmitter {
     const key = `${proxy.host}:${proxy.port}`;
     const startTime = Date.now();
     
-    // Create a minimal ProxyConfig interface for health checking
     let health: ProxyHealth = {
       proxy: {} as ProxyConfigInterface,
       healthy: false,
@@ -2221,7 +1763,6 @@ class HealthChecker extends EventEmitter {
     };
 
     try {
-      // Create test connection
       const socket = await this.createTestConnection(proxy);
       
       health.healthy = true;
@@ -2229,7 +1770,6 @@ class HealthChecker extends EventEmitter {
       
       socket.destroy();
       
-      // Update success rate
       const previous = this.health.get(key);
       if (previous) {
         health.successRate = (previous.successRate * 0.9) + 0.1;
@@ -2241,7 +1781,6 @@ class HealthChecker extends EventEmitter {
       health.healthy = false;
       health.error = error instanceof Error ? error.message : String(error);
       
-      // Update error count
       const previous = this.health.get(key);
       if (previous) {
         health.errorCount = previous.errorCount + 1;
@@ -2274,7 +1813,6 @@ class HealthChecker extends EventEmitter {
         clearTimeout(timeout);
         
         if (proxy.protocol === 'http' || proxy.protocol === 'https') {
-          // Send test CONNECT request
           const request = 'CONNECT www.google.com:443 HTTP/1.1\r\n' +
                          'Host: www.google.com:443\r\n' +
                          'Proxy-Connection: Keep-Alive\r\n\r\n';
@@ -2291,7 +1829,6 @@ class HealthChecker extends EventEmitter {
             }
           });
         } else {
-          // For SOCKS, just connection is enough for basic check
           resolve(socket);
         }
       });
@@ -2308,7 +1845,7 @@ class HealthChecker extends EventEmitter {
     const health = this.health.get(key);
     
     if (!health) {
-      return true; // Assume healthy if not checked yet
+      return true;
     }
     
     return health.healthy && health.errorCount < 3;
@@ -2406,12 +1943,10 @@ class MetricsCollector extends EventEmitter {
   private recordLatency(latency: number): void {
     this.latencyValues.push(latency);
     
-    // Keep only recent values
     if (this.latencyValues.length > this.maxLatencyValues) {
       this.latencyValues = this.latencyValues.slice(-this.maxLatencyValues);
     }
     
-    // Update metrics
     this.updateLatencyMetrics();
   }
 
@@ -2437,7 +1972,6 @@ class MetricsCollector extends EventEmitter {
   }
 
   stop(): void {
-    // Cleanup if needed
   }
 }
 
@@ -2459,5 +1993,4 @@ interface AuthenticationHandler {
   createHeader: (auth: ProxyAuthentication, challenge?: string, socket?: net.Socket) => string | Promise<string | null>;
 }
 
-// Export singleton instance
 export const proxyManager = ProxyManager.getInstance();

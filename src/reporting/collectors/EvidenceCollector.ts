@@ -8,8 +8,6 @@ import { MetricsCollector } from './MetricsCollector';
 import { PerformanceCollector } from './PerformanceCollector';
 import { NetworkCollector } from './NetworkCollector';
 import { TraceCollector } from './TraceCollector';
-// import { FileUtils } from '../../core/utils/FileUtils'; - Not used
-// import { DateUtils } from '../../core/utils/DateUtils'; - Not used
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 import {
   EvidenceCollection as EvidenceCollectionType,
@@ -23,7 +21,6 @@ import {
   ConsoleLogLevel
 } from '../types/reporting.types';
 
-// Define missing types
 type CollectorType = 'screenshot' | 'video' | 'log' | 'metrics' | 'performance' | 'network' | 'trace';
 
 interface EvidenceItem {
@@ -94,12 +91,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import * as zlib from 'zlib';
-// import { pipeline } from 'stream/promises'; // Not used in current implementation
 
-/**
- * Central evidence collection orchestrator
- * Coordinates all collectors and manages evidence lifecycle
- */
 export class EvidenceCollector {
   private static instance: EvidenceCollector;
   private readonly logger = Logger.getInstance(EvidenceCollector.name);
@@ -111,9 +103,6 @@ export class EvidenceCollector {
   private readonly compressionEnabled: boolean;
   private collectionInProgress: boolean = false;
   
-  /**
-   * Check if evidence collection is in progress
-   */
   isCollectionInProgress(): boolean {
     return this.collectionInProgress;
   }
@@ -131,7 +120,6 @@ export class EvidenceCollector {
     this.maxEvidenceSize = ConfigurationManager.getInt('MAX_EVIDENCE_SIZE_MB', 100) * 1024 * 1024;
     this.compressionEnabled = ConfigurationManager.getBoolean('COMPRESS_EVIDENCE', true);
     
-    // Initialize all collectors
     this.screenshotCollector = ScreenshotCollector.getInstance();
     this.videoCollector = VideoCollector.getInstance();
     this.logCollector = LogCollector.getInstance();
@@ -140,7 +128,6 @@ export class EvidenceCollector {
     this.networkCollector = NetworkCollector.getInstance();
     this.traceCollector = TraceCollector.getInstance();
     
-    // Register collectors
     this.collectors.set('screenshot', this.screenshotCollector);
     this.collectors.set('video', this.videoCollector);
     this.collectors.set('log', this.logCollector);
@@ -161,7 +148,6 @@ export class EvidenceCollector {
 
   private initializeStorage(): void {
     try {
-      // Create evidence directory structure
       const dirs = [
         this.evidencePath,
         path.join(this.evidencePath, 'screenshots'),
@@ -178,7 +164,6 @@ export class EvidenceCollector {
         }
       });
       
-      // Clean old evidence based on retention policy
       this.cleanOldEvidence();
       
     } catch (error) {
@@ -187,9 +172,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Start evidence collection for a test execution
-   */
   async startCollection(executionId: string, options: CollectionOptions = {}): Promise<void> {
     const startTime = Date.now();
     
@@ -197,7 +179,6 @@ export class EvidenceCollector {
       this.logger.info(`Starting evidence collection for execution: ${executionId}`);
       this.collectionInProgress = true;
       
-      // Create execution-specific collection
       const collection: EvidenceCollection = {
         executionId,
         startTime: new Date(),
@@ -224,7 +205,6 @@ export class EvidenceCollector {
           totalSize: 0,
           duration: 0
         },
-        // Initialize required collections
         screenshots: [],
         videos: [],
         traces: [],
@@ -237,7 +217,6 @@ export class EvidenceCollector {
       
       this.evidenceStorage.set(executionId, collection);
       
-      // Initialize all collectors for this execution
       const initPromises = Array.from(this.collectors.values()).map(collector =>
         collector.initialize(executionId, options)
       );
@@ -253,9 +232,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Collect evidence for a specific scenario
-   */
   async collectForScenario(
     executionId: string,
     scenarioId: string,
@@ -269,7 +245,6 @@ export class EvidenceCollector {
         throw new Error(`No collection found for execution ${executionId}`);
       }
       
-      // Collect from each collector
       const collectionPromises = Array.from(this.collectors.entries()).map(
         async ([type, collector]) => {
           try {
@@ -284,7 +259,6 @@ export class EvidenceCollector {
       
       const results = await Promise.all(collectionPromises);
       
-      // Process and store collected items
       for (const { type, items } of results) {
         for (const item of items) {
           if (!this.isValidCollectorType(type)) {
@@ -295,17 +269,14 @@ export class EvidenceCollector {
           const evidenceItem = await this.processEvidenceItem(item, type as CollectorType, scenarioId);
           collection.items.push(evidenceItem);
           
-          // Update summary
           collection.summary.totalItems++;
           collection.summary.byType[type as CollectorType] = (collection.summary.byType[type as CollectorType] || 0) + 1;
           collection.summary.totalSize += evidenceItem.size;
           
-          // Add to specific type collection
           this.addToSpecificCollection(collection, type as CollectorType, evidenceItem, item);
         }
       }
       
-      // Check storage limits
       await this.enforceStorageLimits(executionId);
       
       this.logger.info(`Evidence collection for scenario ${scenarioId} completed in ${Date.now() - startTime}ms`);
@@ -316,9 +287,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Collect evidence for a specific step
-   */
   async collectForStep(
     executionId: string,
     scenarioId: string,
@@ -329,10 +297,9 @@ export class EvidenceCollector {
     try {
       const collection = this.evidenceStorage.get(executionId);
       if (!collection) {
-        return; // Silent fail for step collection
+        return;
       }
       
-      // Prioritize collectors based on step status
       const priorityCollectors = status === 'failed' 
         ? ['screenshot', 'log', 'network', 'performance']
         : ['metrics'];
@@ -364,7 +331,6 @@ export class EvidenceCollector {
               collection.summary.totalItems++;
               collection.summary.totalSize += evidenceItem.size;
               
-              // Add to specific type collection
               this.addToSpecificCollection(collection, collectorType as CollectorType, evidenceItem, item);
             }
           } catch (error) {
@@ -378,9 +344,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Process and store an evidence item
-   */
   private async processEvidenceItem(
     item: any,
     type: CollectorType,
@@ -390,18 +353,15 @@ export class EvidenceCollector {
     const timestamp = new Date();
     const itemId = this.generateEvidenceId(type, scenarioId, stepId);
     
-    // Determine storage path
     const filename = `${itemId}_${timestamp.getTime()}${this.getFileExtension(type, item)}`;
     const relativePath = path.join(this.getTypeDirectory(type), filename);
     const absolutePath = path.join(this.evidencePath, relativePath);
     
-    // Store the evidence
     let size = 0;
     let stored = false;
     
     try {
       if (item.data) {
-        // Binary data (screenshots, videos)
         const buffer = Buffer.isBuffer(item.data) ? item.data : Buffer.from(item.data);
         
         if (this.compressionEnabled && this.shouldCompress(type)) {
@@ -414,7 +374,6 @@ export class EvidenceCollector {
         }
         stored = true;
       } else if (item.content) {
-        // Text content (logs, metrics)
         const content = typeof item.content === 'string' 
           ? item.content 
           : JSON.stringify(item.content, null, 2);
@@ -432,7 +391,7 @@ export class EvidenceCollector {
       type,
       timestamp,
       scenarioId,
-      ...(stepId && { stepId }),  // Only include stepId if it's defined
+      ...(stepId && { stepId }),
       name: item.name || `${type}_${timestamp.getTime()}`,
       description: item.description || `${type} evidence`,
       path: stored ? relativePath : null,
@@ -449,9 +408,6 @@ export class EvidenceCollector {
     return evidenceItem;
   }
 
-  /**
-   * Complete evidence collection for an execution
-   */
   async completeCollection(executionId: string): Promise<EvidenceCollection> {
     const startTime = Date.now();
     
@@ -461,21 +417,17 @@ export class EvidenceCollector {
         throw new Error(`No collection found for execution ${executionId}`);
       }
       
-      // Finalize all collectors
       const finalizePromises = Array.from(this.collectors.values()).map(collector =>
         collector.finalize ? collector.finalize(executionId) : Promise.resolve()
       );
       
       await Promise.all(finalizePromises);
       
-      // Update collection summary
       collection.endTime = new Date();
       collection.summary.duration = collection.endTime.getTime() - collection.startTime.getTime();
       
-      // Generate collection manifest
       await this.generateManifest(executionId, collection);
       
-      // Archive if configured
       if (ConfigurationManager.getBoolean('ARCHIVE_EVIDENCE', false)) {
         await this.archiveCollection(executionId, collection);
       }
@@ -493,9 +445,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Archive evidence collection using tar.gz
-   */
   private async archiveCollection(
     executionId: string,
     collection: EvidenceCollection
@@ -507,22 +456,18 @@ export class EvidenceCollector {
         `${executionId}_${Date.now()}.tar.gz`
       );
       
-      // Create archives directory
       const archiveDir = path.dirname(archivePath);
       if (!fs.existsSync(archiveDir)) {
         fs.mkdirSync(archiveDir, { recursive: true });
       }
       
-      // Collect all evidence files
       const filesToArchive: string[] = [];
       
-      // Add manifest
       const manifestPath = path.join(this.evidencePath, `manifest_${executionId}.json`);
       if (fs.existsSync(manifestPath)) {
         filesToArchive.push(`manifest_${executionId}.json`);
       }
       
-      // Add all evidence files
       for (const item of collection.items) {
         if (item.path) {
           const filePath = item.path;
@@ -536,9 +481,6 @@ export class EvidenceCollector {
         }
       }
       
-      // Create tar.gz archive using Node.js built-in zlib
-      // For now, we'll create a simple JSON manifest with file references
-      // In production, you would use a proper archiving library like 'archiver' or 'tar'
       const archiveManifest = {
         executionId,
         createdAt: new Date(),
@@ -547,18 +489,15 @@ export class EvidenceCollector {
           ...collection,
           items: collection.items.map(item => ({
             ...item,
-            // Don't include actual file content in manifest
             path: item.path
           }))
         }
       };
       
-      // Write compressed manifest
       const manifestBuffer = Buffer.from(JSON.stringify(archiveManifest, null, 2));
       const compressedManifest = await this.compressData(manifestBuffer);
       await fs.promises.writeFile(archivePath, compressedManifest);
       
-      // Verify archive was created
       const archiveStats = await fs.promises.stat(archivePath);
       
       this.logger.info(
@@ -571,7 +510,6 @@ export class EvidenceCollector {
         fileCount: filesToArchive.length
       });
       
-      // Optionally delete original files after archiving
       if (ConfigurationManager.getBoolean('DELETE_AFTER_ARCHIVE', false)) {
         for (const file of filesToArchive) {
           try {
@@ -588,22 +526,16 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Extract archived evidence collection
-   */
   async extractArchive(archivePath: string, targetDir: string): Promise<void> {
     try {
-      // Create target directory
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
       }
       
-      // Extract archive (reading compressed manifest)
       const compressedData = await fs.promises.readFile(archivePath);
       const decompressedData = await this.decompressData(compressedData);
       const manifest = JSON.parse(decompressedData.toString());
       
-      // Write manifest to target directory
       await fs.promises.writeFile(
         path.join(targetDir, `manifest_${manifest.executionId}.json`),
         JSON.stringify(manifest, null, 2)
@@ -617,9 +549,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Compress data using gzip
-   */
   private async compressData(data: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       zlib.gzip(data, { level: zlib.constants.Z_BEST_COMPRESSION }, (error, compressed) => {
@@ -632,9 +561,6 @@ export class EvidenceCollector {
     });
   }
 
-  /**
-   * Decompress gzipped data
-   */
   private async decompressData(data: Buffer): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       zlib.gunzip(data, (error, decompressed) => {
@@ -647,20 +573,11 @@ export class EvidenceCollector {
     });
   }
 
-  /**
-   * Stream-based compression for large files
-   */
-  /**
-   * Type guard to check if a string is a valid CollectorType
-   */
   private isValidCollectorType(type: string): type is CollectorType {
     const validTypes: CollectorType[] = ['screenshot', 'video', 'log', 'metrics', 'performance', 'network', 'trace'];
     return validTypes.includes(type as CollectorType);
   }
   
-  /**
-   * Add evidence item to specific type collection
-   */
   private addToSpecificCollection(
     collection: EvidenceCollection,
     type: CollectorType,
@@ -764,7 +681,6 @@ export class EvidenceCollector {
         break;
       }
       case 'metrics':
-        // Metrics are typically stored as performance logs
         const metricsLog: PerformanceLog = {
           timestamp: evidenceItem.timestamp,
           metric: originalItem.metric || 'custom',
@@ -777,9 +693,6 @@ export class EvidenceCollector {
     }
   }
   
-  /**
-   * Generate evidence ID
-   */
   private generateEvidenceId(
     type: string,
     scenarioId: string,
@@ -799,9 +712,6 @@ export class EvidenceCollector {
     return `${type}_${hash}`;
   }
 
-  /**
-   * Get file extension for evidence type
-   */
   private getFileExtension(type: string, item: any): string {
     const extensions: Record<CollectorType, string> = {
       screenshot: '.png',
@@ -813,16 +723,12 @@ export class EvidenceCollector {
       trace: '.zip'
     };
     
-    // Check if type is valid CollectorType before accessing
     if (this.isValidCollectorType(type)) {
       return item.extension || extensions[type] || '.dat';
     }
     return item.extension || '.dat';
   }
 
-  /**
-   * Get directory for evidence type
-   */
   private getTypeDirectory(type: string): string {
     const directories: Record<CollectorType, string> = {
       screenshot: 'screenshots',
@@ -834,24 +740,17 @@ export class EvidenceCollector {
       trace: 'traces'
     };
     
-    // Check if type is valid CollectorType before accessing
     if (this.isValidCollectorType(type)) {
       return directories[type] || 'misc';
     }
     return 'misc';
   }
 
-  /**
-   * Check if type should be compressed
-   */
   private shouldCompress(type: CollectorType): boolean {
     const compressible: CollectorType[] = ['log', 'metrics', 'performance', 'network'];
     return compressible.includes(type);
   }
 
-  /**
-   * Get format for evidence type
-   */
   private getFormat(type: string, item: any): string {
     if (item.format) {
       return item.format;
@@ -867,16 +766,12 @@ export class EvidenceCollector {
       trace: 'zip'
     };
     
-    // Check if type is valid CollectorType before accessing
     if (this.isValidCollectorType(type)) {
       return formats[type] || 'unknown';
     }
     return 'unknown';
   }
 
-  /**
-   * Generate collection manifest
-   */
   private async generateManifest(
     executionId: string,
     collection: EvidenceCollection
@@ -893,14 +788,12 @@ export class EvidenceCollector {
       checksums: {} as Record<string, string>
     };
     
-    // Calculate checksums for integrity
     for (const item of collection.items) {
       if (item.path) {
         try {
           const absolutePath = path.join(this.evidencePath, item.path);
           let filePath = absolutePath;
           
-          // Check if compressed version exists
           if (!fs.existsSync(filePath) && fs.existsSync(filePath + '.gz')) {
             filePath = filePath + '.gz';
           }
@@ -924,16 +817,12 @@ export class EvidenceCollector {
     );
   }
 
-  /**
-   * Get evidence collection for reporting
-   */
   async getCollection(
     executionId: string,
     filter?: EvidenceFilter
   ): Promise<EvidenceCollection> {
     const collection = this.evidenceStorage.get(executionId);
     if (!collection) {
-      // Try to load from disk
       const manifestPath = path.join(
         this.evidencePath,
         `manifest_${executionId}.json`
@@ -951,9 +840,6 @@ export class EvidenceCollector {
     return this.applyFilter(collection, filter);
   }
 
-  /**
-   * Get evidence item content
-   */
   async getEvidenceContent(
     executionId: string,
     itemId: string
@@ -975,9 +861,6 @@ export class EvidenceCollector {
     return await fs.promises.readFile(absolutePath);
   }
 
-  /**
-   * Apply filter to evidence collection
-   */
   private applyFilter(
     collection: EvidenceCollection,
     filter?: EvidenceFilter
@@ -1018,7 +901,6 @@ export class EvidenceCollector {
       );
     }
     
-    // Recalculate summary
     const summary = {
       totalItems: filteredItems.length,
       byType: {
@@ -1046,22 +928,17 @@ export class EvidenceCollector {
     };
   }
 
-  /**
-   * Enforce storage limits
-   */
   private async enforceStorageLimits(executionId: string): Promise<void> {
     const collection = this.evidenceStorage.get(executionId);
     if (!collection) {
       return;
     }
     
-    // Check total size
     if (collection.summary.totalSize > this.maxEvidenceSize) {
       this.logger.warn(
         `Evidence collection ${executionId} exceeds size limit: ${collection.summary.totalSize} > ${this.maxEvidenceSize}`
       );
       
-      // Remove oldest items until under limit
       const sortedItems = [...collection.items].sort(
         (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
       );
@@ -1072,7 +949,6 @@ export class EvidenceCollector {
       ) {
         const item = sortedItems.shift()!;
         
-        // Remove from storage
         if (item.path) {
           try {
             const absolutePath = path.join(this.evidencePath, item.path);
@@ -1086,7 +962,6 @@ export class EvidenceCollector {
           }
         }
         
-        // Remove from collection
         const index = collection.items.findIndex(i => i.id === item.id);
         if (index >= 0) {
           collection.items.splice(index, 1);
@@ -1098,16 +973,12 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Clean old evidence based on retention policy
-   */
   private async cleanOldEvidence(): Promise<void> {
     try {
       const retentionDays = ConfigurationManager.getInt('EVIDENCE_RETENTION_DAYS', 7);
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
       
-      // Find and remove old manifest files
       const files = await fs.promises.readdir(this.evidencePath);
       const manifestFiles = files.filter(f => f.startsWith('manifest_') && f.endsWith('.json'));
       
@@ -1116,12 +987,10 @@ export class EvidenceCollector {
         const stats = await fs.promises.stat(manifestPath);
         
         if (stats.mtime < cutoffDate) {
-          // Load manifest to get evidence items
           try {
             const manifestContent = await fs.promises.readFile(manifestPath, 'utf-8');
             const manifest = JSON.parse(manifestContent);
             
-            // Delete all evidence files
             for (const item of manifest.items || []) {
               if (item.path) {
                 const itemPath = path.join(this.evidencePath, item.path);
@@ -1132,12 +1001,10 @@ export class EvidenceCollector {
                     await fs.promises.unlink(itemPath + '.gz');
                   }
                 } catch (error) {
-                  // Continue cleanup even if individual file fails
                 }
               }
             }
             
-            // Delete manifest
             await fs.promises.unlink(manifestPath);
             
             this.logger.info(`Cleaned old evidence collection from ${manifestFile}`);
@@ -1147,7 +1014,6 @@ export class EvidenceCollector {
         }
       }
       
-      // Clean old archives
       const archiveDir = path.join(this.evidencePath, 'archives');
       if (fs.existsSync(archiveDir)) {
         const archives = await fs.promises.readdir(archiveDir);
@@ -1168,9 +1034,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Export evidence summary for reporting
-   */
   async exportSummary(executionId: string): Promise<EvidenceStorage> {
     const collection = await this.getCollection(executionId);
     
@@ -1192,14 +1055,10 @@ export class EvidenceCollector {
     return summary;
   }
 
-  /**
-   * Clear evidence for an execution
-   */
   async clearEvidence(executionId: string): Promise<void> {
     try {
       const collection = await this.getCollection(executionId);
       
-      // Delete all evidence files
       for (const item of collection.items) {
         if (item.path) {
           const absolutePath = path.join(this.evidencePath, item.path);
@@ -1210,12 +1069,10 @@ export class EvidenceCollector {
               await fs.promises.unlink(absolutePath + '.gz');
             }
           } catch (error) {
-            // Continue cleanup
           }
         }
       }
       
-      // Delete manifest
       const manifestPath = path.join(
         this.evidencePath,
         `manifest_${executionId}.json`
@@ -1225,7 +1082,6 @@ export class EvidenceCollector {
         await fs.promises.unlink(manifestPath);
       }
       
-      // Remove from memory
       this.evidenceStorage.delete(executionId);
       
       this.logger.info(`Evidence collection cleared for ${executionId}`);
@@ -1235,9 +1091,6 @@ export class EvidenceCollector {
     }
   }
 
-  /**
-   * Get storage statistics
-   */
   async getStorageStats(): Promise<{
     totalSize: number;
     fileCount: number;
@@ -1286,7 +1139,6 @@ export class EvidenceCollector {
         }
       };
       
-      // Process each type directory
       await processDirectory('screenshots', 'screenshot');
       await processDirectory('videos', 'video');
       await processDirectory('logs', 'log');

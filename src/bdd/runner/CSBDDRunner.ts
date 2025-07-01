@@ -32,6 +32,7 @@ import {
     SystemMetrics
 } from '../../reporting/types/reporting.types';
 import { StepDefinitionLoader } from '../base/StepDefinitionLoader';
+import { OptimizedStepDefinitionLoader } from '../base/OptimizedStepDefinitionLoader';
 import { HookExecutor } from '../hooks/HookExecutor';
 import { ProxyManager } from '../../core/proxy/ProxyManager';
 import { ADOIntegrationService } from '../../integrations/ado/ADOIntegrationService';
@@ -51,10 +52,7 @@ import {
     FeatureStatus
 } from '../types/bdd.types';
 
-// CONDITIONAL IMPORTS - Only import step definitions when needed
-// import '../../steps/api/index'; // REMOVED - Now conditionally loaded
 
-// Test execution types
 export interface TestExecutionProfile {
     requiresBrowser: boolean;
     requiresAPI: boolean;
@@ -68,9 +66,6 @@ export interface TestExecutionProfile {
     };
 }
 
-/**
- * Main BDD test runner that orchestrates the entire test execution lifecycle
- */
 export class CSBDDRunner {
     private static instance: CSBDDRunner;
     private state: RunnerState = 'idle';
@@ -82,11 +77,9 @@ export class CSBDDRunner {
     private abortController: AbortController;
     private reportOrchestrator: ReportOrchestrator;
     
-    // NEW: Test execution profile
     private executionProfile: TestExecutionProfile | null = null;
 
     private constructor() {
-        // Defer instantiation to avoid circular dependencies and blocking
         this.executionMonitor = null as any;
         this.parallelExecutor = null as any;
         this.featureExecutor = null as any;
@@ -95,9 +88,6 @@ export class CSBDDRunner {
         this.reportOrchestrator = null as any;
     }
 
-    /**
-     * Ensure all dependencies are initialized
-     */
     private ensureInitialized(): void {
         if (!this.executionMonitor) {
             this.executionMonitor = ExecutionMonitor.getInstance();
@@ -123,23 +113,15 @@ export class CSBDDRunner {
         return CSBDDRunner.instance;
     }
 
-    /**
-     * Main entry point for test execution
-     */
     public static async run(options: RunOptions): Promise<void> {
         const runner = CSBDDRunner.getInstance();
         await runner.execute(options);
     }
 
-    /**
-     * Execute test run with given options
-     */
     public async execute(options: RunOptions): Promise<void> {
-        // Start console capture as early as possible to capture all logs
         const consoleCapture = ConsoleCapture.getInstance();
         consoleCapture.startCapture();
         
-        // Ensure all dependencies are initialized
         this.ensureInitialized();
         
         this.runOptions = options;
@@ -156,22 +138,18 @@ export class CSBDDRunner {
             logger.info('CS BDD Runner - Starting test execution');
             logger.debug('Run Options: ' + JSON.stringify(options, null, 2));
 
-            // Initialize framework
             try {
                 await this.initialize(options);
                 initializationSuccess = true;
                 logger.info('✅ Framework initialization completed successfully');
             } catch (initError) {
                 logger.error('❌ Framework initialization failed: ' + (initError as Error).message);
-                // Create minimal execution result for reporting
                 executionResult = this.createFailedExecutionResult(startTime, 'Initialization failed: ' + (initError as Error).message);
                 throw initError;
             }
 
-            // Lock step registry before test execution
             stepRegistry.lock();
 
-            // Discover tests
             let executionPlan: ExecutionPlan;
             try {
                 executionPlan = await this.discover(options);
@@ -181,7 +159,6 @@ export class CSBDDRunner {
                 if (executionPlan.totalScenarios === 0) {
                     logger.warn('⚠️  No scenarios found matching criteria - generating empty report');
                     executionResult = this.createEmptyExecutionResult(startTime, 'No scenarios found matching criteria');
-                    // Still generate reports for empty results
                     await this.report(executionResult);
                     return;
                 }
@@ -191,22 +168,18 @@ export class CSBDDRunner {
                 throw discoveryError;
             }
 
-            // Execute tests
             try {
                 this.state = 'running';
                 executionResult = await this.executeTests(executionPlan);
                 executionSuccess = true;
                 logger.info('✅ Test execution completed');
 
-                // Update execution result with start time
                 executionResult.startTime = startTime;
             } catch (executionError) {
                 logger.error('❌ Test execution failed: ' + (executionError as Error).message);
-                // Create failed execution result if we don't have one
                 if (!executionResult) {
                     executionResult = this.createFailedExecutionResult(startTime, 'Execution failed: ' + (executionError as Error).message);
                 }
-                // Don't throw here - we want to generate reports even for failed executions
             }
 
         } catch (error) {
@@ -214,13 +187,11 @@ export class CSBDDRunner {
             const logger = ActionLogger.getInstance();
             logger.error('CS BDD Runner - Fatal error during execution: ' + (error as Error).message);
             
-            // Ensure we have an execution result for reporting
             if (!executionResult) {
                 executionResult = this.createFailedExecutionResult(startTime, 'Fatal error: ' + (error as Error).message);
             }
         }
 
-        // ALWAYS generate reports first (regardless of success/failure)
         const logger = ActionLogger.getInstance();
         try {
             if (executionResult) {
@@ -230,16 +201,12 @@ export class CSBDDRunner {
             }
         } catch (reportError) {
             logger.error('❌ Report generation failed: ' + (reportError as Error).message);
-            // Don't let report failures prevent ADO upload
         }
 
-        // Upload to ADO AFTER reports are generated (even for failed tests)
         try {
-            // Check if ADO upload is enabled in configuration and not disabled by runtime options
             const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_UPLOAD_RESULTS', false) ||
                 ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false);
             
-            // Check runtime options - adoEnabled defaults to true if not specified
             const adoRuntimeEnabled = options.adoEnabled !== false;
             
             if (adoConfigEnabled && adoRuntimeEnabled && executionResult) {
@@ -249,35 +216,27 @@ export class CSBDDRunner {
             }
         } catch (adoError) {
             logger.error('❌ ADO upload failed: ' + (adoError as Error).message);
-            // Don't let ADO failures prevent cleanup
         }
 
-        // Save console logs including initialization messages after ADO upload
         try {
-            // Get the current report directory set by ReportOrchestrator
             const currentReportDir = ConfigurationManager.get('CURRENT_REPORT_DIR');
             if (currentReportDir) {
                 const evidenceDir = path.join(currentReportDir, 'evidence');
                 
-                // Save console logs in multiple formats
                 await logger.saveConsoleLogs(path.join(evidenceDir, 'console-logs.txt'), 'text');
                 await logger.saveConsoleLogs(path.join(evidenceDir, 'console-logs.json'), 'json');
                 await logger.saveConsoleLogs(path.join(evidenceDir, 'console-logs.html'), 'html');
                 
-                // Also save to a console-logs subdirectory for the report to find
                 const consoleLogsDir = path.join(evidenceDir, 'console-logs');
                 await FileUtils.ensureDir(consoleLogsDir);
                 
-                // Save execution logs JSON for the report
                 const consoleLogs = ConsoleCapture.getInstance().getMessages();
                 await FileUtils.writeJSON(path.join(consoleLogsDir, 'execution-logs.json'), consoleLogs);
                 
-                // Also save directly in evidence directory for backward compatibility
                 await FileUtils.writeJSON(path.join(evidenceDir, 'execution-logs.json'), consoleLogs);
                 
                 logger.info(`📝 Console logs saved to report directory: ${currentReportDir}`);
             } else {
-                // Fallback to default report path
                 const reportPath = this.runOptions['reportPath'] || './reports';
                 await logger.saveConsoleLogs(path.join(reportPath, 'console-logs.txt'), 'text');
                 await logger.saveConsoleLogs(path.join(reportPath, 'console-logs.json'), 'json');
@@ -287,14 +246,12 @@ export class CSBDDRunner {
             logger.warn('Failed to save console logs: ' + (consoleLogError as Error).message);
         }
 
-        // Final cleanup
         try {
             await this.cleanup();
         } catch (cleanupError) {
             logger.error('❌ Cleanup failed: ' + (cleanupError as Error).message);
         }
 
-        // Determine final state and exit code
         this.state = 'stopped';
         
         if (!initializationSuccess) {
@@ -318,21 +275,15 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Analyze features to determine test execution profile
-     */
     private async analyzeTestExecutionProfile(options: RunOptions): Promise<TestExecutionProfile> {
         const logger = ActionLogger.getInstance();
         logger.info('🔍 Analyzing test execution profile...');
 
-        // Get feature paths for analysis
         const featurePaths = options['featurePaths'] || options['features'] || options['paths'] || ['**/*.feature'];
         
-        // Parse features to analyze tags and content
         const parser = FeatureFileParser.getInstance();
         const features = await parser.parseAll(featurePaths);
         
-        // Analyze tags across all scenarios
         const allTags = new Set<string>();
         let hasUISteps = false;
         let hasAPISteps = false;
@@ -340,14 +291,11 @@ export class CSBDDRunner {
         
         for (const feature of features) {
             for (const scenario of feature.scenarios) {
-                // Collect tags
                 scenario.tags?.forEach(tag => allTags.add(tag));
                 
-                // Analyze step content for type detection
                 for (const step of scenario.steps) {
                     const stepText = step.text.toLowerCase();
                     
-                    // UI step patterns
                     if (stepText.includes('click') || stepText.includes('navigate') || 
                         stepText.includes('browser') || stepText.includes('page') ||
                         stepText.includes('element') || stepText.includes('login') ||
@@ -355,7 +303,6 @@ export class CSBDDRunner {
                         hasUISteps = true;
                     }
                     
-                    // API step patterns
                     if (stepText.includes('api') || stepText.includes('request') || 
                         stepText.includes('response') || stepText.includes('http') ||
                         stepText.includes('get ') || stepText.includes('post ') ||
@@ -364,7 +311,6 @@ export class CSBDDRunner {
                         hasAPISteps = true;
                     }
                     
-                    // Database step patterns
                     if (stepText.includes('database') || stepText.includes('query') || 
                         stepText.includes('sql') || stepText.includes('table') ||
                         stepText.includes('record') || stepText.includes('connect')) {
@@ -374,25 +320,21 @@ export class CSBDDRunner {
             }
         }
 
-        // Check configuration flags
         const configRequiresBrowser = ConfigurationManager.getBoolean('BROWSER_REQUIRED', false);
         const configUIEnabled = ConfigurationManager.getBoolean('UI_ENABLED', true);
         const configAPIEnabled = ConfigurationManager.getBoolean('API_ENABLED', true);
         const configDatabaseEnabled = ConfigurationManager.getBoolean('DATABASE_ENABLED', false);
 
-        // Tag-based detection
         const hasAPITags = allTags.has('@api');
         const hasDatabaseTags = allTags.has('@database');
-        const hasUITags = !hasAPITags && !hasDatabaseTags; // Default to UI if no specific tags
+        const hasUITags = !hasAPITags && !hasDatabaseTags;
 
-        // Determine requirements
         const requiresAPI = hasAPITags || hasAPISteps || configAPIEnabled;
         const requiresDatabase = hasDatabaseTags || hasDatabaseSteps || configDatabaseEnabled;
         const requiresBrowser = (hasUITags || hasUISteps || configRequiresBrowser || configUIEnabled) && 
-                               !options.headless && // Don't require browser for headless API tests
-                               !(hasAPITags && !hasUISteps); // Don't require browser for pure API tests
+                               !options.headless &&
+                               !(hasAPITags && !hasUISteps);
 
-        // Determine step definition paths
         const stepDefinitionPaths: string[] = [];
         if (requiresBrowser || hasUISteps) {
             stepDefinitionPaths.push('src/steps/ui/**/*.ts', 'test/**/steps/**/*.ts');
@@ -427,18 +369,13 @@ export class CSBDDRunner {
         return profile;
     }
 
-    /**
-     * Load step definitions based on execution profile
-     */
     private async loadStepDefinitionsConditionally(profile: TestExecutionProfile): Promise<void> {
         const logger = ActionLogger.getInstance();
         logger.info('📚 Loading step definitions conditionally...');
 
-        // Clear any existing step definitions
         const stepLoader = StepDefinitionLoader.getInstance();
         stepLoader.reset();
 
-        // Load step definitions based on profile
         if (profile.requiresAPI) {
             logger.info('🔌 Loading API step definitions...');
             await import('../../steps/api/index');
@@ -446,7 +383,6 @@ export class CSBDDRunner {
 
         if (profile.requiresBrowser) {
             logger.info('🖥️  Loading UI step definitions...');
-            // Import UI steps dynamically
             try {
                 await import('../../steps/ui/InteractionSteps');
                 await import('../../steps/ui/NavigationSteps');
@@ -456,7 +392,6 @@ export class CSBDDRunner {
                 await import('../../steps/ui/AdvancedInteractionSteps');
                 await import('../../steps/ui/DebugSteps');
                 
-                // Load test-specific step definitions will be loaded automatically by StepDefinitionLoader
                 logger.info('✅ UI step definitions loaded');
             } catch (error) {
                 logger.warn('⚠️  Some UI step definitions could not be loaded:', error as Error);
@@ -479,25 +414,19 @@ export class CSBDDRunner {
             }
         }
 
-        // Load all step definitions
         await stepLoader.loadAll();
         
-        // Debug: Check what step definitions are loaded
         const stats = stepRegistry.getStats();
         logger.info(`✅ Step definitions loaded conditionally - Total steps: ${stats.totalSteps}`);
         logger.info(`🔍 DEBUG: Registered class instances: ${Array.from(stepRegistry['classInstances'].keys()).join(', ')}`);
         logger.info(`🔍 DEBUG: Total step definitions: ${stepRegistry.getAllStepDefinitions().length}`);
     }
 
-    /**
-     * Initialize framework components
-     */
     private async initialize(options: RunOptions): Promise<void> {
         const logger = ActionLogger.getInstance();
         logger.info('Framework Initialization - Starting initialization');
 
         try {
-            // 1. Load configuration
             if (options.project) {
                 await ConfigurationManager.loadConfiguration(options.project, options.environment || 'default');
                 logger.info(`Configuration loaded - Project: ${options.project}, Environment: ${options.environment || 'default'}`);
@@ -506,44 +435,45 @@ export class CSBDDRunner {
                 logger.info('Configuration loaded - Environment: ' + (options.environment || 'default'));
             }
 
-            // 2. Configure proxy if needed
             if (ConfigurationManager.getBoolean('PROXY_ENABLED', false)) {
                 const proxyManager = ProxyManager.getInstance();
                 await proxyManager.initialize({} as any);
                 logger.info('Proxy configured');
             }
 
-            // 3. Initialize action logger with options
             await logger.initialize({
                 logLevel: options['logLevel'] || ConfigurationManager.get('LOG_LEVEL', 'info'),
                 logToFile: ConfigurationManager.getBoolean('LOG_TO_FILE', true),
                 logPath: ConfigurationManager.get('LOG_PATH', './logs')
             } as any);
 
-            // 4. ANALYZE TEST EXECUTION PROFILE FIRST
             this.executionProfile = await this.analyzeTestExecutionProfile(options);
             logger.info('✅ Test execution profile analyzed');
 
-            // 5. Initialize and unlock step registry
             logger.info('🔍 Initializing step registry...');
             stepRegistry.initialize();
             stepRegistry.unlock();
 
-            // 6. Load step definitions conditionally based on test execution profile
-            console.log('🔍 DEBUG: About to create StepDefinitionLoader instance');
-            const stepLoader = StepDefinitionLoader.getInstance();
-            console.log('🔍 DEBUG: StepDefinitionLoader instance created, about to call loadStepDefinitionsConditionally()');
+            const useOptimizedLoader = ConfigurationManager.getBoolean('USE_OPTIMIZED_STEP_LOADER', true);
             
-            // LOAD ALL STEP DEFINITIONS (including test-specific ones like AKHAN)
-            console.log('🔍 DEBUG: Loading ALL step definitions (including test-specific AKHAN steps)...');
-            await stepLoader.loadAll();
-            console.log('🔍 DEBUG: loadStepDefinitionsConditionally() completed');
-            const stats = stepRegistry.getStats();
-            const stepCount = stats.totalSteps;
-            console.log(`🔍 DEBUG: Step count from registry: ${stepCount}`);
-            logger.info('Step definitions loaded conditionally - Total steps: ' + stepCount);
+            if (useOptimizedLoader) {
+                const optimizedLoader = OptimizedStepDefinitionLoader.getInstance();
+                
+                const featurePaths = options['featurePaths'] || options['features'] || options['paths'] || ['**/*.feature'];
+                const parser = FeatureFileParser.getInstance();
+                const featureFiles = await parser.discoverFeatureFiles(Array.isArray(featurePaths) ? featurePaths.join(',') : featurePaths);
+                
+                await optimizedLoader.initialize(featureFiles);
+                
+                const stats = stepRegistry.getStats();
+                logger.info(`✅ Step definitions loaded - ${stats.totalSteps} steps`);
+            } else {
+                const stepLoader = StepDefinitionLoader.getInstance();
+                await stepLoader.loadAll();
+                const stats = stepRegistry.getStats();
+                logger.info(`✅ Step definitions loaded - ${stats.totalSteps} steps`);
+            }
 
-            // 7. Initialize browser ONLY if required (CONDITIONAL INITIALIZATION)
             if (this.executionProfile.componentInitialization.browser) {
                 logger.info('🖥️  Browser required - initializing browser...');
                 const browserConfig = {
@@ -561,10 +491,8 @@ export class CSBDDRunner {
                     videosDir: './videos'
                 };
 
-                // Use ONLY single browser manager
                 const browserManager = BrowserManager.getInstance();
                 try {
-                    // Check if browser is already initialized to prevent multiple launches
                     if (browserManager.isHealthy()) {
                         logger.info('✅ Browser already initialized and healthy - reusing existing browser');
                     } else {
@@ -580,28 +508,22 @@ export class CSBDDRunner {
                 logger.info('🚫 Browser initialization SKIPPED - not required for this test type');
             }
 
-            // Set screenshot mode from command line options
-            // Check if screenshot option was passed (could be boolean or string)
             const screenshotOption = options.screenshot || options['screenshot'];
             if (screenshotOption !== undefined) {
                 let screenshotMode: string;
                 
                 if (typeof screenshotOption === 'boolean') {
-                    // Legacy boolean mode: true = always, false = never
                     screenshotMode = screenshotOption ? 'always' : 'never';
                 } else {
-                    // String mode: 'always', 'on-failure', 'never'
                     screenshotMode = screenshotOption;
                 }
                 
                 ConfigurationManager.set('SCREENSHOT_MODE', screenshotMode);
-                // Also set legacy screenshot settings for compatibility
                 ConfigurationManager.set('SCREENSHOT_ON_FAILURE', String(screenshotMode === 'always' || screenshotMode === 'on-failure'));
                 ConfigurationManager.set('SCREENSHOT_ON_PASS', String(screenshotMode === 'always'));
                 logger.info(`📸 Screenshot mode set to: ${screenshotMode}`);
             }
 
-            // 8. Initialize report manager
             const reportConfig = new ReportConfig();
             await reportConfig.load({
                 outputDir: options['reportPath'] || ConfigurationManager.get('REPORT_PATH', './reports'),
@@ -618,24 +540,20 @@ export class CSBDDRunner {
             } as any);
             await this.reportOrchestrator.initialize(reportConfig);
 
-            // 9. Initialize ADO integration if enabled (check both config and runtime options)
             const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false);
-            const adoRuntimeEnabled = options.adoEnabled !== false; // Default to true unless explicitly disabled
+            const adoRuntimeEnabled = options.adoEnabled !== false;
             
             if (adoConfigEnabled && adoRuntimeEnabled) {
                 logger.info('Initializing ADO integration...');
 
-                // Initialize ADO configuration (reads from environment variables)
                 ADOConfig.initialize();
 
-                // Initialize ADO service
                 await ADOIntegrationService.getInstance().initialize();
                 logger.info('ADO integration initialized');
             } else {
                 logger.info('ADO integration disabled - skipping initialization');
             }
 
-            // 10. Execute global before hooks
             await this.hookExecutor.executeBeforeHooks({} as any);
 
             logger.info('Framework Initialization - Initialization completed');
@@ -646,18 +564,13 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Discover test scenarios based on options
-     */
     private async discover(options: RunOptions): Promise<ExecutionPlan> {
         const logger = ActionLogger.getInstance();
         logger.info('Test Discovery - Starting test discovery');
 
         try {
-            // Parse feature files with timeout
             const parser = FeatureFileParser.getInstance();
             
-            // Get feature paths from options - check multiple possible property names for compatibility
             const featurePaths = options['featurePaths'] || options['features'] || options['paths'] || options['featurePaths'] || ['**/*.feature'];
             
             logger.info(`Feature discovery - Using paths: ${JSON.stringify(featurePaths)}`);
@@ -670,11 +583,9 @@ export class CSBDDRunner {
             const features = await Promise.race([parsePromise, parseTimeoutPromise]) as any[];
             logger.info('Features parsed - Total features: ' + features.length);
 
-            // Expand scenario outlines before filtering
             const expandedFeatures = await this.expandScenarioOutlines(features);
             logger.info('Scenario outlines expanded - Total features: ' + expandedFeatures.length);
 
-            // Debug: Log parsed features
             expandedFeatures.forEach((feature, i) => {
                 logger.debug(`Parsed feature ${i+1}: "${feature.name}" (URI: ${feature.uri}) with ${feature.scenarios.length} scenarios`);
                 feature.scenarios.forEach((scenario: any, j: number) => {
@@ -682,7 +593,6 @@ export class CSBDDRunner {
                 });
             });
 
-            // Apply filters
             logger.debug('Applying filters with options: ' + JSON.stringify({
                 features: options['features'],
                 tags: options.tags,
@@ -695,7 +605,6 @@ export class CSBDDRunner {
             const totalScenariosAfterFilter = filteredFeatures.reduce((sum, f) => sum + f.scenarios.length, 0);
             logger.info(`Total scenarios after filtering: ${totalScenariosAfterFilter}`);
             
-            // Create execution plan
             const scheduler = new TestScheduler();
             const executionPlan = await scheduler.createExecutionPlan(filteredFeatures, options);
 
@@ -704,7 +613,6 @@ export class CSBDDRunner {
                 ', totalScenarios=' + executionPlan.totalScenarios +
                 ', estimatedDuration=' + executionPlan.estimatedDuration + 'ms');
 
-            // Log execution plan details
             if (options.dryRun) {
                 this.logExecutionPlan(executionPlan);
             }
@@ -717,28 +625,21 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Execute test plan
-     */
     private async executeTests(plan: ExecutionPlan): Promise<ExecutionResult> {
         const logger = ActionLogger.getInstance();
         logger.info('Test Execution - Starting test execution');
 
-        // Start execution monitoring
         this.executionMonitor.startMonitoring();
 
         try {
             let result: ExecutionResult;
 
             // CRITICAL FIX: ALWAYS force sequential execution to prevent multiple browser instances
-            // Parallel execution PERMANENTLY disabled to fix browser flashing and multiple browser issues
             logger.info('🔧 FORCED SEQUENTIAL EXECUTION - Parallel execution permanently disabled');
             result = await this.executeSequential(plan);
 
-            // Stop monitoring
             this.executionMonitor.stopMonitoring();
 
-            // Log execution summary
             this.logExecutionSummary(result.summary);
 
             return result;
@@ -750,9 +651,6 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Execute tests sequentially
-     */
     private async executeSequential(plan: ExecutionPlan): Promise<ExecutionResult> {
         const results: ExecutionResult = {
             startTime: new Date(),
@@ -797,14 +695,11 @@ export class CSBDDRunner {
                 
                 results.features.push(featureResult);
 
-                // Update summary
                 this.updateSummary(results.summary, featureResult);
                 
                 logger.info(`🔥 DEBUG: Summary after update: totalFeatures=${results.summary.totalFeatures}, totalScenarios=${results.summary.totalScenarios}, totalSteps=${(results.summary as any).totalSteps}, passed=${results.summary.passed}`);
 
-                // Update execution monitor
                 if (feature.scenarios && feature.scenarios.length > 0) {
-                    // Update execution monitor - using event system
                     this.executionMonitor.emit('scenarioStart', feature.scenarios[0]);
                 }
 
@@ -825,20 +720,15 @@ export class CSBDDRunner {
         return results;
     }
 
-    /**
-     * Generate test reports
-     */
     private async report(result: ExecutionResult): Promise<void> {
         const logger = ActionLogger.getInstance();
         logger.info('Report Generation - Starting report generation');
 
         try {
-            // Ensure report orchestrator is properly initialized
             if (!this.reportOrchestrator) {
                 this.reportOrchestrator = new ReportOrchestrator();
             }
 
-            // Initialize report orchestrator if not already done
             try {
                 const reportConfig = new ReportConfig();
                 await reportConfig.load({
@@ -859,30 +749,22 @@ export class CSBDDRunner {
                 logger.warn('Report config initialization failed, using defaults: ' + (configError as Error).message);
             }
 
-            // Convert ExecutionResult to ReportData
             const reportData = this.convertToReportData(result);
             
-            // Generate reports
             await this.reportOrchestrator.generateReports(reportData);
 
-            // Log report locations
             const reportPaths = { html: './reports/index.html', json: './reports/report.json' };
             logger.info('Reports generated: ' + JSON.stringify(reportPaths));
 
-            // Open HTML report if configured
             if (this.runOptions['openReport'] && reportPaths.html) {
                 await this.openReport(reportPaths.html);
             }
 
         } catch (error) {
             logger.error('Report Generation - Report generation failed: ' + (error as Error).message);
-            // Don't throw - reports are not critical
         }
     }
 
-    /**
-     * Upload results to ADO
-     */
     private async uploadToADO(result: ExecutionResult): Promise<void> {
         const logger = ActionLogger.getInstance();
         logger.info('ADO Upload - Starting ADO upload');
@@ -896,25 +778,18 @@ export class CSBDDRunner {
 
         } catch (error) {
             logger.error('ADO Upload - Upload failed: ' + (error as Error).message);
-            // Don't throw - ADO upload is not critical
         }
     }
 
-    /**
-     * Cleanup framework resources
-     */
     private async cleanup(): Promise<void> {
         const logger = ActionLogger.getInstance();
         logger.info('Cleanup - Starting cleanup');
 
         try {
-            // Execute global after hooks
             await this.hookExecutor.executeAfterHooks({} as any);
 
-            // Close browsers - SINGLE BROWSER ONLY (no pool)
             await BrowserManager.getInstance().close();
 
-            // Reset and reinitialize ADO service only if ADO is enabled
             const adoConfigEnabled = ConfigurationManager.getBoolean('ADO_INTEGRATION_ENABLED', false);
             const adoRuntimeEnabled = this.runOptions.adoEnabled !== false;
             
@@ -927,11 +802,8 @@ export class CSBDDRunner {
                 }
             }
 
-            // Cleanup temporary files
             await this.cleanupTempFiles();
 
-            // Finalize reports
-            // Report finalization handled in generateReports
 
             logger.info('Cleanup - Cleanup completed');
 
@@ -940,13 +812,9 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Convert ExecutionResult to ReportData
-     */
     private convertToReportData(result: ExecutionResult): ReportData {
         const now = new Date();
         
-        // 🔥 DEBUG: Log the ExecutionResult being converted
         const logger = ActionLogger.getInstance();
         logger.info(`🔥 DEBUG: Converting ExecutionResult to ReportData`);
         logger.info(`🔥 DEBUG: ExecutionResult features count: ${result.features.length}`);
@@ -961,7 +829,6 @@ export class CSBDDRunner {
                     scenarios: (firstFeature.scenarios && firstFeature.scenarios.length) || 0
                 });
                 
-                // Debug scenario details
                 if (firstFeature.scenarios && firstFeature.scenarios.length > 0) {
                     const firstScenario = firstFeature.scenarios[0];
                     if (firstScenario) {
@@ -980,23 +847,19 @@ export class CSBDDRunner {
             }
         }
 
-        // Get browser version from BrowserManager if available
         let browserVersion = 'Unknown';
         let browserName = this.runOptions.browser || 'chromium';
         try {
             const browserManager = BrowserManager.getInstance();
             if (browserManager) {
-                // Use the existing getBrowserVersion method
                 browserVersion = browserManager.getBrowserVersion();
             }
         } catch (error) {
             logger.debug('Could not retrieve browser version: ' + (error as Error).message);
         }
 
-        // Get Playwright version from package.json
-        const playwrightVersion = '1.40.1'; // Hardcoded from package.json, ideally should be read dynamically
+        const playwrightVersion = '1.40.1';
         
-        // 🔥 FIX: Collect logs from evidence directory
         const collectedLogs = this.collectLogsFromEvidence();
         
         return {
@@ -1033,7 +896,6 @@ export class CSBDDRunner {
                 executionOptions: {
                     env: ConfigurationManager.getEnvironmentName()
                 },
-                // 🔥 FIX: Include collected logs in metadata
                 logs: collectedLogs
             },
             configuration: {
@@ -1146,7 +1008,6 @@ export class CSBDDRunner {
                             line: st.line || 0,
                             error: st.error ? (typeof st.error === 'string' ? st.error : st.error.message || '') : '',
                             errorStack: st.error && typeof st.error === 'object' ? (st.error.stack || '') : '',
-                            // Add attachments if available
                             attachments: st.attachments || [],
                             // CRITICAL: Include actionDetails from step execution
                             actionDetails: (st as any).actionDetails || null
@@ -1184,7 +1045,6 @@ export class CSBDDRunner {
                             line: st.line || 0,
                             error: st.error ? (typeof st.error === 'string' ? st.error : st.error.message || '') : '',
                             errorStack: st.error && typeof st.error === 'object' ? (st.error.stack || '') : '',
-                            // Add attachments if available
                             attachments: st.attachments || [],
                             // CRITICAL: Include actionDetails from step execution
                             actionDetails: (st as any).actionDetails || null
@@ -1318,7 +1178,6 @@ export class CSBDDRunner {
                         },
                         embeddings: [],
                         actions: [],
-                        // Add attachments if available
                         attachments: st.attachments || [],
                         // CRITICAL: Include actionDetails from step execution
                         actionDetails: (st as any).actionDetails || null
@@ -1373,7 +1232,6 @@ export class CSBDDRunner {
                 videos: [],
                 traces: [],
                 networkLogs: [],
-                // 🔥 FIX: Include collected logs in evidence
                 consoleLogs: collectedLogs,
                 performanceLogs: [],
                 downloads: [],
@@ -1468,9 +1326,6 @@ export class CSBDDRunner {
         } as ReportData;
     }
 
-    /**
-     * 🔥 NEW METHOD: Collect logs from evidence directory
-     */
     private collectLogsFromEvidence(): any[] {
         const logger = ActionLogger.getInstance();
         const logs: any[] = [];
@@ -1479,12 +1334,11 @@ export class CSBDDRunner {
             const fs = require('fs');
             const path = require('path');
             
-            // Get logs from ActionLogger first (these have proper timestamps)
             const actionLogs = logger.getAllLogs();
             actionLogs.forEach(log => {
                 if (log && log.message && log.timestamp) {
                     logs.push({
-                        timestamp: log.timestamp, // Keep original timestamp
+                        timestamp: log.timestamp,
                         level: log.level || 'info',
                         category: this.extractLogCategory(log.message) || 'general',
                         message: this.cleanLogMessage(log.message),
@@ -1497,11 +1351,9 @@ export class CSBDDRunner {
                 }
             });
             
-            // Also get recent logs from buffer
             const recentLogs = logger.getRecentLogs(500);
             recentLogs.forEach(log => {
                 if (log && log.message && log.timestamp) {
-                    // Check if we already have this log (avoid duplicates)
                     const exists = logs.some(existingLog => 
                         existingLog.timestamp === log.timestamp && 
                         existingLog.message === log.message
@@ -1509,7 +1361,7 @@ export class CSBDDRunner {
                     
                     if (!exists) {
                         logs.push({
-                            timestamp: log.timestamp, // Keep original timestamp
+                            timestamp: log.timestamp,
                             level: log.level || 'info',
                             category: this.extractLogCategory(log.message) || 'general',
                             message: this.cleanLogMessage(log.message),
@@ -1523,14 +1375,13 @@ export class CSBDDRunner {
                 }
             });
             
-            // Look for recent console-logs.json files in reports directory
             const reportsDir = './reports';
             if (fs.existsSync(reportsDir)) {
                 const reportDirs = fs.readdirSync(reportsDir)
                     .filter((dir: string) => dir.startsWith('report-'))
                     .sort()
-                    .reverse() // Get most recent first
-                    .slice(0, 2); // Check last 2 reports
+                    .reverse()
+                    .slice(0, 2);
                 
                 for (const reportDir of reportDirs) {
                     const evidenceDir = path.join(reportsDir, reportDir, 'evidence');
@@ -1542,7 +1393,6 @@ export class CSBDDRunner {
                                 const consoleLogs = JSON.parse(logContent);
                                 
                                 if (Array.isArray(consoleLogs)) {
-                                    // Process and clean up logs
                                     const processedLogs = consoleLogs
                                         .filter((log: any) => log && log.message)
                                         .map((log: any) => ({
@@ -1560,7 +1410,7 @@ export class CSBDDRunner {
                                     
                                     logs.push(...processedLogs);
                                     logger.info(`🔥 LOG COLLECTION: Found ${processedLogs.length} logs in ${consoleLogsPath}`);
-                                    break; // Use the most recent report's logs
+                                    break;
                                 }
                             } catch (error) {
                                 logger.warn(`🔥 LOG COLLECTION: Failed to parse ${consoleLogsPath}: ${(error as Error).message}`);
@@ -1570,7 +1420,6 @@ export class CSBDDRunner {
                 }
             }
             
-            // Add some synthetic logs if we don't have enough
             if (logs.length === 0) {
                 const now = new Date().toISOString();
                 logs.push({
@@ -1597,7 +1446,6 @@ export class CSBDDRunner {
         } catch (error) {
             logger.error(`🔥 LOG COLLECTION: Error collecting logs: ${(error as Error).message}`);
             
-            // Return at least one log entry so the tab isn't empty
             const now = new Date().toISOString();
             logs.push({
                 timestamp: now,
@@ -1609,13 +1457,9 @@ export class CSBDDRunner {
             });
         }
         
-        // Sort logs by timestamp (newest first for better readability)
         return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }
 
-    /**
-     * Extract log level from message
-     */
     private extractLogLevel(message: string): string | null {
         if (!message) return null;
         
@@ -1631,15 +1475,11 @@ export class CSBDDRunner {
         return 'info';
     }
 
-    /**
-     * Extract log category from message
-     */
     private extractLogCategory(message: string): string | null {
         if (!message) return null;
         
         const categoryMatches = message.match(/\[([A-Z_][A-Z0-9_]*)\]/g);
         if (categoryMatches && categoryMatches.length > 1) {
-            // Return the second bracket content (first is usually log level)
             const category = categoryMatches[1] ? categoryMatches[1].replace(/[\[\]]/g, '').toLowerCase() : 'general';
             return category;
         }
@@ -1655,33 +1495,21 @@ export class CSBDDRunner {
         return 'general';
     }
 
-    /**
-     * Clean log message by removing ANSI codes and extra formatting
-     */
     private cleanLogMessage(message: string): string {
         if (!message) return '';
         
         return message
-            // Remove ANSI escape codes
             .replace(/\u001b\[[0-9;]*m/g, '')
-            // Remove extra whitespace
             .replace(/\s+/g, ' ')
-            // Remove timestamp prefix if present
             .replace(/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}[.\d]*Z?\s*/, '')
-            // Remove log level brackets
             .replace(/^\[(ERROR|WARN|INFO|DEBUG|TRACE)\]\s*/i, '')
-            // Remove category brackets
             .replace(/^\[[A-Z_][A-Z0-9_]*\]\s*/i, '')
             .trim();
     }
 
-    /**
-     * Beautify log message for display
-     */
     private beautifyLogMessage(message: string): string {
         const cleaned = this.cleanLogMessage(message);
         
-        // Add emoji indicators for common log types
         if (cleaned.includes('✅')) return cleaned;
         if (cleaned.includes('❌')) return cleaned;
         if (cleaned.includes('⚠️')) return cleaned;
@@ -1707,18 +1535,12 @@ export class CSBDDRunner {
         return cleaned;
     }
 
-    /**
-     * Emergency cleanup on fatal errors
-     */
     private async emergencyCleanup(): Promise<void> {
         try {
-            // Force close all browsers
-            // BrowserPool permanently disabled - using single browser only
             if (BrowserManager.getInstance()) {
                 await BrowserManager.getInstance().close();
             }
 
-            // Save any pending logs
             const logger = ActionLogger.getInstance();
             logger.info('Emergency cleanup completed');
 
@@ -1727,9 +1549,6 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Expand scenario outlines into individual scenarios
-     */
     private async expandScenarioOutlines(features: Feature[]): Promise<Feature[]> {
         const logger = ActionLogger.getInstance();
         const examplesParser = ExamplesParser.getInstance();
@@ -1743,22 +1562,18 @@ export class CSBDDRunner {
                     logger.debug(`Expanding scenario outline: "${scenario.name}" with ${scenario.examples.length} examples tables`);
                     
                     try {
-                        // Expand the scenario outline using the examples parser
                         const expanded = examplesParser.expandScenarioOutline(scenario as any);
                         expandedScenarios.push(...expanded);
                         logger.debug(`Expanded to ${expanded.length} scenarios`);
                     } catch (error) {
                         logger.error(`Failed to expand scenario outline "${scenario.name}": ${(error as Error).message}`);
-                        // Keep the original scenario if expansion fails
                         expandedScenarios.push(scenario);
                     }
                 } else {
-                    // Regular scenario, keep as is
                     expandedScenarios.push(scenario);
                 }
             }
             
-            // Create a new feature with expanded scenarios
             expandedFeatures.push({
                 ...feature,
                 scenarios: expandedScenarios
@@ -1768,14 +1583,10 @@ export class CSBDDRunner {
         return expandedFeatures;
     }
 
-    /**
-     * Apply filters to features
-     */
     private applyFilters(features: Feature[], options: RunOptions): Feature[] {
         const logger = ActionLogger.getInstance();
         logger.debug(`Applying filters to ${features.length} features`);
         
-        // 🔍 DEBUG: Check what options are available
         logger.debug(`🔍 FILTER DEBUG: options keys = ${JSON.stringify(Object.keys(options))}`);
         logger.debug(`🔍 FILTER DEBUG: options['features'] = ${JSON.stringify(options['features'])}`);
         logger.debug(`🔍 FILTER DEBUG: options['featurePaths'] = ${JSON.stringify(options['featurePaths'])}`);
@@ -1783,78 +1594,9 @@ export class CSBDDRunner {
         
         let filtered = [...features];
 
-        // Filter by feature names/patterns
-        // TEMPORARILY DISABLED: Feature pattern filtering conflicts with file discovery patterns
-        // The --feature parameter is used for file discovery, not feature name filtering
-        /*
-        const featurePatterns = options['features'] || options.featurePaths;
-        if (featurePatterns && featurePatterns.length > 0) {
-            logger.debug(`Filtering by feature patterns: ${JSON.stringify(featurePatterns)}`);
-            
-            filtered = filtered.filter(feature => {
-                const featureName = feature.name || '';
-                const featureUri = feature.uri || '';
-                
-                logger.debug(`🔍 PATTERN MATCH DEBUG: Feature "${featureName}"`);
-                logger.debug(`🔍 PATTERN MATCH DEBUG: URI = "${featureUri}"`);
-                logger.debug(`🔍 PATTERN MATCH DEBUG: Patterns = ${JSON.stringify(featurePatterns)}`);
-                
-                return featurePatterns!.some((pattern: string) => {
-                    logger.debug(`🔍 PATTERN MATCH DEBUG: Testing pattern "${pattern}" against feature "${featureName}"`);
-                    
-                    // Check feature name match
-                    if (featureName.includes(pattern)) {
-                        logger.debug(`Feature "${featureName}" matches pattern "${pattern}" by name`);
-                        return true;
-                    }
-                    
-                    // Check URI match (both absolute and relative paths)
-                    if (featureUri) {
-                        // Direct path match
-                        if (featureUri.includes(pattern)) {
-                            logger.debug(`Feature "${featureName}" matches pattern "${pattern}" by URI (direct)`);
-                            return true;
-                        }
-                        
-                        // Normalize paths for comparison (handle both forward and back slashes)
-                        const normalizedUri = featureUri.replace(/\\/g, '/');
-                        const normalizedPattern = pattern.replace(/\\/g, '/');
-                        
-                        logger.debug(`🔍 PATTERN MATCH DEBUG: Normalized URI = "${normalizedUri}"`);
-                        logger.debug(`🔍 PATTERN MATCH DEBUG: Normalized Pattern = "${normalizedPattern}"`);
-                        
-                        if (normalizedUri.includes(normalizedPattern)) {
-                            logger.debug(`Feature "${featureName}" matches pattern "${pattern}" by URI (normalized)`);
-                            return true;
-                        }
-                        
-                        // Check if pattern matches the end of the URI (relative path matching)
-                        if (normalizedUri.endsWith(normalizedPattern)) {
-                            logger.debug(`Feature "${featureName}" matches pattern "${pattern}" by URI (suffix)`);
-                            return true;
-                        }
-                        
-                        // Extract filename and check match
-                        const fileName = normalizedUri.split('/').pop() || '';
-                        if (fileName.includes(normalizedPattern) || normalizedPattern.includes(fileName)) {
-                            logger.debug(`Feature "${featureName}" matches pattern "${pattern}" by filename`);
-                            return true;
-                        }
-                    }
-                    
-                    logger.debug(`🔍 PATTERN MATCH DEBUG: NO MATCH for pattern "${pattern}"`);
-                    return false;
-                });
-            });
-            
-            logger.info(`Feature filtering: ${features.length} -> ${filtered.length} features after pattern filtering`);
-        }
-        */
         
-        // TEMPORARY FIX: Skip feature pattern filtering to allow all discovered features to execute
         logger.info(`Feature pattern filtering DISABLED - all ${features.length} discovered features will be processed`);
 
-        // Filter by tags
         if (options.tags) {
             logger.debug(`Filtering by tags: ${options.tags}`);
             const tagFilter = new TagFilter(options.tags);
@@ -1876,7 +1618,6 @@ export class CSBDDRunner {
             logger.info(`Tag filtering: ${filtered.reduce((sum, f) => sum + f.scenarios.length, 0)} scenarios remaining`);
         }
 
-        // Filter by scenario names
         if (options['scenarios'] && options['scenarios'].length > 0) {
             logger.debug(`Filtering by scenario patterns: ${JSON.stringify(options['scenarios'])}`);
             
@@ -1902,7 +1643,6 @@ export class CSBDDRunner {
         const totalScenariosAfterFiltering = filtered.reduce((sum, f) => sum + f.scenarios.length, 0);
         logger.info(`Final filtering result: ${filtered.length} features, ${totalScenariosAfterFiltering} scenarios`);
         
-        // Log details of what will be executed
         if (totalScenariosAfterFiltering > 0) {
             logger.info('Features and scenarios to execute:');
             filtered.forEach(feature => {
@@ -1925,9 +1665,6 @@ export class CSBDDRunner {
         return filtered;
     }
 
-    /**
-     * Update execution summary
-     */
     private updateSummary(summary: ExecutionSummary, featureResult: any): void {
         // CRITICAL FIX: Increment totalFeatures instead of setting to 1
         summary.totalFeatures++;
@@ -1950,10 +1687,8 @@ export class CSBDDRunner {
                     break;
             }
             
-            // 🔥 FIX: Count steps from each scenario
             if (scenarioResult.steps && Array.isArray(scenarioResult.steps)) {
                 for (const step of scenarioResult.steps) {
-                    // Add step counts to summary
                     (summary as any).totalSteps = ((summary as any).totalSteps || 0) + 1;
                     
                     switch (step.status) {
@@ -1974,9 +1709,6 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Log execution plan details
-     */
     private logExecutionPlan(plan: ExecutionPlan): void {
         console.log('\n=== Execution Plan ===');
         console.log(`Total Features: ${plan.totalFeatures}`);
@@ -1993,13 +1725,10 @@ export class CSBDDRunner {
         console.log('\n');
     }
 
-    /**
-     * Log execution summary
-     */
     private logExecutionSummary(summary: ExecutionSummary): void {
         console.log('\n=== Execution Summary ===');
         console.log(`Total Scenarios: ${summary.totalScenarios || summary.total}`);
-        const total = summary.totalScenarios || summary.total || 1; // Prevent division by zero
+        const total = summary.totalScenarios || summary.total || 1;
         console.log(`Passed: ${summary.passed} (${total > 0 ? (summary.passed / total * 100).toFixed(1) : '0.0'}%)`);
         console.log(`Failed: ${summary.failed} (${total > 0 ? (summary.failed / total * 100).toFixed(1) : '0.0'}%)`);
         console.log(`Skipped: ${summary.skipped}`);
@@ -2007,19 +1736,12 @@ export class CSBDDRunner {
         console.log('\n');
     }
 
-    /**
-     * Open HTML report in browser
-     */
     private async openReport(reportPath: string): Promise<void> {
         const open = await import('open');
         await open.default(reportPath);
     }
 
-    /**
-     * Clean up temporary files
-     */
     private async cleanupTempFiles(): Promise<void> {
-        // Implementation for cleaning temp files
         const fs = await import('fs/promises');
 
         const tempDirs = [
@@ -2032,14 +1754,10 @@ export class CSBDDRunner {
             try {
                 await fs.rmdir(dir, { recursive: true });
             } catch (error) {
-                // Ignore errors
             }
         }
     }
 
-    /**
-     * Abort current execution
-     */
     public abort(): void {
         const logger = ActionLogger.getInstance();
         logger.warn('Aborting test execution');
@@ -2047,23 +1765,14 @@ export class CSBDDRunner {
         this.state = 'stopped';
     }
 
-    /**
-     * Get current runner state
-     */
     public getState(): RunnerState {
         return this.state;
     }
 
-    /**
-     * Get execution progress
-     */
     public getProgress(): any {
         return this.executionMonitor.getExecutionSnapshot();
     }
 
-    /**
-     * Map scenario status to test status
-     */
     private mapScenarioStatusToTestStatus(status: ScenarioStatus | string): TestStatus {
         switch (status) {
             case 'passed':
@@ -2078,9 +1787,6 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Map step status to test status
-     */
     private mapStepStatusToTestStatus(status: StepStatus | string): TestStatus {
         switch (status) {
             case 'passed':
@@ -2097,9 +1803,6 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Map feature status to test status
-     */
     private mapFeatureStatusToTestStatus(status: FeatureStatus | string): TestStatus {
         switch (status) {
             case 'passed':
@@ -2114,9 +1817,6 @@ export class CSBDDRunner {
         }
     }
 
-    /**
-     * Create a failed execution result for reporting
-     */
     private createFailedExecutionResult(startTime: Date, errorMessage: string): ExecutionResult {
         return {
             startTime,
@@ -2151,9 +1851,6 @@ export class CSBDDRunner {
         };
     }
 
-    /**
-     * Create an empty execution result for reporting
-     */
     private createEmptyExecutionResult(startTime: Date, message: string): ExecutionResult {
         return {
             startTime,
@@ -2188,9 +1885,6 @@ export class CSBDDRunner {
     }
 }
 
-/**
- * Tag filter implementation
- */
 class TagFilter {
     private expression: string;
 
@@ -2199,12 +1893,9 @@ class TagFilter {
     }
 
     public matches(tags: string[]): boolean {
-        // Parse and evaluate tag expression
-        // Supports: @tag1 and @tag2, @tag1 or @tag2, not @tag3
         const normalizedTags = tags.map(t => t.toLowerCase());
         const normalizedExpression = this.expression.toLowerCase();
 
-        // Simple implementation - can be enhanced
         if (normalizedExpression.includes(' and ')) {
             const parts = normalizedExpression.split(' and ').map(p => p.trim());
             return parts.every(part => this.evaluatePart(part, normalizedTags));

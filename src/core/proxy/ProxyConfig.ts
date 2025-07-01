@@ -1,12 +1,3 @@
-/**
- * CS Test Automation Framework - ProxyConfig
- * 
- * Comprehensive proxy configuration management with validation,
- * serialization, and environment variable support.
- * 
- * @author CS Test Automation Team
- * @version 4.0.0
- */
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -148,13 +139,11 @@ export class ProxyConfig {
   static fromEnvironment(): ProxyConfig {
     const config = new ProxyConfig();
     
-    // Check standard proxy environment variables
     const httpProxy = process.env['HTTP_PROXY'] || process.env['http_proxy'];
     const httpsProxy = process.env['HTTPS_PROXY'] || process.env['https_proxy'];
     const socksProxy = process.env['SOCKS_PROXY'] || process.env['socks_proxy'];
     const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
     
-    // Parse proxy URLs
     if (httpProxy) {
       const server = ProxyConfig.parseProxyUrl(httpProxy, 'http');
       if (server) config.servers.push(server);
@@ -170,21 +159,17 @@ export class ProxyConfig {
       if (server) config.servers.push(server);
     }
     
-    // Parse bypass list
     if (noProxy) {
       config.bypass = noProxy.split(',').map(s => s.trim()).filter(s => s);
     }
     
-    // Check for PAC URL
     const pacUrl = process.env['PAC_URL'] || process.env['pac_url'];
     if (pacUrl) {
       config.pacUrl = pacUrl;
     }
     
-    // Enable if any proxy is configured
     config.enabled = config.servers.length > 0 || !!config.pacUrl;
     
-    // Load additional settings from environment
     config.loadEnvironmentSettings();
     
     return config;
@@ -225,7 +210,6 @@ export class ProxyConfig {
     
     const config = new ProxyConfig();
     
-    // Apply defaults and transform
     const processed = ProxyConfig.applyDefaults(obj);
     Object.assign(config, processed);
     
@@ -236,26 +220,20 @@ export class ProxyConfig {
     const errors: string[] = [];
     const warnings: string[] = [];
     
-    // Validate against schema
     ProxyConfig.validateAgainstSchema(config, ProxyConfig.CONFIG_SCHEMA, '', errors, warnings);
     
-    // Additional validation
     if (config.servers && config.servers.length > 0) {
-      // Validate each server
       config.servers.forEach((server: any, index: number) => {
         if (server.auth) {
-          // NTLM specific validation
           if (server.auth.type === 'ntlm' && !server.auth.domain) {
             warnings.push(`Server ${index}: NTLM authentication typically requires a domain`);
           }
           
-          // Password strength warning
           if (server.auth.password && server.auth.password.length < 8) {
             warnings.push(`Server ${index}: Weak password detected`);
           }
         }
         
-        // Port validation
         if (server.protocol === 'http' && server.port === 443) {
           warnings.push(`Server ${index}: HTTP proxy on port 443 is unusual`);
         }
@@ -266,12 +244,10 @@ export class ProxyConfig {
       });
     }
     
-    // PAC validation
     if (config.pacUrl && config.pacScript) {
       warnings.push('Both pacUrl and pacScript are specified. pacUrl will take precedence');
     }
     
-    // Rotation validation
     if (config.rotation?.enabled && (!config.servers || config.servers.length < 2)) {
       errors.push('Rotation requires at least 2 proxy servers');
     }
@@ -398,7 +374,6 @@ export class ProxyConfig {
       
       let protocol = parsed.protocol.replace(':', '') as ProxyProtocol;
       
-      // Handle special cases
       if (protocol === 'socks' as ProxyProtocol) protocol = 'socks5';
       if (!['http', 'https', 'socks4', 'socks5'].includes(protocol)) {
         protocol = defaultProtocol || 'http';
@@ -410,7 +385,6 @@ export class ProxyConfig {
         port: parseInt(parsed.port) || (protocol === 'https' ? 443 : protocol.startsWith('socks') ? 1080 : 80)
       };
       
-      // Extract authentication
       if (parsed.username) {
         server.auth = {
           username: decodeURIComponent(parsed.username),
@@ -420,7 +394,6 @@ export class ProxyConfig {
       
       return server;
     } catch {
-      // Try parsing as host:port
       const match = proxyUrl.match(/^([^:]+):(\d+)$/);
       if (match) {
         return {
@@ -435,7 +408,6 @@ export class ProxyConfig {
   }
 
   private loadEnvironmentSettings(): void {
-    // Load rotation settings
     if (process.env['PROXY_ROTATION_ENABLED'] === 'true') {
       this.rotation = {
         enabled: true,
@@ -444,7 +416,6 @@ export class ProxyConfig {
       };
     }
     
-    // Load health check settings
     if (process.env['PROXY_HEALTH_CHECK_ENABLED'] !== undefined) {
       this.healthCheck = {
         enabled: process.env['PROXY_HEALTH_CHECK_ENABLED'] === 'true',
@@ -452,7 +423,6 @@ export class ProxyConfig {
       };
     }
     
-    // Load retry settings
     if (process.env['PROXY_RETRY_ATTEMPTS']) {
       this.retry = {
         maxAttempts: parseInt(process.env['PROXY_RETRY_ATTEMPTS']),
@@ -461,7 +431,6 @@ export class ProxyConfig {
       };
     }
     
-    // Load connection pool settings
     if (process.env['PROXY_POOL_SIZE']) {
       this.connectionPool = {
         maxSize: parseInt(process.env['PROXY_POOL_SIZE']),
@@ -551,7 +520,6 @@ export class ProxyConfig {
       merged.bypass = [...new Set([...merged.bypass, ...other.bypass])];
     }
     
-    // Merge other properties
     Object.assign(merged, {
       enabled: other.enabled !== undefined ? other.enabled : merged.enabled,
       pacUrl: other.pacUrl || merged.pacUrl,
@@ -602,7 +570,6 @@ export class ProxyConfig {
     };
   }
 
-  // Static factory methods for common configurations
 
   static createBasicProxy(host: string, port: number, username?: string, password?: string): ProxyConfig {
     const config = new ProxyConfig();

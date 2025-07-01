@@ -2,9 +2,6 @@
 
 import { TestData } from '../types/data.types';
 
-/**
- * Options for variable interpolation
- */
 export interface InterpolationOptions {
     prefix?: string;
     suffix?: string;
@@ -17,9 +14,6 @@ export interface InterpolationOptions {
     preserveUnmatched?: boolean;
 }
 
-/**
- * Source of variable values
- */
 export interface VariableSource {
     type?: 'env' | 'context' | 'random' | 'date' | 'custom';
     name: string;
@@ -28,9 +22,6 @@ export interface VariableSource {
     resolve?: (variable: string) => Promise<any>;
 }
 
-/**
- * Result of variable interpolation
- */
 export interface InterpolationResult {
     success: boolean;
     result: any;
@@ -47,9 +38,6 @@ export interface InterpolationResult {
     }>;
 }
 
-/**
- * Variable metadata
- */
 export interface VariableMetadata {
     name: string;
     source: string;
@@ -58,18 +46,12 @@ export interface VariableMetadata {
     fallback?: string;
 }
 
-/**
- * Parser result for variable expressions
- */
 export interface ParsedVariable {
     variable: string;
     filters: string[];
     fallback?: string;
 }
 
-/**
- * Context for interpolation
- */
 export interface InterpolationContext extends Record<string, any> {
     env: NodeJS.ProcessEnv;
     testData?: TestData;

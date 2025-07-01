@@ -53,7 +53,6 @@ export class StorageSteps extends CSBDDBaseStepDefinition {
         
         try {
             const cookies: Cookie[] = dataTable.hashes().map(row => {
-                // Ensure required fields are present
                 if (!row['name'] || !row['value']) {
                     throw new Error('Cookie must have name and value fields');
                 }

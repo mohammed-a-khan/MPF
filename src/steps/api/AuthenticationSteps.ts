@@ -8,20 +8,12 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import { FileUtils } from '../../core/utils/FileUtils';
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 
-/**
- * Step definitions for API authentication
- * Supports all authentication methods: Basic, Bearer, API Key, OAuth2, Certificate, NTLM, AWS
- */
 @StepDefinitions
 export class AuthenticationSteps extends CSBDDBaseStepDefinition {
     constructor() {
         super();
     }
 
-    /**
-     * Sets Bearer token authentication
-     * Example: Given user sets bearer token "{{authToken}}"
-     */
     @CSBDDStepDef("user sets bearer token {string}")
     async setBearerToken(token: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -31,10 +23,8 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const interpolatedToken = await this.interpolateValue(token);
             
-            // Set Authorization header
             currentContext.setHeader('Authorization', `Bearer ${interpolatedToken}`);
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'bearer');
             currentContext.setVariable('authToken', interpolatedToken);
             
@@ -48,10 +38,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets Basic authentication
-     * Example: Given user sets basic auth username "admin" and password "{{password}}"
-     */
     @CSBDDStepDef("user sets basic auth username {string} and password {string}")
     async setBasicAuth(username: string, password: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -62,13 +48,11 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const interpolatedUsername = await this.interpolateValue(username);
             const interpolatedPassword = await this.interpolateValue(password);
             
-            // Create Basic auth header
             const credentials = `${interpolatedUsername}:${interpolatedPassword}`;
             const encodedCredentials = Buffer.from(credentials).toString('base64');
             
             currentContext.setHeader('Authorization', `Basic ${encodedCredentials}`);
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'basic');
             currentContext.setVariable('authUsername', interpolatedUsername);
             currentContext.setVariable('authPassword', interpolatedPassword);
@@ -83,10 +67,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets API key authentication in header
-     * Example: Given user sets API key header "X-API-Key" to "{{apiKey}}"
-     */
     @CSBDDStepDef("user sets API key header {string} to {string}")
     async setAPIKeyHeader(headerName: string, apiKey: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -98,7 +78,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             
             currentContext.setHeader(headerName, interpolatedKey);
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'apikey');
             currentContext.setVariable('authLocation', 'header');
             currentContext.setVariable('authKeyName', headerName);
@@ -115,10 +94,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets API key authentication in query parameter
-     * Example: Given user sets API key parameter "api_key" to "{{apiKey}}"
-     */
     @CSBDDStepDef("user sets API key parameter {string} to {string}")
     async setAPIKeyParameter(paramName: string, apiKey: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -128,12 +103,10 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const interpolatedKey = await this.interpolateValue(apiKey);
             
-            // Set query parameter
             const queryParams = currentContext.getVariable('queryParams') || {};
             queryParams[paramName] = interpolatedKey;
             currentContext.setVariable('queryParams', queryParams);
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'apikey');
             currentContext.setVariable('authLocation', 'query');
             currentContext.setVariable('authKeyName', paramName);
@@ -150,13 +123,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets OAuth2 client credentials
-     * Example: Given user sets OAuth2 client credentials:
-     *   | clientId     | {{clientId}}     |
-     *   | clientSecret | {{clientSecret}} |
-     *   | tokenUrl     | {{tokenUrl}}     |
-     */
     @CSBDDStepDef("user sets OAuth2 client credentials:")
     async setOAuth2ClientCredentials(dataTable: any): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -166,24 +132,20 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const credentials: any = {};
             
-            // Parse data table - handle both formats
             let rows: any[] = [];
             
             if (dataTable.hashes && typeof dataTable.hashes === 'function') {
-                // Cucumber format with headers - this creates objects with key-value pairs
                 const hashes = dataTable.hashes();
                 await actionLogger.logAction('dataTableHashesDebug', { 
                     hashCount: hashes.length,
                     firstHash: JSON.stringify(hashes[0], null, 2).substring(0, 200)
                 });
                 
-                // Convert hashes to rows format - each hash should be an object with key and value properties
                 rows = hashes.map((hash: any) => ({
                     key: hash.key,
                     value: hash.value
                 }));
             } else if (dataTable.rows && typeof dataTable.rows === 'function') {
-                // Raw array format - skip header row and convert to key-value pairs
                 const rawRows = dataTable.rows();
                 await actionLogger.logAction('dataTableRowsDebug', { 
                     rowCount: rawRows.length,
@@ -191,20 +153,17 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                     secondRow: rawRows.length > 1 ? JSON.stringify(rawRows[1]) : 'none'
                 });
                 
-                // Skip header row (first row) and convert to key-value pairs
                 const dataRows = rawRows.slice(1);
                 rows = dataRows.map((row: any[]) => ({
                     key: row[0],
                     value: row[1]
                 }));
             } else if (Array.isArray(dataTable)) {
-                // Direct array format
                 rows = dataTable.map((row: any[]) => ({
                     key: row[0],
                     value: row[1]
                 }));
             } else {
-                // Log the actual dataTable structure to help debug
                 await actionLogger.logAction('dataTableStructureDebug', { 
                     type: typeof dataTable,
                     keys: Object.keys(dataTable),
@@ -213,12 +172,10 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`Unsupported data table format: ${typeof dataTable}`);
             }
             
-            // Process rows to extract AWS config
             for (const row of rows) {
                 const key = row.key || row[0];
                 const value = row.value || row[1];
                 
-                // Debug logging for each row
                 await actionLogger.logAction('rowProcessing', { 
                     rowIndex: rows.indexOf(row),
                     key: key,
@@ -231,12 +188,10 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 }
             }
             
-            // Validate required fields
             if (!credentials.clientId || !credentials.clientSecret || !credentials.tokenUrl) {
                 throw new Error('OAuth2 client credentials require: clientId, clientSecret, tokenUrl');
             }
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'oauth2');
             currentContext.setVariable('oauth2Flow', 'client_credentials');
             currentContext.setVariable('oauth2ClientId', credentials.clientId);
@@ -256,10 +211,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets OAuth2 access token directly
-     * Example: Given user sets OAuth2 access token "{{accessToken}}"
-     */
     @CSBDDStepDef("user sets OAuth2 access token {string}")
     async setOAuth2AccessToken(accessToken: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -269,10 +220,8 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const interpolatedToken = await this.interpolateValue(accessToken);
             
-            // Set Authorization header
             currentContext.setHeader('Authorization', `Bearer ${interpolatedToken}`);
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'oauth2');
             currentContext.setVariable('oauth2Flow', 'manual');
             currentContext.setVariable('oauth2AccessToken', interpolatedToken);
@@ -287,10 +236,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Loads client certificate for mutual TLS
-     * Example: Given user loads certificate from "certs/client.p12" with password "{{certPassword}}"
-     */
     @CSBDDStepDef("user loads certificate from {string} with password {string}")
     async loadCertificate(certPath: string, password: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -305,23 +250,18 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const resolvedPath = await this.resolveCertPath(certPath);
             const interpolatedPassword = await this.interpolateValue(password);
             
-            // Check if certificate exists
             if (!await FileUtils.exists(resolvedPath)) {
                 throw new Error(`Certificate file not found: ${resolvedPath}`);
             }
             
-            // Load certificate
-            // Read certificate file
             const certContent = await FileUtils.readFile(resolvedPath);
             
-            // Create certificate config for API context
             const certConfig = {
                 cert: certContent.toString(),
                 passphrase: interpolatedPassword,
                 type: this.detectCertType(resolvedPath) as any
             };
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'certificate');
             currentContext.setVariable('certPath', resolvedPath);
             currentContext.setVariable('certContent', certConfig.cert);
@@ -341,13 +281,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets client certificate authentication details
-     * Example: Given user sets certificate authentication:
-     *   | certFile | certs/client.crt |
-     *   | keyFile  | certs/client.key |
-     *   | caFile   | certs/ca.crt     |
-     */
     @CSBDDStepDef("user sets certificate authentication:")
     async setCertificateAuth(dataTable: any): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -357,7 +290,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const certConfig: any = {};
             
-            // Parse data table
             const rows = dataTable.hashes ? dataTable.hashes() : dataTable.rows();
             
             for (const row of rows) {
@@ -369,7 +301,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 }
             }
             
-            // Load certificate files
             const authConfig: any = { type: 'certificate' };
             
             if (certConfig.certFile) {
@@ -391,7 +322,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 authConfig.passphrase = certConfig.passphrase;
             }
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', authConfig.type);
             if (authConfig.cert) currentContext.setVariable('certContent', authConfig.cert);
             if (authConfig.key) currentContext.setVariable('certKey', authConfig.key);
@@ -410,10 +340,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets NTLM authentication
-     * Example: Given user sets NTLM auth with username "DOMAIN\user" and password "{{password}}"
-     */
     @CSBDDStepDef("user sets NTLM auth with username {string} and password {string}")
     async setNTLMAuth(username: string, password: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -424,7 +350,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const interpolatedUsername = await this.interpolateValue(username);
             const interpolatedPassword = await this.interpolateValue(password);
             
-            // Parse domain from username if present
             let domain = '';
             let user = interpolatedUsername;
             
@@ -434,7 +359,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 user = parts[1] || interpolatedUsername;
             }
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'ntlm');
             currentContext.setVariable('ntlmUsername', user);
             currentContext.setVariable('ntlmPassword', interpolatedPassword);
@@ -452,10 +376,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets AWS Signature V4 authentication
-     * Example: Given user sets AWS auth with key "{{accessKey}}" and secret "{{secretKey}}"
-     */
     @CSBDDStepDef("user sets AWS auth with key {string} and secret {string}")
     async setAWSAuth(accessKey: string, secretKey: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -466,7 +386,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const interpolatedKey = await this.interpolateValue(accessKey);
             const interpolatedSecret = await this.interpolateValue(secretKey);
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'aws');
             currentContext.setVariable('awsAccessKeyId', interpolatedKey);
             currentContext.setVariable('awsSecretAccessKey', interpolatedSecret);
@@ -484,14 +403,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets AWS authentication with session token
-     * Example: Given user sets AWS auth:
-     *   | accessKey    | {{accessKey}}    |
-     *   | secretKey    | {{secretKey}}    |
-     *   | sessionToken | {{sessionToken}} |
-     *   | region       | us-west-2        |
-     */
     @CSBDDStepDef("user sets AWS auth:")
     async setAWSAuthDetailed(dataTable: any): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -501,24 +412,20 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             const currentContext = this.getAPIContext();
             const awsConfig: any = {};
             
-            // Parse data table - handle both formats
             let rows: any[] = [];
             
             if (dataTable.hashes && typeof dataTable.hashes === 'function') {
-                // Cucumber format with headers - this creates objects with key-value pairs
                 const hashes = dataTable.hashes();
                 await actionLogger.logAction('dataTableHashesDebug', { 
                     hashCount: hashes.length,
                     firstHash: JSON.stringify(hashes[0], null, 2).substring(0, 200)
                 });
                 
-                // Convert hashes to rows format - each hash should be an object with key and value properties
                 rows = hashes.map((hash: any) => ({
                     key: hash.key,
                     value: hash.value
                 }));
             } else if (dataTable.rows && typeof dataTable.rows === 'function') {
-                // Raw array format - skip header row and convert to key-value pairs
                 const rawRows = dataTable.rows();
                 await actionLogger.logAction('dataTableRowsDebug', { 
                     rowCount: rawRows.length,
@@ -526,20 +433,17 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                     secondRow: rawRows.length > 1 ? JSON.stringify(rawRows[1]) : 'none'
                 });
                 
-                // Skip header row (first row) and convert to key-value pairs
                 const dataRows = rawRows.slice(1);
                 rows = dataRows.map((row: any[]) => ({
                     key: row[0],
                     value: row[1]
                 }));
             } else if (Array.isArray(dataTable)) {
-                // Direct array format
                 rows = dataTable.map((row: any[]) => ({
                     key: row[0],
                     value: row[1]
                 }));
             } else {
-                // Log the actual dataTable structure to help debug
                 await actionLogger.logAction('dataTableStructureDebug', { 
                     type: typeof dataTable,
                     keys: Object.keys(dataTable),
@@ -548,12 +452,10 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`Unsupported data table format: ${typeof dataTable}`);
             }
             
-            // Process rows to extract AWS config
             for (const row of rows) {
                 const key = row.key || row[0];
                 const value = row.value || row[1];
                 
-                // Debug logging for each row
                 await actionLogger.logAction('rowProcessing', { 
                     rowIndex: rows.indexOf(row),
                     key: key,
@@ -566,7 +468,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 }
             }
             
-            // Validate required fields
             if (!awsConfig.accessKey || !awsConfig.secretKey) {
                 await actionLogger.logAction('awsConfigDebug', { 
                     configKeys: Object.keys(awsConfig),
@@ -577,7 +478,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 throw new Error('AWS authentication requires: accessKey and secretKey');
             }
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'aws');
             currentContext.setVariable('awsAccessKeyId', awsConfig.accessKey);
             currentContext.setVariable('awsSecretAccessKey', awsConfig.secretKey);
@@ -598,10 +498,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Clears all authentication
-     * Example: Given user clears authentication
-     */
     @CSBDDStepDef("user clears authentication")
     async clearAuthentication(): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -610,10 +506,8 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         try {
             const currentContext = this.getAPIContext();
             
-            // Remove Authorization header
             currentContext.removeHeader('Authorization');
             
-            // Clear authentication config by removing auth variables
             currentContext.setVariable('authType', null);
             
             await actionLogger.logAction('authenticationCleared', {});
@@ -623,10 +517,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets custom authentication header
-     * Example: Given user sets custom auth header "X-Custom-Auth" to "{{customToken}}"
-     */
     @CSBDDStepDef("user sets custom auth header {string} to {string}")
     async setCustomAuthHeader(headerName: string, headerValue: string): Promise<void> {
         const actionLogger = ActionLogger.getInstance();
@@ -638,7 +528,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             
             currentContext.setHeader(headerName, interpolatedValue);
             
-            // Store authentication config in variables
             currentContext.setVariable('authType', 'custom');
             currentContext.setVariable('customAuthHeaderName', headerName);
             currentContext.setVariable('customAuthHeaderValue', interpolatedValue);
@@ -654,36 +543,20 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Sets AWS authentication with detailed configuration (alias for AWS auth)
-     * Example: Given user sets AWS authentication:
-     *   | accessKey    | AKIAIOSFODNN7EXAMPLE |
-     *   | secretKey    | wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY |
-     *   | region       | us-east-1 |
-     *   | service      | execute-api |
-     *   | sessionToken | temporary-session-token |
-     */
     @CSBDDStepDef("user sets AWS authentication:")
     async setAWSAuthentication(dataTable: any): Promise<void> {
-        // Delegate to the existing AWS auth method
         return this.setAWSAuthDetailed(dataTable);
     }
 
-    /**
-     * Helper method to get current API context
-     */
     private getAPIContext(): APIContext {
-        // Try to get from BDD context (only if scenario context is available)
         try {
             const context = this.retrieve('currentAPIContext') as APIContext;
             if (context) {
                 return context;
             }
         } catch (error) {
-            // Scenario context not available - try alternative sources
         }
         
-        // Try to get from APIContextManager
         try {
             const apiContextManager = APIContextManager.getInstance();
             if (apiContextManager.hasContext('default')) {
@@ -692,15 +565,11 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
                 return apiContextManager.createContext('default');
             }
         } catch (error) {
-            // APIContextManager not available
         }
         
         throw new Error('No API context available. Please use "Given user sets API base URL" first');
     }
 
-    /**
-     * Helper method to mask sensitive tokens
-     */
     private maskToken(token: string): string {
         if (token.length <= 8) {
             return '***';
@@ -708,16 +577,12 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         return token.substring(0, 4) + '...' + token.substring(token.length - 4);
     }
 
-    /**
-     * Helper method to resolve certificate paths
-     */
     private async resolveCertPath(certPath: string): Promise<string> {
         const path = await import('path');
         if (path.isAbsolute(certPath)) {
             return certPath;
         }
         
-        // Try certificates directory
         const certsPath = ConfigurationManager.get('CERTIFICATES_PATH', './certs');
         const resolvedPath = path.join(certsPath, certPath);
         
@@ -725,7 +590,6 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             return resolvedPath;
         }
         
-        // Try test data directory
         const testDataPath = ConfigurationManager.get('TEST_DATA_PATH', './test-data');
         const testDataResolvedPath = path.join(testDataPath, 'certs', certPath);
         
@@ -733,13 +597,9 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
             return testDataResolvedPath;
         }
         
-        // Try relative to project root
         return certPath;
     }
 
-    /**
-     * Helper method to detect certificate type
-     */
     private detectCertType(certPath: string): string {
         const path = (typeof window === 'undefined') ? require('path') : { extname: (p: string) => { const parts = p.split('.'); return parts.length > 1 ? '.' + parts[parts.length - 1] : ''; } };
         const ext = path.extname(certPath).toLowerCase();
@@ -760,25 +620,19 @@ export class AuthenticationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Helper method to interpolate variables
-     */
     private async interpolateValue(value: string): Promise<string> {
         if (!value.includes('{{')) {
             return value;
         }
         
-        // Get variables from context - using retrieve for stored variables
         const variables: Record<string, any> = {};
         
-        // Try to get common variables from the BDD context
         const currentContext = this.retrieve('currentAPIContext');
         if (currentContext && typeof currentContext === 'object' && 'getVariables' in currentContext) {
             const apiVars = (currentContext as APIContext).getVariables();
             Object.assign(variables, apiVars);
         }
         
-        // Replace placeholders
         let interpolated = value;
         for (const [key, val] of Object.entries(variables)) {
             interpolated = interpolated.replace(new RegExp(`{{${key}}}`, 'g'), String(val));

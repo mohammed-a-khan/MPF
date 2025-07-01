@@ -29,158 +29,94 @@ export class QueryContext {
         this.startTime = new Date();
     }
 
-    /**
-     * Get query ID
-     */
     getId(): string {
         return this.queryId;
     }
 
-    /**
-     * Set query parameter
-     */
     setParameter(name: string, value: any): void {
         this.parameters.set(name, value);
     }
 
-    /**
-     * Get query parameter
-     */
     getParameter(name: string): any {
         return this.parameters.get(name);
     }
 
-    /**
-     * Get all parameters
-     */
     getParameters(): Record<string, any> {
         return Object.fromEntries(this.parameters);
     }
 
-    /**
-     * Set metadata
-     */
     setMetadata(key: string, value: any): void {
         this.metadata.set(key, value);
     }
 
-    /**
-     * Get metadata
-     */
     getMetadata(key: string): any {
         return this.metadata.get(key);
     }
 
-    /**
-     * Set query result
-     */
     setResult(result: QueryResult): void {
         this.result = result;
         this.endTime = new Date();
         
-        // Update statistics from result
         if (result.rowCount !== undefined) {
             this.statistics.rowsRead = result.rowCount;
         }
     }
 
-    /**
-     * Get query result
-     */
     getResult(): QueryResult | undefined {
         return this.result;
     }
 
-    /**
-     * Set error
-     */
     setError(error: Error): void {
         this.error = error;
         this.endTime = new Date();
     }
 
-    /**
-     * Get error
-     */
     getError(): Error | undefined {
         return this.error;
     }
 
-    /**
-     * Add warning
-     */
     addWarning(warning: string): void {
         this.warnings.push(warning);
         const logger = Logger.getInstance();
         logger.warn(`Query ${this.queryId} warning: ${warning}`);
     }
 
-    /**
-     * Get warnings
-     */
     getWarnings(): string[] {
         return [...this.warnings];
     }
 
-    /**
-     * Add affected table
-     */
     addAffectedTable(tableName: string): void {
         this.affectedTables.add(tableName);
     }
 
-    /**
-     * Get affected tables
-     */
     getAffectedTables(): string[] {
         return Array.from(this.affectedTables);
     }
 
-    /**
-     * Add used index
-     */
     addUsedIndex(indexName: string): void {
         this.usedIndexes.add(indexName);
     }
 
-    /**
-     * Get used indexes
-     */
     getUsedIndexes(): string[] {
         return Array.from(this.usedIndexes);
     }
 
-    /**
-     * Set execution plan
-     */
     setExecutionPlan(plan: any): void {
         this.executionPlan = plan;
     }
 
-    /**
-     * Get execution plan
-     */
     getExecutionPlan(): any {
         return this.executionPlan;
     }
 
-    /**
-     * Update statistics
-     */
     updateStatistics(stats: Partial<QueryStatistics>): void {
         Object.assign(this.statistics, stats);
     }
 
-    /**
-     * Get statistics
-     */
     getStatistics(): QueryStatistics {
         return { ...this.statistics };
     }
 
-    /**
-     * Get execution duration
-     */
     getDuration(): number {
         if (!this.endTime) {
             return Date.now() - this.startTime.getTime();
@@ -188,23 +124,14 @@ export class QueryContext {
         return this.endTime.getTime() - this.startTime.getTime();
     }
 
-    /**
-     * Check if query is complete
-     */
     isComplete(): boolean {
         return this.endTime !== undefined;
     }
 
-    /**
-     * Check if query succeeded
-     */
     isSuccess(): boolean {
         return this.isComplete() && !this.error;
     }
 
-    /**
-     * Get execution summary
-     */
     getExecutionSummary(): QueryExecutionSummary {
         const summary: QueryExecutionSummary = {
             queryId: this.queryId,
@@ -232,9 +159,6 @@ export class QueryContext {
         return summary;
     }
 
-    /**
-     * Generate performance report
-     */
     generatePerformanceReport(): string {
         const summary = this.getExecutionSummary();
         const lines: string[] = [
@@ -308,13 +232,9 @@ export class QueryContext {
         return lines.join('\n');
     }
 
-    /**
-     * Clone context
-     */
     clone(): QueryContext {
         const cloned = new QueryContext(`${this.queryId}_clone`);
         
-        // Copy all properties
         cloned.startTime = new Date(this.startTime);
         if (this.endTime) {
             cloned.endTime = new Date(this.endTime);
@@ -336,7 +256,6 @@ export class QueryContext {
         return cloned;
     }
 
-    // Private helper methods
 
     private formatBytes(bytes: number): string {
         if (bytes === 0) return '0 B';
@@ -349,7 +268,6 @@ export class QueryContext {
     }
 }
 
-// Type definitions for QueryContext
 
 interface QueryStatistics {
     rowsRead: number;

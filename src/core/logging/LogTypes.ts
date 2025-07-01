@@ -1,11 +1,3 @@
-/**
- * CS Test Automation Framework - LogTypes
- * 
- * Comprehensive type definitions for the logging system.
- * 
- * @author CS Test Automation Team
- * @version 4.0.0
- */
 
 export enum LogLevel {
   TRACE = 'TRACE',
@@ -990,7 +982,7 @@ export interface LogScheduler {
 export interface ScheduledTask {
   id?: string;
   name: string;
-  schedule: string; // Cron expression
+  schedule: string;
   task: () => Promise<void>;
   enabled: boolean;
   lastRun?: Date;

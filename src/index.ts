@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 
-/**
- * CS Test Automation Framework
- * Main Entry Point - Production Implementation
- */
 
-// Set max listeners to prevent EventEmitter warnings
 process.setMaxListeners(20);
 
-// Start console capture immediately to capture all initialization logs
 import { consoleCapture } from './core/logging/ConsoleCapture';
 consoleCapture.startCapture();
 
@@ -17,11 +11,9 @@ import { performance } from 'perf_hooks';
 import * as cluster from 'node:cluster';
 import * as os from 'os';
 
-// Import only what's needed for initial parsing
 import { CommandLineParser } from './core/cli/CommandLineParser';
 import { ExecutionOptions } from './core/cli/ExecutionOptions';
 
-// Framework Metadata
 const FRAMEWORK_VERSION = '1.0.0';
 const FRAMEWORK_NAME = 'CS Test Automation Framework';
 const FRAMEWORK_BANNER = `
@@ -40,83 +32,64 @@ const FRAMEWORK_BANNER = `
 ╚════════════════════════════════════════════════════════════════╝
 `;
 
-// Global Error Handlers
 const exitHandler = new Map<string, Function>();
 const runningProcesses = new Set<any>();
 let isShuttingDown = false;
 
-/**
- * Main CLI Entry Point
- */
 async function main(): Promise<void> {
-    console.log('🔍 DEBUG: main() function called');
-    console.log('🔍 DEBUG: process.argv =', JSON.stringify(process.argv));
+    if (process.env.DEBUG === 'true') {
+        console.log('🔍 DEBUG: main() function called');
+        console.log('🔍 DEBUG: process.argv =', JSON.stringify(process.argv));
+    }
     
     const startTime = performance.now();
     let executionResult: any = null;
 
     try {
-        // Parse command line arguments first
         const options = CommandLineParser.parse(process.argv);
         
-        // Show help if requested
         if (options.help) {
             displayHelp();
             process.exit(0);
         }
 
-        // Show version if requested
         if (options.version) {
             console.log(`${FRAMEWORK_NAME} v${FRAMEWORK_VERSION}`);
             process.exit(0);
         }
 
-        // Display banner
-        console.log('\x1b[35m%s\x1b[0m', FRAMEWORK_BANNER); // Magenta color for brand
-        console.log('\x1b[32m%s\x1b[0m', '🚀 Running PURE TYPESCRIPT execution - No compiled JS files!'); // Green confirmation
+        if (!options.quiet && process.env.LOG_LEVEL !== 'error') {
+            console.log('\x1b[35m%s\x1b[0m', FRAMEWORK_BANNER);
+        }
 
-        // Dynamically import heavy modules only when needed
-        // const { ConfigurationManager } = await import('./core/configuration/ConfigurationManager');
-        // const { logger } = await import('./core/utils/Logger');
-        // const { ProxyManager } = await import('./core/proxy/ProxyManager');
-        // const { DebugManager } = await import('./core/debugging/DebugManager');
-        // const { ReportOrchestrator } = await import('./reporting/core/ReportOrchestrator');
-        // const { ADOIntegrationService } = await import('./integrations/ado/ADOIntegrationService');
-        // const { CSBDDRunner } = await import('./bdd/runner/CSBDDRunner');
 
-        // Configure log level if needed
         const { logger } = await import('./core/utils/Logger');
         if (options.logLevel) {
             logger.getInstance().setLevel(options.logLevel as any);
         }
+        
+        if (options.debug || options.logLevel === 'debug') {
+            process.env.DEBUG = 'true';
+        }
 
         logger.info(`Starting ${FRAMEWORK_NAME} v${FRAMEWORK_VERSION}`);
-        logger.info(`Node.js ${process.version} on ${os.platform()} ${os.arch()}`);
-        logger.info(`Working directory: ${process.cwd()}`);
 
-        // Validate environment
         await validateEnvironment();
 
-        // Setup signal handlers
         setupSignalHandlers();
 
-        // Check if running in cluster mode
         if (options.cluster && (cluster as any).isPrimary) {
             await runInClusterMode(options);
         } else {
-            // Run tests
             executionResult = await runTests(options);
         }
 
-        // Calculate execution time
         const executionTime = ((performance.now() - startTime) / 1000).toFixed(2);
         
-        // Display summary
         if (executionResult && !options.quiet) {
             displayExecutionSummary(executionResult, executionTime);
         }
 
-        // Exit with appropriate code
         const exitCode = executionResult?.failed > 0 ? 1 : 0;
         await gracefulShutdown(exitCode);
 
@@ -126,49 +99,30 @@ async function main(): Promise<void> {
     }
 }
 
-/**
- * Run tests with full framework initialization - FIXED DYNAMIC IMPORTS
- */
 async function runTests(options: ExecutionOptions): Promise<any> {
-    console.log('🚀 Starting test execution with optimized initialization...');
-    console.log('📊 Environment:', options.environment || 'dev');
-    console.log('⚙️ Options:', JSON.stringify(options, null, 2));
+    const { logger } = await import('./core/utils/Logger');
+    logger.info('🚀 Starting test execution...');
 
     try {
-        // 🔥 FIX: Use TypeScript imports for critical modules
         const { CSFramework } = await import('./core/CSFramework');
         const { logger } = await import('./core/utils/Logger');
         const { StepDefinitionLoader } = await import('./bdd/base/StepDefinitionLoader');
         
-        console.log('✅ Critical modules loaded successfully');
-        
-        // Initialize step definition loader with performance optimization
         const stepLoader = StepDefinitionLoader.getInstance();
-        
-        // For AKHAN project, only load AKHAN-specific steps
-        const projectName = options.project || 'saucedemo';
-        if (projectName === 'akhan') {
-            console.log('🚀 Loading AKHAN-specific step definitions only...');
-            // The StepDefinitionLoader already has optimization for AKHAN project
-        }
-        
         await stepLoader.initialize();
-        console.log('✅ Step definition loader initialized');
         
-        // Get framework instance
         const framework = CSFramework.getInstance();
-        console.log('✅ Framework instance obtained');
         
-        // 🔥 FIX: Add initialization timeout protection (30 seconds)
         logger.info('🚀 Starting CS Framework with timeout protection...');
         
-        // Extract project and environment from options
-        const project = options.project || 'saucedemo'; // Default to saucedemo if not specified
+        const project = options.project || 'saucedemo';
         const environment = options.environment || 'dev';
         
-        console.log(`🔍 DEBUG: options.project = '${options.project}', project = '${project}'`);
-        console.log(`🔍 DEBUG: options.environment = '${options.environment}', environment = '${environment}'`);
-        console.log(`🔍 DEBUG: Full options:`, JSON.stringify(options, null, 2));
+        if (process.env.DEBUG === 'true') {
+            console.log(`🔍 DEBUG: options.project = '${options.project}', project = '${project}'`);
+            console.log(`🔍 DEBUG: options.environment = '${options.environment}', environment = '${environment}'`);
+            console.log(`🔍 DEBUG: Full options:`, JSON.stringify(options, null, 2));
+        }
         
         const initPromise = framework.initialize(
             project, 
@@ -190,25 +144,23 @@ async function runTests(options: ExecutionOptions): Promise<any> {
         );
         
         await Promise.race([initPromise, timeoutPromise]);
-        console.log('✅ Framework initialization completed');
 
-        // 🔥 FIX: Graceful configuration validation with fallback
         try {
             const isConfigValid = await framework.validateConfiguration();
             if (!isConfigValid) {
                 logger.warn('⚠️ Configuration validation failed - continuing with fallback configuration');
-                // Don't throw error, continue with fallbacks
             } else {
-                console.log('✅ Configuration validation passed');
+                logger.debug('✅ Configuration validation passed');
             }
         } catch (configError) {
             logger.warn(`⚠️ Configuration validation error: ${configError} - continuing with fallbacks`);
         }
 
-        // Determine feature paths to execute
         const featurePaths: string[] = [];
-        console.log(`🔍 DEBUG: options.features = ${JSON.stringify(options.features)}`);
-        console.log(`🔍 DEBUG: options object keys:`, Object.keys(options));
+        if (process.env.DEBUG === 'true') {
+            console.log(`🔍 DEBUG: options.features = ${JSON.stringify(options.features)}`);
+            console.log(`🔍 DEBUG: options object keys:`, Object.keys(options));
+        }
         
         if (options.features) {
             if (Array.isArray(options.features)) {
@@ -217,13 +169,13 @@ async function runTests(options: ExecutionOptions): Promise<any> {
                 featurePaths.push(options.features);
             }
         } else {
-            // Default feature discovery
             featurePaths.push('./features/**/*.feature');
         }
         
-        console.log(`🔍 DEBUG: Final featurePaths = ${JSON.stringify(featurePaths)}`);
+        if (process.env.DEBUG === 'true') {
+            console.log(`🔍 DEBUG: Final featurePaths = ${JSON.stringify(featurePaths)}`);
+        }
 
-        // Execute tests using the framework
         logger.info('Starting test execution with CS Framework...');
         const result = await framework.executeTests(featurePaths, options);
         
@@ -233,11 +185,8 @@ async function runTests(options: ExecutionOptions): Promise<any> {
     } catch (error) {
         const { logger } = await import('./core/utils/Logger');
         logger.error('❌ Test execution failed', error as Error);
-        console.error('❌ Framework initialization failed:', error);
-        console.log('🔄 Attempting recovery with minimal configuration...');
         
         try {
-            // Ultimate fallback: try minimal initialization
             return await initializeMinimalFramework(options);
         } catch (fallbackError) {
             console.error('❌ Minimal initialization also failed:', fallbackError);
@@ -246,21 +195,12 @@ async function runTests(options: ExecutionOptions): Promise<any> {
     }
 }
 
-/**
- * Minimal framework initialization as ultimate fallback
- */
 async function initializeMinimalFramework(options: ExecutionOptions): Promise<any> {
-    console.log('🔧 Initializing minimal framework configuration...');
-    
     try {
-        // Set minimal environment variables
         process.env['BROWSER_TYPE'] = 'chromium';
         process.env['HEADLESS'] = 'true';
         process.env['TIMEOUT'] = '30000';
         
-        console.log('✅ Minimal environment configured');
-        
-        // Return minimal test result to prevent complete failure
         const result = {
             total: 0,
             passed: 0,
@@ -275,7 +215,6 @@ async function initializeMinimalFramework(options: ExecutionOptions): Promise<an
             environment: options.environment || 'minimal'
         };
         
-        console.log('⚠️ Running in minimal mode - limited functionality available');
         return result;
         
     } catch (error) {
@@ -284,11 +223,7 @@ async function initializeMinimalFramework(options: ExecutionOptions): Promise<an
     }
 }
 
-/**
- * Validate environment before running tests
- */
 async function validateEnvironment(): Promise<void> {
-    // Check Node.js version
     const nodeVersion = process.version;
     const versionParts = nodeVersion.split('.');
     const majorVersionStr = versionParts[0];
@@ -297,43 +232,33 @@ async function validateEnvironment(): Promise<void> {
         throw new Error(`Node.js 14 or higher is required. Current version: ${nodeVersion}`);
     }
 
-    // Check for config directory (required)
     if (!fs.existsSync('config')) {
         throw new Error('Configuration directory not found: config');
     }
 
-    // Check for global.env file (required)
     if (!fs.existsSync('config/global.env')) {
         throw new Error('Global configuration file not found: config/global.env');
     }
 
-    // Check for common directory (required)
     if (!fs.existsSync('config/common')) {
         throw new Error('Common configuration directory not found: config/common');
     }
 
-    // Check optional directories and create if missing
     const optionalDirs = ['features', 'src/steps'];
     for (const dir of optionalDirs) {
         if (!fs.existsSync(dir)) {
-            console.log(`Creating missing directory: ${dir}`);
             try {
                 fs.mkdirSync(dir, { recursive: true });
             } catch (error) {
-                console.warn(`Failed to create directory ${dir}: ${error}`);
             }
         }
     }
 
-    // Validate src directory structure (required)
     if (!fs.existsSync('src')) {
         throw new Error('Source directory not found: src');
     }
 }
 
-/**
- * Setup signal handlers for graceful shutdown
- */
 function setupSignalHandlers(): void {
     const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT', 'SIGHUP'];
 
@@ -358,9 +283,6 @@ function setupSignalHandlers(): void {
     });
 }
 
-/**
- * Graceful shutdown handler
- */
 async function gracefulShutdown(exitCode: number): Promise<void> {
     if (isShuttingDown) {
         return;
@@ -372,7 +294,6 @@ async function gracefulShutdown(exitCode: number): Promise<void> {
         const { logger } = require('./core/utils/Logger');
         logger.info('Starting graceful shutdown...');
 
-        // Execute registered exit handlers
         for (const [name, handler] of exitHandler.entries()) {
             try {
                 await handler();
@@ -381,7 +302,6 @@ async function gracefulShutdown(exitCode: number): Promise<void> {
             }
         }
 
-        // Close running processes
         for (const process of runningProcesses) {
             try {
                 if (process.kill) {
@@ -392,7 +312,6 @@ async function gracefulShutdown(exitCode: number): Promise<void> {
             }
         }
 
-        // Final exit
         process.exit(exitCode);
 
     } catch (error) {
@@ -401,9 +320,6 @@ async function gracefulShutdown(exitCode: number): Promise<void> {
     }
 }
 
-/**
- * Display help information
- */
 function displayHelp(): void {
     console.log(`
 ${FRAMEWORK_NAME} v${FRAMEWORK_VERSION}
@@ -436,13 +352,10 @@ EXAMPLES:
   # Run specific feature with video
   npm test -- --env=uat --feature=login.feature --video
 
-For more information, visit: https://github.com/your-org/cs-test-framework
+For more information, visit: https:
 `);
 }
 
-/**
- * Display execution summary
- */
 function displayExecutionSummary(result: any, executionTime: string): void {
     const { total, passed, failed, skipped } = result;
     const passRate = total > 0 ? ((passed / total) * 100).toFixed(1) : '0';
@@ -458,30 +371,20 @@ function displayExecutionSummary(result: any, executionTime: string): void {
     console.log('═'.repeat(60));
 }
 
-/**
- * Run in cluster mode
- */
 async function runInClusterMode(options: ExecutionOptions): Promise<any> {
     const { logger } = require('./core/utils/Logger');
     const numWorkers = options.workers || os.cpus().length;
     logger.info(`Running in cluster mode with ${numWorkers} workers`);
     
-    // Implementation simplified for brevity
     return { total: 0, passed: 0, failed: 0, skipped: 0 };
 }
 
-/**
- * Register exit handler
- */
 export function registerExitHandler(name: string, handler: Function): void {
     exitHandler.set(name, handler);
 }
 
-// Export main for programmatic use
 export { main, runTests };
 
-// Lazy export functions to prevent circular dependencies
-// TypeScript Dynamic Exports (Lazy Loading)
 export const getCSFramework = async () => (await import('./core/CSFramework')).CSFramework;
 export const getFrameworkInstance = async () => (await import('./core/CSFramework')).framework;
 export const getCSBDDEngine = async () => (await import('./bdd/engine/CSBDDEngine')).CSBDDEngine;
@@ -489,7 +392,6 @@ export const getBDDEngineInstance = async () => (await import('./bdd/engine/CSBD
 export const getCSTestRunner = async () => (await import('./core/runner/CSTestRunner')).CSTestRunner;
 export const getTestRunnerInstance = async () => (await import('./core/runner/CSTestRunner')).testRunner;
 
-// Lazy framework class exports - Pure TypeScript imports
 export const getCSWebElement = async () => (await import('./core/elements/CSWebElement')).CSWebElement;
 export const getCSBasePage = async () => (await import('./core/pages/CSBasePage')).CSBasePage;
 export const getCSGetElement = async () => (await import('./core/elements/decorators/CSGetElement')).CSGetElement;
@@ -506,14 +408,11 @@ export const getLogger = async () => (await import('./core/utils/Logger')).logge
 export const getAIElementIdentifier = async () => (await import('./core/ai/engine/AIElementIdentifier')).AIElementIdentifier;
 export const getSelfHealingEngine = async () => (await import('./core/ai/healing/SelfHealingEngine')).SelfHealingEngine;
 
-// Safe type-only exports
 export type { Feature, Scenario, StepResult, ExecutionResult, TestResult, FeatureResult, ScenarioResult } from './bdd/types/bdd.types';
 export type { BrowserConfig, ViewportSize } from './core/browser/types/browser.types';
 export type { ElementMetadata } from './core/elements/decorators/ElementMetadata';
 
-// Worker mode handling
 if (process.env['WORKER_ID']) {
-    // Running as a worker
     const workerId = process.env['WORKER_ID'];
     
     runTests(JSON.parse(process.env['WORKER_OPTIONS'] || '{}') as ExecutionOptions)
@@ -526,7 +425,6 @@ if (process.env['WORKER_ID']) {
             process.exit(1);
         });
 } else if (require.main === module) {
-    // Running as main process
     main().catch(error => {
         console.error('Unhandled error in main:', error);
         process.exit(1);

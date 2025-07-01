@@ -3,10 +3,6 @@ import { logger } from '../utils/Logger';
 import { ActionLogger } from '../logging/ActionLogger';
 import { PageState, PageMetrics, ContextData } from './types/page.types';
 
-/**
- * PageContext - Store page-specific context and metrics
- * Manages state, metrics, and data sharing within a page
- */
 export class PageContext {
     private data: Map<string, any> = new Map();
     private metrics!: PageMetrics;
@@ -23,9 +19,6 @@ export class PageContext {
         this.initializeMetrics();
     }
 
-    /**
-     * Set context data
-     */
     set(key: string, value: any): void {
         const previousValue = this.data.get(key);
         this.data.set(key, value);
@@ -39,9 +32,6 @@ export class PageContext {
         ActionLogger.logPageOperation('context_set', this.constructor.name, { key });
     }
 
-    /**
-     * Get context data
-     */
     get<T>(key: string, defaultValue?: T): T {
         const value = this.data.get(key);
         
@@ -53,9 +43,6 @@ export class PageContext {
         return value !== undefined ? value : defaultValue as T;
     }
 
-    /**
-     * Get required context data
-     */
     getRequired<T>(key: string): T {
         const value = this.data.get(key);
         
@@ -66,16 +53,10 @@ export class PageContext {
         return value;
     }
 
-    /**
-     * Check if context has key
-     */
     has(key: string): boolean {
         return this.data.has(key);
     }
 
-    /**
-     * Delete context data
-     */
     delete(key: string): boolean {
         const result = this.data.delete(key);
         
@@ -86,9 +67,6 @@ export class PageContext {
         return result;
     }
 
-    /**
-     * Clear all context data
-     */
     clear(): void {
         const size = this.data.size;
         this.data.clear();
@@ -98,29 +76,19 @@ export class PageContext {
         ActionLogger.logPageOperation('context_clear', this.constructor.name, { items: size });
     }
 
-    /**
-     * Get all context data
-     */
     getAll(): ContextData {
         return Object.fromEntries(this.data);
     }
 
-    /**
-     * Set multiple values
-     */
     setMultiple(data: ContextData): void {
         Object.entries(data).forEach(([key, value]) => {
             this.set(key, value);
         });
     }
 
-    /**
-     * Merge data into context
-     */
     merge(data: ContextData): void {
         Object.entries(data).forEach(([key, value]) => {
             if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-                // Deep merge for objects
                 const existing = this.get(key);
                 if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
                     this.set(key, { ...existing, ...value });
@@ -133,9 +101,6 @@ export class PageContext {
         });
     }
 
-    /**
-     * Record a metric
-     */
     recordMetric(name: string, value: number): void {
         if (!this.metrics.customMetrics[name]) {
             this.metrics.customMetrics[name] = [];
@@ -149,9 +114,6 @@ export class PageContext {
         this.recordHistory('metric', { name, value });
     }
 
-    /**
-     * Record an action
-     */
     recordAction(action: string, duration: number, details?: any): void {
         this.metrics.actions.push({
             action,
@@ -165,9 +127,6 @@ export class PageContext {
         ActionLogger.logInfo('context_action', { action, duration });
     }
 
-    /**
-     * Record an error
-     */
     recordError(error: string | Error, context?: any): void {
         const errorMessage = error instanceof Error ? error.message : error;
         const errorStack = error instanceof Error ? error.stack : undefined;
@@ -197,16 +156,10 @@ export class PageContext {
         logger.error('PageContext: Error recorded', error as Error);
     }
 
-    /**
-     * Increment screenshot counter
-     */
     incrementScreenshots(): void {
         this.metrics.screenshots++;
     }
 
-    /**
-     * Increment API call counter
-     */
     incrementAPICalls(details?: { url?: string; method?: string; status?: number }): void {
         this.metrics.apiCalls++;
         
@@ -222,9 +175,6 @@ export class PageContext {
         }
     }
 
-    /**
-     * Get metrics
-     */
     getMetrics(): PageMetrics {
         return {
             ...this.metrics,
@@ -235,16 +185,10 @@ export class PageContext {
         };
     }
 
-    /**
-     * Get action history
-     */
     getHistory(): Array<{ action: string; timestamp: Date; data?: any }> {
         return [...this.history];
     }
 
-    /**
-     * Save current state
-     */
     saveState(): PageState {
         return {
             url: this.pageUrl,
@@ -254,9 +198,6 @@ export class PageContext {
         };
     }
 
-    /**
-     * Restore state
-     */
     restoreState(state: PageState): void {
         this.data = new Map(state.data);
         this.metrics = { ...state.metrics };
@@ -270,9 +211,6 @@ export class PageContext {
         });
     }
 
-    /**
-     * Create a checkpoint
-     */
     createCheckpoint(name: string): void {
         const checkpoint = {
             name,
@@ -285,9 +223,6 @@ export class PageContext {
         this.recordHistory('checkpoint', { name });
     }
 
-    /**
-     * Restore from checkpoint
-     */
     restoreCheckpoint(name: string): void {
         const checkpoint = this.get(`__checkpoint_${name}`);
         
@@ -301,37 +236,26 @@ export class PageContext {
         this.recordHistory('restore_checkpoint', { name });
     }
 
-    /**
-     * Execute with temporary context
-     */
     async withTemporaryContext<T>(
         temporaryData: ContextData,
         action: () => Promise<T>
     ): Promise<T> {
-        // Save current state
         const savedState = this.saveState();
         
         try {
-            // Apply temporary data
             this.setMultiple(temporaryData);
             
-            // Execute action
             return await action();
         } finally {
-            // Restore original state
             this.restoreState(savedState);
         }
     }
 
-    /**
-     * Get context size (for monitoring)
-     */
     getSize(): { items: number; approximateBytes: number } {
         let approximateBytes = 0;
         
         this.data.forEach((value, key) => {
-            // Rough estimation
-            approximateBytes += key.length * 2; // Unicode
+            approximateBytes += key.length * 2;
             approximateBytes += JSON.stringify(value).length * 2;
         });
         
@@ -341,9 +265,6 @@ export class PageContext {
         };
     }
 
-    /**
-     * Export context for debugging
-     */
     export(): any {
         return {
             url: this.pageUrl,
@@ -355,7 +276,6 @@ export class PageContext {
         };
     }
 
-    // Private methods
 
     private initializeMetrics(): void {
         this.metrics = {
@@ -376,7 +296,6 @@ export class PageContext {
             data
         });
         
-        // Limit history size to prevent memory issues
         if (this.history.length > 1000) {
             this.history.shift();
         }

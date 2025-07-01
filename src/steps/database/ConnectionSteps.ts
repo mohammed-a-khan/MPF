@@ -35,12 +35,10 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
             const database = await CSDatabase.getInstance(config.database || 'default');
             await database.connect();
 
-            // Generate alias from connection string
             const alias = this.generateAliasFromConfig(config);
             this.databases.set(alias, database);
             this.currentDatabaseAlias = alias;
 
-            // Set active connection in context
             const connection = await database.getConnection();
             const adapter = database.getAdapter();
             this.databaseContext.setActiveConnection(alias, adapter, connection);
@@ -72,7 +70,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
             this.databases.set(alias, database);
             this.currentDatabaseAlias = alias;
 
-            // Set active connection in context
             const connection = await database.getConnection();
             const adapter = database.getAdapter();
             this.databaseContext.setActiveConnection(alias, adapter, connection);
@@ -99,7 +96,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         });
 
         try {
-            // Load configuration for the named database
             const config = await this.loadDatabaseConfig(databaseAlias);
             
             const database = await CSDatabase.getInstance(databaseAlias);
@@ -108,9 +104,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
             this.databases.set(databaseAlias, database);
             this.currentDatabaseAlias = databaseAlias;
 
-            // Set active connection in context
-            // CSDatabase acts as the adapter facade, so we pass it as the adapter
-            // Create a minimal connection object with just the type
             const connection = { type: database.getType(), alias: databaseAlias };
             this.databaseContext.setActiveConnection(databaseAlias, database as any, connection as any);
 
@@ -140,7 +133,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
 
             this.currentDatabaseAlias = databaseAlias;
             
-            // Switch active connection in context
             const connection = await database.getConnection();
             this.databaseContext.switchConnection(databaseAlias, connection);
 
@@ -213,7 +205,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
                 throw new Error('Database is not connected');
             }
 
-            // Run a simple test query
             const testQuery = this.getTestQuery(database.getType());
             const result = await database.query(testQuery);
 
@@ -252,11 +243,7 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    /**
-     * Parse connection string into DatabaseConfig
-     */
     private parseConnectionString(connectionString: string): DatabaseConfig {
-        // Handle different connection string formats
         if (connectionString.startsWith('mongodb://') || connectionString.startsWith('mongodb+srv://')) {
             return this.parseMongoConnectionString(connectionString);
         } else if (connectionString.includes('Server=') || connectionString.includes('Data Source=')) {
@@ -274,13 +261,9 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         throw new Error(`Unsupported connection string format: ${connectionString}`);
     }
 
-    /**
-     * Parse SQL Server connection string
-     */
     private parseSqlServerConnectionString(connectionString: string): DatabaseConfig {
         const params = new Map<string, string>();
         
-        // Parse key=value pairs
         connectionString.split(';').forEach(pair => {
             const [key, value] = pair.split('=').map(s => s.trim());
             if (key && value) {
@@ -304,9 +287,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         };
     }
 
-    /**
-     * Parse PostgreSQL connection string
-     */
     private parsePostgresConnectionString(connectionString: string): DatabaseConfig {
         const url = new URL(connectionString);
         const searchParams = new URLSearchParams(url.search);
@@ -324,9 +304,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         };
     }
 
-    /**
-     * Parse MySQL connection string
-     */
     private parseMySqlConnectionString(connectionString: string): DatabaseConfig {
         const url = new URL(connectionString);
         const searchParams = new URLSearchParams(url.search);
@@ -344,9 +321,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         };
     }
 
-    /**
-     * Parse MongoDB connection string
-     */
     private parseMongoConnectionString(connectionString: string): DatabaseConfig {
         const url = new URL(connectionString);
         const searchParams = new URLSearchParams(url.search);
@@ -364,9 +338,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         };
     }
 
-    /**
-     * Parse Oracle connection string
-     */
     private parseOracleConnectionString(connectionString: string): DatabaseConfig {
         const url = new URL(connectionString);
         const searchParams = new URLSearchParams(url.search);
@@ -384,9 +355,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         };
     }
 
-    /**
-     * Parse Redis connection string
-     */
     private parseRedisConnectionString(connectionString: string): DatabaseConfig {
         const url = new URL(connectionString);
         const searchParams = new URLSearchParams(url.search);
@@ -404,16 +372,11 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         };
     }
 
-    /**
-     * Build database config from data table
-     */
     private async buildDatabaseConfig(options: Record<string, any>): Promise<DatabaseConfig> {
-        // Required fields
         const type = this.validateDatabaseType(options['type'] || options['database_type']);
         const host = options['host'] || options['server'] || 'localhost';
         const database = options['database'] || options['database_name'] || 'test';
 
-        // Optional fields with defaults
         const config: DatabaseConfig = {
             type,
             host,
@@ -428,9 +391,7 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
             options: {}
         };
 
-        // Handle encrypted passwords
         if (config.password && config.password.startsWith('ENCRYPTED:')) {
-            // Use EncryptionConfigurationManager for consistent decryption
             try {
                 const testResult = await EncryptionConfigurationManager.testDecryption(config.password);
                 if (testResult.success && testResult.decrypted) {
@@ -440,13 +401,11 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
                 this.logger.error('Failed to decrypt database password', error instanceof Error ? error : new Error(String(error)));
             }
         } else if (config.password && config.password.startsWith('encrypted:')) {
-            // Handle legacy format
             config.password = config.password.substring(10);
         } else if (config.password && config.password.startsWith('enc:')) {
             config.password = config.password.substring(4);
         }
 
-        // Add any additional options
         Object.keys(options).forEach(key => {
             if (!['type', 'database_type', 'host', 'server', 'database', 'database_name', 
                  'port', 'username', 'user', 'password', 'ssl', 'use_ssl', 'timeout', 
@@ -458,9 +417,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         return config;
     }
 
-    /**
-     * Validate database type
-     */
     private validateDatabaseType(type: string): DatabaseType {
         const validTypes: DatabaseType[] = ['sqlserver', 'mysql', 'postgresql', 'oracle', 'mongodb', 'redis'];
         const normalizedType = type.toLowerCase().replace(/\s+/g, '') as DatabaseType;
@@ -472,9 +428,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         return normalizedType;
     }
 
-    /**
-     * Get default port for database type
-     */
     private getDefaultPort(type: DatabaseType): string {
         const defaultPorts: Record<DatabaseType, string> = {
             'sqlserver': '1433',
@@ -488,29 +441,18 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         return defaultPorts[type] || '0';
     }
 
-    /**
-     * Generate alias from database config
-     */
     private generateAliasFromConfig(config: DatabaseConfig): string {
         return `${config.type}_${config.host}_${config.database}`.replace(/[^a-zA-Z0-9_]/g, '_');
     }
 
-    /**
-     * Sanitize connection string for logging
-     */
     private sanitizeConnectionString(connectionString: string): string {
-        // Hide passwords in connection strings
         return connectionString
             .replace(/password=([^;]+)/gi, 'password=***')
             .replace(/pwd=([^;]+)/gi, 'pwd=***')
             .replace(/:\/\/([^:]+):([^@]+)@/, '://$1:***@');
     }
 
-    /**
-     * Load database configuration
-     */
     private async loadDatabaseConfig(alias: string): Promise<DatabaseConfig> {
-        // Try to load from configuration
         const configKey = `database.${alias}`;
         
         if (ConfigurationManager.has(configKey)) {
@@ -518,7 +460,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
             return await this.buildDatabaseConfig(config);
         }
 
-        // Try to load from environment-specific config
         const envConfigKey = `${ConfigurationManager.getEnvironmentName()}.database.${alias}`;
         if (ConfigurationManager.has(envConfigKey)) {
             const config = ConfigurationManager.get(envConfigKey) as unknown as Record<string, any>;
@@ -528,9 +469,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         throw new Error(`Database configuration not found for alias: ${alias}`);
     }
 
-    /**
-     * Get test query for database type
-     */
     private getTestQuery(type: DatabaseType): string {
         const testQueries: Record<DatabaseType, string> = {
             'sqlserver': 'SELECT 1 AS test',
@@ -544,9 +482,6 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         return testQueries[type] || 'SELECT 1';
     }
 
-    /**
-     * Parse data table
-     */
     private parseDataTable(dataTable: any): Record<string, any> {
         const result: Record<string, any> = {};
         
@@ -568,22 +503,16 @@ export class ConnectionSteps extends CSBDDBaseStepDefinition {
         return result;
     }
 
-    /**
-     * Interpolate variables in string
-     */
     private interpolateVariables(value: string): string {
-        // Replace ${VAR} with environment variables
         value = value.replace(/\${([^}]+)}/g, (match, varName) => {
             return process.env[varName] || match;
         });
 
-        // Replace {{VAR}} with stored variables
         value = value.replace(/{{([^}]+)}}/g, (match, varName) => {
             const retrieved = this.retrieve(varName);
             return retrieved !== undefined ? String(retrieved) : match;
         });
 
-        // Replace %VAR% with configuration values
         value = value.replace(/%([^%]+)%/g, (match, varName) => {
             return ConfigurationManager.get(varName, match) as string;
         });

@@ -30,7 +30,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
             const queryResult = await adapter.executeStoredProcedure(connection, interpolatedName);
             const executionTime = Date.now() - startTime;
 
-            // Convert QueryResult to StoredProcedureCall format
             const result: StoredProcedureCall = {
                 resultSets: [queryResult],
                 outputParameters: {},
@@ -67,7 +66,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
             const queryResult = await adapter.executeStoredProcedure(connection, interpolatedName, paramArray);
             const executionTime = Date.now() - startTime;
 
-            // Convert QueryResult to StoredProcedureCall format
             const result: StoredProcedureCall = {
                 resultSets: [queryResult],
                 outputParameters: this.extractOutputParameters(parameters, paramArray),
@@ -101,7 +99,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
             const connection = this.getActiveConnection();
             const result = await adapter.executeFunction(connection, interpolatedName);
             
-            // Store function return value
             this.store(alias, result);
             this.lastReturnValue = result;
 
@@ -248,7 +245,7 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
             throw new Error('No result sets available. Execute a stored procedure first');
         }
 
-        const index = resultSetIndex - 1; // Convert to 0-based
+        const index = resultSetIndex - 1;
         if (index < 0 || index >= resultSets.length) {
             throw new Error(
                 `Result set index ${resultSetIndex} out of bounds. ` +
@@ -303,12 +300,10 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
         try {
             const interpolatedName = this.interpolateVariables(procedureName);
             
-            // System procedures are just stored procedures
             const adapter = this.databaseContext.getActiveAdapter();
             const connection = this.getActiveConnection();
             const queryResult = await adapter.executeStoredProcedure(connection, interpolatedName);
             
-            // Convert QueryResult to StoredProcedureCall format
             const result: StoredProcedureCall = {
                 resultSets: [queryResult],
                 outputParameters: {},
@@ -334,8 +329,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
         await actionLogger.logDatabase('list_stored_procedures', '', 0);
 
         try {
-            // List stored procedures - this is database-specific
-            // For now, return empty array as procedure listing requires specific implementation
             const procedures: StoredProcedureMetadata[] = [];
 
             console.log('\n=== Available Stored Procedures ===');
@@ -347,7 +340,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
             });
             console.log(`Total: ${procedures.length} procedure(s)\n`);
 
-            // Store for validation
             this.store('availableProcedures', procedures);
 
             await actionLogger.logDatabase('stored_procedures_listed', '', 0, undefined, {
@@ -360,7 +352,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    // Helper methods
     private getActiveConnection(): any {
         const connectionField = 'activeConnection';
         const connection = (this.databaseContext as any)[connectionField];
@@ -374,7 +365,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
         const parameters: ProcedureParameter[] = [];
 
         if (dataTable && dataTable.rawTable) {
-            // Expected format: | name | value | type | direction |
             const headers = dataTable.rawTable[0].map((h: string) => h.toLowerCase().trim());
             
             for (let i = 1; i < dataTable.rawTable.length; i++) {
@@ -408,7 +398,6 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
                     }
                 });
 
-                // Validate parameter
                 if (!param.name) {
                     throw new Error(`Parameter name is required at row ${i}`);
                 }
@@ -436,26 +425,22 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
     }
 
     private handleProcedureResult(result: StoredProcedureCall, procedureName: string, executionTime: number): void {
-        // Store result sets
         if (result.resultSets && result.resultSets.length > 0) {
             this.lastResultSets = result.resultSets;
             const firstResultSet = result.resultSets[0];
             if (firstResultSet) {
-                this.databaseContext.storeResult('last', firstResultSet); // Default to first result set
+                this.databaseContext.storeResult('last', firstResultSet);
             }
         }
 
-        // Store output parameters
         if (result.outputParameters) {
             this.lastOutputParameters = result.outputParameters;
         }
 
-        // Store return value
         if (result.returnValue !== undefined) {
             this.lastReturnValue = result.returnValue;
         }
 
-        // Store procedure execution for history
         this.store('lastProcedureExecution', {
             procedureName,
             executionTime,
@@ -466,24 +451,18 @@ export class StoredProcedureSteps extends CSBDDBaseStepDefinition {
     }
 
     private convertParameterValue(value: string): any {
-        // Handle null
         if (value.toLowerCase() === 'null') return null;
         
-        // Handle boolean
         if (value.toLowerCase() === 'true') return true;
         if (value.toLowerCase() === 'false') return false;
         
-        // Handle numbers
         if (/^-?\d+$/.test(value)) return parseInt(value);
         if (/^-?\d+\.\d+$/.test(value)) return parseFloat(value);
         
-        // Handle dates
         if (/^\d{4}-\d{2}-\d{2}/.test(value)) return new Date(value);
         
-        // Handle empty string
         if (value === "''") return '';
         
-        // Default to string
         return value;
     }
 

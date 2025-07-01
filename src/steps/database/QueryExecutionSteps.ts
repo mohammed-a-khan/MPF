@@ -86,7 +86,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
         await actionLogger.logDatabase('execute_predefined_query', '', 0, undefined, { queryName });
 
         try {
-            // Load predefined query from configuration
             const query = ConfigurationManager.get(`DB_QUERY_${queryName.toUpperCase()}`);
             if (!query) {
                 throw new Error(`Predefined query '${queryName}' not found in configuration`);
@@ -157,7 +156,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
             throw new Error(`Batch execution failed:\n${errors.join('\n')}`);
         }
 
-        // Store aggregated results
         const aggregatedResult: QueryResult = {
             rows: results.flatMap(r => r.rows),
             fields: results[0]?.fields || [],
@@ -190,7 +188,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
             const interpolatedQuery = this.interpolateVariables(query);
 
             const startTime = Date.now();
-            // Set timeout on the context
             const originalTimeout = this.databaseContext['queryTimeout'];
             this.databaseContext['queryTimeout'] = timeout * 1000;
             const result = await this.databaseContext.executeQuery(interpolatedQuery);
@@ -259,7 +256,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
             const result = await this.databaseContext.executeQuery(interpolatedQuery);
             const scalarValue = result.rows[0] ? Object.values(result.rows[0])[0] : null;
 
-            // Store scalar result
             this.store('lastScalarResult', scalarValue);
 
             await actionLogger.logDatabase('scalar_query_executed', interpolatedQuery, 0, 1, {
@@ -284,7 +280,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
         try {
             const interpolatedQuery = this.interpolateVariables(query);
 
-            // Ensure it's a count query
             if (!interpolatedQuery.toLowerCase().includes('count')) {
                 throw new Error('Query must contain COUNT function');
             }
@@ -324,7 +319,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
                 throw new Error('Query returned no rows');
             }
 
-            // Store only first row
             const firstRowResult: QueryResult = {
                 rows: [result.rows[0]],
                 fields: result.fields,
@@ -360,7 +354,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
         try {
             const interpolatedQuery = this.interpolateVariables(query);
             
-            // Add LIMIT clause if not present (database-specific)
             const limitedQuery = this.addLimitToQuery(interpolatedQuery, limit);
             
             const result = await this.databaseContext.executeQuery(limitedQuery);
@@ -390,7 +383,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
         try {
             const interpolatedQuery = this.interpolateVariables(query);
 
-            // Use executeWithPlan to get execution plan
             const result = await this.databaseContext.executeWithPlan(interpolatedQuery);
             const executionPlan = this.databaseContext.getLastExecutionPlan() || 'No execution plan available';
 
@@ -417,10 +409,8 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
         await actionLogger.logDatabase('cancel_query', '', 0, undefined, {});
 
         try {
-            // Get the active adapter to cancel query
             const adapter = this.databaseContext.getActiveAdapter();
             
-            // Access the private activeConnection field
             const connectionField = 'activeConnection';
             const connection = (this.databaseContext as any)[connectionField];
             
@@ -442,10 +432,8 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    // Helper methods
 
     private resolveFilePath(filePath: string): string {
-        // Try multiple paths
         const paths = [
             filePath,
             `./test-data/queries/${filePath}`,
@@ -471,7 +459,6 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
                     const paramName = row[0]?.trim() || '';
                     const paramValue = this.interpolateVariables(row[1]?.trim() || '');
                     
-                    // Convert to appropriate type
                     parameters[paramName] = this.convertParameterValue(paramValue);
                 }
             });
@@ -481,26 +468,20 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
     }
 
     private convertParameterValue(value: string): any {
-        // Handle null
         if (value.toLowerCase() === 'null') return null;
         
-        // Handle boolean
         if (value.toLowerCase() === 'true') return true;
         if (value.toLowerCase() === 'false') return false;
         
-        // Handle numbers
         if (/^\d+$/.test(value)) return parseInt(value);
         if (/^\d+\.\d+$/.test(value)) return parseFloat(value);
         
-        // Handle dates (ISO format)
         if (/^\d{4}-\d{2}-\d{2}/.test(value)) return new Date(value);
         
-        // Default to string
         return value;
     }
 
     private parseBatchQueries(docString: string): string[] {
-        // Split by semicolon and filter empty queries
         return docString
             .split(';')
             .map(q => q.trim())
@@ -510,12 +491,10 @@ export class QueryExecutionSteps extends CSBDDBaseStepDefinition {
     private addLimitToQuery(query: string, limit: number): string {
         const lowerQuery = query.toLowerCase();
         
-        // Check if LIMIT/TOP already exists
         if (lowerQuery.includes(' limit ') || lowerQuery.includes(' top ')) {
             return query;
         }
 
-        // Default to MySQL syntax - would need to check adapter type for specific syntax
         return `${query} LIMIT ${limit}`;
     }
 

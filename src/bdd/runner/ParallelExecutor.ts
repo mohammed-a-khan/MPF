@@ -21,10 +21,6 @@ import { ConfigurationManager } from '../../core/configuration/ConfigurationMana
 import { BrowserPool } from '../../core/browser/BrowserPool';
 import { EventEmitter } from 'events';
 
-/**
- * Manages parallel test execution across multiple worker threads
- * Distributes tests, manages workers, and aggregates results
- */
 export class ParallelExecutor extends EventEmitter {
   private static instance: ParallelExecutor;
   private workers: Map<number, WorkerInfo>;
@@ -62,9 +58,6 @@ export class ParallelExecutor extends EventEmitter {
     return ParallelExecutor.instance;
   }
 
-  /**
-   * Execute test plan in parallel
-   */
   async execute(plan: ExecutionPlan): Promise<ExecutionResult> {
     ActionLogger.logInfo('ParallelExecutor', 
       `Starting parallel execution with ${this.maxWorkers} workers`);
@@ -73,28 +66,22 @@ export class ParallelExecutor extends EventEmitter {
     this.aborted = false;
 
     try {
-      // Initialize browser pool if UI tests
       if (this.requiresBrowserPool(plan)) {
         await this.initializeBrowserPool();
       }
 
-      // Create work items from execution plan
       this.createWorkItems(plan);
       this.totalItems = this.workQueue.length;
 
       ActionLogger.logInfo('ParallelExecutor', 
         `Created ${this.totalItems} work items for execution`);
 
-      // Create worker pool
       await this.createWorkerPool();
 
-      // Start processing work items
       await this.processWorkQueue();
 
-      // Wait for all workers to complete
       await this.waitForCompletion();
 
-      // Aggregate and return results
       return this.aggregateResults();
 
     } catch (error) {
@@ -105,23 +92,16 @@ export class ParallelExecutor extends EventEmitter {
     }
   }
 
-  /**
-   * Calculate maximum number of workers
-   */
   private calculateMaxWorkers(): number {
     const configured = ConfigurationManager.getInt('MAX_PARALLEL_WORKERS', 0);
     if (configured > 0) {
       return configured;
     }
 
-    // Default to CPU count - 1 (leave one for main thread)
     const cpuCount = os.cpus().length;
     return Math.max(1, cpuCount - 1);
   }
 
-  /**
-   * Initialize execution statistics
-   */
   private initializeStats(): ExecutionStats {
     return {
       totalWorkers: 0,
@@ -136,29 +116,18 @@ export class ParallelExecutor extends EventEmitter {
     };
   }
 
-  /**
-   * Check if browser pool is required
-   */
   private requiresBrowserPool(plan: ExecutionPlan): boolean {
     return plan.scenarios.some((scenario: Scenario) => 
       !scenario.tags?.includes('@api') && !scenario.tags?.includes('@database')
     );
   }
 
-  /**
-   * DISABLED: Browser pool initialization to prevent multiple browser instances
-   */
   private async initializeBrowserPool(): Promise<void> {
     ActionLogger.logInfo('ParallelExecutor', 'Browser pool disabled - using single browser only');
     // CRITICAL FIX: Browser pool completely disabled to prevent multiple browser instances
-    // For parallel execution, we'll use single browser with multiple contexts instead
   }
 
-  /**
-   * Create work items from execution plan
-   */
   private createWorkItems(plan: ExecutionPlan): void {
-    // Group scenarios by feature for better resource utilization
     const featureGroups = new Map<string, Scenario[]>();
 
     for (const scenario of plan.scenarios) {
@@ -168,10 +137,8 @@ export class ParallelExecutor extends EventEmitter {
       featureGroups.set(featureId, scenarios);
     }
 
-    // Create work items
     let itemId = 0;
     for (const [featureFile, scenarios] of featureGroups) {
-      // Option 1: One work item per scenario (fine-grained)
               if (ConfigurationManager.getBoolean('PARALLEL_SCENARIO_EXECUTION', false)) {
         for (const scenario of scenarios) {
           this.workQueue.push({
@@ -184,7 +151,6 @@ export class ParallelExecutor extends EventEmitter {
           });
         }
       } else {
-        // Option 2: One work item per feature (coarse-grained)
         this.workQueue.push({
           id: `work-item-${itemId++}`,
           type: 'feature',
@@ -196,74 +162,50 @@ export class ParallelExecutor extends EventEmitter {
       }
     }
 
-    // Sort work queue by priority (highest first)
     this.workQueue.sort((a, b) => b.priority - a.priority);
   }
 
-  /**
-   * Calculate scenario priority
-   */
   private calculatePriority(scenario: Scenario): number {
-    let priority = 50; // Base priority
+    let priority = 50;
 
     // Critical scenarios get highest priority
     if (scenario.tags?.includes('@critical')) priority += 40;
     if (scenario.tags?.includes('@smoke')) priority += 30;
     if (scenario.tags?.includes('@regression')) priority += 20;
     
-    // Fast scenarios get higher priority (quick wins)
     if (scenario.tags?.includes('@fast')) priority += 10;
     
-    // Flaky tests get lower priority
     if (scenario.tags?.includes('@flaky')) priority -= 20;
 
     return priority;
   }
 
-  /**
-   * Calculate feature priority
-   */
   private calculateFeaturePriority(scenarios: Scenario[]): number {
     const priorities = scenarios.map(s => this.calculatePriority(s));
     return Math.max(...priorities);
   }
 
-  /**
-   * Estimate scenario duration
-   */
   private estimateDuration(scenario: Scenario): number {
-    // Use historical data if available
     const historicalDuration = this.getHistoricalDuration(scenario);
     if (historicalDuration > 0) {
       return historicalDuration;
     }
 
-    // Otherwise estimate based on steps
-    const baseTime = 1000; // 1 second base
-    const perStepTime = 500; // 500ms per step
+    const baseTime = 1000;
+    const perStepTime = 500;
     return baseTime + (scenario.steps.length * perStepTime);
   }
 
-  /**
-   * Estimate feature duration
-   */
   private estimateFeatureDuration(scenarios: Scenario[]): number {
     return scenarios.reduce((total, scenario) => 
       total + this.estimateDuration(scenario), 0
     );
   }
 
-  /**
-   * Get historical duration for scenario
-   */
   private getHistoricalDuration(_scenario: Scenario): number {
-    // In a real implementation, this would query historical test data
     return 0;
   }
 
-  /**
-   * Create worker pool
-   */
   private async createWorkerPool(): Promise<void> {
     ActionLogger.logInfo('ParallelExecutor', `Creating ${this.maxWorkers} workers`);
 
@@ -277,9 +219,6 @@ export class ParallelExecutor extends EventEmitter {
     this.executionStats.totalWorkers = this.workers.size;
   }
 
-  /**
-   * Create a single worker
-   */
   private async createWorker(): Promise<void> {
     const workerId = this.workerIdCounter++;
     const workerPath = path.join(__dirname, 'TestWorker.js');
@@ -308,9 +247,6 @@ export class ParallelExecutor extends EventEmitter {
     ActionLogger.logDebug('ParallelExecutor', `Worker ${workerId} created`);
   }
 
-  /**
-   * Setup worker event handlers
-   */
   private setupWorkerEventHandlers(workerInfo: WorkerInfo): void {
     const { worker, id } = workerInfo;
 
@@ -330,9 +266,6 @@ export class ParallelExecutor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle worker message
-   */
   private handleWorkerMessage(workerInfo: WorkerInfo, message: WorkerMessage): void {
     switch (message.type) {
       case 'ready':
@@ -360,17 +293,11 @@ export class ParallelExecutor extends EventEmitter {
     }
   }
 
-  /**
-   * Handle worker ready
-   */
   private handleWorkerReady(workerInfo: WorkerInfo): void {
     workerInfo.status = 'idle';
     this.assignWork(workerInfo);
   }
 
-  /**
-   * Handle worker progress
-   */
   private handleWorkerProgress(workerInfo: WorkerInfo, message: WorkerMessage): void {
     this.emit('progress', {
       workerId: workerInfo.id,
@@ -379,19 +306,14 @@ export class ParallelExecutor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle worker result
-   */
   private handleWorkerResult(workerInfo: WorkerInfo, message: WorkerMessage): void {
     const result = message.data as WorkerResult;
     
-    // Store result
     if (workerInfo.currentWork) {
       this.results.set(workerInfo.currentWork.id, result);
       this.completedItems++;
       workerInfo.itemsProcessed++;
       
-      // Update statistics
       if (result.status === 'failed') {
         this.executionStats.workItemsFailed++;
       }
@@ -400,7 +322,6 @@ export class ParallelExecutor extends EventEmitter {
       ActionLogger.logInfo('ParallelExecutor', 
         `Work item ${workerInfo.currentWork.id} completed by worker ${workerInfo.id}`);
       
-      // Emit progress event
       this.emit('itemComplete', {
         workItem: workerInfo.currentWork,
         result,
@@ -412,30 +333,22 @@ export class ParallelExecutor extends EventEmitter {
       });
     }
 
-    // Mark worker as idle and assign new work
     workerInfo.status = 'idle';
     workerInfo.currentWork = null;
     this.assignWork(workerInfo);
   }
 
-  /**
-   * Handle worker error message
-   */
   private handleWorkerErrorMessage(workerInfo: WorkerInfo, message: WorkerMessage): void {
     ActionLogger.logError(`ParallelExecutor: Worker ${workerInfo.id} reported error`, message.data as Error);
     
     workerInfo.errors++;
     
-    // If too many errors, terminate worker
     if (workerInfo.errors > 3) {
       this.terminateWorker(workerInfo);
-      this.createWorker(); // Replace with new worker
+      this.createWorker();
     }
   }
 
-  /**
-   * Handle worker log
-   */
   private handleWorkerLog(message: WorkerMessage): void {
     const { level, message: logMessage, data } = message.data;
     const workerMessage = `Worker: ${logMessage}`;
@@ -458,54 +371,37 @@ export class ParallelExecutor extends EventEmitter {
     }
   }
 
-  /**
-   * Handle worker error
-   */
   private handleWorkerError(workerInfo: WorkerInfo, _error: Error): void {
     workerInfo.status = 'error';
     this.executionStats.failedWorkers++;
     
-    // Reassign current work
     if (workerInfo.currentWork) {
       this.workQueue.unshift(workerInfo.currentWork);
     }
     
-    // Replace worker
     this.workers.delete(workerInfo.id);
     this.createWorker();
   }
 
-  /**
-   * Handle worker exit
-   */
   private handleWorkerExit(workerInfo: WorkerInfo, code: number): void {
     this.workers.delete(workerInfo.id);
     this.executionStats.completedWorkers++;
     
     if (code !== 0 && workerInfo.currentWork) {
-      // Worker crashed, reassign work
       this.workQueue.unshift(workerInfo.currentWork);
     }
     
-    // Create replacement worker if needed
     if (this.workQueue.length > 0 && !this.aborted) {
       this.createWorker();
     }
   }
 
-  /**
-   * Process work queue
-   */
   private async processWorkQueue(): Promise<void> {
-    // Initial work assignment
     for (const workerInfo of this.workers.values()) {
       this.assignWork(workerInfo);
     }
   }
 
-  /**
-   * Assign work to worker
-   */
   private assignWork(workerInfo: WorkerInfo): void {
     if (this.aborted || workerInfo.status !== 'idle' || this.workQueue.length === 0) {
       return;
@@ -519,19 +415,14 @@ export class ParallelExecutor extends EventEmitter {
     ActionLogger.logDebug('ParallelExecutor', 
       `Assigning work item ${workItem.id} to worker ${workerInfo.id}`);
 
-    // Send work to worker
     workerInfo.worker.postMessage({
       type: 'execute',
       workItem
     });
 
-    // Update statistics
     this.updateWorkerStats();
   }
 
-  /**
-   * Wait for all workers to complete
-   */
   private async waitForCompletion(): Promise<void> {
     return new Promise((resolve) => {
       const checkInterval = setInterval(() => {
@@ -543,9 +434,6 @@ export class ParallelExecutor extends EventEmitter {
     });
   }
 
-  /**
-   * Update worker statistics
-   */
   private updateWorkerStats(): void {
     let active = 0;
     let idle = 0;
@@ -557,7 +445,6 @@ export class ParallelExecutor extends EventEmitter {
         idle++;
       }
 
-      // Calculate utilization
       const utilization = (workerInfo.itemsProcessed / this.totalItems) * 100;
       this.executionStats.workerUtilization.set(workerInfo.id, utilization);
     }
@@ -566,9 +453,6 @@ export class ParallelExecutor extends EventEmitter {
     this.executionStats.idleWorkers = idle;
   }
 
-  /**
-   * Terminate worker
-   */
   private async terminateWorker(workerInfo: WorkerInfo): Promise<void> {
     try {
       await workerInfo.worker.terminate();
@@ -579,14 +463,10 @@ export class ParallelExecutor extends EventEmitter {
     this.workers.delete(workerInfo.id);
   }
 
-  /**
-   * Aggregate results
-   */
   private aggregateResults(): ExecutionResult {
     const features = new Map<string, FeatureResult>();
     const duration = Date.now() - this.startTime;
 
-    // Group results by feature
     for (const [, result] of this.results) {
       if (result.type === 'scenario') {
         const featureFile = result.featureFile || 'unknown';
@@ -609,7 +489,6 @@ export class ParallelExecutor extends EventEmitter {
       }
     }
 
-    // Calculate summary
     const allScenarios = Array.from(this.results.values())
       .map(r => r.scenarioResult)
       .filter(Boolean) as ScenarioResult[];
@@ -656,25 +535,19 @@ export class ParallelExecutor extends EventEmitter {
     };
   }
 
-  /**
-   * Cleanup resources
-   */
   private async cleanup(): Promise<void> {
     ActionLogger.logDebug('ParallelExecutor', 'Cleaning up parallel executor');
 
-    // Terminate all workers
     const terminatePromises: Promise<void>[] = [];
     for (const workerInfo of this.workers.values()) {
       terminatePromises.push(this.terminateWorker(workerInfo));
     }
     await Promise.all(terminatePromises);
 
-    // Cleanup browser pool
     if (this.browserPool) {
       await this.browserPool.drainPool();
     }
 
-    // Clear state
     this.workers.clear();
     this.workQueue = [];
     this.results.clear();
@@ -682,18 +555,12 @@ export class ParallelExecutor extends EventEmitter {
     this.completedItems = 0;
   }
 
-  /**
-   * Abort execution
-   */
   async abort(): Promise<void> {
     ActionLogger.logWarn('ParallelExecutor: Aborting parallel execution');
     this.aborted = true;
     await this.cleanup();
   }
 
-  /**
-   * Get execution progress
-   */
   getProgress(): ExecutionProgress {
     return {
       totalItems: this.totalItems,
@@ -705,12 +572,9 @@ export class ParallelExecutor extends EventEmitter {
     };
   }
 
-  /**
-   * Estimate time remaining
-   */
   private estimateTimeRemaining(): number {
     if (this.completedItems === 0) {
-      return -1; // Unknown
+      return -1;
     }
 
     const avgTimePerItem = (Date.now() - this.startTime) / this.completedItems;
@@ -718,9 +582,6 @@ export class ParallelExecutor extends EventEmitter {
     return Math.round(avgTimePerItem * remainingItems);
   }
 
-  /**
-   * Export execution state
-   */
   exportState(): any {
     return {
       workers: this.workers.size,
@@ -736,7 +597,6 @@ export class ParallelExecutor extends EventEmitter {
   }
 }
 
-// Interfaces
 interface WorkerInfo {
   id: number;
   worker: Worker;

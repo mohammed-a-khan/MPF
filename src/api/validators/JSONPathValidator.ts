@@ -1,10 +1,6 @@
 import { ValidationResult, JSONPathResult, JSONPathOptions } from '../types/api.types';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * JSONPath validator with full JSONPath syntax support
- * Implements JSONPath specification for querying and validating JSON data
- */
 export class JSONPathValidator {
     private static instance: JSONPathValidator;
 
@@ -17,9 +13,6 @@ export class JSONPathValidator {
         return JSONPathValidator.instance;
     }
 
-    /**
-     * Validate JSONPath expression result
-     */
     public async validatePath(
         data: any,
         path: string,
@@ -34,10 +27,8 @@ export class JSONPathValidator {
                 expectedType: typeof expected
             });
 
-            // Extract value using JSONPath
             const result = this.query(data, path, options);
 
-            // Handle different result scenarios
             let actual: any;
             let valid = false;
             let message = '';
@@ -92,9 +83,6 @@ export class JSONPathValidator {
         }
     }
 
-    /**
-     * Extract value(s) using JSONPath
-     */
     public extractValue(data: any, path: string, options: JSONPathOptions = {}): any {
         const result = this.query(data, path, options);
         
@@ -107,18 +95,13 @@ export class JSONPathValidator {
         }
     }
 
-    /**
-     * Query JSON data using JSONPath expression
-     */
     public query(data: any, path: string, options: JSONPathOptions = {}): JSONPathResult {
         ActionLogger.logDebug(`Executing JSONPath query: ${path}`);
 
-        // Validate path syntax
         if (!this.isValidPath(path)) {
             throw new Error(`Invalid JSONPath expression: ${path}`);
         }
 
-        // Parse and execute JSONPath
         const tokens = this.tokenizePath(path);
         const context = {
             root: data,
@@ -134,9 +117,6 @@ export class JSONPathValidator {
         };
     }
 
-    /**
-     * Tokenize JSONPath expression
-     */
     private tokenizePath(path: string): PathToken[] {
         const tokens: PathToken[] = [];
         let current = 0;
@@ -155,7 +135,7 @@ export class JSONPathValidator {
                     tokens.push({ type: 'recursive', value: '..' });
                     current += 2;
                 } else {
-                    current++; // Skip single dot
+                    current++;
                 }
             } else if (char === '[') {
                 const endIndex = this.findMatchingBracket(path, current);
@@ -166,7 +146,6 @@ export class JSONPathValidator {
                 tokens.push({ type: 'wildcard', value: '*' });
                 current++;
             } else {
-                // Property name
                 const match = path.substring(current).match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)/);
                 const matchedProperty = match?.[1];
                 if (match && matchedProperty) {
@@ -181,9 +160,6 @@ export class JSONPathValidator {
         return tokens;
     }
 
-    /**
-     * Find matching closing bracket
-     */
     private findMatchingBracket(path: string, start: number): number {
         let depth = 1;
         let inString = false;
@@ -213,18 +189,13 @@ export class JSONPathValidator {
         throw new Error('Unmatched bracket in JSONPath');
     }
 
-    /**
-     * Parse bracket content
-     */
     private parseBracketContent(content: string): PathToken {
         content = content.trim();
 
-        // Array index
         if (/^-?\d+$/.test(content)) {
             return { type: 'index', value: parseInt(content) };
         }
 
-        // Array slice
         if (content.includes(':')) {
             const parts = content.split(':').map(p => p.trim());
             return {
@@ -237,7 +208,6 @@ export class JSONPathValidator {
             };
         }
 
-        // Multiple indices
         if (content.includes(',')) {
             const indices = content.split(',').map(i => {
                 const trimmed = i.trim();
@@ -249,7 +219,6 @@ export class JSONPathValidator {
             return { type: 'union', value: indices };
         }
 
-        // Filter expression
         if (content.startsWith('?(') && content.endsWith(')')) {
             return {
                 type: 'filter',
@@ -257,7 +226,6 @@ export class JSONPathValidator {
             };
         }
 
-        // Script expression
         if (content.startsWith('(') && content.endsWith(')')) {
             return {
                 type: 'script',
@@ -265,13 +233,9 @@ export class JSONPathValidator {
             };
         }
 
-        // Property name
         return { type: 'property', value: this.parsePropertyName(content) };
     }
 
-    /**
-     * Parse property name (handle quotes)
-     */
     private parsePropertyName(name: string): string {
         if ((name.startsWith('"') && name.endsWith('"')) ||
             (name.startsWith("'") && name.endsWith("'"))) {
@@ -280,11 +244,7 @@ export class JSONPathValidator {
         return name;
     }
 
-    /**
-     * Parse filter expression
-     */
     private parseFilterExpression(expr: string): FilterExpression {
-        // Simple implementation - in production would use proper expression parser
         const match = expr.match(/^@\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(==|!=|<|>|<=|>=)\s*(.+)$/);
         
         if (match) {
@@ -303,7 +263,6 @@ export class JSONPathValidator {
             };
         }
 
-        // Handle existence check
         if (expr.match(/^@\.([a-zA-Z_$][a-zA-Z0-9_$]*)$/)) {
             return {
                 property: expr.substring(2),
@@ -315,37 +274,26 @@ export class JSONPathValidator {
         throw new Error(`Unsupported filter expression: ${expr}`);
     }
 
-    /**
-     * Parse filter value
-     */
     private parseFilterValue(value: string): any {
         value = value.trim();
 
-        // String
         if ((value.startsWith('"') && value.endsWith('"')) ||
             (value.startsWith("'") && value.endsWith("'"))) {
             return value.substring(1, value.length - 1);
         }
 
-        // Number
         if (/^-?\d+(\.\d+)?$/.test(value)) {
             return parseFloat(value);
         }
 
-        // Boolean
         if (value === 'true') return true;
         if (value === 'false') return false;
 
-        // Null
         if (value === 'null') return null;
 
-        // Assume property reference
         return { type: 'reference', path: value };
     }
 
-    /**
-     * Execute JSONPath tokens
-     */
     private executePath(tokens: PathToken[], context: QueryContext): QueryResult[] {
         let results: QueryResult[] = [{ value: context.root, path: '$' }];
 
@@ -356,9 +304,6 @@ export class JSONPathValidator {
         return results;
     }
 
-    /**
-     * Execute single token
-     */
     private executeToken(
         token: PathToken,
         inputs: QueryResult[],
@@ -448,7 +393,6 @@ export class JSONPathValidator {
                 case 'union':
                     for (const selector of token.value) {
                         if (typeof selector === 'number') {
-                            // Array index
                             if (Array.isArray(input.value) && selector < input.value.length) {
                                 results.push({
                                     value: input.value[selector],
@@ -456,7 +400,6 @@ export class JSONPathValidator {
                                 });
                             }
                         } else {
-                            // Property name
                             if (input.value && typeof input.value === 'object') {
                                 const propValue = input.value[selector];
                                 if (propValue !== undefined) {
@@ -484,7 +427,6 @@ export class JSONPathValidator {
                     break;
 
                 case 'script':
-                    // Script expressions not supported for security
                     throw new Error('Script expressions are not supported');
             }
         }
@@ -492,9 +434,6 @@ export class JSONPathValidator {
         return results;
     }
 
-    /**
-     * Recursive search
-     */
     private recursiveSearch(value: any, basePath: string): QueryResult[] {
         const results: QueryResult[] = [];
 
@@ -529,9 +468,6 @@ export class JSONPathValidator {
         return results;
     }
 
-    /**
-     * Evaluate filter expression
-     */
     private evaluateFilter(
         value: any,
         filter: FilterExpression,
@@ -566,21 +502,15 @@ export class JSONPathValidator {
         }
     }
 
-    /**
-     * Validate JSONPath syntax
-     */
     private isValidPath(path: string): boolean {
-        // Basic validation
         if (!path || typeof path !== 'string') {
             return false;
         }
 
-        // Must start with $ or @
         if (!path.startsWith('$') && !path.startsWith('@')) {
             return false;
         }
 
-        // Check for balanced brackets
         let bracketCount = 0;
         let inString = false;
         let stringChar = '';
@@ -602,9 +532,6 @@ export class JSONPathValidator {
         return bracketCount === 0 && !inString;
     }
 
-    /**
-     * Compare values for validation
-     */
     private compareValues(actual: any, expected: any, options: JSONPathOptions): boolean {
         if (options.compareFunction) {
             return options.compareFunction(actual, expected);
@@ -629,9 +556,6 @@ export class JSONPathValidator {
         return actual === expected;
     }
 
-    /**
-     * Compare arrays for validation
-     */
     private compareArrays(actual: any[], expected: any, options: JSONPathOptions): boolean {
         if (!Array.isArray(expected)) {
             return false;
@@ -652,7 +576,6 @@ export class JSONPathValidator {
             );
         }
 
-        // Default: check if arrays have same elements (any order)
         if (actual.length !== expected.length) {
             return false;
         }
@@ -671,9 +594,6 @@ export class JSONPathValidator {
         return true;
     }
 
-    /**
-     * Deep equality check
-     */
     private deepEqual(a: any, b: any): boolean {
         if (a === b) return true;
         if (a === null || b === null) return false;
@@ -700,32 +620,22 @@ export class JSONPathValidator {
         return false;
     }
 
-    /**
-     * Get all values matching a path
-     */
     public queryAll(data: any, path: string, options: JSONPathOptions = {}): any[] {
         const result = this.query(data, path, options);
         return result.values;
     }
 
-    /**
-     * Check if path exists
-     */
     public pathExists(data: any, path: string): boolean {
         const result = this.query(data, path, {});
         return result.values.length > 0;
     }
 
-    /**
-     * Count matches
-     */
     public countMatches(data: any, path: string): number {
         const result = this.query(data, path, {});
         return result.values.length;
     }
 }
 
-// Type definitions for internal use
 interface PathToken {
     type: 'root' | 'current' | 'property' | 'wildcard' | 'recursive' | 
           'index' | 'slice' | 'union' | 'filter' | 'script';

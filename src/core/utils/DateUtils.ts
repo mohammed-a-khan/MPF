@@ -1,9 +1,3 @@
-/**
- * CS Test Automation Framework - Date Utilities
- * 
- * Comprehensive date/time manipulation utilities with timezone support,
- * formatting, parsing, and calculations
- */
 
 export interface DateFormatOptions {
   [key: string]: any;
@@ -46,7 +40,6 @@ export class DateUtils {
   private static readonly MILLISECONDS_PER_HOUR = 60 * 60 * 1000;
   private static readonly MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
-  // Current date/time
   public static now(): Date {
     return new Date();
   }
@@ -69,7 +62,6 @@ export class DateUtils {
     return date;
   }
 
-  // Date creation
   public static create(
     year: number,
     month: number,
@@ -128,7 +120,6 @@ export class DateUtils {
     let pattern = format;
     let remaining = dateString;
 
-    // Sort tokens by length (descending) to match longer tokens first
     const sortedTokens = Object.keys(tokens).sort((a, b) => b.length - a.length);
 
     for (const token of sortedTokens) {
@@ -194,7 +185,6 @@ export class DateUtils {
       pattern = suffix;
     }
 
-    // Handle 12-hour format
     if (is12Hour) {
       if (isPM && hour !== 12) {
         hour += 12;
@@ -206,11 +196,9 @@ export class DateUtils {
     return this.create(year, month, day, hour, minute, second, millisecond);
   }
 
-  // Date formatting
   public static format(date: Date, format: string, options: DateFormatOptions = {}): string {
     const { locale, timezone } = options;
 
-    // Handle timezone conversion
     let adjustedDate = date;
     if (timezone) {
       const formatter = new Intl.DateTimeFormat('en-US', {
@@ -279,7 +267,6 @@ export class DateUtils {
       'ZZ': this.getTimezoneOffsetString(adjustedDate).replace(':', '')
     };
 
-    // Sort by length to replace longer patterns first
     const sortedKeys = Object.keys(replacements).sort((a, b) => b.length - a.length);
     
     let result = format;
@@ -317,7 +304,6 @@ export class DateUtils {
     return new Date(timestamp * 1000);
   }
 
-  // Date manipulation
   public static add(date: Date, amount: number, unit: 'year' | 'month' | 'day' | 'hour' | 'minute' | 'second' | 'millisecond'): Date {
     const result = new Date(date);
 
@@ -380,7 +366,6 @@ export class DateUtils {
     return this.add(date, milliseconds, 'millisecond');
   }
 
-  // Date comparison
   public static isEqual(date1: Date, date2: Date): boolean {
     return date1.getTime() === date2.getTime();
   }
@@ -456,7 +441,6 @@ export class DateUtils {
     return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   }
 
-  // Date difference
   public static diff(date1: Date, date2: Date): DateDiff {
     const diffMs = Math.abs(date1.getTime() - date2.getTime());
     
@@ -466,7 +450,6 @@ export class DateUtils {
     const totalHours = Math.floor(diffMs / this.MILLISECONDS_PER_HOUR);
     const totalDays = Math.floor(diffMs / this.MILLISECONDS_PER_DAY);
 
-    // Calculate detailed differences
     let years = 0;
     let months = 0;
     let days = 0;
@@ -531,7 +514,6 @@ export class DateUtils {
     return Math.abs(date1.getTime() - date2.getTime());
   }
 
-  // Date parts
   public static getYear(date: Date): number {
     return date.getFullYear();
   }
@@ -588,7 +570,6 @@ export class DateUtils {
     return this.isLeapYear(year) ? 366 : 365;
   }
 
-  // Date setting
   public static setYear(date: Date, year: number): Date {
     const result = new Date(date);
     result.setFullYear(year);
@@ -631,7 +612,6 @@ export class DateUtils {
     return result;
   }
 
-  // Start/End operations
   public static startOfDay(date: Date): Date {
     const result = new Date(date);
     result.setHours(0, 0, 0, 0);
@@ -704,7 +684,6 @@ export class DateUtils {
     return result;
   }
 
-  // Business days
   public static addBusinessDays(date: Date, days: number, options: BusinessDaysOptions = {}): Date {
     const { weekends = [0, 6], holidays = [] } = options;
 
@@ -727,12 +706,10 @@ export class DateUtils {
   public static isBusinessDay(date: Date, options: BusinessDaysOptions = {}): boolean {
     const { weekends = [0, 6], holidays = [] } = options;
 
-    // Check if weekend
     if (weekends.includes(date.getDay())) {
       return false;
     }
 
-    // Check if holiday
     return !holidays.some(holiday => this.isSameDay(date, holiday));
   }
 
@@ -761,7 +738,6 @@ export class DateUtils {
     return this.addBusinessDays(date, -1, options);
   }
 
-  // Range operations
   public static createRange(start: Date, end: Date): DateRange {
     if (start > end) {
       throw new Error('Start date must be before or equal to end date');
@@ -799,7 +775,6 @@ export class DateUtils {
   public static mergeRanges(ranges: DateRange[]): DateRange[] {
     if (ranges.length <= 1) return ranges;
 
-    // Sort ranges by start date
     const sorted = [...ranges].sort((a, b) => a.start.getTime() - b.start.getTime());
     const merged: DateRange[] = [];
     
@@ -814,10 +789,8 @@ export class DateUtils {
         const last = merged[merged.length - 1];
 
         if (current && last && current.start <= last.end) {
-          // Overlapping ranges, merge them
           last.end = new Date(Math.max(last.end.getTime(), current.end.getTime()));
         } else if (current) {
-          // Non-overlapping, add as new range
           merged.push({ ...current });
         }
       }
@@ -837,9 +810,7 @@ export class DateUtils {
     return null;
   }
 
-  // Timezone operations
   public static convertTimezone(date: Date, fromTimezone: string, toTimezone: string): Date {
-    // Get offset for source timezone
     const fromFormatter = new Intl.DateTimeFormat('en-US', {
       timeZone: fromTimezone,
       year: 'numeric',
@@ -854,7 +825,6 @@ export class DateUtils {
     const fromParts = fromFormatter.formatToParts(date);
     const fromDate = this.partsToDate(fromParts);
 
-    // Get offset for target timezone
     const toFormatter = new Intl.DateTimeFormat('en-US', {
       timeZone: toTimezone,
       year: 'numeric',
@@ -869,7 +839,6 @@ export class DateUtils {
     const toParts = toFormatter.formatToParts(date);
     const toDate = this.partsToDate(toParts);
 
-    // Calculate offset difference
     const offsetDiff = toDate.getTime() - fromDate.getTime();
 
     return new Date(date.getTime() + offsetDiff);
@@ -893,18 +862,15 @@ export class DateUtils {
   }
 
   public static getTimezoneNames(): string[] {
-    // Check if Intl.supportedValuesOf is available
     if (typeof Intl !== 'undefined' && 
         'supportedValuesOf' in Intl && 
         typeof (Intl as any).supportedValuesOf === 'function') {
       try {
         return (Intl as any).supportedValuesOf('timeZone');
       } catch (e) {
-        // Fallback to common timezones
       }
     }
     
-    // Return common timezone names as fallback
     return [
       'UTC',
       'America/New_York',
@@ -936,20 +902,17 @@ export class DateUtils {
     const parts = formatter.formatToParts(date);
     const timezoneName = parts.find(part => part.type === 'timeZoneName')?.value || '';
 
-    // Parse offset from timezone name (e.g., "GMT+5", "GMT-8")
     const match = timezoneName.match(/GMT([+-]\d+)/);
     if (match && match[1]) {
       return parseInt(match[1], 10) * 60;
     }
 
-    // Calculate offset by comparing local and UTC times
     const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
     const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
     
     return (tzDate.getTime() - utcDate.getTime()) / this.MILLISECONDS_PER_MINUTE;
   }
 
-  // Relative time
   public static relative(date: Date, baseDate: Date = new Date(), locale: string = 'en-US'): string {
     const diff = date.getTime() - baseDate.getTime();
     const absDiff = Math.abs(diff);
@@ -989,7 +952,6 @@ export class DateUtils {
     return rtf.format(isPast ? -value : value, unit as any);
   }
 
-  // Validation
   public static isValidDate(date: any): date is Date {
     return date instanceof Date && !isNaN(date.getTime());
   }
@@ -999,7 +961,6 @@ export class DateUtils {
     return this.isValidDate(date);
   }
 
-  // Calendar operations
   public static getCalendarMonth(year: number, month: number): Date[][] {
     const firstDay = new Date(year, month - 1, 1);
     const lastDay = new Date(year, month, 0);
@@ -1034,7 +995,6 @@ export class DateUtils {
     return months;
   }
 
-  // Age calculation
   public static calculateAge(birthDate: Date, referenceDate: Date = new Date()): {
     years: number;
     months: number;
@@ -1063,7 +1023,6 @@ export class DateUtils {
     return age.years;
   }
 
-  // Duration formatting
   public static formatDuration(milliseconds: number, options: {
     format?: 'long' | 'short';
     units?: Array<'year' | 'month' | 'day' | 'hour' | 'minute' | 'second' | 'millisecond'>;
@@ -1127,7 +1086,6 @@ export class DateUtils {
     return parts.length > 0 ? parts.join(separator) : '0' + (format === 'long' ? ' seconds' : 's');
   }
 
-  // Working with UTC
   public static toUTC(date: Date): Date {
     return new Date(Date.UTC(
       date.getFullYear(),
@@ -1152,17 +1110,14 @@ export class DateUtils {
     );
   }
 
-  // Clone
   public static clone(date: Date): Date {
     return new Date(date.getTime());
   }
 
-  // Format date and time
   public static formatDateTime(date: Date, format: string = 'YYYY-MM-DD HH:mm:ss'): string {
     return this.format(date, format);
   }
 
-  // Min/Max
   public static min(...dates: Date[]): Date {
     return new Date(Math.min(...dates.map(d => d.getTime())));
   }
@@ -1171,7 +1126,6 @@ export class DateUtils {
     return new Date(Math.max(...dates.map(d => d.getTime())));
   }
 
-  // Sort
   public static sort(dates: Date[], ascending: boolean = true): Date[] {
     return [...dates].sort((a, b) => {
       const diff = a.getTime() - b.getTime();
@@ -1179,7 +1133,6 @@ export class DateUtils {
     });
   }
 
-  // Unique dates (by day)
   public static uniqueDays(dates: Date[]): Date[] {
     const seen = new Set<string>();
     const unique: Date[] = [];

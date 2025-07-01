@@ -13,9 +13,6 @@ import {
     ResourceRequirement
 } from './test-scheduler.types';
 
-/**
- * Schedules test execution order and creates execution plan
- */
 export class TestScheduler {
     private readonly priorityMap: Map<string, PriorityLevel> = new Map([
         ['@critical', 'critical'],
@@ -33,27 +30,18 @@ export class TestScheduler {
         ['@external-service', ['network', 'external']]
     ]);
 
-    /**
-     * Create execution plan from features
-     */
     public async createExecutionPlan(features: Feature[], options: RunOptions): Promise<ExecutionPlan> {
         ActionLogger.logInfo('Test Scheduler', 'Creating execution plan');
 
-        // const startTime = Date.now();
         
-        // Flatten all scenarios
         const allScenarios = this.flattenScenarios(features);
         
-        // Apply scheduling strategy
         const scheduledScenarios = await this.scheduleScenarios(allScenarios, options);
         
-        // Group scenarios for execution
         const groups = this.groupScenarios(scheduledScenarios, options);
         
-        // Calculate estimates
         const estimates = this.calculateEstimates(groups);
         
-        // Create execution plan
         const plan: ExecutionPlan = {
             features: this.reconstructFeatures(features, scheduledScenarios),
             scenarios: allScenarios.map(s => s.scenario),
@@ -73,9 +61,6 @@ export class TestScheduler {
         return plan;
     }
 
-    /**
-     * Flatten all scenarios from features
-     */
     private flattenScenarios(features: Feature[]): Array<{scenario: Scenario, feature: Feature}> {
         const scenarios: Array<{scenario: Scenario, feature: Feature}> = [];
         
@@ -88,9 +73,6 @@ export class TestScheduler {
         return scenarios;
     }
 
-    /**
-     * Schedule scenarios based on strategy
-     */
     private async scheduleScenarios(
         scenarios: Array<{scenario: Scenario, feature: Feature}>,
         options: RunOptions
@@ -113,32 +95,23 @@ export class TestScheduler {
         }
     }
 
-    /**
-     * Priority-based scheduling
-     */
     private schedulePriorityBased(
         scenarios: Array<{scenario: Scenario, feature: Feature}>
     ): Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}> {
-        // Assign priorities
         const withPriority = scenarios.map(item => ({
             ...item,
             priority: this.determinePriority(item.scenario, item.feature)
         }));
 
-        // Sort by priority
         return withPriority.sort((a, b) => {
             const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
             return (priorityOrder as any)[a.priority] - (priorityOrder as any)[b.priority];
         });
     }
 
-    /**
-     * Resource-based scheduling
-     */
     private scheduleResourceBased(
         scenarios: Array<{scenario: Scenario, feature: Feature}>
     ): Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}> {
-        // Group by resource requirements
         const resourceGroups = new Map<string, typeof scenarios>();
         
         scenarios.forEach(item => {
@@ -151,17 +124,14 @@ export class TestScheduler {
             resourceGroups.get(key)!.push(item);
         });
 
-        // Schedule groups to minimize resource conflicts
         const scheduled: Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}> = [];
         
-        // First: scenarios with no resource requirements
         if (resourceGroups.has('none')) {
             resourceGroups.get('none')!.forEach(item => {
                 scheduled.push({ ...item, priority: 'medium' });
             });
         }
 
-        // Then: group by resource to run similar tests together
         const sortedKeys = Array.from(resourceGroups.keys())
             .filter(k => k !== 'none')
             .sort((a, b) => a.split(',').length - b.split(',').length);
@@ -175,9 +145,6 @@ export class TestScheduler {
         return scheduled;
     }
 
-    /**
-     * Dependency-based scheduling
-     */
     private scheduleDependencyBased(
         scenarios: Array<{scenario: Scenario, feature: Feature}>
     ): Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}> {
@@ -195,7 +162,6 @@ export class TestScheduler {
 
             processing.add(id);
 
-            // Process dependencies first
             const deps = this.getDependencies(item.scenario);
             deps.forEach(depId => {
                 const dep = scenarios.find(s => this.getScenarioId(s) === depId);
@@ -207,36 +173,26 @@ export class TestScheduler {
             processed.add(id);
         };
 
-        // Process all scenarios
         scenarios.forEach(visit);
 
         return scheduled;
     }
 
-    /**
-     * Time-optimal scheduling
-     */
     private scheduleTimeOptimal(
         scenarios: Array<{scenario: Scenario, feature: Feature}>
     ): Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}> {
-        // Estimate execution times
         const withEstimates = scenarios.map(item => ({
             ...item,
             estimatedTime: this.estimateScenarioTime(item.scenario),
             priority: 'medium' as PriorityLevel
         }));
 
-        // Sort by execution time (shortest first for better parallelization)
         return withEstimates.sort((a, b) => a.estimatedTime - b.estimatedTime);
     }
 
-    /**
-     * Random scheduling
-     */
     private scheduleRandom(
         scenarios: Array<{scenario: Scenario, feature: Feature}>
     ): Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}> {
-        // Fisher-Yates shuffle
         const shuffled = [...scenarios];
         for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -248,9 +204,6 @@ export class TestScheduler {
         return shuffled.map(item => ({ ...item, priority: 'medium' as PriorityLevel }));
     }
 
-    /**
-     * Group scenarios for execution
-     */
     private groupScenarios(
         scenarios: Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}>,
         options: RunOptions
@@ -259,7 +212,6 @@ export class TestScheduler {
 
         const workers = options.workers || 1;
         if (!options.parallel || workers <= 1) {
-            // Single group for sequential execution
             groups.push({
                 id: 'sequential-group-1',
                 scenarios: scenarios.map(s => s.scenario),
@@ -269,7 +221,6 @@ export class TestScheduler {
                 resourceRequirements: []
             });
         } else {
-            // Create parallel groups
             const parallelizableGroups = this.createParallelGroups(scenarios, workers);
             groups.push(...parallelizableGroups);
         }
@@ -277,16 +228,12 @@ export class TestScheduler {
         return groups;
     }
 
-    /**
-     * Create groups for parallel execution
-     */
     private createParallelGroups(
         scenarios: Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}>,
         maxWorkers: number
     ): TestGroup[] {
         const groups: TestGroup[] = [];
         
-        // Group by parallelization constraints
         const cannotParallelize = scenarios.filter(s => 
             s.scenario.tags.includes('@serial') || 
             s.scenario.tags.includes('@no-parallel')
@@ -297,7 +244,6 @@ export class TestScheduler {
             !s.scenario.tags.includes('@no-parallel')
         );
 
-        // Create serial group if needed
         if (cannotParallelize.length > 0) {
             groups.push({
                 id: 'serial-group',
@@ -309,7 +255,6 @@ export class TestScheduler {
             });
         }
 
-        // Distribute parallel scenarios across workers
         if (canParallelize.length > 0) {
             const workerGroups = this.distributeAcrossWorkers(canParallelize, maxWorkers);
             groups.push(...workerGroups);
@@ -318,9 +263,6 @@ export class TestScheduler {
         return groups;
     }
 
-    /**
-     * Distribute scenarios across workers
-     */
     private distributeAcrossWorkers(
         scenarios: Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}>,
         maxWorkers: number
@@ -348,9 +290,6 @@ export class TestScheduler {
         return groups;
     }
 
-    /**
-     * Calculate execution estimates
-     */
     private calculateEstimates(groups: TestGroup[]): any {
         const scenarioEstimates = groups.flatMap(g => 
             g.scenarios.map((s: Scenario) => ({
@@ -361,12 +300,10 @@ export class TestScheduler {
 
         const totalSequentialTime = scenarioEstimates.reduce((sum: number, e: any) => sum + e.estimatedTime, 0);
         
-        // Calculate parallel execution time
         let parallelTime = 0;
         const parallelGroups = groups.filter(g => g.parallel);
         
         if (parallelGroups.length > 0) {
-            // Time is the maximum of all parallel group times
             const groupTimes = parallelGroups.map(g => 
                 g.scenarios.reduce((sum: number, s: Scenario) => sum + this.estimateScenarioTime(s), 0)
             );
@@ -391,16 +328,12 @@ export class TestScheduler {
         };
     }
 
-    /**
-     * Reconstruct features with scheduled scenarios
-     */
     private reconstructFeatures(
         originalFeatures: Feature[],
         scheduledScenarios: Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}>
     ): Feature[] {
         const featureMap = new Map<string, Feature>();
 
-        // Initialize with empty features
         originalFeatures.forEach(f => {
             const featureUri = f.uri || `feature_${f.name}`;
             featureMap.set(featureUri, {
@@ -409,7 +342,6 @@ export class TestScheduler {
             });
         });
 
-        // Add scheduled scenarios back
         scheduledScenarios.forEach(item => {
             const featureUri = item.feature.uri || `feature_${item.feature.name}`;
             const feature = featureMap.get(featureUri);
@@ -421,9 +353,6 @@ export class TestScheduler {
         return Array.from(featureMap.values()).filter(f => f.scenarios.length > 0);
     }
 
-    /**
-     * Helper methods
-     */
     private determinePriority(scenario: Scenario, feature: Feature): PriorityLevel {
         const allTags = [...feature.tags, ...scenario.tags];
         
@@ -445,7 +374,7 @@ export class TestScheduler {
             }
         }
         
-        return [...new Set(requirements)]; // Remove duplicates
+        return [...new Set(requirements)];
     }
 
     private getDependencies(scenario: Scenario): string[] {
@@ -470,16 +399,13 @@ export class TestScheduler {
     }
 
     private estimateScenarioTime(scenario: Scenario): number {
-        // Base estimate
-        let estimate = scenario.steps.length * 1000; // 1 second per step
+        let estimate = scenario.steps.length * 1000;
         
-        // Adjust based on tags
         if (scenario.tags.includes('@slow')) estimate *= 3;
         if (scenario.tags.includes('@api')) estimate *= 1.5;
         if (scenario.tags.includes('@database')) estimate *= 2;
         if (scenario.tags.includes('@ui-heavy')) estimate *= 2.5;
         
-        // Check for explicit timing tag
         const timingTag = scenario.tags.find(t => t.match(/@time\(\d+\)/));
         if (timingTag) {
             const match = timingTag.match(/@time\((\d+)\)/);
@@ -497,7 +423,6 @@ export class TestScheduler {
     private getGroupPriority(
         scenarios: Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}>
     ): PriorityLevel {
-        // Group priority is the highest priority of its scenarios
         const priorities = scenarios.map(s => s.priority);
         if (priorities.includes('critical')) return 'critical';
         if (priorities.includes('high')) return 'high';
@@ -512,20 +437,11 @@ export class TestScheduler {
         return [...new Set(resources)];
     }
 
-    // private generatePlanId(): string {
-    //     return `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    // }
     
-    /**
-     * Create execution order array
-     */
     private createExecutionOrder(scenarios: Array<{scenario: Scenario, feature: Feature, priority: PriorityLevel}>): string[] {
         return scenarios.map(s => s.scenario.name);
     }
     
-    /**
-     * Convert TestGroups to ScenarioGroups
-     */
     private convertToScenarioGroups(groups: TestGroup[]): any[] {
         return groups.map(group => ({
             id: group.id,

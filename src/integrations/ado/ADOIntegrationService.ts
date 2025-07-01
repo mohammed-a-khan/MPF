@@ -77,9 +77,6 @@ export class ADOIntegrationService {
     ADOIntegrationService.logger.info('ADO Integration Service initialized');
   }
 
-  /**
-   * Get singleton instance
-   */
   static getInstance(): ADOIntegrationService {
     if (!this.instance) {
       this.instance = new ADOIntegrationService();
@@ -87,9 +84,6 @@ export class ADOIntegrationService {
     return this.instance;
   }
 
-  /**
-   * Initialize service
-   */
   async initialize(): Promise<void> {
     try {
       ADOIntegrationService.logger.info('Initializing ADO integration...');
@@ -121,9 +115,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Verify ADO connection
-   */
   private async verifyConnection(): Promise<void> {
     try {
       ADOIntegrationService.logger.info('Verifying ADO connection...');
@@ -142,9 +133,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Upload test results to ADO
-   */
   async uploadTestResults(
     executionResult: ExecutionResult,
     options?: ADOUploadOptions
@@ -153,7 +141,6 @@ export class ADOIntegrationService {
       ADOIntegrationService.logger.info('Starting test results upload to ADO...');
       ADOIntegrationService.logger.info(`Processing ${executionResult.features.length} features with ${executionResult.summary.total} total scenarios`);
       
-      // Log initial scenario state
       ADOIntegrationService.logger.info(
         `uploadTestResults called with ${executionResult.features.length} features`
       );
@@ -181,7 +168,6 @@ export class ADOIntegrationService {
           `Creating test run for Plan: ${testPlanId}, Suite: ${testSuiteId} with ${scenarios.length} scenarios`
         );
         
-        // Debug: Check if scenarios have metadata before creating partial result
         for (const { scenario } of scenarios) {
           ADOIntegrationService.logger.info(
             `Before createFeaturesFromScenarios - scenario "${scenario.scenario}" adoMetadata: ${JSON.stringify(scenario.adoMetadata)}`
@@ -211,7 +197,7 @@ export class ADOIntegrationService {
             ADOIntegrationService.logger.warn(
               `Skipping test run for Plan: ${testPlanId}, Suite: ${testSuiteId} - no valid test cases found`
             );
-            continue; // Skip to next group
+            continue;
           }
           
           this.currentTestRun = testRun;
@@ -262,9 +248,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Create test run
-   */
   private async createTestRun(
     executionResult: ExecutionResult,
     options: Required<ADOUploadOptions>,
@@ -280,7 +263,6 @@ export class ADOIntegrationService {
     
     const testCaseIdToScenario = new Map<number, { scenario: ScenarioResult; feature: FeatureResult }>();
     
-    // Use provided scenarios with metadata if available, otherwise fall back to executionResult
     if (scenariosWithMetadata) {
       ADOIntegrationService.logger.info(`Using ${scenariosWithMetadata.length} scenarios with metadata`);
       for (const { scenario, feature } of scenariosWithMetadata) {
@@ -295,10 +277,8 @@ export class ADOIntegrationService {
         }
       }
     } else {
-      // Fallback to original logic for backward compatibility
       for (const feature of executionResult.features) {
         for (const scenario of feature.scenarios) {
-          // Fix metadata if it's in an incorrect format (same as in createFeaturesFromScenarios)
           if (scenario.adoMetadata) {
             if (typeof scenario.adoMetadata === 'string') {
               try {
@@ -391,7 +371,7 @@ export class ADOIntegrationService {
           `None of the test cases (${Array.from(testCaseIdToScenario.keys()).join(', ')}) found in ` +
           `Test Plan ${testPlanId}, Suite ${testSuiteId}. Skipping this test run.`
         );
-        return null; // Return null to indicate no test run was created
+        return null;
       }
     } catch (error) {
       ADOIntegrationService.logger.error('Failed to get test points:', error as Error);
@@ -441,9 +421,6 @@ export class ADOIntegrationService {
   }
 
 
-  /**
-   * Upload scenario result
-   */
   private async uploadScenarioResult(
     scenario: ScenarioResult,
     feature: FeatureResult,
@@ -515,7 +492,6 @@ export class ADOIntegrationService {
           `(current state: ${testResult.state}, outcome: ${testResult.outcome})`
         );
         
-        // Debug: Log the full test result object to understand its structure
         ADOIntegrationService.logger.debug(
           `Full test result object for debugging: ${JSON.stringify(testResult, null, 2)}`
         );
@@ -550,27 +526,23 @@ export class ADOIntegrationService {
         `Updating test result ${testResultId} for test case ${testCaseId} with outcome: ${testResultUpdate.outcome}`
       );
       
-      // Use the correct API endpoint format for updating test results
       const updateUrl = ADOConfig.buildUrl(
         `${ADOConfig.getEndpoints().testRuns}/${this.currentTestRun!.id}/results`
       );
       
-      // Format the update request according to ADO API requirements
       const updatePayload: any[] = [{
         id: testResultId,
         outcome: testResultUpdate.outcome,
         state: testResultUpdate.state,
-        durationInMs: Math.round(testResultUpdate.durationInMs), // Ensure it's an integer
+        durationInMs: Math.round(testResultUpdate.durationInMs),
         startedDate: testResultUpdate.startedDate,
         completedDate: testResultUpdate.completedDate,
         comment: testResultUpdate.comment
       }];
       
-      // Add error information for failed tests
       if (scenario.error && testResultUpdate.outcome === 'Failed') {
         updatePayload[0].errorMessage = testResultUpdate.errorMessage || 'Test failed';
         updatePayload[0].stackTrace = testResultUpdate.stackTrace || '';
-        // Don't include failureType and resolutionState as they might cause errors
       }
       
       ADOIntegrationService.logger.debug(`Test result update payload: ${JSON.stringify(updatePayload, null, 2)}`);
@@ -582,7 +554,6 @@ export class ADOIntegrationService {
           `Test result ${testResultId} updated successfully. Response status: ${updateResponse.status}`
         );
         
-        // Verify the update by getting the specific test result
         const verifyUrl = ADOConfig.buildUrl(
           `${ADOConfig.getEndpoints().testRuns}/${this.currentTestRun!.id}/results/${testResultId}`
         );
@@ -638,9 +609,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Upload scenario attachments
-   */
   private async uploadScenarioAttachments(
     scenario: ScenarioResult,
     testResultId: number,
@@ -681,9 +649,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Extract priority from scenario tags
-   */
   private extractPriority(scenario: ScenarioResult): number {
     const priorityTag = scenario.tags?.find(tag => tag.startsWith('@priority:'));
     if (priorityTag) {
@@ -699,9 +664,6 @@ export class ADOIntegrationService {
     return 3;
   }
 
-  /**
-   * Load test case mappings
-   */
   private async loadTestCaseMappings(testPlanId: number, testSuiteId: number): Promise<void> {
     try {
       ADOIntegrationService.logger.info('Loading test case mappings...');
@@ -760,9 +722,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Get test case details
-   */
   private async getTestCase(testCaseId: number): Promise<any> {
     const url = ADOConfig.buildUrl(
       `${ADOConfig.getEndpoints().testCases}/${testCaseId}`
@@ -772,9 +731,6 @@ export class ADOIntegrationService {
     return response.data;
   }
 
-  /**
-   * Create bug for failure
-   */
   private async createBugForFailure(
     scenario: ScenarioResult,
     testResult: ADOTestResult
@@ -858,7 +814,6 @@ export class ADOIntegrationService {
         }
       }
       
-      // Use the correct endpoint format for creating bugs
       const bugUrl = ADOConfig.buildUrl(`${ADOConfig.getEndpoints().workItems}/$Bug`);
       
       const response = await this.client.post(
@@ -881,9 +836,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Link bug to test result
-   */
   private async linkBugToTestResult(testResultId: number, bugId: number): Promise<void> {
     const linkData = [
       {
@@ -903,9 +855,6 @@ export class ADOIntegrationService {
     );
   }
 
-  /**
-   * Complete test run
-   */
   private async completeTestRun(): Promise<void> {
     if (!this.currentTestRun) return;
     
@@ -930,16 +879,10 @@ export class ADOIntegrationService {
     ADOIntegrationService.logger.info(`Test run ${this.currentTestRun.id} completed successfully`);
   }
 
-  /**
-   * Queue evidence upload
-   */
   private queueEvidenceUpload(uploadFn: () => Promise<void>): void {
     this.uploadQueue.push(uploadFn);
   }
 
-  /**
-   * Process upload queue
-   */
   private async processUploadQueue(): Promise<void> {
     if (this.isProcessingQueue || this.uploadQueue.length === 0) {
       return;
@@ -962,9 +905,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Merge upload options with configuration
-   */
   private mergeUploadOptions(options?: ADOUploadOptions): Required<ADOUploadOptions> {
     const config = ADOConfig.getConfig();
     const uploadConfig = ADOConfig.getUploadConfig();
@@ -983,9 +923,6 @@ export class ADOIntegrationService {
     };
   }
 
-  /**
-   * Map test status to ADO outcome
-   */
   private mapOutcome(status: string): ADOTestResult['outcome'] {
     switch (status) {
       case 'passed':
@@ -1001,9 +938,6 @@ export class ADOIntegrationService {
     }
   }
 
-  /**
-   * Format run name by replacing placeholders
-   */
   private formatRunName(name: string): string {
     const now = new Date();
     return name
@@ -1012,9 +946,6 @@ export class ADOIntegrationService {
       .replace('{{time}}', now.toTimeString().split(' ')[0] || '');
   }
 
-  /**
-   * Generate run comment
-   */
   private generateRunComment(executionResult: ExecutionResult): string {
     const { summary } = executionResult;
     return `Automated test run executed ${summary.total} tests. ` +
@@ -1023,9 +954,6 @@ export class ADOIntegrationService {
            `Environment: ${executionResult.environment}`;
   }
 
-  /**
-   * Generate result comment
-   */
   private generateResultComment(scenario: ScenarioResult): string {
     const steps = scenario.steps.length;
     const failedStep = scenario.steps.find(s => s.status === 'failed');
@@ -1044,9 +972,6 @@ export class ADOIntegrationService {
     return comment;
   }
 
-  /**
-   * Generate repro steps
-   */
   private generateReproSteps(scenario: ScenarioResult): string {
     let steps = '<ol>';
     
@@ -1064,9 +989,6 @@ export class ADOIntegrationService {
     return steps;
   }
 
-  /**
-   * Get test run by ID
-   */
   async getTestRun(runId: number): Promise<ADOTestRun> {
     const testRun = await this.testRunManager.getTestRun(runId);
     const result: ADOTestRun = {
@@ -1091,16 +1013,10 @@ export class ADOIntegrationService {
     return result;
   }
 
-  /**
-   * Get test results for run
-   */
   async getTestResults(runId: number): Promise<ADOTestResult[]> {
     return this.testResultUploader.getTestResults(runId);
   }
 
-  /**
-   * Upload reports folder as zip
-   */
   private async uploadReportsFolder(executionResult: ExecutionResult): Promise<void> {
     if (!this.currentTestRun) {
       ADOIntegrationService.logger.warn('No current test run to upload reports to');
@@ -1120,7 +1036,7 @@ export class ADOIntegrationService {
       tempZipPath = path.join(process.cwd(), `reports_${this.currentTestRun.id}_${Date.now()}.zip`);
       const output = fs.createWriteStream(tempZipPath);
       const archive = archiver('zip', {
-        zlib: { level: 9 } // Maximum compression
+        zlib: { level: 9 }
       });
       output.on('close', () => {
         ADOIntegrationService.logger.info(`Reports zip created: ${archive.pointer()} bytes`);
@@ -1137,7 +1053,6 @@ export class ADOIntegrationService {
       ADOIntegrationService.logger.info(`Looking for report files. CURRENT_REPORT_DIR: ${currentReportDir}`);
       
       if (currentReportDir) {
-        // Check for HTML report in 'html' subdirectory first, then root
         const htmlSubdirPath = path.join(currentReportDir, 'html', 'index.html');
         const htmlRootPath = path.join(currentReportDir, 'index.html');
         
@@ -1153,7 +1068,6 @@ export class ADOIntegrationService {
         
         screenshotsPath = path.join(currentReportDir, 'evidence', 'screenshots');
         if (!fs.existsSync(screenshotsPath)) {
-          // Fallback to older structure
           screenshotsPath = path.join(currentReportDir, 'screenshots');
         }
         ADOIntegrationService.logger.info(`HTML report exists: ${htmlReportPath ? fs.existsSync(htmlReportPath) : false}`);
@@ -1162,7 +1076,6 @@ export class ADOIntegrationService {
         const expectedReportDir = path.join(reportsPath, `report_${reportTimestamp}`);
         ADOIntegrationService.logger.info(`No CURRENT_REPORT_DIR, checking expected dir: ${expectedReportDir}`);
         if (fs.existsSync(expectedReportDir)) {
-          // Check for HTML report in 'html' subdirectory first, then root
           const htmlSubdirPath = path.join(expectedReportDir, 'html', 'index.html');
           const htmlRootPath = path.join(expectedReportDir, 'index.html');
           
@@ -1174,7 +1087,6 @@ export class ADOIntegrationService {
           
           screenshotsPath = path.join(expectedReportDir, 'evidence', 'screenshots');
           if (!fs.existsSync(screenshotsPath)) {
-            // Fallback to older structure
             screenshotsPath = path.join(expectedReportDir, 'screenshots');
           }
           ADOIntegrationService.logger.info(`Found report directory at expected location`);
@@ -1182,11 +1094,9 @@ export class ADOIntegrationService {
       }
       
       if (htmlReportPath && fs.existsSync(htmlReportPath)) {
-        // FIXED: Place HTML file directly in zip root (not in html/ folder)
         archive.file(htmlReportPath, { name: 'index.html' });
         ADOIntegrationService.logger.info(`Added HTML report to zip root from: ${htmlReportPath}`);
         
-        // Also add CSS and JS files if they exist (also in root)
         const htmlDir = path.dirname(htmlReportPath);
         const cssPath = path.join(htmlDir, 'styles.css');
         const jsPath = path.join(htmlDir, 'script.js');
@@ -1204,14 +1114,12 @@ export class ADOIntegrationService {
       }
       
       if (screenshotsPath && fs.existsSync(screenshotsPath)) {
-        // FIXED: Place screenshots in evidence/screenshots/ folder to preserve relative paths
         archive.directory(screenshotsPath, 'evidence/screenshots');
         ADOIntegrationService.logger.info('Added screenshots folder to zip at evidence/screenshots/');
       }
       
       if (!htmlReportPath || !fs.existsSync(htmlReportPath)) {
         ADOIntegrationService.logger.warn('HTML report not found, creating minimal zip');
-        // Add a summary file if no HTML report exists
         const summaryContent = `Test Execution Summary
 =====================
 Environment: ${executionResult.environment}
@@ -1233,14 +1141,12 @@ Timestamp: ${new Date().toISOString()}
       const zipBuffer = fs.readFileSync(tempZipPath);
       const fileName = `html-report-screenshots_${executionResult.environment}_${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
       
-      // Use the simpler approach - upload directly with stream
       const attachmentUrl = ADOConfig.buildUrl(
         `${ADOConfig.getEndpoints().testRuns}/${this.currentTestRun.id}/attachments`
       );
       
       ADOIntegrationService.logger.info('Uploading zip file as test run attachment...');
       
-      // Convert buffer to base64 for stream upload
       const base64Content = zipBuffer.toString('base64');
       
       const attachmentData = {
@@ -1279,9 +1185,6 @@ Timestamp: ${new Date().toISOString()}
     }
   }
 
-  /**
-   * Group scenarios by test plan and suite
-   */
   private async groupScenariosByTestPlanSuite(
     executionResult: ExecutionResult,
     options?: ADOUploadOptions
@@ -1329,7 +1232,6 @@ Timestamp: ${new Date().toISOString()}
         ADOIntegrationService.logger.info(
           `Attached adoMetadata to scenario "${scenario.scenario}": ${JSON.stringify(scenario.adoMetadata)}`
         );
-        // Double-check the type after assignment
         ADOIntegrationService.logger.info(
           `After assignment - type: ${typeof scenario.adoMetadata}, value: ${JSON.stringify(scenario.adoMetadata)}`
         );
@@ -1340,9 +1242,6 @@ Timestamp: ${new Date().toISOString()}
     return grouped;
   }
 
-  /**
-   * Extract complete ADO metadata with inheritance
-   */
   private extractCompleteADOMetadata(
     scenario: ScenarioResult,
     feature: FeatureResult,
@@ -1379,9 +1278,6 @@ Timestamp: ${new Date().toISOString()}
     return { testCaseId, testPlanId, testSuiteId };
   }
 
-  /**
-   * Extract ID from tags
-   */
   private extractIdFromTags(tags: string[], idType: 'TestCaseId' | 'TestPlanId' | 'TestSuiteId'): number | undefined {
     ADOIntegrationService.logger.info(`Extracting ${idType} from tags: ${JSON.stringify(tags)}`);
     
@@ -1397,9 +1293,6 @@ Timestamp: ${new Date().toISOString()}
     return undefined;
   }
 
-  /**
-   * Create features from scenarios
-   */
   private createFeaturesFromScenarios(
     scenarios: Array<{ scenario: ScenarioResult; feature: FeatureResult }>
   ): FeatureResult[] {
@@ -1407,19 +1300,15 @@ Timestamp: ${new Date().toISOString()}
     
     ADOIntegrationService.logger.info(`Creating features from ${scenarios.length} scenarios`);
     
-    // Create a map to track unique test cases per feature to avoid duplicates
     const processedTestCases = new Map<string, Set<number>>();
     
     for (const { scenario, feature } of scenarios) {
-      // FIXED: Get feature name from feature.feature.name (the nested Feature object) first, then fallback to feature.name
       const featureName = feature.feature?.name || feature.name || 'Unnamed Feature';
       ADOIntegrationService.logger.info(
         `Processing scenario "${scenario.scenario}" for feature "${featureName}" (from feature.feature.name: ${feature.feature?.name}, feature.name: ${feature.name})`
       );
       
-      // Fix metadata if it's in an incorrect format
       if (scenario.adoMetadata) {
-        // Check if it's a string that needs parsing
         if (typeof scenario.adoMetadata === 'string') {
           ADOIntegrationService.logger.warn(
             `adoMetadata is a string for scenario "${scenario.scenario}", parsing...`
@@ -1430,13 +1319,11 @@ Timestamp: ${new Date().toISOString()}
             ADOIntegrationService.logger.error(`Failed to parse adoMetadata string`);
           }
         } 
-        // Check if it's been converted to a character-by-character object
         else if (typeof scenario.adoMetadata === 'object' && '0' in scenario.adoMetadata) {
           ADOIntegrationService.logger.warn(
             `adoMetadata appears to be a stringified object for scenario "${scenario.scenario}", reconstructing...`
           );
           try {
-            // Reconstruct the string from the character-by-character object
             const chars = Object.keys(scenario.adoMetadata)
               .sort((a, b) => parseInt(a) - parseInt(b))
               .map(key => (scenario.adoMetadata as any)[key]);
@@ -1451,7 +1338,6 @@ Timestamp: ${new Date().toISOString()}
         }
       }
       
-      // Check if we've already processed this test case for this feature
       const testCaseId = scenario.adoMetadata?.testCaseId;
       if (testCaseId) {
         if (!processedTestCases.has(featureName)) {
@@ -1463,7 +1349,7 @@ Timestamp: ${new Date().toISOString()}
           ADOIntegrationService.logger.warn(
             `Skipping duplicate test case ${testCaseId} for feature "${featureName}" (scenario: "${scenario.scenario}")`
           );
-          continue; // Skip this scenario as we've already processed this test case
+          continue;
         }
         
         featureTestCases.add(testCaseId);
@@ -1472,7 +1358,7 @@ Timestamp: ${new Date().toISOString()}
       if (!featureMap.has(featureName)) {
         featureMap.set(featureName, {
           ...feature,
-          name: featureName, // Ensure name is set
+          name: featureName,
           scenarios: []
         });
       }
@@ -1488,9 +1374,6 @@ Timestamp: ${new Date().toISOString()}
     return Array.from(featureMap.values());
   }
 
-  /**
-   * Calculate summary for scenarios
-   */
   private calculateSummaryForScenarios(scenarios: Array<{ scenario: ScenarioResult; feature: FeatureResult }>): ExecutionResult['summary'] {
     const summary: ExecutionResult['summary'] = {
       total: scenarios.length,
@@ -1526,9 +1409,6 @@ Timestamp: ${new Date().toISOString()}
     return summary;
   }
 
-  /**
-   * Reset service state
-   */
   reset(): void {
     this.currentTestRun = null;
     this.testCaseMapping.clear();

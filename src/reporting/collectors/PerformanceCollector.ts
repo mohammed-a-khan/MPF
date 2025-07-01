@@ -5,7 +5,6 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { promisify } from 'util';
 import { performance, PerformanceObserver, PerformanceEntry } from 'perf_hooks';
-// import { Logger } from '../../core/utils/Logger'; // Unused import
 import { ConfigurationManager } from '../../core/configuration/ConfigurationManager';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import {
@@ -35,9 +34,7 @@ export class PerformanceCollector implements CollectorInterface {
   private executionId: string = '';
   private options: CollectorOptions = {};
   private performancePath: string = '';
-  // private initialized: boolean = false; // Unused property
   
-  // Performance data storage
   private navigationTimings: Map<string, NavigationTiming[]> = new Map();
   private resourceTimings: Map<string, ResourceTiming[]> = new Map();
   private userTimings: Map<string, UserTiming[]> = new Map();
@@ -47,11 +44,9 @@ export class PerformanceCollector implements CollectorInterface {
   private customMarks: Map<string, PerformanceEntry[]> = new Map();
   private customMeasures: Map<string, PerformanceEntry[]> = new Map();
   
-  // Performance observer
   private observer?: PerformanceObserver;
   private scenarioPages: Map<string, any> = new Map();
   
-  // Thresholds
   private thresholds: {
     FCP: number;
     LCP: number;
@@ -65,14 +60,14 @@ export class PerformanceCollector implements CollectorInterface {
     resourceLoad: number;
     [key: string]: number;
   } = {
-    FCP: 1800,      // First Contentful Paint
-    LCP: 2500,      // Largest Contentful Paint
-    FID: 100,       // First Input Delay
-    CLS: 0.1,       // Cumulative Layout Shift
-    TTFB: 800,      // Time to First Byte
-    TTI: 3800,      // Time to Interactive
-    TBT: 200,       // Total Blocking Time
-    INP: 200,       // Interaction to Next Paint
+    FCP: 1800,
+    LCP: 2500,
+    FID: 100,
+    CLS: 0.1,
+    TTFB: 800,
+    TTI: 3800,
+    TBT: 200,
+    INP: 200,
     pageLoad: 3000,
     resourceLoad: 1000
   };
@@ -89,7 +84,6 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   async collect(): Promise<Evidence[]> {
-    // Implementation of the required collect method from CollectorInterface
     return this.getEvidence();
   }
 
@@ -102,7 +96,6 @@ export class PerformanceCollector implements CollectorInterface {
         ...options
       } as any;
 
-      // Create performance directory
       this.performancePath = path.join(
         ConfigurationManager.get('EVIDENCE_PATH', './evidence'),
         'performance',
@@ -110,7 +103,6 @@ export class PerformanceCollector implements CollectorInterface {
       );
       await fs.promises.mkdir(this.performancePath, { recursive: true });
 
-      // Load custom thresholds if provided
       if (this.options.performancebudget && Array.isArray(this.options.performancebudget)) {
         const thresholdObj: Record<string, number> = {};
         this.options.performancebudget.forEach((threshold: PerformanceThreshold) => {
@@ -119,7 +111,6 @@ export class PerformanceCollector implements CollectorInterface {
         this.thresholds = { ...this.thresholds, ...thresholdObj };
       }
 
-      // this.initialized = true; // Property removed
       ActionLogger.logInfo('PerformanceCollector initialized', { executionId, options: this.options });
     } catch (error) {
       ActionLogger.logError('Failed to initialize PerformanceCollector', error as Error);
@@ -128,24 +119,20 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private setupPerformanceObserver(): void {
-    // Node.js performance observer for server-side metrics
     this.observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         this.processServerPerformanceEntry(entry);
       }
     });
 
-    // Observe all available entry types
     try {
       this.observer.observe({ entryTypes: ['measure', 'mark', 'function', 'gc'] });
     } catch (error) {
-      // Some entry types might not be available
       this.observer.observe({ entryTypes: ['measure', 'mark'] });
     }
   }
 
   private processServerPerformanceEntry(entry: PerformanceEntry): void {
-    // Process server-side performance entries
     if (entry.entryType === 'mark') {
       if (!this.customMarks.has(this.executionId)) {
         this.customMarks.set(this.executionId, []);
@@ -163,7 +150,6 @@ export class PerformanceCollector implements CollectorInterface {
     const evidence: Evidence[] = [];
     
     try {
-      // Initialize scenario-specific storage
       this.navigationTimings.set(scenarioId, []);
       this.resourceTimings.set(scenarioId, []);
       this.userTimings.set(scenarioId, []);
@@ -171,7 +157,6 @@ export class PerformanceCollector implements CollectorInterface {
       this.longTasks.set(scenarioId, []);
       this.memorySnapshots.set(scenarioId, []);
 
-      // Mark scenario start
       performance.mark(`scenario-start-${scenarioId}`);
 
       ActionLogger.logInfo(`Started performance collection for scenario: ${scenarioName}`, { scenarioId });
@@ -194,10 +179,8 @@ export class PerformanceCollector implements CollectorInterface {
     try {
       const stepKey = `${scenarioId}-${stepId}`;
       
-      // Mark step timing
       performance.mark(`step-${status}-${stepKey}`);
       
-      // Create measure from step start to end
       try {
         performance.measure(
           `step-duration-${stepKey}`,
@@ -205,15 +188,12 @@ export class PerformanceCollector implements CollectorInterface {
           `step-${status}-${stepKey}`
         );
       } catch (error) {
-        // Start mark might not exist
       }
 
-      // Collect browser performance metrics if page is available
       const page = this.scenarioPages.get(scenarioId);
       if (page) {
         await this.collectBrowserMetrics(scenarioId, page);
         
-        // Capture performance metrics on failure
         if (status === 'failed') {
           const report = await this.generatePerformanceSnapshot(scenarioId, `step-failed-${stepId}`);
           evidence.push(report);
@@ -229,7 +209,6 @@ export class PerformanceCollector implements CollectorInterface {
 
   async collectBrowserMetrics(scenarioId: string, page: any): Promise<void> {
     try {
-      // Execute performance collection in browser context
       const metrics = await page.evaluate(() => {
         const getNavigationTiming = () => {
           const navigation = (performance as any).getEntriesByType('navigation')[0] as any;
@@ -238,7 +217,6 @@ export class PerformanceCollector implements CollectorInterface {
           return {
             timestamp: Date.now(),
             url: window.location.href,
-            // Network timings
             fetchStart: navigation.fetchStart,
             domainLookupStart: navigation.domainLookupStart,
             domainLookupEnd: navigation.domainLookupEnd,
@@ -248,14 +226,12 @@ export class PerformanceCollector implements CollectorInterface {
             requestStart: navigation.requestStart,
             responseStart: navigation.responseStart,
             responseEnd: navigation.responseEnd,
-            // Document timings
             domInteractive: navigation.domInteractive,
             domContentLoadedEventStart: navigation.domContentLoadedEventStart,
             domContentLoadedEventEnd: navigation.domContentLoadedEventEnd,
             domComplete: navigation.domComplete,
             loadEventStart: navigation.loadEventStart,
             loadEventEnd: navigation.loadEventEnd,
-            // Calculated metrics
             dns: navigation.domainLookupEnd - navigation.domainLookupStart,
             tcp: navigation.connectEnd - navigation.connectStart,
             ssl: navigation.secureConnectionStart > 0 ? navigation.connectEnd - navigation.secureConnectionStart : 0,
@@ -264,7 +240,6 @@ export class PerformanceCollector implements CollectorInterface {
             domProcessing: navigation.domComplete - navigation.domInteractive,
             onLoad: navigation.loadEventEnd - navigation.loadEventStart,
             total: navigation.loadEventEnd - navigation.fetchStart,
-            // Additional metrics
             redirectCount: navigation.redirectCount,
             type: navigation.type,
             protocol: navigation.nextHopProtocol,
@@ -300,7 +275,6 @@ export class PerformanceCollector implements CollectorInterface {
             encodedBodySize: resource.encodedBodySize,
             decodedBodySize: resource.decodedBodySize,
             serverTiming: resource.serverTiming || [],
-            // Calculated values
             dns: resource.domainLookupEnd - resource.domainLookupStart,
             tcp: resource.connectEnd - resource.connectStart,
             ssl: resource.secureConnectionStart > 0 ? resource.connectEnd - resource.secureConnectionStart : 0,
@@ -338,7 +312,6 @@ export class PerformanceCollector implements CollectorInterface {
               });
             }).observe({ entryTypes: ['largest-contentful-paint' as any] });
             
-            // Timeout after 10 seconds
             setTimeout(() => resolve(null), 10000);
           });
         };
@@ -354,7 +327,6 @@ export class PerformanceCollector implements CollectorInterface {
               });
             }).observe({ entryTypes: ['first-input' as any] });
             
-            // Timeout after 10 seconds
             setTimeout(() => resolve(null), 10000);
           });
         };
@@ -401,13 +373,12 @@ export class PerformanceCollector implements CollectorInterface {
             }
           }).observe({ entryTypes: ['event' as any] });
           
-          // Calculate INP (75th percentile of interactions)
           const sortedDurations = interactions.map(i => i.duration).sort((a, b) => a - b);
           const p75Index = Math.floor(sortedDurations.length * 0.75);
           
           return {
             value: sortedDurations[p75Index] || 0,
-            interactions: interactions.slice(-10) // Last 10 interactions
+            interactions: interactions.slice(-10)
           };
         };
 
@@ -442,7 +413,6 @@ export class PerformanceCollector implements CollectorInterface {
               totalJSHeapSize: (performance as any).memory.totalJSHeapSize,
               usedJSHeapSize: (performance as any).memory.usedJSHeapSize,
               jsHeapSizeLimit: (performance as any).memory.jsHeapSizeLimit,
-              // Calculate usage percentage
               usagePercent: ((performance as any).memory.usedJSHeapSize / (performance as any).memory.jsHeapSizeLimit) * 100
             };
           }
@@ -468,7 +438,6 @@ export class PerformanceCollector implements CollectorInterface {
           };
         };
 
-        // Execute all collectors
         return {
           navigation: getNavigationTiming(),
           resources: getResourceTimings(),
@@ -483,27 +452,22 @@ export class PerformanceCollector implements CollectorInterface {
         };
       });
 
-      // Store navigation timing
       if (metrics.navigation) {
         this.navigationTimings.get(scenarioId)!.push(metrics.navigation);
       }
 
-      // Store resource timings
       if (metrics.resources && metrics.resources.length > 0) {
         const existing = this.resourceTimings.get(scenarioId) || [];
         this.resourceTimings.set(scenarioId, [...existing, ...metrics.resources]);
       }
 
-      // Process Core Web Vitals
       await this.processCoreWebVitals(scenarioId, metrics);
 
-      // Store long tasks
       if (metrics.longTasks && metrics.longTasks.length > 0) {
         const existing = this.longTasks.get(scenarioId) || [];
         this.longTasks.set(scenarioId, [...existing, ...metrics.longTasks]);
       }
 
-      // Store memory info
       if (metrics.memory) {
         this.memorySnapshots.get(scenarioId)!.push({
           timestamp: Date.now(),
@@ -511,7 +475,6 @@ export class PerformanceCollector implements CollectorInterface {
         });
       }
 
-      // Store user timings
       if (metrics.userTimings) {
         const userTimingEntry: UserTiming = {
           name: 'userTimings',
@@ -525,7 +488,6 @@ export class PerformanceCollector implements CollectorInterface {
         this.userTimings.get(scenarioId)!.push(userTimingEntry);
       }
 
-      // Check performance budget
       await this.checkPerformanceBudget(scenarioId, metrics);
 
     } catch (error) {
@@ -545,7 +507,6 @@ export class PerformanceCollector implements CollectorInterface {
       INP: 0
     };
 
-    // Process async metrics
     if (metrics.lcp) {
       const lcpData = await metrics.lcp;
       if (lcpData) {
@@ -572,7 +533,6 @@ export class PerformanceCollector implements CollectorInterface {
       vitals.INPDetails = metrics.inp;
     }
 
-    // Calculate additional metrics
     if (metrics.navigation) {
       vitals.TTI = this.calculateTimeToInteractive(metrics.navigation, metrics.longTasks || []);
       vitals.TBT = this.calculateTotalBlockingTime(metrics.longTasks || [], vitals['FCP'] || 0, vitals.TTI || 0);
@@ -583,17 +543,12 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private calculateTimeToInteractive(navigation: NavigationTiming, longTasks: LongTask[]): number {
-    // TTI is the time when:
-    // 1. FCP has happened
-    // 2. DOMContentLoaded has fired
-    // 3. No long tasks in the last 5 seconds
     
-    const fcp = navigation.responseEnd; // Simplified, should use actual FCP
+    const fcp = navigation.responseEnd;
     const dcl = navigation.domContentLoadedEventEnd;
     
     let tti = Math.max(fcp, dcl);
     
-    // Find the last long task
     const sortedTasks = longTasks.sort((a, b) => a.startTime - b.startTime);
     for (const task of sortedTasks) {
       if (task.startTime > tti) {
@@ -601,7 +556,6 @@ export class PerformanceCollector implements CollectorInterface {
       }
     }
     
-    // Add 5 seconds quiet window
     return tti + 5000;
   }
 
@@ -610,7 +564,6 @@ export class PerformanceCollector implements CollectorInterface {
     
     for (const task of longTasks) {
       if (task.startTime > fcp && task.startTime < tti) {
-        // TBT counts the time over 50ms threshold
         if (task.duration > 50) {
           tbt += task.duration - 50;
         }
@@ -621,40 +574,32 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private async calculateSpeedIndex(scenarioId: string): Promise<number> {
-    // Real Speed Index calculation based on visual progression
     const page = this.scenarioPages.get(scenarioId);
     if (!page) return 0;
 
     try {
-      // Capture visual progression data
       const speedIndex = await page.evaluate(async () => {
-        // Get all visual elements and their rendering times
         const elements = document.querySelectorAll('*');
         const viewport = {
           width: window.innerWidth,
           height: window.innerHeight
         };
         
-        // Calculate visual completeness over time
         const visualProgressData: Array<{time: number, completeness: number}> = [];
         const observedElements = new Map<Element, {visible: boolean, area: number, time: number}>();
         
-        // Create intersection observer to track when elements become visible
         const totalViewportArea = viewport.width * viewport.height;
         let visibleArea = 0;
         
-        // Get computed styles and visibility for each element
         elements.forEach(element => {
           const rect = element.getBoundingClientRect();
           const styles = window.getComputedStyle(element);
           
-          // Check if element is visible
           if (rect.width > 0 && rect.height > 0 && 
               styles.display !== 'none' && 
               styles.visibility !== 'hidden' &&
               styles.opacity !== '0') {
             
-            // Calculate intersection with viewport
             const intersectionRect = {
               left: Math.max(0, rect.left),
               top: Math.max(0, rect.top),
@@ -676,20 +621,16 @@ export class PerformanceCollector implements CollectorInterface {
           }
         });
         
-        // Get paint events
         const paintEvents = (performance as any).getEntriesByType('paint');
         const resourceTimings = (performance as any).getEntriesByType('resource') as PerformanceResourceTiming[];
         
-        // Build timeline of visual changes
         const timeline: Array<{time: number, area: number}> = [];
         
-        // Add first paint
         const fcp = paintEvents.find((p: any) => p.name === 'first-contentful-paint');
         if (fcp) {
           timeline.push({time: fcp.startTime, area: 0});
         }
         
-        // Add image load times
         const images = Array.from(document.querySelectorAll('img'));
         images.forEach(img => {
           const rect = img.getBoundingClientRect();
@@ -705,10 +646,8 @@ export class PerformanceCollector implements CollectorInterface {
           }
         });
         
-        // Sort timeline by time
         timeline.sort((a, b) => a.time - b.time);
         
-        // Calculate cumulative visual completeness
         let cumulativeArea = 0;
         let lastTime = 0;
         let speedIndexSum = 0;
@@ -727,7 +666,6 @@ export class PerformanceCollector implements CollectorInterface {
           });
         });
         
-        // Final calculation
         const navTiming = (performance as any).getEntriesByType('navigation')[0] as any;
         const loadTime = navTiming ? (navTiming.loadEventEnd || navTiming.duration) : 0;
         if (lastTime < loadTime) {
@@ -741,20 +679,17 @@ export class PerformanceCollector implements CollectorInterface {
       
       return speedIndex;
     } catch (error) {
-      // Fallback calculation using resource timings
       const navigation = this.navigationTimings.get(scenarioId)?.[0];
       const resources = this.resourceTimings.get(scenarioId) || [];
       
       if (!navigation) return 0;
       
-      // Calculate based on resource load progression
       const criticalResources = resources.filter(r => 
         r.initiatorType === 'css' || 
         r.initiatorType === 'img' || 
         r.initiatorType === 'script'
       );
       
-      // Sort by response end time
       criticalResources.sort((a, b) => a.responseEnd - b.responseEnd);
       
       let speedIndex = 0;
@@ -778,7 +713,6 @@ export class PerformanceCollector implements CollectorInterface {
   private async checkPerformanceBudget(scenarioId: string, metrics: any): Promise<void> {
     const violations: string[] = [];
     
-    // Check Core Web Vitals against thresholds
     const vitals = this.coreWebVitals.get(scenarioId)?.slice(-1)[0];
     if (vitals) {
       if (vitals['FCP'] !== undefined && vitals['FCP'] > this.thresholds['FCP']) {
@@ -798,12 +732,10 @@ export class PerformanceCollector implements CollectorInterface {
       }
     }
     
-    // Check navigation timing
     if (metrics.navigation && metrics.navigation.total !== undefined && metrics.navigation.total > this.thresholds['pageLoad']) {
       violations.push(`Page load time (${metrics.navigation.total}ms) exceeds threshold (${this.thresholds['pageLoad']}ms)`);
     }
     
-    // Check resource timings
     const slowResources = metrics.resources?.filter((r: ResourceTiming) => 
       r.duration > this.thresholds['resourceLoad']
     ) || [];
@@ -812,7 +744,6 @@ export class PerformanceCollector implements CollectorInterface {
       violations.push(`${slowResources.length} resources exceed load time threshold (${this.thresholds['resourceLoad']}ms)`);
     }
     
-    // Log violations
     if (violations.length > 0) {
       ActionLogger.logWarn('Performance budget violations detected', {
         scenarioId,
@@ -825,11 +756,8 @@ export class PerformanceCollector implements CollectorInterface {
   async registerPage(scenarioId: string, page: any): Promise<void> {
     this.scenarioPages.set(scenarioId, page);
     
-    // Set up page-level performance monitoring
     await page.evaluateOnNewDocument(() => {
-      // Inject performance monitoring script
       window.addEventListener('load', () => {
-        // Monitor long animations
         if ('PerformanceObserver' in window) {
           try {
             new PerformanceObserver((list) => {
@@ -840,7 +768,6 @@ export class PerformanceCollector implements CollectorInterface {
               entryTypes: ['largest-contentful-paint', 'first-input', 'layout-shift', 'longtask'] as any
             });
           } catch (e) {
-            // Some browsers might not support all entry types
           }
         }
       });
@@ -861,7 +788,6 @@ export class PerformanceCollector implements CollectorInterface {
       summary: this.generateSummary(scenarioId)
     };
 
-    // Save snapshot
     const filename = `performance-${reason}-${Date.now()}.json`;
     const filepath = path.join(this.performancePath, filename);
     await writeFileAsync(filepath, JSON.stringify(snapshot, null, 2));
@@ -887,7 +813,6 @@ export class PerformanceCollector implements CollectorInterface {
     const vitals = this.coreWebVitals.get(scenarioId)?.slice(-1)[0];
     const resources = this.resourceTimings.get(scenarioId) || [];
     
-    // Calculate scores
     const scores = {
       FCP: this.calculateMetricScore(vitals && vitals['FCP'] !== undefined ? vitals['FCP'] : 0, this.thresholds['FCP']),
       LCP: this.calculateMetricScore(vitals && vitals['LCP'] !== undefined ? vitals['LCP'] : 0, this.thresholds['LCP']),
@@ -896,7 +821,6 @@ export class PerformanceCollector implements CollectorInterface {
       TTFB: this.calculateMetricScore(vitals && vitals['TTFB'] !== undefined ? vitals['TTFB'] : 0, this.thresholds['TTFB'])
     };
     
-    // Overall score (weighted average)
     const overallScore = (
       scores.FCP * 0.1 +
       scores.LCP * 0.25 +
@@ -905,7 +829,6 @@ export class PerformanceCollector implements CollectorInterface {
       scores.TTFB * 0.1
     );
     
-    // Identify violations
     const violations: string[] = [];
     if (scores.FCP < 0.5) violations.push('Poor First Contentful Paint');
     if (scores.LCP < 0.5) violations.push('Poor Largest Contentful Paint');
@@ -913,7 +836,6 @@ export class PerformanceCollector implements CollectorInterface {
     if (scores.CLS < 0.5) violations.push('Poor Cumulative Layout Shift');
     if (scores.TTFB < 0.5) violations.push('Poor Time to First Byte');
     
-    // Resource analysis
     const resourceStats = {
       total: resources.length,
       cached: resources.filter(r => (r as any).cached).length,
@@ -938,17 +860,16 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private calculateMetricScore(value: number, threshold: number): number {
-    // Score calculation based on Google's Web Vitals scoring
-    if (value <= threshold * 0.75) return 1; // Good
-    if (value <= threshold) return 0.75; // Needs improvement
-    if (value <= threshold * 1.5) return 0.5; // Poor
-    return 0.25; // Very poor
+    if (value <= threshold * 0.75) return 1;
+    if (value <= threshold) return 0.75;
+    if (value <= threshold * 1.5) return 0.5;
+    return 0.25;
   }
 
   private calculateCLSScore(cls: number): number {
-    if (cls <= 0.1) return 1; // Good
-    if (cls <= 0.25) return 0.75; // Needs improvement
-    return 0.5; // Poor
+    if (cls <= 0.1) return 1;
+    if (cls <= 0.25) return 0.75;
+    return 0.5;
   }
 
   private getPerformanceGrade(score: number): string {
@@ -987,12 +908,10 @@ export class PerformanceCollector implements CollectorInterface {
     const resources = this.resourceTimings.get(scenarioId) || [];
     const navigation = this.navigationTimings.get(scenarioId)?.slice(-1)[0];
     
-    // FCP recommendations
     if (vitals && vitals['FCP'] !== undefined && vitals['FCP'] > this.thresholds['FCP']) {
       recommendations.push('Reduce server response time and eliminate render-blocking resources to improve FCP');
     }
     
-    // LCP recommendations
     if (vitals && vitals['LCP'] !== undefined && vitals['LCP'] > this.thresholds['LCP']) {
       recommendations.push('Optimize largest content element loading (images, videos, or large text blocks)');
       if (vitals.LCPDetails?.element) {
@@ -1000,35 +919,30 @@ export class PerformanceCollector implements CollectorInterface {
       }
     }
     
-    // CLS recommendations
     if (vitals && vitals['CLS'] !== undefined && vitals['CLS'] > this.thresholds['CLS']) {
       recommendations.push('Add size attributes to images and videos to prevent layout shifts');
       recommendations.push('Avoid inserting content above existing content');
     }
     
-    // TTFB recommendations
     if (vitals && vitals['TTFB'] !== undefined && vitals['TTFB'] > this.thresholds['TTFB']) {
       recommendations.push('Improve server response time - consider caching, CDN, or server optimization');
     }
     
-    // Resource recommendations
     const uncachedResources = resources.filter(r => !(r as any).cached);
     if (uncachedResources.length > resources.length * 0.5) {
       recommendations.push('Enable caching for static resources to improve load times');
     }
     
-    const largeResources = resources.filter(r => (r.transferSize || 0) > 500000); // 500KB
+    const largeResources = resources.filter(r => (r.transferSize || 0) > 500000);
     if (largeResources.length > 0) {
       recommendations.push(`Optimize ${largeResources.length} large resources (>500KB)`);
     }
     
-    // Long task recommendations
     const longTasks = this.longTasks.get(scenarioId) || [];
     if (longTasks.length > 5) {
       recommendations.push('Break up long JavaScript tasks to improve interactivity');
     }
     
-    // Memory recommendations
     const memorySnapshots = this.memorySnapshots.get(scenarioId) || [];
     if (memorySnapshots.length > 1) {
       const firstSnapshot = memorySnapshots[0];
@@ -1042,7 +956,6 @@ export class PerformanceCollector implements CollectorInterface {
       }
     }
     
-    // Third-party resource recommendations
     const thirdPartyResources = resources.filter(r => {
       try {
         const resourceUrl = new URL(r.name);
@@ -1094,10 +1007,8 @@ export class PerformanceCollector implements CollectorInterface {
     const evidence: Evidence[] = [];
     
     try {
-      // Generate comprehensive performance report
       const report = await this.generateFinalReport(this.executionId);
       
-      // Save main report
       const reportPath = path.join(this.performancePath, 'performance-report.json');
       await writeFileAsync(reportPath, JSON.stringify(report, null, 2));
       
@@ -1116,7 +1027,6 @@ export class PerformanceCollector implements CollectorInterface {
         tags: ['performance', 'report', 'final']
       });
 
-      // Generate detailed analysis reports
       const analysisPath = await this.generateDetailedAnalysis(this.executionId);
       evidence.push({
         id: `performance-analysis-${this.executionId}`,
@@ -1129,7 +1039,6 @@ export class PerformanceCollector implements CollectorInterface {
         tags: ['performance', 'analysis']
       });
 
-      // Generate resource waterfall
       const waterfallPath = await this.generateResourceWaterfall(this.executionId);
       evidence.push({
         id: `performance-waterfall-${this.executionId}`,
@@ -1142,7 +1051,6 @@ export class PerformanceCollector implements CollectorInterface {
         tags: ['performance', 'waterfall']
       });
 
-      // Generate filmstrip if screenshots available
       const filmstripPath = await this.generateFilmstrip(this.executionId);
       if (filmstripPath) {
         evidence.push({
@@ -1157,7 +1065,6 @@ export class PerformanceCollector implements CollectorInterface {
         });
       }
 
-      // Clean up
       this.cleanup();
 
       ActionLogger.logInfo('PerformanceCollector finalized', {
@@ -1174,7 +1081,6 @@ export class PerformanceCollector implements CollectorInterface {
   private async generateFinalReport(executionId: string): Promise<any> {
     const scenarios: any[] = [];
     
-    // Process each scenario
     for (const [scenarioId, navigations] of Array.from(this.navigationTimings.entries())) {
       const scenarioReport = {
         scenarioId,
@@ -1190,7 +1096,6 @@ export class PerformanceCollector implements CollectorInterface {
       scenarios.push(scenarioReport);
     }
     
-    // Calculate overall metrics
     const overallScore = scenarios.reduce((sum, s) => sum + s.summary.score, 0) / scenarios.length;
     const overallGrade = this.getPerformanceGrade(overallScore);
     
@@ -1236,10 +1141,8 @@ export class PerformanceCollector implements CollectorInterface {
   private analyzeResources(scenarioId: string): any {
     const resources = this.resourceTimings.get(scenarioId) || [];
     
-    // Group by type
     const byType = this.groupResourcesByType(resources);
     
-    // Find slowest resources
     const slowest = [...resources]
       .sort((a, b) => b.duration - a.duration)
       .slice(0, 10)
@@ -1250,7 +1153,6 @@ export class PerformanceCollector implements CollectorInterface {
         type: r.initiatorType
       }));
     
-    // Find largest resources
     const largest = [...resources]
       .sort((a, b) => (b.transferSize || 0) - (a.transferSize || 0))
       .slice(0, 10)
@@ -1382,7 +1284,6 @@ export class PerformanceCollector implements CollectorInterface {
       });
     });
     
-    // Return top recommendations
     return Object.entries(allRecommendations)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
@@ -1390,7 +1291,6 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private generateBenchmarks(_scenarios: any[]): any {
-    // Industry standard benchmarks
     const benchmarks = {
       webVitals: {
         FCP: { good: 1800, poor: 3000 },
@@ -1409,7 +1309,6 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private getIndustryBenchmarks(): any {
-    // These would come from HTTP Archive or similar sources
     return {
       FCP: { p50: 1500, p75: 2500, p90: 4000 },
       LCP: { p50: 2000, p75: 3500, p90: 5500 },
@@ -1419,7 +1318,6 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private getPreviousRunBenchmarks(): any {
-    // Would load from previous test runs
     return null;
   }
 
@@ -1463,7 +1361,7 @@ export class PerformanceCollector implements CollectorInterface {
       ttfb: {
         average: this.average(allNavigations.map(n => n.ttfb).filter((t): t is number => t !== undefined)),
         breakdown: {
-          redirect: this.average(allNavigations.map(n => n.redirectCount * 100)), // Estimate
+          redirect: this.average(allNavigations.map(n => n.redirectCount * 100)),
           serverProcessing: this.average(allNavigations.map(n => {
             if (n.ttfb !== undefined && n.tcp !== undefined && n.dns !== undefined) {
               return n.ttfb - n.tcp - n.dns;
@@ -1527,7 +1425,6 @@ export class PerformanceCollector implements CollectorInterface {
     
     const opportunities = [];
     
-    // Compression opportunities
     const uncompressedResources = allResources.filter(r => 
       r.encodedBodySize === r.decodedBodySize && r.decodedBodySize > 1000
     );
@@ -1537,12 +1434,11 @@ export class PerformanceCollector implements CollectorInterface {
         impact: 'high',
         resources: uncompressedResources.length,
         potentialSavings: uncompressedResources.reduce((sum, r) => 
-          sum + (r.decodedBodySize * 0.7), 0 // Assume 70% compression
+          sum + (r.decodedBodySize * 0.7), 0
         )
       });
     }
     
-    // Caching opportunities
     const uncachedResources = allResources.filter(r => !(r as any).cached);
     if (uncachedResources.length > allResources.length * 0.3) {
       opportunities.push({
@@ -1576,7 +1472,6 @@ export class PerformanceCollector implements CollectorInterface {
   private isThirdParty(url: string): boolean {
     try {
       const resourceUrl = new URL(url);
-      // This is simplified - in reality, you'd check against the main domain
       return !resourceUrl.hostname.includes('localhost') && 
              !resourceUrl.hostname.includes('127.0.0.1');
     } catch {
@@ -1604,7 +1499,6 @@ export class PerformanceCollector implements CollectorInterface {
         byDomain[domain].size += resource.transferSize || 0;
         byDomain[domain].duration += resource.duration;
       } catch {
-        // Invalid URL
       }
     });
     
@@ -1647,7 +1541,6 @@ export class PerformanceCollector implements CollectorInterface {
         scenarioId,
         startTime: navigation.fetchStart,
         entries: [
-          // Navigation timing
           {
             name: 'Navigation',
             type: 'navigation',
@@ -1664,7 +1557,6 @@ export class PerformanceCollector implements CollectorInterface {
               load: { start: navigation.loadEventStart, end: navigation.loadEventEnd }
             }
           },
-          // Resource timings
           ...resources.map(r => ({
             name: r.name,
             type: r.initiatorType,
@@ -1693,7 +1585,6 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private async generateFilmstrip(executionId: string): Promise<string | null> {
-    // Real filmstrip generation from performance timeline
     try {
       const filmstripData: any = {
         executionId,
@@ -1704,27 +1595,21 @@ export class PerformanceCollector implements CollectorInterface {
       for (const [scenarioId, page] of Array.from(this.scenarioPages.entries())) {
         if (!page) continue;
 
-        // Enable Chrome DevTools Protocol for detailed timeline
         const client = await page.context().newCDPSession(page);
         
-        // Start tracing to capture screenshots
         await client.send('Tracing.start', {
           categories: ['devtools.timeline', 'v8.execute', 'blink.user_timing', 'disabled-by-default-devtools.screenshot'],
-          options: 'sampling-frequency=10000', // 10ms sampling
+          options: 'sampling-frequency=10000',
           screenshots: true
         });
 
-        // Wait for page to stabilize
         await page.waitForLoadState('networkidle');
 
-        // Stop tracing and get data
         await client.send('Tracing.end');
         
-        // Process trace events to extract screenshots
         const frames: Array<{timestamp: number, screenshot: string}> = [];
         let traceData = '';
         
-        // Collect trace data chunks
         await new Promise<void>((resolve) => {
           client.on('Tracing.dataCollected', (params: any) => {
             traceData += params.value;
@@ -1735,7 +1620,6 @@ export class PerformanceCollector implements CollectorInterface {
           });
         });
 
-        // Parse trace data
         const traceEvents = traceData.split('\n')
           .filter(line => line.trim())
           .map(line => {
@@ -1747,7 +1631,6 @@ export class PerformanceCollector implements CollectorInterface {
           })
           .filter(event => event !== null);
 
-        // Extract screenshot events
         for (const event of traceEvents) {
           if (event.name === 'Screenshot' && event.args && event.args.snapshot) {
             frames.push({
@@ -1757,13 +1640,10 @@ export class PerformanceCollector implements CollectorInterface {
           }
         }
 
-        // Get navigation data
         const navigation = this.navigationTimings.get(scenarioId)?.[0];
         
-        // If no screenshots from tracing, capture programmatically
         if (frames.length === 0) {
           if (navigation) {
-            // Capture screenshots at key moments
             const keyMoments = [
               { name: 'start', time: 0 },
               { name: 'ttfb', time: navigation.ttfb || 0 },
@@ -1774,9 +1654,7 @@ export class PerformanceCollector implements CollectorInterface {
 
             for (const moment of keyMoments) {
               try {
-                // Navigate to the specific time if possible
                 await page.evaluate((time: number) => {
-                  // Simulate time progression for animations
                   if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
                     const startTime = performance.now();
                     const animate = () => {
@@ -1789,7 +1667,6 @@ export class PerformanceCollector implements CollectorInterface {
                   }
                 }, moment.time);
 
-                // Capture screenshot
                 const screenshot = await page.screenshot({
                   type: 'jpeg',
                   quality: 75,
@@ -1807,7 +1684,6 @@ export class PerformanceCollector implements CollectorInterface {
           }
         }
 
-        // Process frames to create visual progression
         const visualProgression = this.analyzeVisualProgression(frames);
         
         filmstripData.scenarios.push({
@@ -1823,15 +1699,12 @@ export class PerformanceCollector implements CollectorInterface {
           speedIndex: await this.calculateSpeedIndex(scenarioId)
         });
 
-        // Cleanup CDP session
         await client.detach();
       }
 
-      // Save filmstrip data
       const filepath = path.join(this.performancePath, 'performance-filmstrip.json');
       await writeFileAsync(filepath, JSON.stringify(filmstripData, null, 2));
 
-      // Generate HTML visualization
       const htmlPath = await this.generateFilmstripHTML(filmstripData);
       
       return htmlPath;
@@ -1851,14 +1724,12 @@ export class PerformanceCollector implements CollectorInterface {
     
     if (!firstFrame || !lastFrame) return [];
     
-    // Analyze each frame's visual completeness
     frames.forEach((frame, index) => {
       if (index === 0) {
-        progression.push(0); // First frame is 0% complete
+        progression.push(0);
       } else if (index === frames.length - 1) {
-        progression.push(100); // Last frame is 100% complete
+        progression.push(100);
       } else {
-        // Calculate visual difference between current frame and final frame
         const currentFrame = Buffer.from(frame.screenshot, 'base64');
         const similarity = this.calculateImageSimilarity(currentFrame, lastFrame);
         progression.push(similarity * 100);
@@ -1869,23 +1740,18 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private calculateImageSimilarity(image1: Buffer, image2: Buffer): number {
-    // Use perceptual hash for quick similarity comparison
     const hash1 = this.calculatePerceptualHash(image1);
     const hash2 = this.calculatePerceptualHash(image2);
     
-    // Calculate Hamming distance
     let distance = 0;
     for (let i = 0; i < hash1.length; i++) {
       if (hash1[i] !== hash2[i]) distance++;
     }
     
-    // Convert to similarity (0-1)
     return 1 - (distance / hash1.length);
   }
 
   private calculatePerceptualHash(imageBuffer: Buffer): string {
-    // Simple perceptual hash implementation
-    // In production, you'd use a library like jimp or sharp for proper image processing
     const hash = crypto.createHash('sha256');
     hash.update(imageBuffer);
     return hash.digest('hex');
@@ -1897,7 +1763,6 @@ export class PerformanceCollector implements CollectorInterface {
   ): Array<{index: number, type: string, timestamp: number}> {
     const keyFrames: Array<{index: number, type: string, timestamp: number}> = [];
     
-    // First frame
     if (frames.length > 0) {
       keyFrames.push({
         index: 0,
@@ -1906,7 +1771,6 @@ export class PerformanceCollector implements CollectorInterface {
       });
     }
     
-    // Find first visual change (FVC)
     for (let i = 1; i < progression.length; i++) {
       const frame = frames[i];
       const progressValue = progression[i];
@@ -1920,7 +1784,6 @@ export class PerformanceCollector implements CollectorInterface {
       }
     }
     
-    // Find visually complete frames
     const thresholds = [50, 85, 95, 100];
     thresholds.forEach(threshold => {
       for (let i = 0; i < progression.length; i++) {
@@ -2106,14 +1969,10 @@ export class PerformanceCollector implements CollectorInterface {
     return filepath;
   }
 
-  /**
-   * Collect system performance metrics
-   */
   async collectSystemMetrics(metrics: any): Promise<void> {
     try {
       const timestamp = Date.now();
       
-      // Store system metrics with timestamp
       const systemSnapshot: MemoryInfo = {
         timestamp,
         heapUsed: metrics.memoryUsage || 0,
@@ -2130,7 +1989,6 @@ export class PerformanceCollector implements CollectorInterface {
       }
       this.memorySnapshots.get('system')!.push(systemSnapshot);
       
-      // Log high memory usage
       const memoryUsagePercent = (metrics.memoryUsage / metrics.totalMemory) * 100;
       if (memoryUsagePercent > 80) {
         const logger = ActionLogger.getInstance();
@@ -2141,9 +1999,6 @@ export class PerformanceCollector implements CollectorInterface {
     }
   }
 
-  /**
-   * Get collected performance metrics
-   */
   getMetrics(): PerformanceMetrics {
     const metrics: PerformanceMetrics = {
       navigationTimings: Array.from(this.navigationTimings.entries()),
@@ -2160,7 +2015,6 @@ export class PerformanceCollector implements CollectorInterface {
   }
 
   private cleanup(): void {
-    // Clear data structures
     this.navigationTimings.clear();
     this.resourceTimings.clear();
     this.userTimings.clear();
@@ -2171,7 +2025,6 @@ export class PerformanceCollector implements CollectorInterface {
     this.customMeasures.clear();
     this.scenarioPages.clear();
     
-    // Disconnect observer
     if (this.observer) {
       this.observer.disconnect();
     }

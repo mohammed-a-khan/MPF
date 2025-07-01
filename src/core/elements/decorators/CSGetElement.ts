@@ -4,51 +4,38 @@ import { CSGetElementOptions } from '../types/element.types';
 import { Page } from 'playwright';
 import { ElementMetadata } from './ElementMetadata';
 
-/**
- * Decorator for defining page elements with automatic initialization
- * @param options Element locator options
- */
 export function CSGetElement(options: CSGetElementOptions): PropertyDecorator {
     return function (target: any, propertyKey: string | symbol) {
         const propertyName = propertyKey.toString();
         const className = target.constructor.name;
         
-        // Store metadata for CSBasePage initialization
         ElementMetadata.store(className, propertyName, options);
         
-        // Create a private property to store the element instance
         const privateKey = `_element_${propertyName}`;
         
         Object.defineProperty(target, propertyKey, {
             get: function () {
-                // Get current page
                 const page = this.page as Page;
                 if (!page) {
                     throw new Error(`Page is not initialized for ${className}.${propertyName}. Make sure the page object is properly initialized with a page instance.`);
                 }
                 
-                // Check if element already exists and page hasn't changed
                 if (this[privateKey]) {
                     const element = this[privateKey] as CSWebElement;
-                    // If the page has changed or is closed, we need to recreate the element
                     try {
-                        // Always check if the page is closed first
                         if (page.isClosed()) {
                             delete this[privateKey];
                         } else if (element.page !== page || element.page.isClosed()) {
                             delete this[privateKey];
                         } else {
-                            // Update the element's page reference to ensure it's current
                             element.page = page;
                             return element;
                         }
                     } catch (error) {
-                        // If we can't check, recreate the element
                         delete this[privateKey];
                     }
                 }
 
-                // Create element configuration
                 const config: ElementConfig = {
                     locatorType: options.locatorType,
                     locatorValue: options.locatorValue,
@@ -63,7 +50,6 @@ export function CSGetElement(options: CSGetElementOptions): PropertyDecorator {
                     fallbacks: []
                 };
 
-                // Create and cache the element
                 const element = new CSWebElement(page, config);
                 this[privateKey] = element;
                 
@@ -78,11 +64,7 @@ export function CSGetElement(options: CSGetElementOptions): PropertyDecorator {
     };
 }
 
-// Additional decorators for common element types
 
-/**
- * Decorator for button elements
- */
 export function CSButton(options: Partial<CSGetElementOptions> & { text: string }): PropertyDecorator {
     return CSGetElement({
         locatorType: 'role',
@@ -92,9 +74,6 @@ export function CSButton(options: Partial<CSGetElementOptions> & { text: string 
     });
 }
 
-/**
- * Decorator for input elements
- */
 export function CSInput(options: Partial<CSGetElementOptions> & { label?: string; placeholder?: string }): PropertyDecorator {
   if (options.label) {
     return CSGetElement({
@@ -115,9 +94,6 @@ export function CSInput(options: Partial<CSGetElementOptions> & { label?: string
   }
 }
 
-/**
- * Decorator for link elements
- */
 export function CSLink(options: Partial<CSGetElementOptions> & { text: string }): PropertyDecorator {
   return CSGetElement({
     locatorType: 'role',
@@ -127,9 +103,6 @@ export function CSLink(options: Partial<CSGetElementOptions> & { text: string })
   });
 }
 
-/**
- * Decorator for checkbox elements
- */
 export function CSCheckbox(options: Partial<CSGetElementOptions> & { label: string }): PropertyDecorator {
   return CSGetElement({
     locatorType: 'role',
@@ -139,9 +112,6 @@ export function CSCheckbox(options: Partial<CSGetElementOptions> & { label: stri
   });
 }
 
-/**
- * Decorator for select/dropdown elements
- */
 export function CSSelect(options: Partial<CSGetElementOptions> & { label?: string; name?: string }): PropertyDecorator {
   if (options.label) {
     return CSGetElement({
@@ -162,9 +132,6 @@ export function CSSelect(options: Partial<CSGetElementOptions> & { label?: strin
   }
 }
 
-/**
- * Decorator for text elements
- */
 export function CSText(options: Partial<CSGetElementOptions> & { text: string }): PropertyDecorator {
   return CSGetElement({
     locatorType: 'text',
@@ -174,9 +141,6 @@ export function CSText(options: Partial<CSGetElementOptions> & { text: string })
   });
 }
 
-/**
- * Decorator for elements by test ID
- */
 export function CSTestId(options: Partial<CSGetElementOptions> & { testId: string }): PropertyDecorator {
   return CSGetElement({
     locatorType: 'testid',
@@ -186,9 +150,6 @@ export function CSTestId(options: Partial<CSGetElementOptions> & { testId: strin
   });
 }
 
-/**
- * Decorator for image elements
- */
 export function CSImage(options: Partial<CSGetElementOptions> & { alt: string }): PropertyDecorator {
   return CSGetElement({
     locatorType: 'alt',

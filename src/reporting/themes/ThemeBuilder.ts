@@ -1,8 +1,3 @@
-/**
- * Theme Builder
- * Dynamically generates CSS themes for reports with brand customization
- * Supports light, dark, and custom color schemes with full CSS generation
- */
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -29,7 +24,6 @@ export class ThemeBuilder {
   private cssVariables: Map<string, CSSVariable> = new Map();
   private componentStyles: Map<string, ComponentStyle> = new Map();
 
-  // CS Brand Colors
   private readonly brandColors = {
     primary: '#93186C',
     primaryLight: '#B91C84',
@@ -53,10 +47,8 @@ export class ThemeBuilder {
     this.themePath = outputPath;
     await FileUtils.ensureDir(this.themePath);
 
-    // Initialize CSS variables
     this.initializeCSSVariables();
 
-    // Initialize component styles
     this.initializeComponentStyles();
 
     Logger.getInstance('ThemeBuilder').info('ThemeBuilder initialized', {
@@ -73,7 +65,6 @@ export class ThemeBuilder {
     });
 
     try {
-      // Start with preset if specified
       let colorPalette: ColorPalette;
       if (config.preset) {
         colorPalette = this.getPresetPalette(config.preset);
@@ -81,27 +72,20 @@ export class ThemeBuilder {
         colorPalette = this.createCustomPalette(config);
       }
 
-      // Override with custom colors if provided
       if (config.customColors) {
         colorPalette = { ...colorPalette, ...config.customColors };
       }
 
-      // Generate CSS
       const css = this.generateCSS(config, colorPalette);
 
-      // Generate component styles
       const components = this.generateComponentStyles(config, colorPalette);
 
-      // Generate animations
       const animations = this.generateAnimations(config.animations);
 
-      // Generate responsive styles
       const responsive = this.generateResponsiveStyles(config.breakpoints);
 
-      // Generate print styles
       const printStyles = this.generatePrintStyles(colorPalette);
 
-      // Combine all CSS
       const fullCSS = this.combineCSS({
         base: css,
         components,
@@ -110,10 +94,8 @@ export class ThemeBuilder {
         print: printStyles,
       });
 
-      // Minify if production
       const finalCSS = config.minify ? this.minifyCSS(fullCSS) : fullCSS;
 
-      // Create theme output
       const themeOutput: ThemeOutput = {
         id: themeId,
         name: config.name,
@@ -128,10 +110,8 @@ export class ThemeBuilder {
         },
       };
 
-      // Save theme files
       await this.saveTheme(themeOutput);
 
-      // Cache generated theme
       this.generatedThemes.set(themeId, themeOutput);
 
       Logger.getInstance('ThemeBuilder').info(`Theme built successfully: ${config.name}`, {
@@ -149,7 +129,6 @@ export class ThemeBuilder {
   }
 
   private initializeCSSVariables(): void {
-    // Color variables
     this.cssVariables.set('--cs-primary', {
       name: '--cs-primary',
       value: this.brandColors.primary,
@@ -169,7 +148,6 @@ export class ThemeBuilder {
       category: 'color',
     } as CSSVariable);
 
-    // Typography variables
     this.cssVariables.set('--cs-font-family', {
       name: '--cs-font-family',
       value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -182,7 +160,6 @@ export class ThemeBuilder {
       category: 'typography',
     } as CSSVariable);
 
-    // Spacing variables
     const spacingSizes = [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 5];
     spacingSizes.forEach(size => {
       this.cssVariables.set(`--cs-spacing-${size}`, {
@@ -192,14 +169,12 @@ export class ThemeBuilder {
       } as CSSVariable);
     });
 
-    // Border radius
     this.cssVariables.set('--cs-border-radius', {
       name: '--cs-border-radius',
       value: '0.375rem',
       category: 'border',
     } as CSSVariable);
 
-    // Shadows
     this.cssVariables.set('--cs-shadow-sm', {
       name: '--cs-shadow-sm',
       value: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
@@ -218,7 +193,6 @@ export class ThemeBuilder {
       category: 'shadow',
     } as CSSVariable);
 
-    // Transitions
     this.cssVariables.set('--cs-transition', {
       name: '--cs-transition',
       value: 'all 0.3s ease',
@@ -233,7 +207,6 @@ export class ThemeBuilder {
   }
 
   private initializeComponentStyles(): void {
-    // Button styles
     this.componentStyles.set('button', {
       base: `
         .cs-button {
@@ -333,7 +306,6 @@ export class ThemeBuilder {
       },
     });
 
-    // Card styles
     this.componentStyles.set('card', {
       base: `
         .cs-card {
@@ -388,7 +360,6 @@ export class ThemeBuilder {
       },
     });
 
-    // Table styles
     this.componentStyles.set('table', {
       base: `
         .cs-table {
@@ -449,7 +420,6 @@ export class ThemeBuilder {
       },
     });
 
-    // Chart container styles
     this.componentStyles.set('chart', {
       base: `
         .cs-chart-container {
@@ -503,7 +473,6 @@ export class ThemeBuilder {
       },
     });
 
-    // Alert/notification styles
     this.componentStyles.set('alert', {
       base: `
         .cs-alert {
@@ -566,7 +535,6 @@ export class ThemeBuilder {
       },
     });
 
-    // Badge styles
     this.componentStyles.set('badge', {
       base: `
         .cs-badge {
@@ -613,7 +581,6 @@ export class ThemeBuilder {
       },
     });
 
-    // Progress bar styles
     this.componentStyles.set('progress', {
       base: `
         .cs-progress {
@@ -690,7 +657,6 @@ export class ThemeBuilder {
       },
     });
 
-    // Navigation styles
     this.componentStyles.set('nav', {
       base: `
         .cs-nav {
@@ -835,26 +801,22 @@ export class ThemeBuilder {
 
   private createCSBrandPalette(): ColorPalette {
     return {
-      // Core colors required by ColorPalette interface
       background: '#FFFFFF',
       surface: '#FFFFFF',
       text: '#212529',
       border: '#DEE2E6',
       shadow: 'rgba(0, 0, 0, 0.1)',
 
-      // Primary colors
       primary: this.brandColors.primary,
       primaryLight: this.brandColors.primaryLight,
       primaryDark: this.brandColors.primaryDark,
       primaryContrast: this.brandColors.primaryContrast,
 
-      // Secondary colors
       secondary: this.brandColors.secondary,
       secondaryLight: '#FFFFFF',
       secondaryDark: this.brandColors.secondaryDark,
       secondaryContrast: this.brandColors.secondaryContrast,
 
-      // Status colors
       success: '#28A745',
       successLight: '#48B461',
       successDark: '#1E7E34',
@@ -871,7 +833,6 @@ export class ThemeBuilder {
       infoLight: '#3AB0C3',
       infoDark: '#138496',
 
-      // Neutral colors
       gray100: '#F8F9FA',
       gray200: '#E9ECEF',
       gray300: '#DEE2E6',
@@ -882,7 +843,6 @@ export class ThemeBuilder {
       gray800: '#343A40',
       gray900: '#212529',
 
-      // Background colors
       bgPrimary: '#FFFFFF',
       bgSecondary: '#F8F9FA',
       bgTertiary: '#E9ECEF',
@@ -892,7 +852,6 @@ export class ThemeBuilder {
       bgStripe: 'rgba(0, 0, 0, 0.02)',
       bgNav: '#FFFFFF',
 
-      // Text colors
       textPrimary: '#212529',
       textSecondary: '#6C757D',
       textMuted: '#ADB5BD',
@@ -902,12 +861,10 @@ export class ThemeBuilder {
       textLink: this.brandColors.primary,
       textLinkHover: this.brandColors.primaryDark,
 
-      // Border colors
       borderColor: '#DEE2E6',
       borderColorLight: '#E9ECEF',
       borderColorDark: '#CED4DA',
 
-      // Shadow colors
       shadowColor: 'rgba(0, 0, 0, 0.1)',
       shadowColorLight: 'rgba(0, 0, 0, 0.05)',
       shadowColorDark: 'rgba(0, 0, 0, 0.15)',
@@ -916,26 +873,22 @@ export class ThemeBuilder {
 
   private createDarkPalette(): ColorPalette {
     return {
-      // Core colors required by ColorPalette interface
       background: '#1A1A1A',
       surface: '#2B2B2B',
       text: '#F4F4F4',
       border: '#3A3A3A',
       shadow: 'rgba(0, 0, 0, 0.3)',
 
-      // Primary colors (adjusted for dark theme)
       primary: '#B91C84',
       primaryLight: '#D13A9C',
       primaryDark: '#93186C',
       primaryContrast: '#FFFFFF',
 
-      // Secondary colors
       secondary: '#2B2B2B',
       secondaryLight: '#3A3A3A',
       secondaryDark: '#1A1A1A',
       secondaryContrast: '#FFFFFF',
 
-      // Status colors (adjusted for dark backgrounds)
       success: '#48B461',
       successLight: '#5BC073',
       successDark: '#28A745',
@@ -952,7 +905,6 @@ export class ThemeBuilder {
       infoLight: '#52B9CB',
       infoDark: '#17A2B8',
 
-      // Neutral colors (inverted)
       gray100: '#1A1A1A',
       gray200: '#2B2B2B',
       gray300: '#3A3A3A',
@@ -963,7 +915,6 @@ export class ThemeBuilder {
       gray800: '#D2D2D2',
       gray900: '#F4F4F4',
 
-      // Background colors
       bgPrimary: '#1A1A1A',
       bgSecondary: '#2B2B2B',
       bgTertiary: '#3A3A3A',
@@ -973,7 +924,6 @@ export class ThemeBuilder {
       bgStripe: 'rgba(255, 255, 255, 0.02)',
       bgNav: '#2B2B2B',
 
-      // Text colors
       textPrimary: '#F4F4F4',
       textSecondary: '#B0B0B0',
       textMuted: '#8E8E8E',
@@ -983,12 +933,10 @@ export class ThemeBuilder {
       textLink: '#D13A9C',
       textLinkHover: '#E95BAB',
 
-      // Border colors
       borderColor: '#3A3A3A',
       borderColorLight: '#4A4A4A',
       borderColorDark: '#2B2B2B',
 
-      // Shadow colors
       shadowColor: 'rgba(0, 0, 0, 0.3)',
       shadowColorLight: 'rgba(0, 0, 0, 0.2)',
       shadowColorDark: 'rgba(0, 0, 0, 0.4)',
@@ -996,7 +944,6 @@ export class ThemeBuilder {
   }
 
   private createLightPalette(): ColorPalette {
-    // Similar to CS brand but with lighter tones
     const base = this.createCSBrandPalette();
 
     return {
@@ -1020,14 +967,12 @@ export class ThemeBuilder {
 
   private createHighContrastPalette(): ColorPalette {
     return {
-      // Core colors required by ColorPalette interface
       background: '#FFFFFF',
       surface: '#FFFFFF',
       text: '#000000',
       border: '#000000',
       shadow: 'transparent',
 
-      // High contrast colors
       primary: '#000000',
       primaryLight: '#333333',
       primaryDark: '#000000',
@@ -1038,7 +983,6 @@ export class ThemeBuilder {
       secondaryDark: '#F0F0F0',
       secondaryContrast: '#000000',
 
-      // Status colors with maximum contrast
       success: '#00FF00',
       successLight: '#33FF33',
       successDark: '#00CC00',
@@ -1055,7 +999,6 @@ export class ThemeBuilder {
       infoLight: '#33FFFF',
       infoDark: '#00CCCC',
 
-      // Black and white only
       gray100: '#FFFFFF',
       gray200: '#FFFFFF',
       gray300: '#FFFFFF',
@@ -1066,7 +1009,6 @@ export class ThemeBuilder {
       gray800: '#000000',
       gray900: '#000000',
 
-      // High contrast backgrounds
       bgPrimary: '#FFFFFF',
       bgSecondary: '#FFFFFF',
       bgTertiary: '#FFFFFF',
@@ -1076,7 +1018,6 @@ export class ThemeBuilder {
       bgStripe: '#F5F5F5',
       bgNav: '#000000',
 
-      // High contrast text
       textPrimary: '#000000',
       textSecondary: '#000000',
       textMuted: '#666666',
@@ -1086,12 +1027,10 @@ export class ThemeBuilder {
       textLink: '#0000FF',
       textLinkHover: '#000080',
 
-      // High contrast borders
       borderColor: '#000000',
       borderColorLight: '#666666',
       borderColorDark: '#000000',
 
-      // No shadows in high contrast
       shadowColor: 'transparent',
       shadowColorLight: 'transparent',
       shadowColorDark: 'transparent',
@@ -1100,14 +1039,12 @@ export class ThemeBuilder {
 
   private createPrintPalette(): ColorPalette {
     return {
-      // Core colors required by ColorPalette interface
       background: '#FFFFFF',
       surface: '#FFFFFF',
       text: '#000000',
       border: '#000000',
       shadow: 'transparent',
 
-      // Print-friendly colors
       primary: '#000000',
       primaryLight: '#333333',
       primaryDark: '#000000',
@@ -1118,7 +1055,6 @@ export class ThemeBuilder {
       secondaryDark: '#F0F0F0',
       secondaryContrast: '#000000',
 
-      // Grayscale status colors for print
       success: '#666666',
       successLight: '#999999',
       successDark: '#333333',
@@ -1135,7 +1071,6 @@ export class ThemeBuilder {
       infoLight: '#999999',
       infoDark: '#333333',
 
-      // Grayscale
       gray100: '#FFFFFF',
       gray200: '#F5F5F5',
       gray300: '#E0E0E0',
@@ -1146,7 +1081,6 @@ export class ThemeBuilder {
       gray800: '#1A1A1A',
       gray900: '#000000',
 
-      // White backgrounds for print
       bgPrimary: '#FFFFFF',
       bgSecondary: '#FFFFFF',
       bgTertiary: '#FFFFFF',
@@ -1156,7 +1090,6 @@ export class ThemeBuilder {
       bgStripe: '#F5F5F5',
       bgNav: '#FFFFFF',
 
-      // Black text for print
       textPrimary: '#000000',
       textSecondary: '#333333',
       textMuted: '#666666',
@@ -1166,12 +1099,10 @@ export class ThemeBuilder {
       textLink: '#000000',
       textLinkHover: '#000000',
 
-      // Black borders for print
       borderColor: '#000000',
       borderColorLight: '#CCCCCC',
       borderColorDark: '#000000',
 
-      // No shadows for print
       shadowColor: 'transparent',
       shadowColorLight: 'transparent',
       shadowColorDark: 'transparent',
@@ -1179,10 +1110,8 @@ export class ThemeBuilder {
   }
 
   private createCustomPalette(config: ThemeConfig): ColorPalette {
-    // Start with brand palette as base
     const base = this.createCSBrandPalette();
 
-    // Override with any custom colors
     if (config.customColors) {
       return { ...base, ...config.customColors };
     }
@@ -1193,26 +1122,21 @@ export class ThemeBuilder {
   private generateCSS(config: ThemeConfig, palette: ColorPalette): string {
     const css: string[] = [];
 
-    // CSS Reset
     css.push(this.generateReset());
 
-    // Root variables
     css.push(':root {');
 
-    // Color variables
     Object.entries(palette).forEach(([key, value]) => {
       const cssVarName = `--cs-${this.camelToKebab(key)}`;
       css.push(`  ${cssVarName}: ${value};`);
     });
 
-    // Add all other CSS variables
     this.cssVariables.forEach(variable => {
       if (!variable.name.includes('color') && !variable.name.includes('primary')) {
         css.push(`  ${variable.name}: ${variable.value};`);
       }
     });
 
-    // Font variables
     if (config.fonts) {
       css.push(`  --cs-font-family-base: ${config.fonts.base ?? 'system-ui, -apple-system, sans-serif'};`);
       css.push(`  --cs-font-family-heading: ${config.fonts.heading ?? 'var(--cs-font-family-base)'};`);
@@ -1221,16 +1145,12 @@ export class ThemeBuilder {
 
     css.push('}');
 
-    // Base styles
     css.push(this.generateBaseStyles(palette));
 
-    // Typography
     css.push(this.generateTypography(config.fonts));
 
-    // Layout
     css.push(this.generateLayout());
 
-    // Utilities
     css.push(this.generateUtilities());
 
     return css.join('\n');
@@ -1238,7 +1158,6 @@ export class ThemeBuilder {
 
   private generateReset(): string {
     return `
-/* CSS Reset */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -1301,7 +1220,6 @@ ol, ul {
 
   private generateBaseStyles(_palette: ColorPalette): string {
     return `
-/* Base Styles */
 .cs-report {
   font-family: var(--cs-font-family-base);
   font-size: var(--cs-font-size-base);
@@ -1349,7 +1267,6 @@ ol, ul {
   margin-top: auto;
 }
 
-/* Status Colors */
 .cs-success { color: var(--cs-success); }
 .cs-error { color: var(--cs-error); }
 .cs-warning { color: var(--cs-warning); }
@@ -1360,19 +1277,16 @@ ol, ul {
 .cs-bg-warning { background-color: var(--cs-warning-bg); }
 .cs-bg-info { background-color: var(--cs-info-bg); }
 
-/* Focus Styles */
 :focus-visible {
   outline: 2px solid var(--cs-primary);
   outline-offset: 2px;
 }
 
-/* Selection */
 ::selection {
   background-color: var(--cs-primary);
   color: var(--cs-primary-contrast);
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 12px;
   height: 12px;
@@ -1395,7 +1309,6 @@ ol, ul {
 
   private generateTypography(_fonts?: FontConfig): string {
     return `
-/* Typography */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--cs-font-family-heading);
   font-weight: 600;
@@ -1501,7 +1414,6 @@ hr {
 
   private generateLayout(): string {
     return `
-/* Layout */
 .cs-row {
   display: flex;
   flex-wrap: wrap;
@@ -1515,7 +1427,6 @@ hr {
   padding-right: var(--cs-spacing-1);
 }
 
-/* Column sizes */
 .cs-col-auto { flex: 0 0 auto; width: auto; }
 .cs-col-1 { flex: 0 0 8.333333%; max-width: 8.333333%; }
 .cs-col-2 { flex: 0 0 16.666667%; max-width: 16.666667%; }
@@ -1530,7 +1441,6 @@ hr {
 .cs-col-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
 .cs-col-12 { flex: 0 0 100%; max-width: 100%; }
 
-/* Grid */
 .cs-grid {
   display: grid;
   gap: var(--cs-spacing-1);
@@ -1543,7 +1453,6 @@ hr {
 .cs-grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .cs-grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 
-/* Flexbox utilities */
 .cs-flex { display: flex; }
 .cs-inline-flex { display: inline-flex; }
 .cs-flex-row { flex-direction: row; }
@@ -1569,7 +1478,6 @@ hr {
 .cs-flex-initial { flex: 0 1 auto; }
 .cs-flex-none { flex: none; }
 
-/* Gap utilities */
 .cs-gap-0 { gap: 0; }
 .cs-gap-1 { gap: var(--cs-spacing-1); }
 .cs-gap-2 { gap: var(--cs-spacing-2); }
@@ -1577,7 +1485,6 @@ hr {
 .cs-gap-4 { gap: var(--cs-spacing-4); }
 .cs-gap-5 { gap: var(--cs-spacing-5); }
 
-/* Position */
 .cs-static { position: static; }
 .cs-fixed { position: fixed; }
 .cs-absolute { position: absolute; }
@@ -1590,7 +1497,6 @@ hr {
 .cs-left-0 { left: 0; }
 .cs-inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
 
-/* Z-index */
 .cs-z-0 { z-index: 0; }
 .cs-z-10 { z-index: 10; }
 .cs-z-20 { z-index: 20; }
@@ -1599,13 +1505,11 @@ hr {
 .cs-z-50 { z-index: 50; }
 .cs-z-auto { z-index: auto; }
 
-/* Display */
 .cs-block { display: block; }
 .cs-inline-block { display: inline-block; }
 .cs-inline { display: inline; }
 .cs-hidden { display: none; }
 
-/* Overflow */
 .cs-overflow-auto { overflow: auto; }
 .cs-overflow-hidden { overflow: hidden; }
 .cs-overflow-visible { overflow: visible; }
@@ -1617,10 +1521,8 @@ hr {
 
   private generateUtilities(): string {
     return `
-/* Spacing Utilities */
 ${this.generateSpacingUtilities()}
 
-/* Width & Height */
 .cs-w-full { width: 100%; }
 .cs-w-screen { width: 100vw; }
 .cs-w-auto { width: auto; }
@@ -1647,7 +1549,6 @@ ${this.generateSpacingUtilities()}
 .cs-max-w-6xl { max-width: 72rem; }
 .cs-max-w-full { max-width: 100%; }
 
-/* Border */
 .cs-border { border-width: 1px; }
 .cs-border-0 { border-width: 0; }
 .cs-border-2 { border-width: 2px; }
@@ -1665,7 +1566,6 @@ ${this.generateSpacingUtilities()}
 .cs-border-warning { border-color: var(--cs-warning); }
 .cs-border-info { border-color: var(--cs-info); }
 
-/* Border Radius */
 .cs-rounded-none { border-radius: 0; }
 .cs-rounded-sm { border-radius: 0.125rem; }
 .cs-rounded { border-radius: var(--cs-border-radius); }
@@ -1675,20 +1575,17 @@ ${this.generateSpacingUtilities()}
 .cs-rounded-2xl { border-radius: 1rem; }
 .cs-rounded-full { border-radius: 9999px; }
 
-/* Shadow */
 .cs-shadow-none { box-shadow: none; }
 .cs-shadow-sm { box-shadow: var(--cs-shadow-sm); }
 .cs-shadow { box-shadow: var(--cs-shadow); }
 .cs-shadow-lg { box-shadow: var(--cs-shadow-lg); }
 
-/* Opacity */
 .cs-opacity-0 { opacity: 0; }
 .cs-opacity-25 { opacity: 0.25; }
 .cs-opacity-50 { opacity: 0.5; }
 .cs-opacity-75 { opacity: 0.75; }
 .cs-opacity-100 { opacity: 1; }
 
-/* Cursor */
 .cs-cursor-auto { cursor: auto; }
 .cs-cursor-default { cursor: default; }
 .cs-cursor-pointer { cursor: pointer; }
@@ -1696,17 +1593,14 @@ ${this.generateSpacingUtilities()}
 .cs-cursor-move { cursor: move; }
 .cs-cursor-not-allowed { cursor: not-allowed; }
 
-/* User Select */
 .cs-select-none { user-select: none; }
 .cs-select-text { user-select: text; }
 .cs-select-all { user-select: all; }
 .cs-select-auto { user-select: auto; }
 
-/* Visibility */
 .cs-visible { visibility: visible; }
 .cs-invisible { visibility: hidden; }
 
-/* Backdrop Filter */
 .cs-backdrop-blur { backdrop-filter: blur(8px); }
 .cs-backdrop-blur-sm { backdrop-filter: blur(4px); }
 .cs-backdrop-blur-lg { backdrop-filter: blur(16px); }
@@ -1783,7 +1677,6 @@ ${this.generateSpacingUtilities()}
 
   private generateAnimations(animations?: AnimationConfig): string {
     const defaultAnimations = `
-/* Animations */
 @keyframes cs-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1876,7 +1769,6 @@ ${this.generateSpacingUtilities()}
   }
 }
 
-/* Animation Classes */
 .cs-animate-fade-in { animation: cs-fade-in 0.5s ease-out; }
 .cs-animate-fade-out { animation: cs-fade-out 0.5s ease-out; }
 .cs-animate-slide-in-up { animation: cs-slide-in-up 0.5s ease-out; }
@@ -1889,7 +1781,6 @@ ${this.generateSpacingUtilities()}
 .cs-animate-pulse { animation: cs-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 .cs-animate-bounce { animation: cs-bounce 1s infinite; }
 
-/* Loading States */
 .cs-loading {
   position: relative;
   pointer-events: none;
@@ -1910,7 +1801,6 @@ ${this.generateSpacingUtilities()}
   animation: cs-spin 0.8s linear infinite;
 }
 
-/* Skeleton Loading */
 .cs-skeleton {
   background: linear-gradient(
     90deg,
@@ -1928,7 +1818,6 @@ ${this.generateSpacingUtilities()}
 }
 `;
 
-    // Add custom animations if provided
     if (animations?.custom) {
       return defaultAnimations + '\n' + animations.custom;
     }
@@ -1950,13 +1839,11 @@ ${this.generateSpacingUtilities()}
 
     Object.entries(points).forEach(([name, value]) => {
       styles.push(`
-/* ${name.toUpperCase()} Breakpoint - ${value} */
 @media (min-width: ${value}) {
   .cs-container {
     max-width: ${value};
   }
   
-  /* Responsive Columns */
   .cs-${name}\\:col-auto { flex: 0 0 auto; width: auto; }
   .cs-${name}\\:col-1 { flex: 0 0 8.333333%; max-width: 8.333333%; }
   .cs-${name}\\:col-2 { flex: 0 0 16.666667%; max-width: 16.666667%; }
@@ -1971,7 +1858,6 @@ ${this.generateSpacingUtilities()}
   .cs-${name}\\:col-11 { flex: 0 0 91.666667%; max-width: 91.666667%; }
   .cs-${name}\\:col-12 { flex: 0 0 100%; max-width: 100%; }
   
-  /* Responsive Grid */
   .cs-${name}\\:grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
   .cs-${name}\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cs-${name}\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1979,14 +1865,12 @@ ${this.generateSpacingUtilities()}
   .cs-${name}\\:grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .cs-${name}\\:grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   
-  /* Responsive Display */
   .cs-${name}\\:block { display: block; }
   .cs-${name}\\:inline-block { display: inline-block; }
   .cs-${name}\\:inline { display: inline; }
   .cs-${name}\\:flex { display: flex; }
   .cs-${name}\\:hidden { display: none; }
   
-  /* Responsive Text */
   .cs-${name}\\:text-sm { font-size: 0.875rem; }
   .cs-${name}\\:text-base { font-size: 1rem; }
   .cs-${name}\\:text-lg { font-size: 1.125rem; }
@@ -2002,7 +1886,6 @@ ${this.generateSpacingUtilities()}
 
   private generatePrintStyles(_palette: ColorPalette): string {
     return `
-/* Print Styles */
 @media print {
   body {
     background: white;
@@ -2014,7 +1897,6 @@ ${this.generateSpacingUtilities()}
     color: black;
   }
   
-  /* Hide non-printable elements */
   .cs-no-print,
   .cs-nav,
   .cs-sidebar,
@@ -2025,7 +1907,6 @@ ${this.generateSpacingUtilities()}
     display: none !important;
   }
   
-  /* Ensure proper page breaks */
   .cs-page-break {
     page-break-after: always;
   }
@@ -2034,7 +1915,6 @@ ${this.generateSpacingUtilities()}
     page-break-inside: avoid;
   }
   
-  /* Reset colors for print */
   * {
     color: black !important;
     background: white !important;
@@ -2042,7 +1922,6 @@ ${this.generateSpacingUtilities()}
     text-shadow: none !important;
   }
   
-  /* Links */
   a {
     text-decoration: underline;
   }
@@ -2052,7 +1931,6 @@ ${this.generateSpacingUtilities()}
     font-size: 0.875em;
   }
   
-  /* Tables */
   table {
     border-collapse: collapse !important;
   }
@@ -2066,18 +1944,15 @@ ${this.generateSpacingUtilities()}
     background-color: #f0f0f0 !important;
   }
   
-  /* Images */
   img {
     max-width: 100% !important;
     page-break-inside: avoid;
   }
   
-  /* Ensure charts are printable */
   .cs-chart-container {
     page-break-inside: avoid;
   }
   
-  /* Headers and footers */
   @page {
     margin: 1cm;
     
@@ -2107,11 +1982,6 @@ ${this.generateSpacingUtilities()}
     print: string;
   }): string {
     const header = `
-/**
- * CS Test Automation Framework - Generated Theme
- * Generated: ${new Date().toISOString()}
- * Version: 1.0.0
- */
 `;
 
     return [header, sections.base, sections.components, sections.animations, sections.responsive, sections.print].join(
@@ -2120,28 +1990,21 @@ ${this.generateSpacingUtilities()}
   }
 
   private minifyCSS(css: string): string {
-    // Remove comments
     css = css.replace(/\/\*[\s\S]*?\*\//g, '');
 
-    // Remove unnecessary whitespace
     css = css.replace(/\s+/g, ' ');
 
-    // Remove whitespace around selectors
     css = css.replace(/\s*([{}:;,])\s*/g, '$1');
 
-    // Remove trailing semicolons
     css = css.replace(/;}/g, '}');
 
-    // Remove quotes from font names
     css = css.replace(/"([^"]+)"/g, (match: string, p1: string): string => {
       if (p1.includes(' ')) return match;
       return p1;
     });
 
-    // Remove units from zero values
     css = css.replace(/:\s*0(px|em|rem|%)/g, ':0');
 
-    // Shorten hex colors
     css = css.replace(/#([0-9a-fA-F])\1([0-9a-fA-F])\2([0-9a-fA-F])\3/g, '#$1$2$3');
 
     return css.trim();
@@ -2151,16 +2014,13 @@ ${this.generateSpacingUtilities()}
     const themePath = path.join(this.themePath, theme.id);
     await FileUtils.ensureDir(themePath);
 
-    // Save CSS file
     const cssPath = path.join(themePath, `${theme.id}.css`);
     await fs.promises.writeFile(cssPath, theme.css, 'utf-8');
 
-    // Save minified version
     const minPath = path.join(themePath, `${theme.id}.min.css`);
     const minified = this.minifyCSS(theme.css);
     await fs.promises.writeFile(minPath, minified, 'utf-8');
 
-    // Save theme metadata
     const metaPath = path.join(themePath, 'theme.json');
     await fs.promises.writeFile(
       metaPath,
@@ -2182,7 +2042,6 @@ ${this.generateSpacingUtilities()}
       'utf-8',
     );
 
-    // Generate color palette preview
     if (theme.colorPalette) {
       const previewPath = path.join(themePath, 'palette.html');
       const preview = this.generatePalettePreview(theme.colorPalette);
@@ -2317,13 +2176,11 @@ ${this.generateSpacingUtilities()}
   }
 
   private isLightColor(color: string): boolean {
-    // Convert hex to RGB
     const hex = color.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
 
-    // Calculate luminance
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
     return luminance > 0.5;
@@ -2352,12 +2209,10 @@ ${this.generateSpacingUtilities()}
   }
 
   async getTheme(themeId: string): Promise<ThemeOutput | null> {
-    // Check cache first
     if (this.generatedThemes.has(themeId)) {
       return this.generatedThemes.get(themeId)!;
     }
 
-    // Try to load from disk
     const themePath = path.join(this.themePath, themeId);
     const metaPath = path.join(themePath, 'theme.json');
 
@@ -2391,7 +2246,6 @@ ${this.generateSpacingUtilities()}
         metadata: metadata.metadata,
       };
 
-      // Cache it
       this.generatedThemes.set(themeId, theme);
 
       return theme;

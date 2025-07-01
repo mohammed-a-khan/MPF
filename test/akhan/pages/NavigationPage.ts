@@ -77,14 +77,11 @@ export class NavigationPage extends CSBasePage {
     }
 
     async verifyAllMenuItems() {
-        // First verify the navigation menu container is present
         await this.navigationMenu.waitFor({ state: 'visible' });
         
-        // Then verify all menu items
         for (const menuItem of this.menuItems) {
             await this.verifyMenuItem(menuItem);
         }
-        // await this.systemAdminMenuItem.waitFor({ state: 'visible' });
     }
 
     async waitForPageLoad() {
@@ -92,7 +89,6 @@ export class NavigationPage extends CSBasePage {
     }
 
     async verifyNavigatedToPage(pageName: string): Promise<void> {
-        // Map page names to expected headers or URL patterns
         const pageMapping: { [key: string]: string } = {
             'Admin': 'Admin',
             'PIM': 'PIM',

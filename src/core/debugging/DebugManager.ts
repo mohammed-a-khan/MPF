@@ -9,10 +9,6 @@ import { ExecutionContext } from '../../bdd/context/ExecutionContext';
 import * as path from 'path';
 import * as readline from 'readline';
 
-/**
- * Central debugging control system
- * Provides step-by-step execution, breakpoints, and REPL
- */
 export class DebugManager {
     private static instance: DebugManager;
     private debugMode: boolean = false;
@@ -26,7 +22,6 @@ export class DebugManager {
     private pausePromiseResolve: (() => void) | null = null;
     private logger: Logger;
     
-    // Configuration
     private readonly maxSnapshots = 50;
     private readonly debugOutputPath = path.join(process.cwd(), 'debug-output');
     
@@ -44,10 +39,8 @@ export class DebugManager {
     
     private async initialize(): Promise<void> {
         try {
-            // Ensure debug output directory exists
             await FileUtils.ensureDir(this.debugOutputPath);
             
-            // Set up process handlers for debug commands
             this.setupProcessHandlers();
             
             this.logger.info('DebugManager initialized');
@@ -57,9 +50,6 @@ export class DebugManager {
         }
     }
     
-    /**
-     * Enable debug mode
-     */
     enableDebugMode(): void {
         this.debugMode = true;
         this.debugSession = {
@@ -73,13 +63,9 @@ export class DebugManager {
         this.logger.info('🐞 Debug mode enabled');
         ActionLogger.logInfo('Debug mode enabled');
         
-        // Show debug commands
         this.printDebugCommands();
     }
     
-    /**
-     * Disable debug mode
-     */
     disableDebugMode(): void {
         this.debugMode = false;
         this.pauseOnNext = false;
@@ -95,16 +81,10 @@ export class DebugManager {
         ActionLogger.logInfo('Debug mode disabled');
     }
     
-    /**
-     * Check if debug mode is enabled
-     */
     isDebugMode(): boolean {
         return this.debugMode;
     }
     
-    /**
-     * Pause on the next step
-     */
     pauseOnNextStep(): void {
         if (!this.debugMode) {
             this.logger.warn('Debug mode is not enabled');
@@ -115,9 +95,6 @@ export class DebugManager {
         this.logger.info('⏸️  Will pause on next step');
     }
     
-    /**
-     * Pause execution immediately
-     */
     async pauseNow(): Promise<void> {
         if (!this.debugMode) {
             this.logger.warn('Debug mode is not enabled');
@@ -129,58 +106,37 @@ export class DebugManager {
         await this.enterDebugRepl();
     }
     
-    /**
-     * Set a breakpoint on a step pattern
-     */
     setBreakpoint(stepPattern: string): void {
         this.breakpoints.add(stepPattern);
         this.logger.info(`🔴 Breakpoint set: ${stepPattern}`);
         ActionLogger.logInfo('Breakpoint set', { location: stepPattern });
     }
     
-    /**
-     * Remove a breakpoint
-     */
     removeBreakpoint(stepPattern: string): void {
         this.breakpoints.delete(stepPattern);
         this.logger.info(`⭕ Breakpoint removed: ${stepPattern}`);
         ActionLogger.logInfo('Breakpoint removed', { location: stepPattern });
     }
     
-    /**
-     * Clear all breakpoints
-     */
     clearBreakpoints(): void {
         this.breakpoints.clear();
         this.logger.info('All breakpoints cleared');
     }
     
-    /**
-     * List all breakpoints
-     */
     listBreakpoints(): string[] {
         return Array.from(this.breakpoints);
     }
     
-    /**
-     * Add a watch expression
-     */
     addWatchExpression(name: string, expression: string): void {
         this.watchExpressions.set(name, expression);
         this.logger.info(`👁️  Watch added: ${name} = ${expression}`);
     }
     
-    /**
-     * Remove a watch expression
-     */
     removeWatchExpression(name: string): void {
         this.watchExpressions.delete(name);
         this.logger.info(`Watch removed: ${name}`);
     }
     
-    /**
-     * Check if should pause for a step
-     */
     async checkStepBreakpoint(stepText: string, context: ExecutionContext): Promise<void> {
         if (!this.debugMode) return;
         
@@ -194,10 +150,8 @@ export class DebugManager {
             this.debugSession.stepsExecuted++;
         }
         
-        // Check if should pause
         let shouldPause = this.pauseOnNext;
         
-        // Check breakpoints
         for (const pattern of this.breakpoints) {
             if (this.matchesPattern(stepText, pattern)) {
                 shouldPause = true;
@@ -211,14 +165,11 @@ export class DebugManager {
         }
         
         if (shouldPause) {
-            this.pauseOnNext = false; // Reset pause on next
+            this.pauseOnNext = false;
             await this.pauseExecution(stepText, context);
         }
     }
     
-    /**
-     * Take a debug screenshot
-     */
     async takeDebugScreenshot(name: string, page?: Page): Promise<string> {
         try {
             const currentPage = page || await this.getCurrentPage();
@@ -253,9 +204,6 @@ export class DebugManager {
         }
     }
     
-    /**
-     * Capture the current page state
-     */
     async capturePageState(page: Page): Promise<PageState> {
         try {
             const [url, title, cookies, localStorage, sessionStorage, viewport] = await Promise.all([
@@ -267,7 +215,6 @@ export class DebugManager {
                 page.viewportSize()
             ]);
             
-            // Capture DOM snapshot
             const domSnapshot = await page.evaluate(() => {
                 const captureElement = (element: Element): any => {
                     const rect = element.getBoundingClientRect();
@@ -285,7 +232,6 @@ export class DebugManager {
                     };
                 };
                 
-                // Capture key elements
                 const forms = Array.from(document.forms).map(captureElement);
                 const buttons = Array.from(document.querySelectorAll('button, input[type="submit"]')).map(captureElement);
                 const inputs = Array.from(document.querySelectorAll('input, textarea, select')).map(captureElement);
@@ -301,10 +247,8 @@ export class DebugManager {
                 };
             });
             
-            // Capture console logs
             const consoleLogs = await this.captureConsoleLogs(page);
             
-            // Capture network activity
             const networkActivity = await this.captureNetworkActivity(page);
             
             const state: PageState = {
@@ -321,7 +265,6 @@ export class DebugManager {
                 customData: {}
             };
             
-            // Store snapshot
             this.addStateSnapshot({
                 id: this.generateSnapshotId(),
                 timestamp: new Date(),
@@ -339,9 +282,6 @@ export class DebugManager {
         }
     }
     
-    /**
-     * Get debug information
-     */
     getDebugInfo(): DebugInfo {
         return {
             debugMode: this.debugMode,
@@ -353,9 +293,6 @@ export class DebugManager {
         };
     }
     
-    /**
-     * Export debug session
-     */
     async exportDebugSession(): Promise<string> {
         try {
             const sessionData = {
@@ -380,20 +317,16 @@ export class DebugManager {
         }
     }
     
-    // Private helper methods
     
     private async pauseExecution(stepText: string, context: ExecutionContext): Promise<void> {
         this.logger.info(`\n${'='.repeat(80)}`);
         this.logger.info(`⏸️  PAUSED at step: ${stepText}`);
         this.logger.info(`${'='.repeat(80)}\n`);
         
-        // Display current state
         await this.displayCurrentState(context);
         
-        // Evaluate watch expressions
         await this.evaluateWatchExpressions(context);
         
-        // Enter REPL
         await this.enterDebugRepl();
     }
     
@@ -477,7 +410,6 @@ export class DebugManager {
                 
             case 'step':
             case 's':
-                // Step into (if applicable)
                 this.logger.info('Step into not yet implemented\n');
                 return false;
                 
@@ -569,7 +501,6 @@ export class DebugManager {
                 process.exit(0);
                 
             default:
-                // Try to evaluate as expression
                 if (command.includes('=') || command.includes('.') || command.includes('(')) {
                     await this.evaluateExpression(command);
                 } else {
@@ -588,7 +519,6 @@ export class DebugManager {
                 return;
             }
             
-            // Check if it's a page evaluation
             if (expression.startsWith('$') || expression.includes('document.')) {
                 const result = await page.evaluate((expr) => {
                     try {
@@ -600,7 +530,6 @@ export class DebugManager {
                 
                 this.logger.info(`Result: ${JSON.stringify(result, null, 2)}`);
             } else {
-                // Evaluate in Node context
                 try {
                     const result = eval(expression);
                     this.logger.info(`Result: ${JSON.stringify(result, null, 2)}`);
@@ -689,7 +618,6 @@ export class DebugManager {
         this.logger.info(`  Title: ${title}`);
         this.logger.info(`  Viewport: ${viewport?.width}x${viewport?.height}`);
         
-        // Get page metrics
         const metrics = await page.evaluate(() => ({
             readyState: document.readyState,
             documentHeight: document.documentElement.scrollHeight,
@@ -925,13 +853,10 @@ export class DebugManager {
     }
     
     private matchesPattern(text: string, pattern: string): boolean {
-        // Support both string contains and regex patterns
         if (pattern.startsWith('/') && pattern.endsWith('/')) {
-            // Regex pattern
             const regex = new RegExp(pattern.slice(1, -1), 'i');
             return regex.test(text);
         } else {
-            // String contains
             return text.toLowerCase().includes(pattern.toLowerCase());
         }
     }
@@ -971,28 +896,22 @@ export class DebugManager {
     }
     
     private async captureConsoleLogs(_page: Page): Promise<ConsoleLog[]> {
-        // This would be populated by page event listeners
-        // For now, return empty array
         return [];
     }
     
     private async captureNetworkActivity(_page: Page): Promise<NetworkActivity[]> {
-        // This would be populated by page event listeners
-        // For now, return empty array
         return [];
     }
     
     private addStateSnapshot(snapshot: StateSnapshot): void {
         this.stateSnapshots.push(snapshot);
         
-        // Maintain max snapshots
         if (this.stateSnapshots.length > this.maxSnapshots) {
             this.stateSnapshots.shift();
         }
     }
     
     private setupProcessHandlers(): void {
-        // Handle Ctrl+C gracefully
         process.on('SIGINT', async () => {
             if (this.debugMode) {
                 this.logger.info('\n\nReceived SIGINT. Saving debug session...');
@@ -1047,17 +966,13 @@ export class DebugManager {
     }
     
     private async getCurrentPage(): Promise<Page | undefined> {
-        // Access page through the execution context
         const context = this.debugContext?.executionContext;
         if (!context) return undefined;
         
-        // Try different ways to access the page
-        // 1. Through public API if available
         if ('getPage' in context && typeof (context as any).getPage === 'function') {
             return await (context as any).getPage();
         }
         
-        // 2. Direct access (may need to be updated based on ExecutionContext implementation)
         if ('page' in context) {
             return (context as any).page;
         }
@@ -1066,13 +981,10 @@ export class DebugManager {
     }
     
     private async getPageFromContext(context: ExecutionContext): Promise<Page | undefined> {
-        // Try different ways to access the page
-        // 1. Through public API if available
         if ('getPage' in context && typeof (context as any).getPage === 'function') {
             return await (context as any).getPage();
         }
         
-        // 2. Direct access
         if ('page' in context) {
             return (context as any).page;
         }
@@ -1080,26 +992,20 @@ export class DebugManager {
         return undefined;
     }
 
-    /**
-     * Cleanup debug resources
-     */
     async cleanup(): Promise<void> {
         try {
             this.logger.debug('Cleaning up debug manager...');
             
-            // End current debug session
             if (this.debugSession) {
                 this.debugSession.endTime = new Date();
                 this.debugSession = null;
             }
             
-            // Close REPL interface
             if (this.replInterface) {
                 this.replInterface.close();
                 this.replInterface = null;
             }
             
-            // Clear state
             this.debugMode = false;
             this.pauseOnNext = false;
             this.breakpoints.clear();
@@ -1115,7 +1021,6 @@ export class DebugManager {
     }
 }
 
-// Type definitions
 interface DebugContext {
     stepText: string;
     executionContext?: ExecutionContext;

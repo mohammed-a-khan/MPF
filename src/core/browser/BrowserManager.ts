@@ -35,13 +35,10 @@ export class BrowserManager {
   };
   private eventHandlers: BrowserEventHandlers = {};
   private healthCheckInterval: NodeJS.Timeout | null = null;
-  private readonly HEALTH_CHECK_INTERVAL = 60000; // PERFORMANCE: Reduced to 60 seconds
+  private readonly HEALTH_CHECK_INTERVAL = 60000;
 
   private constructor() {}
 
-  /**
-   * Get singleton instance
-   */
   static getInstance(): BrowserManager {
     if (!BrowserManager.instance) {
       BrowserManager.instance = new BrowserManager();
@@ -49,9 +46,6 @@ export class BrowserManager {
     return BrowserManager.instance;
   }
 
-  /**
-   * Initialize browser manager with singleton protection
-   */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
       console.log('🔍 DEBUG: BrowserManager already initialized');
@@ -61,22 +55,18 @@ export class BrowserManager {
     console.log('🔍 DEBUG: Initializing BrowserManager');
     await this.createBrowser();
     
-    // Create default context
     if (this.browser && !this.defaultContext) {
       console.log('🔍 DEBUG: Creating default browser context');
       
-      // Build context options
       const contextOptions: any = {
         ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false)
       };
       
-      // Handle maximized mode
       const isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
       if (isMaximized) {
         contextOptions.viewport = null;
         console.log('🔍 DEBUG: Default context created with viewport=null for maximized mode');
       } else {
-        // Use configured viewport if not maximized
         const width = ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920);
         const height = ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 1080);
         contextOptions.viewport = { width, height };
@@ -117,9 +107,6 @@ export class BrowserManager {
     }
   }
 
-  /**
-   * Get current browser instance with validation
-   */
   async getBrowser(): Promise<Browser> {
     if (!this.browser) {
       await this.initialize();
@@ -132,9 +119,6 @@ export class BrowserManager {
     return this.browser;
   }
 
-  /**
-   * Get default browser context
-   */
   getDefaultContext(): BrowserContext {
     if (!this.defaultContext) {
       throw new Error('Browser context not initialized. Call initialize() first.');
@@ -142,16 +126,10 @@ export class BrowserManager {
     return this.defaultContext;
   }
 
-  /**
-   * Check if browser is healthy
-   */
   isHealthy(): boolean {
     return this.isInitialized && this.browser !== null;
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Launch browser with better error handling
-   */
   async launchBrowser(browserType?: string): Promise<Browser> {
     try {
       const type = browserType || this.config?.browser || 'chromium';
@@ -171,10 +149,8 @@ export class BrowserManager {
           break;
       }
       
-      // Setup browser event handlers
       this.setupBrowserEventHandlers();
       
-      // Get browser version (synchronous method)
       const version = this.getBrowserVersion();
       
       return this.browser;
@@ -184,26 +160,18 @@ export class BrowserManager {
     }
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Get or create browser context
-   */
   async getContext(): Promise<BrowserContext> {
     const browser = await this.getBrowser();
     
-    // Check if we have existing contexts
     const contexts = browser.contexts();
     if (contexts.length > 0 && contexts[0]) {
-      // Return the first available context
       return contexts[0];
     }
     
-    // Create new context with optimized settings
     const contextOptions: any = {
       ignoreHTTPSErrors: this.config?.ignoreHTTPSErrors || false
-      // PERFORMANCE: video and HAR recording disabled by default
     };
     
-    // Only set viewport if not in maximized mode
     const isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
     console.log(`🔍 DEBUG: Creating context - maximized mode: ${isMaximized}`);
     
@@ -211,7 +179,6 @@ export class BrowserManager {
       contextOptions.viewport = this.config.viewport;
       console.log('🔍 DEBUG: Setting viewport:', this.config.viewport);
     } else if (isMaximized) {
-      // Explicitly set viewport to null for maximized mode
       contextOptions.viewport = null;
       console.log('🔍 DEBUG: Setting viewport to null for maximized mode');
     } else {
@@ -224,9 +191,6 @@ export class BrowserManager {
     return context;
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Close browser with proper cleanup
-   */
   async close(): Promise<void> {
     if (this.browser) {
       await this.browser.close();
@@ -235,18 +199,12 @@ export class BrowserManager {
     this.isInitialized = false;
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Restart browser
-   */
   async restartBrowser(): Promise<void> {
     await this.close();
     await this.launchBrowser();
     this.health.restarts++;
   }
 
-  /**
-   * Get browser version
-   */
   getBrowserVersion(): string {
     if (!this.browser) {
       return 'Unknown';
@@ -259,26 +217,18 @@ export class BrowserManager {
     }
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Build launch options
-   */
   private buildLaunchOptions(): LaunchOptions {
-    // Load the headless configuration from ConfigurationManager
     const headless = ConfigurationManager.getBoolean('HEADLESS', false);
     
     console.log(`🔍 DEBUG: Building launch options - headless: ${headless}`);
     
     const browserArgs = ['--no-sandbox', '--disable-setuid-sandbox'];
     
-    // Add maximization args based on configuration
     if (ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false) && !headless) {
       console.log('🔍 DEBUG: Browser maximized mode enabled');
-      // For Chromium-based browsers, use start-maximized
       browserArgs.push('--start-maximized');
-      // Also disable default viewport to use full window
       browserArgs.push('--disable-blink-features=AutomationControlled');
     } else {
-      // If not maximized, use configured viewport size
       const width = ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920);
       const height = ConfigurationManager.getNumber('VIEWPORT_HEIGHT', 1080);
       browserArgs.push(`--window-size=${width},${height}`);
@@ -296,11 +246,7 @@ export class BrowserManager {
     return options;
   }
 
-  /**
-   * Load configuration from ConfigurationManager
-   */
   private loadConfigFromManager(): BrowserConfig {
-    // Load configuration from environment files
     const config: any = {
       browser: (ConfigurationManager.get('BROWSER', 'chromium') as any),
       headless: ConfigurationManager.getBoolean('HEADLESS', false),
@@ -310,7 +256,6 @@ export class BrowserManager {
       ignoreHTTPSErrors: ConfigurationManager.getBoolean('IGNORE_HTTPS_ERRORS', false)
     };
     
-    // Only set viewport if not in maximized mode
     if (!ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false)) {
       config.viewport = {
         width: ConfigurationManager.getNumber('VIEWPORT_WIDTH', 1920) || 1920,
@@ -318,15 +263,11 @@ export class BrowserManager {
       };
     }
 
-    // Log loaded configuration
     ActionLogger.logInfo('Browser configuration loaded:', config);
 
     return config;
   }
 
-  /**
-   * Setup browser event handlers
-   */
   private setupBrowserEventHandlers(): void {
     if (!this.browser) return;
 
@@ -338,32 +279,12 @@ export class BrowserManager {
     });
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Start health monitoring with reduced frequency
-   * BROWSER FLASHING FIX: Disable health monitoring during test execution
-   */
   private startHealthMonitoring(): void {
-    // BROWSER FLASHING FIX: Disable health monitoring to prevent any potential page creation
-    // Health monitoring can interfere with test execution and cause browser flashing
     ActionLogger.logInfo('🚫 Browser health monitoring disabled to prevent page flashing during tests');
     return;
     
-    // OLD HEALTH MONITORING CODE - DISABLED TO PREVENT BROWSER FLASHING
-    // if (this.healthCheckInterval) {
-    //   return; // Already monitoring
-    // }
-    // this.healthCheckInterval = setInterval(async () => {
-    //   try {
-    //     await this.performHealthCheck();
-    //   } catch (error) {
-    //     // Ignore health check errors
-    //   }
-    // }, this.HEALTH_CHECK_INTERVAL);
   }
 
-  /**
-   * Stop health monitoring
-   */
   private stopHealthMonitoring(): void {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
@@ -371,9 +292,6 @@ export class BrowserManager {
     }
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Perform health check
-   */
   private async performHealthCheck(): Promise<void> {
     if (!this.browser || !this.browser.isConnected()) {
       this.health.isHealthy = false;
@@ -392,30 +310,18 @@ export class BrowserManager {
     }
   }
 
-  /**
-   * Get health status
-   */
   getHealthStatus(): BrowserHealth {
     return { ...this.health };
   }
 
-  /**
-   * Set event handlers
-   */
   setEventHandlers(handlers: BrowserEventHandlers): void {
     this.eventHandlers = { ...handlers };
   }
 
-  /**
-   * PERFORMANCE OPTIMIZED: Cleanup method
-   */
   async cleanup(): Promise<void> {
     await this.close();
   }
 
-  /**
-   * Alias for close() method for backward compatibility
-   */
   async closeBrowser(): Promise<void> {
     await this.close();
   }

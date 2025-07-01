@@ -106,7 +106,6 @@ export class DebugSteps extends CSBDDBaseStepDefinition {
         try {
             const screenshot = await this.screenshotManager.takeFullPageScreenshot(this.page);
             
-            // Save screenshot
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const path = `${ConfigurationManager.get('SCREENSHOT_PATH', './screenshots')}/full-page-${timestamp}.png`;
             
@@ -130,7 +129,6 @@ export class DebugSteps extends CSBDDBaseStepDefinition {
             const element = await this.findElement(elementDescription);
             const screenshot = await this.screenshotManager.takeElementScreenshot(element);
             
-            // Save screenshot
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const sanitizedName = elementDescription.replace(/[^a-zA-Z0-9]/g, '-');
             const path = `${ConfigurationManager.get('SCREENSHOT_PATH', './screenshots')}/element-${sanitizedName}-${timestamp}.png`;
@@ -158,7 +156,6 @@ export class DebugSteps extends CSBDDBaseStepDefinition {
         try {
             this.debugManager.enableDebugMode();
             
-            // Also enable verbose logging
             ConfigurationManager.set('LOG_LEVEL', 'debug');
             ConfigurationManager.set('VERBOSE_LOGGING', 'true');
             
@@ -327,14 +324,12 @@ export class DebugSteps extends CSBDDBaseStepDefinition {
         try {
             const element = await this.findElement(elementDescription);
             
-            // Inject highlighting style
             await this.page.evaluate((el) => {
                 const elem = el as HTMLElement;
                 elem.style.border = '3px solid red';
                 elem.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
                 elem.style.transition = 'all 0.3s';
                 
-                // Remove highlighting after 3 seconds
                 setTimeout(() => {
                     elem.style.border = '';
                     elem.style.backgroundColor = '';
@@ -357,7 +352,6 @@ export class DebugSteps extends CSBDDBaseStepDefinition {
         try {
             const pageState = await this.debugManager.capturePageState(this.page);
             
-            // Store for later use
             this.context.store('capturedPageState', pageState);
             
             await actionLogger.logAction('Page state captured', {

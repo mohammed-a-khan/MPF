@@ -1,15 +1,7 @@
 // src/core/elements/ElementExtensions.ts
 import { Locator } from 'playwright';
 
-/**
- * Extended element functionality that adds missing methods to Playwright's Locator
- * These are production-ready implementations of commonly needed element operations
- */
 export class ElementExtensions {
-  /**
-   * Wait for an element to be enabled (not disabled)
-   * This is a common requirement in form interactions
-   */
   static async waitForEnabled(
     locator: Locator,
     options?: { timeout?: number }
@@ -17,10 +9,8 @@ export class ElementExtensions {
     const timeout = options?.timeout ?? 30000;
     const startTime = Date.now();
 
-    // First ensure element is visible
     await locator.waitFor({ state: 'visible', timeout });
 
-    // Then wait for it to be enabled
     while (Date.now() - startTime < timeout) {
       try {
         const isDisabled = await locator.evaluate((el) => {
@@ -28,35 +18,27 @@ export class ElementExtensions {
         });
 
         if (!isDisabled) {
-          return; // Element is enabled
+          return;
         }
       } catch (e) {
-        // Element might not exist yet, continue waiting
       }
 
-      // Wait a bit before checking again
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     throw new Error(`Element did not become enabled within ${timeout}ms`);
   }
 
-  /**
-   * Check if element is in the viewport
-   * Useful for scrolling and visibility checks
-   */
   static async isInViewport(locator: Locator): Promise<boolean> {
     try {
       const box = await locator.boundingBox();
       if (!box) return false;
 
-      // Evaluate in browser context for accurate viewport check
       return await locator.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         const windowHeight = window.innerHeight || document.documentElement.clientHeight;
         const windowWidth = window.innerWidth || document.documentElement.clientWidth;
 
-        // Check if element is at least partially visible
         const verticalVisible = rect.top < windowHeight && rect.bottom > 0;
         const horizontalVisible = rect.left < windowWidth && rect.right > 0;
 
@@ -67,13 +49,8 @@ export class ElementExtensions {
     }
   }
 
-  /**
-   * Get all text content including child elements
-   * More comprehensive than textContent
-   */
   static async getAllText(locator: Locator): Promise<string> {
     return await locator.evaluate((element) => {
-      // Recursively get all text nodes
       const getTextNodes = (node: Node): string[] => {
         const texts: string[] = [];
         
@@ -93,10 +70,6 @@ export class ElementExtensions {
     });
   }
 
-  /**
-   * Wait for element's text to match expected value
-   * Useful for dynamic content
-   */
   static async waitForText(
     locator: Locator,
     expectedText: string,
@@ -117,7 +90,6 @@ export class ElementExtensions {
           if (matches) return;
         }
       } catch {
-        // Element might not exist yet
       }
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -126,10 +98,6 @@ export class ElementExtensions {
     throw new Error(`Text did not match expected value within ${timeout}ms`);
   }
 
-  /**
-   * Get element's computed style property
-   * More reliable than getting inline styles
-   */
   static async getComputedStyle(
     locator: Locator,
     property: string
@@ -139,10 +107,6 @@ export class ElementExtensions {
     }, property);
   }
 
-  /**
-   * Scroll element to center of viewport
-   * Better than scrollIntoView for user experience
-   */
   static async scrollToCenter(locator: Locator): Promise<void> {
     await locator.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -160,10 +124,6 @@ export class ElementExtensions {
     });
   }
 
-  /**
-   * Check if element has a specific CSS class
-   * Useful for state validation
-   */
   static async hasClass(locator: Locator, className: string): Promise<boolean> {
     try {
       const classes = await locator.getAttribute('class');
@@ -175,9 +135,6 @@ export class ElementExtensions {
     }
   }
 
-  /**
-   * Wait for element to have specific attribute value
-   */
   static async waitForAttribute(
     locator: Locator,
     attributeName: string,
@@ -192,7 +149,6 @@ export class ElementExtensions {
         const actualValue = await locator.getAttribute(attributeName);
         if (actualValue === expectedValue) return;
       } catch {
-        // Element might not exist yet
       }
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -201,9 +157,6 @@ export class ElementExtensions {
     throw new Error(`Attribute ${attributeName} did not match expected value within ${timeout}ms`);
   }
 
-  /**
-   * Get element's dimensions including border, padding, and margin
-   */
   static async getDimensions(locator: Locator): Promise<{
     width: number;
     height: number;
@@ -216,13 +169,11 @@ export class ElementExtensions {
       const computed = window.getComputedStyle(element);
       const rect = element.getBoundingClientRect();
       
-      // Parse margin values
       const marginTop = parseFloat(computed.marginTop) || 0;
       const marginBottom = parseFloat(computed.marginBottom) || 0;
       const marginLeft = parseFloat(computed.marginLeft) || 0;
       const marginRight = parseFloat(computed.marginRight) || 0;
       
-      // Parse padding values
       const paddingTop = parseFloat(computed.paddingTop) || 0;
       const paddingBottom = parseFloat(computed.paddingBottom) || 0;
       const paddingLeft = parseFloat(computed.paddingLeft) || 0;
@@ -239,10 +190,6 @@ export class ElementExtensions {
     });
   }
 
-  /**
-   * Highlight element for debugging purposes
-   * Adds a temporary border to make element visible
-   */
   static async highlight(
     locator: Locator,
     options?: { color?: string; duration?: number }

@@ -4,19 +4,12 @@ import { TestData, DataTransformation } from '../types/data.types';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import * as jsonpath from 'jsonpath';
 
-/**
- * Transform test data using various transformation rules
- * Supports map, filter, reduce, sort, group, pivot operations
- */
 export class DataTransformer {
     constructor() {
     }
 
-    /**
-     * Apply transformations to data
-     */
     async transform(data: TestData[], transformations: DataTransformation[]): Promise<TestData[]> {
-        let result = [...data]; // Create copy to avoid mutations
+        let result = [...data];
         
         for (const transformation of transformations) {
             ActionLogger.logInfo('Transform operation: apply', {
@@ -75,26 +68,20 @@ export class DataTransformer {
         return result;
     }
 
-    /**
-     * Apply map transformation
-     */
     private async applyMap(data: TestData[], transformation: DataTransformation): Promise<TestData[]> {
         return data.map(record => {
             const mapped = { ...record };
             
             if (transformation.field && transformation.operation) {
-                // Apply operation to specific field
                 const value = this.getFieldValue(record, transformation.field);
                 const newValue = this.applyOperation(value, transformation.operation, transformation.value, record);
                 this.setFieldValue(mapped, transformation.field, newValue);
             } else if (transformation.expression) {
-                // Apply expression to entire record
                 const evaluated = this.evaluateExpression(transformation.expression, record);
                 if (typeof evaluated === 'object' && evaluated !== null) {
                     Object.assign(mapped, evaluated);
                 }
             } else if (transformation.function) {
-                // Apply custom function
                 const result = transformation.function(record);
                 if (typeof result === 'object' && result !== null) {
                     return result;
@@ -105,9 +92,6 @@ export class DataTransformer {
         });
     }
 
-    /**
-     * Apply filter transformation
-     */
     private async applyFilter(data: TestData[], transformation: DataTransformation): Promise<TestData[]> {
         return data.filter(record => {
             if (transformation.field && transformation.operation) {
@@ -123,9 +107,6 @@ export class DataTransformer {
         });
     }
 
-    /**
-     * Apply reduce transformation
-     */
     private async applyReduce(data: TestData[], transformation: DataTransformation): Promise<TestData[]> {
         if (data.length === 0) return [];
         
@@ -193,7 +174,6 @@ export class DataTransformer {
                 
             case 'custom':
                 if (transformation.function) {
-                    // Function signature only takes TestData, not accumulator
                     let lastResult = transformation.value || null;
                     for (const record of data) {
                         lastResult = transformation.function(record);
@@ -206,7 +186,6 @@ export class DataTransformer {
                 throw new Error(`Unknown reduce operation: ${operation}`);
         }
         
-        // Return as single record
         return [{
             [field]: result,
             _operation: operation,
@@ -214,9 +193,6 @@ export class DataTransformer {
         }];
     }
 
-    /**
-     * Apply sort transformation
-     */
     private async applySort(data: TestData[], transformation: DataTransformation): Promise<TestData[]> {
         const field = transformation.field;
         if (!field) {
@@ -230,12 +206,10 @@ export class DataTransformer {
             let valueA = this.getFieldValue(a, field);
             let valueB = this.getFieldValue(b, field);
             
-            // Handle null/undefined
             if (valueA == null && valueB == null) return 0;
             if (valueA == null) return options['nullsFirst'] ? -1 : 1;
             if (valueB == null) return options['nullsFirst'] ? 1 : -1;
             
-            // Type conversion for comparison
             if (options['numeric']) {
                 valueA = Number(valueA) || 0;
                 valueB = Number(valueB) || 0;
@@ -247,16 +221,12 @@ export class DataTransformer {
                 valueB = valueB.toLowerCase();
             }
             
-            // Compare
             if (valueA < valueB) return direction === 'asc' ? -1 : 1;
             if (valueA > valueB) return direction === 'asc' ? 1 : -1;
             return 0;
         });
     }
 
-    /**
-     * Apply group transformation
-     */
     private async applyGroup(data: TestData[], transformation: DataTransformation): Promise<TestData[]> {
         const field = transformation.field;
         if (!field) {
@@ -265,7 +235,6 @@ export class DataTransformer {
         
         const groups = new Map<any, TestData[]>();
         
-        // Group records
         for (const record of data) {
             const key = this.getFieldValue(record, field);
             if (!groups.has(key)) {
@@ -274,7 +243,6 @@ export class DataTransformer {
             groups.get(key)!.push(record);
         }
         
-        // Transform groups
         const result: TestData[] = [];
         const aggregations = transformation.options?.['aggregations'] || {};
         
@@ -285,7 +253,6 @@ export class DataTransformer {
                 _records: groupRecords
             };
             
-            // Apply aggregations
             for (const [aggName, aggConfig] of Object.entries(aggregations)) {
                 if (typeof aggConfig === 'object' && aggConfig !== null && 'field' in aggConfig && 'operation' in aggConfig) {
                     const aggField = (aggConfig as any).field;
@@ -318,9 +285,6 @@ export class DataTransformer {
         return result;
     }
 
-    /**
-     * Apply pivot transformation
-     */
     private async applyPivot(data: TestData[], transformation: DataTransformation): Promise<TestData[]> {
         const options = transformation.options || {};
         const rowField = options['rowField'];
@@ -332,7 +296,6 @@ export class DataTransformer {
             throw new Error('rowField, columnField, and valueField are required for pivot transformation');
         }
         
-        // Get unique column values
         const columnValues = new Set<any>();
         data.forEach(record => {
             const colValue = this.getFieldValue(record, columnField);
@@ -341,7 +304,6 @@ export class DataTransformer {
             }
         });
         
-        // Create pivot map
         const pivotMap = new Map<string, Map<any, number[]>>();
         
         for (const record of data) {
@@ -364,7 +326,6 @@ export class DataTransformer {
             rowData.get(colValue)!.push(value);
         }
         
-        // Build result
         const result: TestData[] = [];
         
         for (const [rowValue, rowData] of pivotMap.entries()) {
@@ -411,15 +372,11 @@ export class DataTransformer {
         return result;
     }
 
-    /**
-     * Apply custom transformation
-     */
     private async applyCustom(data: TestData[], transformation: DataTransformation): Promise<TestData[]> {
         if (!transformation.function) {
             throw new Error('Function is required for custom transformation');
         }
         
-        // Allow async custom functions
         const result = await transformation.function(data);
         
         if (!Array.isArray(result)) {
@@ -429,17 +386,12 @@ export class DataTransformer {
         return result;
     }
 
-    /**
-     * Get field value (supports nested paths)
-     */
     private getFieldValue(record: TestData, field: string): any {
-        // Support JSONPath
         if (field.startsWith('$')) {
             const results = jsonpath.query(record, field);
             return results.length > 0 ? results[0] : undefined;
         }
         
-        // Support dot notation
         const parts = field.split('.');
         let value: any = record;
         
@@ -454,9 +406,6 @@ export class DataTransformer {
         return value;
     }
 
-    /**
-     * Set field value (supports nested paths)
-     */
     private setFieldValue(record: TestData, field: string, value: any): void {
         const parts = field.split('.');
         let current: any = record;
@@ -477,12 +426,8 @@ export class DataTransformer {
         }
     }
 
-    /**
-     * Apply operation to value
-     */
     private applyOperation(value: any, operation: string, operand: any, record: TestData): any {
         switch (operation) {
-            // String operations
             case 'uppercase':
                 return String(value).toUpperCase();
             case 'lowercase':
@@ -500,7 +445,6 @@ export class DataTransformer {
             case 'join':
                 return Array.isArray(value) ? value.join(operand || ',') : value;
                 
-            // Number operations
             case 'add':
                 return Number(value) + Number(operand);
             case 'subtract':
@@ -520,7 +464,6 @@ export class DataTransformer {
             case 'abs':
                 return Math.abs(Number(value));
                 
-            // Date operations
             case 'dateFormat':
                 return this.formatDate(new Date(value), operand);
             case 'dateAdd':
@@ -528,7 +471,6 @@ export class DataTransformer {
             case 'dateDiff':
                 return this.dateDifference(new Date(value), new Date(operand));
                 
-            // Type conversions
             case 'toString':
                 return String(value);
             case 'toNumber':
@@ -546,7 +488,6 @@ export class DataTransformer {
                     return null;
                 }
                 
-            // Conditional operations
             case 'default':
                 return value != null ? value : operand;
             case 'ternary':
@@ -558,9 +499,6 @@ export class DataTransformer {
         }
     }
 
-    /**
-     * Evaluate condition
-     */
     private evaluateCondition(value: any, operation: string, operand: any): boolean {
         switch (operation) {
             case 'equals':
@@ -614,13 +552,8 @@ export class DataTransformer {
         }
     }
 
-    /**
-     * Evaluate expression
-     */
     private evaluateExpression(expression: string, record: TestData): any {
         try {
-            // Simple expression evaluation using Function constructor
-            // In production, consider using a proper expression parser
             const func = new Function('record', 'Math', 'Date', 'JSON', `return ${expression}`);
             return func(record, Math, Date, JSON);
         } catch (error: any) {
@@ -628,9 +561,6 @@ export class DataTransformer {
         }
     }
 
-    /**
-     * Format date
-     */
     private formatDate(date: Date, format: string): string {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -648,9 +578,6 @@ export class DataTransformer {
             .replace('ss', seconds);
     }
 
-    /**
-     * Add to date
-     */
     private addToDate(date: Date, offset: any): Date {
         const result = new Date(date);
         
@@ -668,16 +595,10 @@ export class DataTransformer {
         return result;
     }
 
-    /**
-     * Calculate date difference
-     */
     private dateDifference(date1: Date, date2: Date): number {
         return Math.floor((date1.getTime() - date2.getTime()) / (1000 * 60 * 60 * 24));
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, transformation: DataTransformation): Error {
         const enhancedError = new Error(
             `Data Transformation Error [${transformation.type}]: ${error.message}\n` +

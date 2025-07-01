@@ -4,7 +4,6 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import { gunzip, inflate, brotliDecompress } from 'zlib';
 import { promisify } from 'util';
 
-// Production-ready XML parser interface
 interface XMLParserOptions {
   explicitArray?: boolean;
   ignoreAttrs?: boolean;
@@ -18,19 +17,16 @@ interface XMLParser {
   parseString(xml: string, callback: (err: Error | null, result: any) => void): void;
 }
 
-// Safe XML module loading with fallback
 class SafeXMLParser {
   private parser: XMLParser | null = null;
   private available = false;
 
   constructor(options: XMLParserOptions = {}) {
     try {
-      // Dynamic import with proper error handling
       const xml2js = require('xml2js');
       this.parser = new xml2js.Parser(options);
       this.available = true;
     } catch (error) {
-      // xml2js not available - graceful fallback
       this.available = false;
       ActionLogger.getInstance().warn('xml2js module not available - XML parsing disabled', { error: (error as Error).message });
     }
@@ -57,7 +53,6 @@ class SafeXMLParser {
   }
 }
 
-// Async compression utilities
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
 const brotliDecompressAsync = promisify(brotliDecompress);
@@ -81,7 +76,6 @@ export class ResponseParser {
 
   public async parse(response: ParsedResponse): Promise<ParsedResponse> {
     try {
-      // Parse body based on content type
       const contentType = this.getContentType(response.headers);
       response.contentType = contentType;
 
@@ -103,20 +97,17 @@ export class ResponseParser {
   }
 
   private async parseBuffer(buffer: Buffer, contentType: string, encoding: string): Promise<any> {
-    // Check if response is compressed and decompress if needed
     const decompressed = await this.decompressIfNeeded(buffer);
     return this.parseBufferContent(decompressed, contentType, encoding);
   }
   
   private async parseBufferContent(buffer: Buffer, contentType: string, encoding: string): Promise<any> {
-    // Handle empty responses
     if (buffer.length === 0) {
       return null;
     }
 
     const validEncoding = this.validateEncoding(encoding);
 
-    // Parse based on content type
     if (contentType.includes('application/json')) {
       return this.parseJSON(buffer.toString(validEncoding));
     }
@@ -142,17 +133,14 @@ export class ResponseParser {
     }
 
     if (contentType.includes('application/octet-stream') || contentType.includes('image/')) {
-      return buffer; // Return raw buffer for binary data
+      return buffer;
     }
 
-    // Default to text
     return buffer.toString(validEncoding);
   }
   
   private async decompressIfNeeded(buffer: Buffer): Promise<Buffer> {
-    // Auto-detect compression from buffer signatures
     if (buffer.length >= 2) {
-      // gzip magic number: 1f 8b
       if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
         try {
           return await gunzipAsync(buffer);
@@ -162,7 +150,6 @@ export class ResponseParser {
         }
       }
       
-      // deflate/zlib magic number: 78 (followed by 01, 9c, da, etc.)
       if (buffer[0] === 0x78) {
         try {
           return await inflateAsync(buffer);
@@ -172,12 +159,10 @@ export class ResponseParser {
         }
       }
       
-      // Brotli detection is more complex, but we can try
       if (buffer.length >= 6) {
         try {
           return await brotliDecompressAsync(buffer);
         } catch (error) {
-          // Brotli failed - this is expected if it's not brotli data
           return buffer;
         }
       }
@@ -191,7 +176,6 @@ export class ResponseParser {
       return encoding as BufferEncoding;
     }
     
-    // Default to utf8 for invalid encodings
     ActionLogger.getInstance().debug('Invalid encoding specified, defaulting to utf8', { providedEncoding: encoding });
     return 'utf8';
   }
@@ -200,7 +184,6 @@ export class ResponseParser {
     try {
       return JSON.parse(text);
     } catch (error) {
-      // Try to fix common JSON issues
       const fixed = this.tryFixJSON(text);
       try {
         return JSON.parse(fixed);
@@ -213,21 +196,17 @@ export class ResponseParser {
   private tryFixJSON(text: string): string {
     let fixed = text.trim();
 
-    // Remove BOM if present
     if (fixed.charCodeAt(0) === 0xFEFF) {
       fixed = fixed.slice(1);
     }
 
-    // Handle JSONP
     const jsonpMatch = fixed.match(/^[^(]+\((.+)\)[^)]*$/);
     if (jsonpMatch && jsonpMatch[1]) {
       fixed = jsonpMatch[1];
     }
 
-    // Handle trailing commas
     fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
 
-    // Handle single quotes (convert to double quotes) - be careful with apostrophes
     fixed = fixed.replace(/'/g, '"');
 
     return fixed;
@@ -247,7 +226,6 @@ export class ResponseParser {
 
     params.forEach((value: string, key: string) => {
       if (result[key]) {
-        // Handle multiple values for same key
         if (Array.isArray(result[key])) {
           result[key].push(value);
         } else {
@@ -329,7 +307,6 @@ export class ResponseParser {
       data: body
     };
 
-    // Only add properties if they exist (exactOptionalPropertyTypes compliance)
     if (nameMatch && nameMatch[1]) {
       result.name = nameMatch[1];
     }
@@ -368,7 +345,7 @@ export class ResponseParser {
       if (char === '"') {
         if (inQuotes && nextChar === '"') {
           current += '"';
-          i++; // Skip next quote
+          i++;
         } else {
           inQuotes = !inQuotes;
         }
@@ -435,78 +412,64 @@ export class ResponseParser {
     }
   }
 
-  // Utility method to detect content type from buffer signature
   public detectContentTypeFromBuffer(buffer: Buffer): string {
     if (buffer.length === 0) {
       return 'application/octet-stream';
     }
 
-    // Check for common binary signatures
     const signature = buffer.slice(0, Math.min(buffer.length, 16));
     
-    // PNG signature
     if (signature.length >= 8 && 
         signature[0] === 0x89 && signature[1] === 0x50 && 
         signature[2] === 0x4E && signature[3] === 0x47) {
       return 'image/png';
     }
 
-    // JPEG signature
     if (signature.length >= 3 && 
         signature[0] === 0xFF && signature[1] === 0xD8 && signature[2] === 0xFF) {
       return 'image/jpeg';
     }
 
-    // GIF signature
     if (signature.length >= 6 && 
         signature.toString('ascii', 0, 6) === 'GIF87a' || 
         signature.toString('ascii', 0, 6) === 'GIF89a') {
       return 'image/gif';
     }
 
-    // PDF signature
     if (signature.length >= 4 && signature.toString('ascii', 0, 4) === '%PDF') {
       return 'application/pdf';
     }
 
-    // ZIP signature
     if (signature.length >= 4 && 
         signature[0] === 0x50 && signature[1] === 0x4B && 
         (signature[2] === 0x03 || signature[2] === 0x05)) {
       return 'application/zip';
     }
 
-    // Try to detect text content
     try {
       const text = buffer.toString('utf8', 0, Math.min(buffer.length, 1024));
       
-      // Check for XML
       if (text.trim().startsWith('<?xml') || text.trim().startsWith('<')) {
         return 'application/xml';
       }
 
-      // Check for JSON
       if ((text.trim().startsWith('{') && text.trim().endsWith('}')) ||
           (text.trim().startsWith('[') && text.trim().endsWith(']'))) {
         try {
           JSON.parse(text);
           return 'application/json';
         } catch {
-          // Not valid JSON
         }
       }
 
-      // Check for HTML
       if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype html')) {
         return 'text/html';
       }
 
-      // Default to text if it's printable
       if (/^[\x20-\x7E\s]*$/.test(text)) {
         return 'text/plain';
       }
     } catch {
-      // Not text content
     }
 
     return 'application/octet-stream';

@@ -29,10 +29,8 @@ export class GherkinParser {
   }
   
   private parseFeature(): Feature {
-    // Skip initial comments and tags
     const featureTags = this.parseTags();
     
-    // Find Feature token
     const featureToken = this.expectToken(TokenType.FeatureLine);
     if (!featureToken) {
       throw new ParseError(
@@ -52,7 +50,6 @@ export class GherkinParser {
       uri: this.filePath
     };
     
-    // Parse feature content
     while (!this.isAtEnd()) {
       const token = this.currentToken();
       
@@ -75,23 +72,20 @@ export class GherkinParser {
           
         case TokenType.ScenarioLine:
         case TokenType.ScenarioOutlineLine:
-          // Don't call parseScenario here - it expects to parse tags first
-          // Instead, we need to rewind if there are tags before this scenario
           const scenario = this.parseScenarioWithBacktrack();
           feature.scenarios.push(scenario);
           break;
           
         case TokenType.TagLine:
-          // Skip orphaned tags
           this.advance();
           break;
           
         case TokenType.Comment:
-          this.advance(); // Skip comments
+          this.advance();
           break;
           
         default:
-          this.advance(); // Skip unknown tokens
+          this.advance();
       }
     }
     
@@ -109,7 +103,7 @@ export class GherkinParser {
   }
   
   private parseBackground(): Scenario {
-    const backgroundToken = this.advance(); // Consume BACKGROUND token
+    const backgroundToken = this.advance();
     
     const background: Scenario = {
       type: 'background',
@@ -123,7 +117,6 @@ export class GherkinParser {
       background.line = backgroundToken.line;
     }
     
-    // Parse steps until we hit a scenario or end
     while (!this.isAtEnd()) {
       const token = this.currentToken();
       
@@ -160,10 +153,8 @@ export class GherkinParser {
   }
   
   private parseScenarioWithBacktrack(): Scenario {
-    // Look back to find any tags that precede this scenario
     let tagStartIndex = this.currentIndex;
     
-    // Backtrack to find the first tag
     while (tagStartIndex > 0) {
       const prevToken = this.tokens[tagStartIndex - 1];
       if (prevToken && prevToken.type === TokenType.TagLine) {
@@ -173,21 +164,18 @@ export class GherkinParser {
       }
     }
     
-    // Save current position and reset to tag start
     const savedIndex = this.currentIndex;
     this.currentIndex = tagStartIndex;
     
-    // Now parse the scenario normally (including its tags)
     const scenario = this.parseScenario();
     
     return scenario;
   }
   
   private parseScenario(): Scenario {
-    // Parse scenario tags
     const scenarioTags = this.parseTags();
     
-    const scenarioToken = this.advance(); // Consume SCENARIO or SCENARIO_OUTLINE
+    const scenarioToken = this.advance();
     const isOutline = scenarioToken.type === TokenType.ScenarioOutlineLine;
     
     console.log(`[GherkinParser] Creating scenario "${scenarioToken.value}" with tags:`, scenarioTags);
@@ -208,7 +196,6 @@ export class GherkinParser {
       scenario.examples = [];
     }
     
-    // Parse steps
     while (!this.isAtEnd()) {
       const token = this.currentToken();
       
@@ -233,7 +220,6 @@ export class GherkinParser {
       }
     }
     
-    // Parse examples for scenario outline
     if (isOutline && scenario.examples) {
       while (!this.isAtEnd()) {
         const token = this.currentToken();
@@ -246,12 +232,10 @@ export class GherkinParser {
         scenario.examples.push(examples);
       }
       
-      // Check if scenario has @DataProvider tag
       const hasDataProvider = scenario.tags.some(tag => 
         tag.startsWith('@DataProvider') || tag.includes('DataProvider(')
       );
       
-      // Only require Examples if there's no @DataProvider
       if (scenario.examples.length === 0 && !hasDataProvider) {
         throw new ParseError(
           'Scenario Outline must have at least one Examples section or @DataProvider tag',
@@ -283,7 +267,6 @@ export class GherkinParser {
       line: stepToken.line
     };
     
-    // Check for data table or doc string
     const nextToken = this.currentToken();
     
     if (nextToken) {
@@ -303,7 +286,6 @@ export class GherkinParser {
     
     while (!this.isAtEnd() && this.currentToken()?.type === TokenType.TableRow) {
       const token = this.advance();
-      // Parse table row value - it's a pipe-separated string
       const cells = this.parseTableCells(token.value);
       rows.push(cells);
     }
@@ -347,17 +329,14 @@ export class GherkinParser {
   
   private parseTableCells(value: string): string[] {
     if (typeof value === 'string') {
-      // If it's a pipe-separated string, split it
       return value.split('|').map(cell => cell.trim()).filter(cell => cell !== '');
     }
-    // If it's already an array (shouldn't happen with our TokenType), return empty array
     return [];
   }
   
   private parseDocString(): DocString {
     const docStringToken = this.advance();
     
-    // Extract content type if present
     let contentType: string | undefined;
     const firstLine = docStringToken.value.split('\n')[0];
     if (firstLine && !firstLine.includes('\n')) {
@@ -378,12 +357,12 @@ export class GherkinParser {
   }
   
   private parseExamples(): Examples {
-    const examplesToken = this.advance(); // Consume EXAMPLES token
+    const examplesToken = this.advance();
     
     const examples: Examples = {
       name: examplesToken.value || 'Examples',
-      description: '', // Don't parse description here as it would consume table tokens
-      tags: [], // Tags would have been parsed before the Examples keyword
+      description: '',
+      tags: [],
       header: [],
       rows: []
     };
@@ -392,12 +371,10 @@ export class GherkinParser {
       examples.line = examplesToken.line;
     }
     
-    // Skip empty lines before the table
     while (!this.isAtEnd() && this.currentToken()?.type === TokenType.Empty) {
       this.advance();
     }
     
-    // Parse the table
     const tableToken = this.currentToken();
     
     if (!tableToken || tableToken.type !== TokenType.TableRow) {
@@ -409,16 +386,13 @@ export class GherkinParser {
       );
     }
     
-    // First row is headers
     const headerToken = this.advance();
     examples.header = this.parseTableCells(headerToken.value);
     
-    // Remaining rows are data
     while (!this.isAtEnd() && this.currentToken()?.type === TokenType.TableRow) {
       const rowToken = this.advance();
       const cells = this.parseTableCells(rowToken.value);
       
-      // Validate row has same number of cells as headers
       if (cells.length !== examples.header.length) {
         throw new ParseError(
           `Row has ${cells.length} cells but expected ${examples.header.length}`,
@@ -468,12 +442,10 @@ export class GherkinParser {
         break;
       }
       
-      // Stop if we hit a keyword
       if (this.isKeywordToken(token)) {
         break;
       }
       
-      // Only collect non-empty text tokens
       if (token.type !== TokenType.Empty && token.type !== TokenType.Comment) {
         descriptionLines.push(token.value);
       }
@@ -484,7 +456,6 @@ export class GherkinParser {
   }
   
   private findLanguage(): string {
-    // Language is typically defined in a comment at the beginning
     for (const token of this.tokens) {
       if (token.type === TokenType.Comment && token.value.includes('language:')) {
         const match = token.value.match(/language:\s*(\w+)/i);
@@ -512,12 +483,10 @@ export class GherkinParser {
   }
   
   private getStepKeyword(token: Token): string {
-    // Extract keyword from token if available
     if ('keyword' in token && typeof token.keyword === 'string') {
       return token.keyword;
     }
     
-    // Try to determine from the token value
     const value = token.value.toLowerCase();
     if (value.startsWith('given')) return 'Given';
     if (value.startsWith('when')) return 'When';
@@ -525,7 +494,7 @@ export class GherkinParser {
     if (value.startsWith('and')) return 'And';
     if (value.startsWith('but')) return 'But';
     
-    return 'Given'; // Default fallback
+    return 'Given';
   }
   
   private currentToken(): Token | null {
@@ -568,7 +537,6 @@ export class GherkinParser {
         return token;
       }
       
-      // Skip comments and empty lines
       if (token.type === TokenType.Comment || 
           token.type === TokenType.Empty) {
         this.advance();

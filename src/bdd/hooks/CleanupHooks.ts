@@ -13,10 +13,6 @@ import { ConfigurationManager } from '../../core/configuration/ConfigurationMana
 import { Logger } from '../../core/utils/Logger';
 import * as path from 'path';
 
-/**
- * Specialized hooks for resource cleanup
- * Ensures all resources are properly released after test execution
- */
 export class CleanupHooks {
   private static instance: CleanupHooks;
   private cleanupRegistry: Map<string, CleanupTask>;
@@ -39,11 +35,7 @@ export class CleanupHooks {
     return CleanupHooks.instance;
   }
 
-  /**
-   * Initialize all cleanup tasks
-   */
   private initializeCleanupTasks(): void {
-    // Define cleanup tasks in order of execution
     this.registerCleanupTask({
       name: 'screenshots',
       priority: 1,
@@ -136,13 +128,9 @@ export class CleanupHooks {
     });
   }
 
-  /**
-   * Register cleanup hooks with the framework
-   */
   public registerHooks(): void {
     const hookRegistry = HookRegistry.getInstance();
 
-    // After scenario hook
     hookRegistry.registerHook(
       HookType.After,
       async (context: ExecutionContext) => {
@@ -155,7 +143,6 @@ export class CleanupHooks {
       }
     );
 
-    // After feature hook
     hookRegistry.registerHook(
       HookType.AfterAll,
       async (context: ExecutionContext) => {
@@ -168,7 +155,6 @@ export class CleanupHooks {
       }
     );
 
-    // Final cleanup hook
     hookRegistry.registerHook(
       HookType.AfterAll,
       async (context: ExecutionContext) => {
@@ -181,7 +167,6 @@ export class CleanupHooks {
       }
     );
 
-    // Emergency cleanup on process exit
     if (this.emergencyCleanupEnabled) {
       this.setupEmergencyCleanup();
     }
@@ -189,21 +174,14 @@ export class CleanupHooks {
     ActionLogger.logInfo('Cleanup hooks registered');
   }
 
-  /**
-   * Register a cleanup task
-   */
   private registerCleanupTask(task: CleanupTask): void {
     this.cleanupRegistry.set(task.name, task);
     
-    // Maintain sorted order by priority
     this.cleanupOrder = Array.from(this.cleanupRegistry.values())
       .sort((a, b) => a.priority - b.priority)
       .map(t => t.name);
   }
 
-  /**
-   * Run specific cleanup tasks
-   */
   private async runCleanupTasks(taskNames: string[], context: ExecutionContext): Promise<void> {
     const results: CleanupResult[] = [];
 
@@ -217,7 +195,6 @@ export class CleanupHooks {
       results.push(result);
     }
 
-    // Log cleanup summary
     const failed = results.filter(r => !r.success);
     if (failed.length > 0) {
       ActionLogger.logWarn(`${failed.length} cleanup tasks failed`, {
@@ -226,16 +203,10 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Run all cleanup tasks
-   */
   private async runAllCleanupTasks(context: ExecutionContext): Promise<void> {
     await this.runCleanupTasks(this.cleanupOrder, context);
   }
 
-  /**
-   * Execute a single cleanup task
-   */
   private async executeCleanupTask(task: CleanupTask, context: ExecutionContext): Promise<CleanupResult> {
     const startTime = Date.now();
     const result: CleanupResult = {
@@ -270,9 +241,6 @@ export class CleanupHooks {
     return result;
   }
 
-  /**
-   * Clean up screenshots
-   */
   private async cleanupScreenshots(_context: ExecutionContext): Promise<void> {
     try {
       const screenshotDir = ConfigurationManager.get('SCREENSHOT_DIR', './screenshots');
@@ -290,14 +258,10 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up videos
-   */
   private async cleanupVideos(context: ExecutionContext): Promise<void> {
     try {
       const videoRecorder = VideoRecorder.getInstance();
       
-      // Stop any active recordings
       const activePage = context.getPage();
       if (activePage) {
         try {
@@ -307,12 +271,10 @@ export class CleanupHooks {
             ActionLogger.logDebug(`Video saved to: ${videoPath}`);
           }
         } catch (error) {
-          // Video might not be recording
           this.logger.debug('No active video recording');
         }
       }
 
-      // Clean up old videos if needed
       const keepVideos = ConfigurationManager.getBoolean('KEEP_VIDEOS', true);
       if (!keepVideos) {
         const videoDir = ConfigurationManager.get('VIDEO_DIR', './videos');
@@ -327,29 +289,21 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up traces
-   */
   private async cleanupTraces(context: ExecutionContext): Promise<void> {
     try {
-      // const traceRecorder = TraceRecorder.getInstance();
       
-      // Stop any active traces
       const browserContext = context.getContext();
       if (browserContext) {
         try {
-          // Check if tracing is active on the context
           await browserContext.tracing.stop({
             path: path.join(ConfigurationManager.get('TRACE_DIR', './traces'), `trace-${Date.now()}.zip`)
           });
           ActionLogger.logDebug('Stopped active trace recording');
         } catch (error) {
-          // Tracing might not be active
           this.logger.debug('No active trace recording');
         }
       }
 
-      // Clean up old traces if needed
       const keepTraces = ConfigurationManager.getBoolean('KEEP_TRACES', true);
       if (!keepTraces) {
         const traceDir = ConfigurationManager.get('TRACE_DIR', './traces');
@@ -364,9 +318,6 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up network interceptors
-   */
   private async cleanupNetworkInterceptors(context: ExecutionContext): Promise<void> {
     try {
       const page = context.getPage();
@@ -380,9 +331,6 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up storage
-   */
   private async cleanupStorage(context: ExecutionContext): Promise<void> {
     try {
       const browserContext = context.getContext();
@@ -396,9 +344,6 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up element cache
-   */
   private async cleanupElementCache(_context: ExecutionContext): Promise<void> {
     try {
       ElementCache.getInstance().invalidateAll();
@@ -408,22 +353,14 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up popup handlers
-   */
   private async cleanupPopupHandlers(_context: ExecutionContext): Promise<void> {
     try {
-      // PopupHandler is instantiated per page and doesn't need cleanup
-      // Popup handlers are automatically cleaned when pages are closed
       ActionLogger.logDebug('Popup handlers will be cleaned with page closure');
     } catch (error) {
       this.logger.error('Failed to cleanup popup handlers', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
-  /**
-   * Clean up pages
-   */
   private async cleanupPages(_context: ExecutionContext): Promise<void> {
     try {
       const browserContext = _context.getContext();
@@ -441,9 +378,6 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up contexts
-   */
   private async cleanupContexts(_context: ExecutionContext): Promise<void> {
     try {
       await ContextManager.getInstance().closeAllContexts();
@@ -453,9 +387,6 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up browser
-   */
   private async cleanupBrowser(_context: ExecutionContext): Promise<void> {
     try {
       const shouldCloseBrowser = ConfigurationManager.getBoolean('CLOSE_BROWSER_AFTER_TEST', true);
@@ -468,22 +399,14 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Clean up database connections
-   */
   private async cleanupDatabaseConnections(_context: ExecutionContext): Promise<void> {
     try {
-      // Skip database cleanup if no adapter is configured
-      // Database connections should be cleaned up by the test framework
       ActionLogger.logDebug('Closed database connections');
     } catch (error) {
       this.logger.error('Failed to cleanup database connections', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
-  /**
-   * Clean up temporary files
-   */
   private async cleanupTempFiles(_context: ExecutionContext): Promise<void> {
     try {
       const tempDirs = [
@@ -506,29 +429,19 @@ export class CleanupHooks {
     }
   }
 
-  /**
-   * Finalize reports
-   */
   private async finalizeReports(_context: ExecutionContext): Promise<void> {
     try {
-      // Reports are generated by the runner after all tests complete
-      // Here we just ensure the reporter is properly shut down
-      // const reporter = CSReporter.getInstance();
       ActionLogger.logDebug('Report system ready for shutdown');
     } catch (error) {
       this.logger.error('Failed to finalize reports', error instanceof Error ? error : new Error(String(error)));
     }
   }
 
-  /**
-   * Setup emergency cleanup handlers
-   */
   private setupEmergencyCleanup(): void {
     const emergencyHandler = async () => {
       console.log('\n⚠️  Emergency cleanup initiated...');
       
       try {
-        // Minimal cleanup - just close browser
         await BrowserManager.getInstance().closeBrowser();
         console.log('✓ Browser closed');
       } catch (error) {
@@ -550,17 +463,11 @@ export class CleanupHooks {
     });
   }
 
-  /**
-   * Disable emergency cleanup (for testing)
-   */
   public disableEmergencyCleanup(): void {
     this.emergencyCleanupEnabled = false;
   }
 }
 
-/**
- * Cleanup task interface
- */
 interface CleanupTask {
   name: string;
   priority: number;
@@ -568,9 +475,6 @@ interface CleanupTask {
   skipOnError: boolean;
 }
 
-/**
- * Cleanup result interface
- */
 interface CleanupResult {
   taskName: string;
   success: boolean;
@@ -578,5 +482,4 @@ interface CleanupResult {
   error?: string;
 }
 
-// Export singleton instance
 export const cleanupHooks = CleanupHooks.getInstance();

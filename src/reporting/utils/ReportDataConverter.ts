@@ -9,20 +9,13 @@ import {
 import { ExecutionStatus } from '../../bdd/types/bdd.types';
 
 
-/**
- * Utility class to convert between different report data formats
- */
 export class ReportDataConverter {
     
-    /**
-     * Convert ReportData to ExecutionResult format expected by ExcelExporter
-     */
     static toExecutionResult(reportData: ReportData): ExecutionResult {
         const summary = reportData.summary;
         const features = reportData.features || [];
         const scenarios = reportData.scenarios || [];
         
-        // Determine overall execution status
         let status: ExecutionStatus = ExecutionStatus.PASSED;
         if (summary.failedScenarios > 0) {
             status = ExecutionStatus.FAILED;
@@ -30,12 +23,10 @@ export class ReportDataConverter {
             status = ExecutionStatus.ABORTED;
         }
         
-        // Calculate total counts from features if not in summary
         const totalFeatures = summary.totalFeatures || features.length;
         const totalScenarios = summary.totalScenarios || scenarios.length;
         const totalSteps = summary.totalSteps || 0;
         
-        // Build ExecutionResult
         const executionResult: ExecutionResult = {
             executionId: reportData.metadata?.executionId || `exec-${Date.now()}`,
             startTime: new Date(reportData.metadata?.startTime || reportData.metadata?.executionDate || Date.now()),
@@ -60,7 +51,7 @@ export class ReportDataConverter {
             tags: reportData.tags || [],
             metadata: {
                 ...reportData.metadata,
-                browser: 'chrome', // Default browser since ReportConfiguration doesn't include browser info
+                browser: 'chrome',
                 platform: process.platform || 'unknown',
                 reportGenerated: new Date().toISOString()
             }
@@ -69,13 +60,9 @@ export class ReportDataConverter {
         return executionResult;
     }
     
-    /**
-     * Convert features to ensure they have the required structure
-     */
     private static convertFeatures(features: FeatureReport[]): FeatureReport[] {
         return features.map(feature => ({
             ...feature,
-            // Ensure all required fields are present
             featureId: feature.featureId || `feature-${Date.now()}-${Math.random()}`,
             feature: feature.feature || feature.name || 'Unknown Feature',
             scenarios: feature.scenarios || [],
@@ -87,9 +74,6 @@ export class ReportDataConverter {
         }));
     }
     
-    /**
-     * Determine feature status from its scenarios
-     */
     private static determineFeatureStatus(feature: FeatureReport): TestStatus {
         if (!feature.scenarios || feature.scenarios.length === 0) {
             return TestStatus.SKIPPED;
@@ -114,38 +98,25 @@ export class ReportDataConverter {
         return TestStatus.SKIPPED;
     }
     
-    /**
-     * Count passed features
-     */
     private static countPassedFeatures(features: FeatureReport[]): number {
         return features.filter(f => 
             f.status === 'passed'
         ).length;
     }
     
-    /**
-     * Count failed features
-     */
     private static countFailedFeatures(features: FeatureReport[]): number {
         return features.filter(f => 
             f.status === 'failed'
         ).length;
     }
     
-    /**
-     * Count skipped features
-     */
     private static countSkippedFeatures(features: FeatureReport[]): number {
         return features.filter(f => 
             f.status === 'skipped'
         ).length;
     }
     
-    /**
-     * Calculate total duration from report data
-     */
     private static calculateDuration(reportData: ReportData): number {
-        // Try to get duration from different sources
         if (reportData.summary?.duration) {
             return reportData.summary.duration;
         }
@@ -156,7 +127,6 @@ export class ReportDataConverter {
             return end - start;
         }
         
-        // Calculate from features
         if (reportData.features && reportData.features.length > 0) {
             return reportData.features.reduce((total, feature) => 
                 total + (feature.duration || 0), 0
@@ -166,9 +136,6 @@ export class ReportDataConverter {
         return 0;
     }
     
-    /**
-     * Validate if data can be converted
-     */
     static canConvert(data: any): boolean {
         return data && 
                typeof data === 'object' && 

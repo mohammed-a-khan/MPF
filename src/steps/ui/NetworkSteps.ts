@@ -18,7 +18,6 @@ export class NetworkSteps extends CSBDDBaseStepDefinition {
 
     constructor() {
         super();
-        // Network classes will be initialized when page is available
         this.harRecorder = new HARRecorder();
     }
 
@@ -51,11 +50,9 @@ export class NetworkSteps extends CSBDDBaseStepDefinition {
         try {
             let responseData: any;
             
-            // Try to parse as JSON
             try {
                 responseData = JSON.parse(docString);
             } catch {
-                // If not JSON, use as plain text
                 responseData = docString;
             }
             
@@ -223,7 +220,7 @@ export class NetworkSteps extends CSBDDBaseStepDefinition {
                 throw new Error(`No requests found matching pattern "${pattern}"`);
             }
             
-            const request = requests[requests.length - 1]; // Get most recent
+            const request = requests[requests.length - 1];
             if (!request) {
                 throw new Error('No request found');
             }
@@ -253,7 +250,7 @@ export class NetworkSteps extends CSBDDBaseStepDefinition {
         try {
             await this.harRecorder.startRecording(this.page, {
                 content: ConfigurationManager.get('HAR_CONTENT_TYPE', 'embed') as any,
-                maxSize: ConfigurationManager.getInt('HAR_MAX_SIZE', 50 * 1024 * 1024) // 50MB default
+                maxSize: ConfigurationManager.getInt('HAR_MAX_SIZE', 50 * 1024 * 1024)
             });
             
             ActionLogger.logInfo('HAR recording started', { type: 'network_success' });
@@ -271,7 +268,6 @@ export class NetworkSteps extends CSBDDBaseStepDefinition {
         try {
             const har = await this.harRecorder.stopRecording();
             
-            // Store HAR for later use
             this.context.store('lastHAR', har, 'scenario');
             
             ActionLogger.logInfo('HAR recording stopped', {
@@ -314,7 +310,6 @@ export class NetworkSteps extends CSBDDBaseStepDefinition {
             const analysis = this.harRecorder.analyzeHAR(har);
             const metrics = this.harRecorder.getPerformanceMetrics(har);
             
-            // Store analysis results
             this.context.store('networkAnalysis', analysis, 'scenario');
             this.context.store('performanceMetrics', metrics, 'scenario');
             
@@ -469,11 +464,9 @@ export class NetworkSteps extends CSBDDBaseStepDefinition {
     }
 
     private parseValue(value: string): any {
-        // Try to parse as JSON
         try {
             return JSON.parse(value);
         } catch {
-            // Return as string if not JSON
             return value;
         }
     }

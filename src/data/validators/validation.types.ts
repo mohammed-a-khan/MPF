@@ -2,9 +2,6 @@
 
 import { TestData, ValidationResult } from '../types/data.types';
 
-/**
- * Validation rule types
- */
 export type ValidationRuleType = 
     | 'required' 
     | 'type' 
@@ -32,9 +29,6 @@ export type ValidationRuleType =
     | 'uuid'
     | 'ipAddress';
 
-/**
- * Validation rule definition
- */
 export interface ValidationRule {
     field: string;
     type: ValidationRuleType;
@@ -69,9 +63,6 @@ export interface ValidationRule {
     validate?: (value: any, rule: ValidationRule, record: TestData, allRecords?: TestData[]) => boolean | Promise<boolean>;
 }
 
-/**
- * Data validation options
- */
 export interface DataValidationOptions {
     stopOnFirstError?: boolean;
     throwOnError?: boolean;
@@ -91,17 +82,11 @@ export interface DataValidationOptions {
     timezone?: string;
 }
 
-/**
- * Built-in validation rule for internal use
- */
 export interface BuiltInValidationRule {
     type: ValidationRuleType;
     validate: (value: any, rule: ValidationRule, record: TestData, allRecords?: TestData[]) => boolean | Promise<boolean>;
 }
 
-/**
- * Extended validation result with additional properties
- */
 export interface ExtendedValidationResult {
     isValid: boolean;
     errors: string[];
@@ -112,7 +97,6 @@ export interface ExtendedValidationResult {
         value?: any;
         error: string;
     }>;
-    // Additional properties for internal use
     recordIndex?: number;
     field?: string;
     value?: any;

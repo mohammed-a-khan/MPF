@@ -135,7 +135,6 @@ export class HeaderValidator {
       };
     }
     
-    // Handle charset and other parameters
     const contentTypeParts = contentType.split(';');
     const firstPart = contentTypeParts[0];
     if (!firstPart) {
@@ -403,7 +402,6 @@ export class HeaderValidator {
   ): ValidationResult {
     const errors: ValidationError[] = [];
     
-    // Validate Access-Control-Allow-Origin
     if (expectations.allowOrigin !== undefined) {
       const origin = this.getHeaderValue(headers, 'access-control-allow-origin');
       
@@ -446,7 +444,6 @@ export class HeaderValidator {
       }
     }
     
-    // Validate Access-Control-Allow-Methods
     if (expectations.allowMethods) {
       const methods = this.getHeaderValue(headers, 'access-control-allow-methods');
       
@@ -476,7 +473,6 @@ export class HeaderValidator {
       }
     }
     
-    // Validate Access-Control-Allow-Headers
     if (expectations.allowHeaders) {
       const allowHeaders = this.getHeaderValue(headers, 'access-control-allow-headers');
       
@@ -506,7 +502,6 @@ export class HeaderValidator {
       }
     }
     
-    // Validate Access-Control-Allow-Credentials
     if (expectations.allowCredentials !== undefined) {
       const credentials = this.getHeaderValue(headers, 'access-control-allow-credentials');
       const expectedValue = expectations.allowCredentials ? 'true' : 'false';
@@ -522,7 +517,6 @@ export class HeaderValidator {
       }
     }
     
-    // Validate Access-Control-Expose-Headers
     if (expectations.exposeHeaders) {
       const exposeHeaders = this.getHeaderValue(headers, 'access-control-expose-headers');
       
@@ -552,7 +546,6 @@ export class HeaderValidator {
       }
     }
     
-    // Validate Access-Control-Max-Age
     if (expectations.maxAge !== undefined) {
       const maxAge = this.getHeaderValue(headers, 'access-control-max-age');
       
@@ -595,7 +588,6 @@ export class HeaderValidator {
   ): ValidationResult {
     const errors: ValidationError[] = [];
     
-    // Validate Strict-Transport-Security
     if (expectations.strictTransportSecurity !== undefined) {
       const result = this.validateSecurityHeader(
         headers,
@@ -606,7 +598,6 @@ export class HeaderValidator {
       if (!result.valid && result.errors) errors.push(...result.errors);
     }
     
-    // Validate X-Content-Type-Options
     if (expectations.xContentTypeOptions !== undefined) {
       const result = this.validateSecurityHeader(
         headers,
@@ -617,7 +608,6 @@ export class HeaderValidator {
       if (!result.valid && result.errors) errors.push(...result.errors);
     }
     
-    // Validate X-Frame-Options
     if (expectations.xFrameOptions !== undefined) {
       const result = this.validateSecurityHeader(
         headers,
@@ -628,7 +618,6 @@ export class HeaderValidator {
       if (!result.valid && result.errors) errors.push(...result.errors);
     }
     
-    // Validate X-XSS-Protection
     if (expectations.xXssProtection !== undefined) {
       const result = this.validateSecurityHeader(
         headers,
@@ -639,7 +628,6 @@ export class HeaderValidator {
       if (!result.valid && result.errors) errors.push(...result.errors);
     }
     
-    // Validate Content-Security-Policy
     if (expectations.contentSecurityPolicy !== undefined) {
       const result = this.validateSecurityHeader(
         headers,
@@ -649,7 +637,6 @@ export class HeaderValidator {
       if (!result.valid && result.errors) errors.push(...result.errors);
     }
     
-    // Validate Referrer-Policy
     if (expectations.referrerPolicy !== undefined) {
       const result = this.validateSecurityHeader(
         headers,
@@ -659,7 +646,6 @@ export class HeaderValidator {
       if (!result.valid && result.errors) errors.push(...result.errors);
     }
     
-    // Validate Permissions-Policy
     if (expectations.permissionsPolicy !== undefined) {
       const result = this.validateSecurityHeader(
         headers,
@@ -684,7 +670,6 @@ export class HeaderValidator {
     const value = this.getHeaderValue(headers, headerName);
     
     if (expectation === false) {
-      // Should not exist
       return value ? {
         valid: false,
         errors: [{
@@ -727,7 +712,6 @@ export class HeaderValidator {
   }
 
   private getHeaderValue(headers: Record<string, string | string[]>, name: string): string | undefined {
-    // Case-insensitive header lookup
     const lowerName = name.toLowerCase();
     
     for (const [key, value] of Object.entries(headers)) {
@@ -770,7 +754,6 @@ export class HeaderValidator {
     return (headers: Record<string, string | string[]>) => {
       const errors: ValidationError[] = [];
       
-      // Check required headers
       if (config.required) {
         for (const header of config.required) {
           const result = this.validateHeaderExists(headers, header);
@@ -778,7 +761,6 @@ export class HeaderValidator {
         }
       }
       
-      // Check forbidden headers
       if (config.forbidden) {
         for (const header of config.forbidden) {
           const result = this.validateHeaderNotExists(headers, header);
@@ -786,7 +768,6 @@ export class HeaderValidator {
         }
       }
       
-      // Check exact matches
       if (config.exact) {
         for (const [name, value] of Object.entries(config.exact)) {
           const result = this.validateHeader(headers, name, value);
@@ -794,7 +775,6 @@ export class HeaderValidator {
         }
       }
       
-      // Check patterns
       if (config.patterns) {
         for (const [name, pattern] of Object.entries(config.patterns)) {
           const result = this.validateHeaderPattern(headers, name, pattern);
@@ -802,7 +782,6 @@ export class HeaderValidator {
         }
       }
       
-      // Check contains
       if (config.contains) {
         for (const [name, substring] of Object.entries(config.contains)) {
           const result = this.validateHeaderContains(headers, name, substring);
@@ -810,13 +789,11 @@ export class HeaderValidator {
         }
       }
       
-      // Check CORS
       if (config.cors) {
         const result = this.validateCORS(headers, config.cors);
         if (!result.valid && result.errors) errors.push(...result.errors);
       }
       
-      // Check security headers
       if (config.security) {
         const result = this.validateSecurityHeaders(headers, config.security);
         if (!result.valid && result.errors) errors.push(...result.errors);

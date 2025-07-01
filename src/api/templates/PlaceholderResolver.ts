@@ -1,10 +1,6 @@
 import { TemplateContext, PlaceholderOptions, CustomResolver } from '../types/api.types';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Resolve template placeholders with support for nested properties,
- * transformations, default values, and custom resolvers
- */
 export class PlaceholderResolver {
     private static instance: PlaceholderResolver;
     private customResolvers: Map<string, CustomResolver> = new Map();
@@ -22,16 +18,12 @@ export class PlaceholderResolver {
         return PlaceholderResolver.instance;
     }
 
-    /**
-     * Resolve all placeholders in template
-     */
     public resolve(
         template: string,
         context: TemplateContext,
         options: PlaceholderOptions = {}
     ): string {
         try {
-            // Pattern matches: {{variable}}, {{variable|transformer}}, {{variable|transformer:arg}}, {{variable|default:value}}
             const placeholderPattern = /\{\{([^}]+)\}\}/g;
             
             return template.replace(placeholderPattern, (match, expression) => {
@@ -53,25 +45,19 @@ export class PlaceholderResolver {
         }
     }
 
-    /**
-     * Resolve single placeholder expression
-     */
     private resolvePlaceholder(
         expression: string,
         context: TemplateContext,
         options: PlaceholderOptions
     ): string {
-        // Check cache if enabled
         const cacheKey = `${expression}:${JSON.stringify(context)}`;
         if (options.useCache && this.resolverCache.has(cacheKey)) {
             return this.resolverCache.get(cacheKey);
         }
 
-        // Parse expression
         const parts = this.parseExpression(expression);
         let value: any;
 
-        // Check for custom resolver
         if (parts.path.startsWith('@')) {
             const resolverName = parts.path.substring(1);
             const resolver = this.customResolvers.get(resolverName);
@@ -82,24 +68,19 @@ export class PlaceholderResolver {
                 throw new Error(`Unknown custom resolver: ${resolverName}`);
             }
         } else {
-            // Standard property resolution
             value = this.resolveProperty(parts.path, context);
         }
 
-        // Apply transformers
         for (const transformer of parts.transformers) {
             value = this.applyTransformer(value, transformer.name, transformer.args);
         }
 
-        // Handle default value
         if ((value === undefined || value === null || value === '') && parts.defaultValue !== undefined) {
             value = parts.defaultValue;
         }
 
-        // Convert to string
         const result = this.valueToString(value, options);
 
-        // Cache result if enabled
         if (options.useCache) {
             this.resolverCache.set(cacheKey, result);
         }
@@ -107,9 +88,6 @@ export class PlaceholderResolver {
         return result;
     }
 
-    /**
-     * Parse placeholder expression
-     */
     private parseExpression(expression: string): ParsedExpression {
         const parts: ParsedExpression = {
             path: '',
@@ -117,13 +95,10 @@ export class PlaceholderResolver {
             args: []
         };
 
-        // Split by pipe for transformers
         const segments = this.splitByPipe(expression);
         
-        // First segment is the variable path
         const firstSegment = segments[0]?.trim() || '';
         
-        // Check if path has arguments (for custom resolvers)
         const argMatch = firstSegment.match(/^([^(]+)\(([^)]*)\)$/);
         if (argMatch && argMatch[1] && argMatch[2] !== undefined) {
             parts.path = argMatch[1].trim();
@@ -132,7 +107,6 @@ export class PlaceholderResolver {
             parts.path = firstSegment;
         }
 
-        // Process remaining segments as transformers or default
         for (let i = 1; i < segments.length; i++) {
             const segment = segments[i]?.trim() || '';
             
@@ -157,9 +131,6 @@ export class PlaceholderResolver {
         return parts;
     }
 
-    /**
-     * Split expression by pipe, respecting quotes
-     */
     private splitByPipe(expression: string): string[] {
         const segments: string[] = [];
         let current = '';
@@ -203,9 +174,6 @@ export class PlaceholderResolver {
         return segments;
     }
 
-    /**
-     * Parse function arguments
-     */
     private parseArguments(argsString: string): string[] {
         if (!argsString.trim()) return [];
 
@@ -243,11 +211,7 @@ export class PlaceholderResolver {
         return args;
     }
 
-    /**
-     * Resolve property from context
-     */
     private resolveProperty(path: string, context: TemplateContext): any {
-        // Handle array notation
         const arrayPattern = /^(.+?)\[(\d+)\](.*)$/;
         const match = path.match(arrayPattern);
         
@@ -259,7 +223,6 @@ export class PlaceholderResolver {
             if (Array.isArray(baseValue) && index >= 0 && index < baseValue.length) {
                 const arrayValue = baseValue[index];
                 if (remainingPath) {
-                    // Continue resolving remaining path
                     return this.resolveProperty(remainingPath.substring(1), arrayValue);
                 }
                 return arrayValue;
@@ -267,7 +230,6 @@ export class PlaceholderResolver {
             return undefined;
         }
 
-        // Handle dot notation
         const parts = path.split('.');
         let value: any = context;
 
@@ -276,7 +238,6 @@ export class PlaceholderResolver {
                 return undefined;
             }
 
-            // Handle computed property access
             if (part.includes('[') && part.includes(']')) {
                 const propMatch = part.match(/^(\w+)\[['"]([^'"]+)['"]\]$/);
                 if (propMatch && propMatch[1] && propMatch[2]) {
@@ -298,9 +259,6 @@ export class PlaceholderResolver {
         return value;
     }
 
-    /**
-     * Apply transformer to value
-     */
     private applyTransformer(value: any, transformerName: string, args: string): any {
         const transformer = this.transformers.get(transformerName);
         
@@ -315,9 +273,6 @@ export class PlaceholderResolver {
         }
     }
 
-    /**
-     * Convert value to string
-     */
     private valueToString(value: any, options: PlaceholderOptions): string {
         if (value === null) {
             return options.nullValue || 'null';
@@ -337,11 +292,7 @@ export class PlaceholderResolver {
         return String(value);
     }
 
-    /**
-     * Register built-in transformers
-     */
     private registerBuiltInTransformers(): void {
-        // String transformers
         this.registerTransformer('upper', (value, _args) => {
             return String(value || '').toUpperCase();
         });
@@ -425,7 +376,6 @@ export class PlaceholderResolver {
             return String(value || '').split(separator);
         });
 
-        // Number transformers
         this.registerTransformer('int', (value, _args) => {
             return parseInt(value) || 0;
         });
@@ -466,7 +416,6 @@ export class PlaceholderResolver {
             return parts.join(decimalSep);
         });
 
-        // Date transformers
         this.registerTransformer('date', (value, args) => {
             const format = args || 'YYYY-MM-DD';
             const date = value ? new Date(value) : new Date();
@@ -489,7 +438,6 @@ export class PlaceholderResolver {
             return `${Math.floor(seconds / 86400)} days ago`;
         });
 
-        // Array transformers
         this.registerTransformer('join', (value, args) => {
             const separator = args || ',';
             return Array.isArray(value) ? value.join(separator) : String(value || '');
@@ -529,7 +477,6 @@ export class PlaceholderResolver {
             return 0;
         });
 
-        // Boolean transformers
         this.registerTransformer('bool', (value, _args) => {
             if (typeof value === 'boolean') return value;
             if (typeof value === 'string') {
@@ -542,7 +489,6 @@ export class PlaceholderResolver {
             return !value;
         });
 
-        // Encoding transformers
         this.registerTransformer('base64', (value, _args) => {
             return Buffer.from(String(value || '')).toString('base64');
         });
@@ -581,7 +527,6 @@ export class PlaceholderResolver {
             }
         });
 
-        // Hash transformers
         this.registerTransformer('md5', (value, _args) => {
             const crypto = require('crypto');
             return crypto.createHash('md5').update(String(value || '')).digest('hex');
@@ -597,7 +542,6 @@ export class PlaceholderResolver {
             return crypto.createHash('sha256').update(String(value || '')).digest('hex');
         });
 
-        // Type checking transformers
         this.registerTransformer('type', (value, _args) => {
             if (value === null) return 'null';
             if (Array.isArray(value)) return 'array';
@@ -612,7 +556,6 @@ export class PlaceholderResolver {
             return false;
         });
 
-        // Object transformers
         this.registerTransformer('keys', (value, _args) => {
             return value && typeof value === 'object' ? Object.keys(value) : [];
         });
@@ -626,25 +569,16 @@ export class PlaceholderResolver {
         });
     }
 
-    /**
-     * Register custom transformer
-     */
     public registerTransformer(name: string, transformer: (value: any, args?: string) => any): void {
         this.transformers.set(name, transformer);
         ActionLogger.getInstance().debug(`Registered transformer: ${name}`);
     }
 
-    /**
-     * Register custom resolver
-     */
     public registerCustomResolver(name: string, resolver: CustomResolver): void {
         this.customResolvers.set(name, resolver);
         ActionLogger.getInstance().debug(`Registered custom resolver: @${name}`);
     }
 
-    /**
-     * Format date helper
-     */
     private formatDate(date: Date, format: string): string {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -679,30 +613,20 @@ export class PlaceholderResolver {
             .replace('a', date.getHours() >= 12 ? 'pm' : 'am');
     }
 
-    /**
-     * Clear resolver cache
-     */
     public clearCache(): void {
         this.resolverCache.clear();
         ActionLogger.getInstance().debug('Placeholder resolver cache cleared');
     }
 
-    /**
-     * Get transformer names
-     */
     public getTransformerNames(): string[] {
         return Array.from(this.transformers.keys());
     }
 
-    /**
-     * Get custom resolver names
-     */
     public getCustomResolverNames(): string[] {
         return Array.from(this.customResolvers.keys());
     }
 }
 
-// Type definitions
 interface ParsedExpression {
     path: string;
     transformers: Array<{ name: string; args: string }>;

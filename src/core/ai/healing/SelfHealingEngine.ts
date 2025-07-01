@@ -89,7 +89,6 @@ export class SelfHealingEngine {
   }
 
   private initializeStrategies(): void {
-    // Initialize healing strategies
     // Note: The actual strategy implementations need to be imported and registered
   }
 
@@ -98,8 +97,8 @@ export class SelfHealingEngine {
       enabled: ConfigurationManager.getBoolean('AI_SELF_HEALING_ENABLED', true),
       maxAttempts: ConfigurationManager.getInt('AI_HEALING_MAX_ATTEMPTS', 5),
       confidenceThreshold: ConfigurationManager.getFloat('AI_HEALING_CONFIDENCE_THRESHOLD', 0.7),
-      cacheTimeout: ConfigurationManager.getInt('AI_HEALING_CACHE_TIMEOUT', 300000), // 5 minutes
-      snapshotInterval: ConfigurationManager.getInt('AI_HEALING_SNAPSHOT_INTERVAL', 60000), // 1 minute
+      cacheTimeout: ConfigurationManager.getInt('AI_HEALING_CACHE_TIMEOUT', 300000),
+      snapshotInterval: ConfigurationManager.getInt('AI_HEALING_SNAPSHOT_INTERVAL', 60000),
       strategies: ConfigurationManager.getArray('AI_HEALING_STRATEGIES', ',') || [
         'nearby', 'similar-text', 'similar-attributes', 'parent-child', 'ai-identification'
       ]
@@ -113,12 +112,10 @@ export class SelfHealingEngine {
 
     const elementId = this.getElementId(element);
     
-    // Check if already healing
     if (this.isHealing.get(elementId)) {
       throw new Error('Healing already in progress for this element');
     }
 
-    // Check cache
     const cached = this.getCachedHealing(elementId);
     if (cached && cached.newLocator) {
       ActionLogger.logInfo('Self-healing cache hit', { 
@@ -143,21 +140,16 @@ export class SelfHealingEngine {
         type: 'ai_operation'
       });
 
-      // Try each strategy
       const healingResult = await this.attemptHealing(context);
 
       if (healingResult.success && healingResult.newLocator) {
-        // Validate the healed locator
         const isValid = await this.validateHealing(element, healingResult.newLocator);
         
         if (isValid) {
-          // Update element with new locator
           await this.updateElement(element, healingResult);
           
-          // Record success
           await this.recordHealingSuccess(element, healingResult);
           
-          // Cache result
           this.cacheHealing(elementId, healingResult);
           
           ActionLogger.logInfo('Self-healing successful', {
@@ -175,7 +167,6 @@ export class SelfHealingEngine {
         }
       }
 
-      // Healing failed
       this.recordHealingFailure(element, context);
       
       throw new Error(`Failed to heal element: ${element.description}`);
@@ -207,7 +198,6 @@ export class SelfHealingEngine {
     let attempts = 0;
     const maxAttempts = this.config.maxAttempts;
     
-    // Get ordered strategies
     const orderedStrategies = this.getOrderedStrategies(context);
 
     for (const strategyName of orderedStrategies) {
@@ -260,7 +250,7 @@ export class SelfHealingEngine {
       confidence: 0,
       attempts,
       duration: Date.now() - context.startTime,
-      newLocator: context.page.locator('body') // placeholder locator
+      newLocator: context.page.locator('body')
     };
   }
 
@@ -274,7 +264,6 @@ export class SelfHealingEngine {
       return null;
     }
 
-    // Generate robust locator
     const element = await result.elementHandle();
     if (!element) {
       return null;
@@ -287,10 +276,8 @@ export class SelfHealingEngine {
       return null;
     }
 
-    // Create Playwright locator
     const locator = context.page.locator(robustLocator.primary);
     
-    // Verify locator finds exactly one element
     const count = await locator.count();
     if (count !== 1) {
       return null;
@@ -304,10 +291,8 @@ export class SelfHealingEngine {
   }
 
   private getOrderedStrategies(context: HealingContext): string[] {
-    // Get success rates for each strategy
     const strategyStats = this.history.getStrategyStatistics();
     
-    // Order strategies by success rate for similar elements
     const elementType = this.getElementType(context.element);
     const orderedStrategies = [...this.config.strategies].sort((a, b) => {
       const aStats = (strategyStats as any)[a];
@@ -315,14 +300,12 @@ export class SelfHealingEngine {
       
       if (!aStats || !bStats) return 0;
       
-      // Prioritize by success rate for element type
       const aRate = aStats.successRateByType.get(elementType) || aStats.overallSuccessRate;
       const bRate = bStats.successRateByType.get(elementType) || bStats.overallSuccessRate;
       
       return bRate - aRate;
     });
 
-    // Always try AI identification last if enabled
     if (orderedStrategies.includes('ai-identification')) {
       const aiIndex = orderedStrategies.indexOf('ai-identification');
       orderedStrategies.splice(aiIndex, 1);
@@ -334,16 +317,13 @@ export class SelfHealingEngine {
 
   public async validateHealing(element: CSWebElement, healedLocator: Locator): Promise<boolean> {
     try {
-      // Check if element exists
       const exists = await healedLocator.count() === 1;
       if (!exists) {
         return false;
       }
 
-      // Wait for element to be stable
       await healedLocator.waitFor({ state: 'attached', timeout: 5000 });
 
-      // Compare with expected properties if available
       if (element.description) {
         const actualText = await healedLocator.textContent();
         const similarity = this.calculateTextSimilarity(
@@ -356,13 +336,11 @@ export class SelfHealingEngine {
         }
       }
 
-      // Verify element type matches
       const tagName = await healedLocator.evaluate(el => el.tagName.toLowerCase());
       if (!this.isCompatibleElementType(element, tagName)) {
         return false;
       }
 
-      // Check visibility if required
       if (element.options.waitForVisible) {
         const isVisible = await healedLocator.isVisible();
         if (!isVisible) {
@@ -378,7 +356,6 @@ export class SelfHealingEngine {
   }
 
   private calculateTextSimilarity(text1: string, text2: string): number {
-    // Simple Levenshtein distance based similarity
     const maxLength = Math.max(text1.length, text2.length);
     if (maxLength === 0) return 1;
     
@@ -413,7 +390,6 @@ export class SelfHealingEngine {
 
   private isCompatibleElementType(element: CSWebElement, tagName: string): boolean {
     
-    // Map expected types to compatible tag names
     const compatibilityMap: Record<string, string[]> = {
       'button': ['button', 'input', 'a', 'div', 'span'],
       'input': ['input', 'textarea'],
@@ -423,7 +399,6 @@ export class SelfHealingEngine {
       'radio': ['input']
     };
 
-    // Check text content for element type hints
     const description = element.description.toLowerCase();
     for (const [type, tags] of Object.entries(compatibilityMap)) {
       if (description.includes(type) && tags.includes(tagName)) {
@@ -431,12 +406,10 @@ export class SelfHealingEngine {
       }
     }
 
-    // Default permissive for generic elements
     return true;
   }
 
   private async updateElement(element: CSWebElement, healingResult: ExtendedHealingResult): Promise<void> {
-    // Store old locator as fallback
     if (!element.options.fallbacks) {
       element.options.fallbacks = [];
     }
@@ -446,10 +419,8 @@ export class SelfHealingEngine {
       value: element.options.locatorValue
     });
 
-    // Update primary locator
     element.options.locatorValue = healingResult.newLocator!.toString();
     
-    // Add healing metadata
     (element as any)._healingMetadata = {
       healedAt: new Date(),
       strategy: healingResult.strategy,
@@ -457,7 +428,6 @@ export class SelfHealingEngine {
       originalLocator: element.options.fallbacks[0]?.value
     };
 
-    // Store snapshot for future healing
     if ((healingResult as ExtendedHealingResult).snapshot) {
       this.storeElementSnapshot(element, (healingResult as ExtendedHealingResult).snapshot!);
     }
@@ -479,7 +449,6 @@ export class SelfHealingEngine {
       }
     );
 
-    // Train AI if AI strategy was used
     if (result.strategy === 'ai-identification' && result.newLocator) {
       await this.aiIdentifier.trainOnSuccess(element, result.newLocator);
     }
@@ -506,7 +475,6 @@ export class SelfHealingEngine {
     const stats = this.history.getStrategyStatistics();
     const fragileElements = this.history.getFragileElements();
     
-    // Convert to HealingStats format
     const byStrategy: Record<string, any> = {};
     for (const [strategyName, strategyStats] of Object.entries(stats)) {
       byStrategy[strategyName] = {
@@ -534,7 +502,6 @@ export class SelfHealingEngine {
   }
 
   private getElementType(element: CSWebElement): string {
-    // Extract type from description or locator
     const description = element.description.toLowerCase();
     const types = ['button', 'input', 'link', 'dropdown', 'checkbox', 'radio', 'text', 'image'];
     
@@ -551,7 +518,6 @@ export class SelfHealingEngine {
     const elementId = this.getElementId(element);
     const history = this.history.getElementHistory(elementId);
     
-    // Find last successful healing
     const lastSuccess = history
       .filter(h => h.success && h.newLocator)
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
@@ -617,7 +583,6 @@ export class SelfHealingEngine {
     const snapshots = this.elementSnapshots.get(elementId)!;
     snapshots.push(snapshot);
     
-    // Keep only last 10 snapshots
     if (snapshots.length > 10) {
       snapshots.shift();
     }
@@ -630,7 +595,6 @@ export class SelfHealingEngine {
       return null;
     }
     
-    // Check if cache is still valid
     const age = Date.now() - (cached.cachedAt || 0);
     if (age > this.config.cacheTimeout) {
       this.healingCache.delete(elementId);
@@ -653,12 +617,10 @@ export class SelfHealingEngine {
 
   public async takePreventiveSnapshot(element: CSWebElement): Promise<void> {
     try {
-      // Use public method to get locator instead of private resolve
       const locator = element.page.locator(element.options.locatorValue);
       const snapshot = await this.captureElementSnapshot(locator);
       this.storeElementSnapshot(element, snapshot);
     } catch (error) {
-      // Ignore errors in preventive snapshots
       ActionLogger.logDebug(`Failed to take preventive snapshot: ${(error as Error).message}`);
     }
   }
@@ -680,7 +642,7 @@ export class SelfHealingEngine {
         elementId: id,
         snapshots: snapshots.map(s => ({
           ...s,
-          innerHTML: undefined // Exclude HTML for size
+          innerHTML: undefined
         }))
       }))
     };

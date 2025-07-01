@@ -5,9 +5,6 @@ import { DatabaseAdapter } from '../adapters/DatabaseAdapter';
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Database connection pool implementation
- */
 export class ConnectionPool {
   private adapter: DatabaseAdapter;
   private config: DatabaseConfig;
@@ -37,9 +34,6 @@ export class ConnectionPool {
     };
   }
 
-  /**
-   * Initialize connection pool
-   */
   async initialize(): Promise<void> {
     if (this.initialized) {
       return;
@@ -52,7 +46,6 @@ export class ConnectionPool {
     });
 
     try {
-      // Create minimum connections
       const promises: Promise<void>[] = [];
       for (let i = 0; i < this.poolConfig.min!; i++) {
         promises.push(this.createConnection());
@@ -65,7 +58,6 @@ export class ConnectionPool {
         connections: this.connections.length
       });
 
-      // Start idle connection cleanup
       this.startIdleConnectionCleanup();
       
     } catch (error) {
@@ -74,22 +66,17 @@ export class ConnectionPool {
     }
   }
 
-  /**
-   * Acquire connection from pool
-   */
   async acquire(): Promise<DatabaseConnection> {
     if (this.draining) {
       throw new Error('Connection pool is draining');
     }
 
-    // Try to get available connection
     let connection = await this.getAvailableConnection();
     
     if (connection) {
       return connection;
     }
 
-    // Create new connection if under limit
     if (this.connections.length < this.poolConfig.max!) {
       try {
         await this.createConnection();
@@ -103,22 +90,16 @@ export class ConnectionPool {
       }
     }
 
-    // Wait for connection to become available
     return this.waitForConnection();
   }
 
-  /**
-   * Release connection back to pool
-   */
   async release(connection: DatabaseConnection): Promise<void> {
     if (this.draining) {
-      // Close connection if draining
       await this.closeConnection(connection);
       return;
     }
 
     try {
-      // Validate connection before returning to pool
       if (this.poolConfig.validateOnBorrow) {
         const isValid = await this.validateConnection(connection);
         if (!isValid) {
@@ -127,13 +108,11 @@ export class ConnectionPool {
         }
       }
 
-      // Mark as available
       const index = this.connections.indexOf(connection);
       if (index !== -1) {
         this.availableConnections.push(connection);
         this.activeCount--;
         
-        // Process waiting queue
         this.processWaitingQueue();
       }
       
@@ -144,23 +123,18 @@ export class ConnectionPool {
     }
   }
 
-  /**
-   * Drain pool (close all connections)
-   */
   async drain(): Promise<void> {
     this.draining = true;
 
     const actionLogger = ActionLogger.getInstance();
     await actionLogger.logDatabase('poolDrain', 'pool', 0);
 
-    // Reject all waiting requests
     while (this.waitingQueue.length > 0) {
       const waiter = this.waitingQueue.shift()!;
       clearTimeout(waiter.timeout);
       waiter.reject(new Error('Connection pool is draining'));
     }
 
-    // Close all connections
     const promises = this.connections.map(conn => this.closeConnection(conn));
     await Promise.all(promises);
 
@@ -171,9 +145,6 @@ export class ConnectionPool {
     this.draining = false;
   }
 
-  /**
-   * Get pool statistics
-   */
   getStats(): ConnectionStats {
     return {
       total: this.connections.length,
@@ -185,29 +156,20 @@ export class ConnectionPool {
     };
   }
 
-  /**
-   * Reconnect all connections
-   */
   async reconnect(): Promise<void> {
     const actionLogger = ActionLogger.getInstance();
     await actionLogger.logDatabase('poolReconnect', 'pool', 0);
 
-    // Close all existing connections
     await this.drain();
     
-    // Reinitialize
     this.draining = false;
     await this.initialize();
   }
 
-  /**
-   * Create new connection
-   */
   private async createConnection(): Promise<void> {
     try {
       const connection = await this.adapter.connect(this.config);
       
-      // Set connection metadata
       (connection as any)._poolCreatedAt = Date.now();
       (connection as any)._poolLastUsed = Date.now();
       
@@ -226,14 +188,10 @@ export class ConnectionPool {
     }
   }
 
-  /**
-   * Close connection
-   */
   private async closeConnection(connection: DatabaseConnection): Promise<void> {
     try {
       await this.adapter.disconnect(connection);
       
-      // Remove from arrays
       const index = this.connections.indexOf(connection);
       if (index !== -1) {
         this.connections.splice(index, 1);
@@ -255,14 +213,10 @@ export class ConnectionPool {
     }
   }
 
-  /**
-   * Get available connection
-   */
   private async getAvailableConnection(): Promise<DatabaseConnection | null> {
     while (this.availableConnections.length > 0) {
       const connection = this.availableConnections.shift()!;
       
-      // Test connection if configured
       if (this.poolConfig.testOnBorrow) {
         const isValid = await this.validateConnection(connection);
         if (!isValid) {
@@ -271,7 +225,6 @@ export class ConnectionPool {
         }
       }
       
-      // Update metadata
       (connection as any)._poolLastUsed = Date.now();
       this.activeCount++;
       
@@ -281,13 +234,9 @@ export class ConnectionPool {
     return null;
   }
 
-  /**
-   * Wait for connection to become available
-   */
   private waitForConnection(): Promise<DatabaseConnection> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        // Remove from queue
         const index = this.waitingQueue.findIndex(w => w.timeout === timeout);
         if (index !== -1) {
           this.waitingQueue.splice(index, 1);
@@ -300,9 +249,6 @@ export class ConnectionPool {
     });
   }
 
-  /**
-   * Process waiting queue
-   */
   private async processWaitingQueue(): Promise<void> {
     while (this.waitingQueue.length > 0 && this.availableConnections.length > 0) {
       const waiter = this.waitingQueue.shift()!;
@@ -313,7 +259,6 @@ export class ConnectionPool {
         if (connection) {
           waiter.resolve(connection);
         } else {
-          // Put back in queue
           this.waitingQueue.unshift(waiter);
           break;
         }
@@ -323,9 +268,6 @@ export class ConnectionPool {
     }
   }
 
-  /**
-   * Validate connection
-   */
   private async validateConnection(connection: DatabaseConnection): Promise<boolean> {
     try {
       await this.adapter.ping(connection);
@@ -337,13 +279,9 @@ export class ConnectionPool {
     }
   }
 
-  /**
-   * Replace bad connection
-   */
   private async replaceConnection(connection: DatabaseConnection): Promise<void> {
     await this.closeConnection(connection);
     
-    // Create replacement if under minimum
     if (this.connections.length < this.poolConfig.min!) {
       try {
         await this.createConnection();
@@ -354,9 +292,6 @@ export class ConnectionPool {
     }
   }
 
-  /**
-   * Start idle connection cleanup
-   */
   private startIdleConnectionCleanup(): void {
     setInterval(() => {
       if (this.draining) return;
@@ -364,13 +299,11 @@ export class ConnectionPool {
       const now = Date.now();
       const idleTimeout = this.poolConfig.idleTimeout!;
       
-      // Find idle connections
       const idleConnections = this.availableConnections.filter(conn => {
         const lastUsed = (conn as any)._poolLastUsed || 0;
         return (now - lastUsed) > idleTimeout && this.connections.length > this.poolConfig.min!;
       });
       
-      // Close idle connections
       idleConnections.forEach(conn => {
         this.closeConnection(conn).catch(error => {
           const logger = Logger.getInstance();
@@ -378,12 +311,9 @@ export class ConnectionPool {
         });
       });
       
-    }, 30000); // Check every 30 seconds
+    }, 30000);
   }
 
-  /**
-   * Cleanup on error
-   */
   private async cleanup(): Promise<void> {
     const promises = this.connections.map(conn => 
       this.adapter.disconnect(conn).catch(() => {})

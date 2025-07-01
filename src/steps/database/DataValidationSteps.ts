@@ -30,7 +30,7 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
         try {
             const validation = this.resultSetValidator.validateCellValue(
                 result, 
-                row - 1, // Convert to 0-based index
+                row - 1,
                 column, 
                 this.convertExpectedValue(interpolatedExpected)
             );
@@ -323,7 +323,7 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
                 return sum + numValue;
             }, 0);
 
-            const tolerance = 0.001; // For floating point comparison
+            const tolerance = 0.001;
             if (Math.abs(actualSum - expectedSum) > tolerance) {
                 throw new Error(
                     `Expected sum: ${expectedSum}, but got: ${actualSum}`
@@ -407,7 +407,6 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
             const minValue = values.reduce((min, val) => {
                 if (val === null || val === undefined) return min;
                 
-                // Compare based on type
                 if (typeof val === 'number' && typeof min === 'number') {
                     return val < min ? val : min;
                 } else if (val instanceof Date && min instanceof Date) {
@@ -456,7 +455,6 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
             const maxValue = values.reduce((max, val) => {
                 if (val === null || val === undefined) return max;
                 
-                // Compare based on type
                 if (typeof val === 'number' && typeof max === 'number') {
                     return val > max ? val : max;
                 } else if (val instanceof Date && max instanceof Date) {
@@ -496,7 +494,6 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
         const result = this.getLastResult();
 
         try {
-            // Find column metadata
             const columnMeta = result.fields?.find((col: any) => col.name === column);
             if (!columnMeta) {
                 throw new Error(`Column '${column}' not found in result set`);
@@ -625,14 +622,12 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
         const expectedData = this.parseExpectedData(dataTable);
 
         try {
-            // Validate row count
             if (expectedData.length !== result.rowCount) {
                 throw new Error(
                     `Row count mismatch. Expected: ${expectedData.length}, Actual: ${result.rowCount}`
                 );
             }
 
-            // Validate each row
             for (let i = 0; i < expectedData.length; i++) {
                 const expectedRow = expectedData[i];
                 const actualRow = result.rows[i];
@@ -675,7 +670,6 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
             throw new Error('No scalar result available. Execute a scalar query first');
         }
         
-        // Get first value from first row
         const columns = Object.keys(result.rows[0]);
         if (columns.length === 0) {
             throw new Error('No columns in result');
@@ -711,7 +705,6 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    // Helper methods
     private getLastResult(): QueryResult {
         const result = this.databaseContext.getStoredResult('last');
         if (!result) {
@@ -737,42 +730,33 @@ export class DataValidationSteps extends CSBDDBaseStepDefinition {
     }
 
     private convertExpectedValue(value: string): any {
-        // Handle special values
         if (value.toLowerCase() === 'null') return null;
         if (value.toLowerCase() === 'true') return true;
         if (value.toLowerCase() === 'false') return false;
         
-        // Handle numbers
         if (/^-?\d+$/.test(value)) return parseInt(value);
         if (/^-?\d+\.\d+$/.test(value)) return parseFloat(value);
         
-        // Handle dates
         if (/^\d{4}-\d{2}-\d{2}/.test(value)) return new Date(value);
         
-        // Handle empty string
         if (value === "''") return '';
         
-        // Default to string
         return value;
     }
 
     private valuesEqual(actual: any, expected: any): boolean {
-        // Handle null/undefined
         if (actual === null || actual === undefined) {
             return expected === null || expected === undefined || expected === 'null';
         }
 
-        // Handle dates
         if (actual instanceof Date && expected instanceof Date) {
             return actual.getTime() === expected.getTime();
         }
 
-        // Handle numbers with tolerance
         if (typeof actual === 'number' && typeof expected === 'number') {
             return Math.abs(actual - expected) < 0.001;
         }
 
-        // Default comparison
         return actual === expected;
     }
 

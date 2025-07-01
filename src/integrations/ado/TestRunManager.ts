@@ -236,9 +236,6 @@ export class TestRunManager {
     return ADOConfig.getEndpoints();
   }
 
-  /**
-   * Create test run
-   */
   async createTestRun(request: TestRunCreateRequest): Promise<TestRun> {
     try {
       this.logger.info(`Creating test run: ${request.name}`);
@@ -274,9 +271,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Get test run by ID
-   */
   async getTestRun(runId: number, includeDetails: boolean = false): Promise<TestRun> {
     try {
       if (!includeDetails && this.runCache.has(runId)) {
@@ -307,9 +301,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Update test run
-   */
   async updateTestRun(runId: number, request: Partial<TestRunUpdateRequest>): Promise<TestRun> {
     try {
       this.logger.info(`Updating test run: ${runId}`);
@@ -343,9 +334,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Delete test run
-   */
   async deleteTestRun(runId: number): Promise<void> {
     try {
       this.logger.info(`Deleting test run: ${runId}`);
@@ -363,9 +351,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Query test runs
-   */
   async queryTestRuns(filter: RunFilter): Promise<{ runs: TestRun[]; continuationToken?: string }> {
     try {
       this.logger.info('Querying test runs...');
@@ -396,9 +381,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Get test runs for build
-   */
   async getTestRunsForBuild(
     buildId: string,
     options?: {
@@ -426,9 +408,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Get test runs for release
-   */
   async getTestRunsForRelease(
     releaseId: string,
     releaseEnvId: string,
@@ -458,9 +437,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Get test run statistics
-   */
   async getTestRunStatistics(runId: number): Promise<TestRunStatistics> {
     try {
       this.logger.info(`Fetching statistics for test run: ${runId}`);
@@ -475,9 +451,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Get test run message logs
-   */
   async getTestRunLogs(runId: number): Promise<Array<{
     logId: number;
     message: string;
@@ -497,9 +470,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Add test run log
-   */
   async addTestRunLog(
     runId: number,
     message: string,
@@ -522,9 +492,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Get test run coverage
-   */
   async getTestRunCoverage(runId: number): Promise<{
     modules: Array<{
       name: string;
@@ -552,9 +519,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Add test run attachment
-   */
   async addTestRunAttachment(
     runId: number,
     attachment: {
@@ -600,9 +564,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Cancel test run
-   */
   async cancelTestRun(runId: number): Promise<TestRun> {
     try {
       this.logger.info(`Cancelling test run: ${runId}`);
@@ -625,9 +586,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Clone test run
-   */
   async cloneTestRun(
     sourceRunId: number,
     options?: {
@@ -687,9 +645,6 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Start monitoring test run
-   */
   private startRunMonitoring(runId: number): void {
     if (this.activeRuns.has(runId)) {
       return;
@@ -714,9 +669,6 @@ export class TestRunManager {
     this.activeRuns.set(runId, interval);
   }
 
-  /**
-   * Stop monitoring test run
-   */
   private stopRunMonitoring(runId: number): void {
     const interval = this.activeRuns.get(runId);
     if (interval) {
@@ -726,24 +678,15 @@ export class TestRunManager {
     }
   }
 
-  /**
-   * Get active test runs
-   */
   getActiveTestRuns(): number[] {
     return Array.from(this.activeRuns.keys());
   }
 
-  /**
-   * Clear cache
-   */
   clearCache(): void {
     this.runCache.clear();
     this.logger.debug('Test run cache cleared');
   }
 
-  /**
-   * Cleanup
-   */
   cleanup(): void {
     for (const runId of this.activeRuns.keys()) {
       this.stopRunMonitoring(runId);

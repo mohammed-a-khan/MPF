@@ -20,7 +20,6 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
             const element = await this.findElement(elementDescription);
             await element.click();
             
-            // Wait for any navigation or changes
             await this.waitForStability();
             
             await actionLogger.logAction('element_clicked', { element: elementDescription, success: true });
@@ -81,7 +80,6 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
         try {
             const element = await this.findElement(elementDescription);
             
-            // Clear existing text first if configured
             if (ConfigurationManager.getBoolean('CLEAR_BEFORE_TYPE', true)) {
                 await element.clear();
             }
@@ -202,7 +200,6 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
         try {
             const element = await this.findElement(elementDescription);
             
-            // Only check if not already checked
             if (!await element.isChecked()) {
                 await element.check();
                 await actionLogger.logAction('element_checked', { element: elementDescription, success: true });
@@ -224,7 +221,6 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
         try {
             const element = await this.findElement(elementDescription);
             
-            // Only uncheck if already checked
             if (await element.isChecked()) {
                 await element.uncheck();
                 await actionLogger.logAction('element_unchecked', { element: elementDescription, success: true });
@@ -248,7 +244,6 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
             const element = await this.findElement(elementDescription);
             await element.hover();
             
-            // Wait for any hover effects
             await this.page.waitForTimeout(ConfigurationManager.getInt('HOVER_DELAY', 100));
             
             await actionLogger.logAction('element_hovered', { element: elementDescription, success: true });
@@ -337,7 +332,6 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
         try {
             const element = await this.findElement(elementDescription);
             
-            // Resolve file path relative to test data directory if not absolute
             const resolvedPath = this.resolveFilePath(filePath);
             
             await element.upload(resolvedPath);
@@ -389,7 +383,6 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
             const element = await this.findElement(elementDescription);
             await element.scrollIntoView();
             
-            // Wait for scroll animation
             await this.page.waitForTimeout(ConfigurationManager.getInt('SCROLL_DELAY', 300));
             
             await actionLogger.logAction('scrolled_to_element', { element: elementDescription, success: true });
@@ -483,13 +476,11 @@ export class InteractionSteps extends CSBDDBaseStepDefinition {
     }
 
     private async findElement(description: string): Promise<CSWebElement> {
-        // Check if it's a stored element reference
         const storedElement = this.context.retrieve<CSWebElement>(`element_${description}`);
         if (storedElement) {
             return storedElement;
         }
 
-        // Create element with AI-enabled options
         const options: CSGetElementOptions = {
             description,
             locatorType: 'text',

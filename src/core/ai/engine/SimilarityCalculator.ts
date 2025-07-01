@@ -76,7 +76,6 @@ export class SimilarityCalculator {
       semanticSimilarity * weights.semantic +
       contextSimilarity * weights.context;
 
-    // Log similarity calculation for debugging
     ActionLogger.logDebug('Similarity calculated', {
       operation: 'similarity_calculated',
       scores: {
@@ -93,7 +92,6 @@ export class SimilarityCalculator {
   }
 
   quickCalculate(features1: ElementFeatures, features2: ElementFeatures): number {
-    // Quick calculation for performance-critical operations
     const textSim = this.quickTextSimilarity(features1.text, features2.text);
     const tagSim = features1.structural.tagName === features2.structural.tagName ? 1 : 0;
     const visibleSim = features1.visual.isVisible === features2.visual.isVisible ? 1 : 0;
@@ -108,13 +106,10 @@ export class SimilarityCalculator {
   calculateTextSimilarity(text1: TextFeatures, text2: TextFeatures): number {
     const scores: Record<string, number> = {};
 
-    // Content similarity
     scores['content'] = this.stringSimilarity(text1.content, text2.content);
     
-    // Visible text similarity
     scores['visibleText'] = this.stringSimilarity(text1.visibleText, text2.visibleText);
     
-    // ARIA label similarity
     if (text1.ariaLabel && text2.ariaLabel) {
       scores['ariaLabel'] = this.stringSimilarity(text1.ariaLabel, text2.ariaLabel);
     } else if (!text1.ariaLabel && !text2.ariaLabel) {
@@ -123,7 +118,6 @@ export class SimilarityCalculator {
       scores['ariaLabel'] = 0;
     }
     
-    // Placeholder similarity
     if (text1.placeholder && text2.placeholder) {
       scores['placeholder'] = this.stringSimilarity(text1.placeholder, text2.placeholder);
     } else if (!text1.placeholder && !text2.placeholder) {
@@ -132,7 +126,6 @@ export class SimilarityCalculator {
       scores['placeholder'] = 0;
     }
     
-    // Value similarity
     if (text1.value && text2.value) {
       scores['value'] = this.stringSimilarity(text1.value, text2.value);
     } else if (!text1.value && !text2.value) {
@@ -141,7 +134,6 @@ export class SimilarityCalculator {
       scores['value'] = 0;
     }
 
-    // Weighted combination
     let totalScore = 0;
     let totalWeight = 0;
     
@@ -161,36 +153,28 @@ export class SimilarityCalculator {
   ): number {
     const scores: Record<string, number> = {};
 
-    // Tag name similarity
     scores['tagName'] = struct1.tagName === struct2.tagName ? 1 : 0;
 
-    // Attributes similarity
     scores['attributes'] = this.attributesSimilarity(struct1.attributes, struct2.attributes);
 
-    // Class list similarity
     scores['classList'] = this.arraysSimilarity(struct1.classList, struct2.classList);
 
-    // Hierarchy similarity (depth and path)
     scores['hierarchy'] = this.hierarchySimilarity(struct1, struct2);
 
-    // Interactive state similarity
     scores['interactive'] = struct1.isInteractive === struct2.isInteractive ? 1 : 0;
 
-    // Form element similarity
     if (struct1.formElement && struct2.formElement) {
       scores['formElement'] = struct1.inputType === struct2.inputType ? 1 : 0.5;
     } else {
       scores['formElement'] = struct1.formElement === struct2.formElement ? 1 : 0;
     }
 
-    // Role similarity
     if (struct1.role && struct2.role) {
       scores['role'] = struct1.role === struct2.role ? 1 : 0;
     } else {
-      scores['role'] = 0.5; // Neutral if one or both don't have roles
+      scores['role'] = 0.5;
     }
 
-    // Calculate weighted total
     let totalScore = 0;
     let totalWeight = 0;
 
@@ -210,35 +194,28 @@ export class SimilarityCalculator {
   ): number {
     const scores: Record<string, number> = {};
 
-    // Visibility similarity
     scores['visibility'] = visual1.isVisible === visual2.isVisible ? 1 : 0;
     if (!visual1.isVisible || !visual2.isVisible) {
-      return scores['visibility'] * 0.2; // Low score if either is not visible
+      return scores['visibility'] * 0.2;
     }
 
-    // Position similarity
     scores['position'] = this.positionSimilarity(
       visual1.boundingBox,
       visual2.boundingBox
     );
 
-    // Size similarity
     scores['size'] = this.sizeSimilarity(
       visual1.boundingBox,
       visual2.boundingBox
     );
 
-    // Style similarity
     scores['style'] = this.styleSimilarity(visual1, visual2);
 
-    // Z-index similarity (normalized)
     const zDiff = Math.abs(visual1.zIndex - visual2.zIndex);
     scores['zIndex'] = Math.max(0, 1 - zDiff / 100);
 
-    // Viewport similarity
     scores['viewport'] = visual1.inViewport === visual2.inViewport ? 1 : 0.5;
 
-    // Calculate weighted total
     let totalScore = 0;
     let totalWeight = 0;
 
@@ -259,52 +236,43 @@ export class SimilarityCalculator {
     let score = 0;
     let factors = 0;
 
-    // Role similarity
     if (semantic1.role === semantic2.role) {
       score += 1;
     }
     factors++;
 
-    // Landmark similarity
     if (semantic1.isLandmark === semantic2.isLandmark) {
       score += 1;
     }
     factors++;
 
-    // Heading level similarity
     if (semantic1.headingLevel === semantic2.headingLevel) {
       score += 1;
     } else if (semantic1.headingLevel > 0 && semantic2.headingLevel > 0) {
-      // Partial score for different heading levels
       score += 0.5;
     }
     factors++;
 
-    // List context similarity
     if (semantic1.listItem === semantic2.listItem) {
       score += 1;
     }
     factors++;
 
-    // Table context similarity
     if (semantic1.tableCell === semantic2.tableCell) {
       score += 1;
     }
     factors++;
 
-    // Semantic type similarity
     if (semantic1.semanticType === semantic2.semanticType) {
       score += 1;
     }
     factors++;
 
-    // Required state similarity
     if (semantic1.isRequired === semantic2.isRequired) {
       score += 0.5;
     }
     factors += 0.5;
 
-    // Invalid state similarity
     if (semantic1.isInvalid === semantic2.isInvalid) {
       score += 0.5;
     }
@@ -320,13 +288,11 @@ export class SimilarityCalculator {
     let score = 0;
     let factors = 0;
 
-    // Parent tag similarity
     if (context1.parentTag === context2.parentTag) {
       score += 1;
     }
     factors++;
 
-    // Parent text similarity
     if (context1.parentText && context2.parentText) {
       score += this.stringSimilarity(context1.parentText, context2.parentText);
     } else {
@@ -334,11 +300,9 @@ export class SimilarityCalculator {
     }
     factors++;
 
-    // Sibling texts similarity
     score += this.stringArraySimilarity(context1.siblingTexts, context2.siblingTexts);
     factors++;
 
-    // Nearby heading similarity
     if (context1.nearbyHeading && context2.nearbyHeading) {
       score += this.stringSimilarity(context1.nearbyHeading, context2.nearbyHeading);
     } else if (!context1.nearbyHeading && !context2.nearbyHeading) {
@@ -348,7 +312,6 @@ export class SimilarityCalculator {
     }
     factors++;
 
-    // Label text similarity
     if (context1.labelText && context2.labelText) {
       score += this.stringSimilarity(context1.labelText, context2.labelText);
     } else if (!context1.labelText && !context2.labelText) {
@@ -358,7 +321,6 @@ export class SimilarityCalculator {
     }
     factors++;
 
-    // Form context similarity
     if (context1.formId === context2.formId) {
       score += 1;
     } else if (context1.formId && context2.formId) {
@@ -366,7 +328,6 @@ export class SimilarityCalculator {
     }
     factors++;
 
-    // Table headers similarity
     if (context1.tableHeaders.length > 0 || context2.tableHeaders.length > 0) {
       score += this.stringArraySimilarity(context1.tableHeaders, context2.tableHeaders);
       factors++;
@@ -384,14 +345,12 @@ export class SimilarityCalculator {
 
     if (s1 === s2) return 1;
 
-    // Check containment
     if (s1.includes(s2) || s2.includes(s1)) {
       const longer = s1.length > s2.length ? s1 : s2;
       const shorter = s1.length > s2.length ? s2 : s1;
       return shorter.length / longer.length;
     }
 
-    // Use Jaccard similarity for word-based comparison
     const words1 = new Set(s1.split(/\s+/));
     const words2 = new Set(s2.split(/\s+/));
     
@@ -403,7 +362,6 @@ export class SimilarityCalculator {
 
     const jaccard = intersection.size / union.size;
 
-    // Also consider Levenshtein distance for short strings
     if (s1.length < 20 && s2.length < 20) {
       const levenshtein = this.normalizedLevenshteinDistance(s1, s2);
       return (jaccard + levenshtein) / 2;
@@ -422,7 +380,6 @@ export class SimilarityCalculator {
     if (str1.length === 0) return str2.length;
     if (str2.length === 0) return str1.length;
 
-    // Use a Map for type-safe 2D array access
     const getValue = (i: number, j: number, map: Map<string, number>): number => {
       return map.get(`${i},${j}`) ?? 0;
     };
@@ -433,17 +390,14 @@ export class SimilarityCalculator {
 
     const matrix = new Map<string, number>();
 
-    // Initialize first row
     for (let j = 0; j <= str1.length; j++) {
       setValue(0, j, j, matrix);
     }
 
-    // Initialize first column
     for (let i = 0; i <= str2.length; i++) {
       setValue(i, 0, i, matrix);
     }
 
-    // Fill the matrix using dynamic programming
     for (let i = 1; i <= str2.length; i++) {
       for (let j = 1; j <= str1.length; j++) {
         if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
@@ -474,22 +428,18 @@ export class SimilarityCalculator {
     const commonKeys = new Set([...keys1].filter(k => keys2.has(k)));
     let matchScore = 0;
 
-    // Check common attributes
     for (const key of commonKeys) {
       if (attrs1[key] === attrs2[key]) {
         matchScore += 1;
       } else {
-        // Partial score for similar values
         const val1 = attrs1[key] ?? '';
         const val2 = attrs2[key] ?? '';
         matchScore += this.stringSimilarity(val1, val2) * 0.5;
       }
     }
 
-    // Jaccard coefficient for keys
     const keyJaccard = commonKeys.size / new Set([...keys1, ...keys2]).size;
     
-    // Combine key similarity and value similarity
     const valueSimilarity = commonKeys.size > 0 ? matchScore / commonKeys.size : 0;
     
     return (keyJaccard + valueSimilarity) / 2;
@@ -509,11 +459,9 @@ export class SimilarityCalculator {
   }
 
   private hierarchySimilarity(struct1: StructuralFeatures, struct2: StructuralFeatures): number {
-    // Compare depth
     const depthDiff = Math.abs(struct1.depth - struct2.depth);
     const depthScore = Math.max(0, 1 - depthDiff / 10);
 
-    // Compare paths if available
     if (struct1.path && struct2.path) {
       const pathScore = this.pathSimilarity(struct1.path, struct2.path);
       return (depthScore + pathScore) / 2;
@@ -523,7 +471,6 @@ export class SimilarityCalculator {
   }
 
   private pathSimilarity(path1: string[], path2: string[]): number {
-    // Find common prefix length
     let commonPrefix = 0;
     const minLength = Math.min(path1.length, path2.length);
     
@@ -535,13 +482,11 @@ export class SimilarityCalculator {
       }
     }
 
-    // Calculate similarity based on common prefix and total length
     const maxLength = Math.max(path1.length, path2.length);
     return commonPrefix / maxLength;
   }
 
   private positionSimilarity(box1: DOMRect, box2: DOMRect): number {
-    // Calculate center points
     const center1 = {
       x: box1.x + box1.width / 2,
       y: box1.y + box1.height / 2
@@ -552,13 +497,11 @@ export class SimilarityCalculator {
       y: box2.y + box2.height / 2
     };
 
-    // Calculate distance between centers
     const distance = Math.sqrt(
       Math.pow(center1.x - center2.x, 2) + 
       Math.pow(center1.y - center2.y, 2)
     );
 
-    // Normalize distance (assuming viewport of ~1920x1080)
     const maxDistance = Math.sqrt(1920 * 1920 + 1080 * 1080);
     return Math.max(0, 1 - distance / maxDistance);
   }
@@ -572,7 +515,6 @@ export class SimilarityCalculator {
     
     const ratio = Math.min(area1, area2) / Math.max(area1, area2);
     
-    // Also consider aspect ratio similarity
     const aspectRatio1 = box1.width / box1.height;
     const aspectRatio2 = box2.width / box2.height;
     const aspectSimilarity = Math.min(aspectRatio1, aspectRatio2) / 
@@ -585,7 +527,6 @@ export class SimilarityCalculator {
     let score = 0;
     let factors = 0;
 
-    // Font size similarity
     if (visual1.fontSize === visual2.fontSize) {
       score += 1;
     } else {
@@ -596,11 +537,9 @@ export class SimilarityCalculator {
     }
     factors++;
 
-    // Font weight similarity
     if (visual1.fontWeight === visual2.fontWeight) {
       score += 1;
     } else {
-      // Convert to numeric for comparison
       const weight1 = this.parseFontWeight(visual1.fontWeight);
       const weight2 = this.parseFontWeight(visual2.fontWeight);
       const diff = Math.abs(weight1 - weight2);
@@ -608,15 +547,13 @@ export class SimilarityCalculator {
     }
     factors++;
 
-    // Color similarity (simple comparison)
     if (visual1.color === visual2.color) {
       score += 1;
     } else {
-      score += 0.5; // Could implement proper color distance
+      score += 0.5;
     }
     factors++;
 
-    // Background color similarity
     if (visual1.backgroundColor === visual2.backgroundColor) {
       score += 1;
     } else {
@@ -624,13 +561,11 @@ export class SimilarityCalculator {
     }
     factors++;
 
-    // Display type similarity
     if (visual1.display === visual2.display) {
       score += 0.5;
     }
     factors += 0.5;
 
-    // Position type similarity
     if (visual1.position === visual2.position) {
       score += 0.5;
     }
@@ -657,7 +592,6 @@ export class SimilarityCalculator {
     if (t1 === t2) return 1;
     if (!t1 || !t2) return 0;
     
-    // Quick check for containment
     if (t1.includes(t2) || t2.includes(t1)) {
       return Math.min(t1.length, t2.length) / Math.max(t1.length, t2.length);
     }
@@ -672,7 +606,6 @@ export class SimilarityCalculator {
     let totalSimilarity = 0;
     const compared = Math.max(arr1.length, arr2.length);
 
-    // Compare each string in arr1 with best match in arr2
     for (const str1 of arr1) {
       let bestMatch = 0;
       for (const str2 of arr2) {
@@ -682,7 +615,6 @@ export class SimilarityCalculator {
       totalSimilarity += bestMatch;
     }
 
-    // Also compare in reverse direction
     for (const str2 of arr2) {
       let bestMatch = 0;
       for (const str1 of arr1) {

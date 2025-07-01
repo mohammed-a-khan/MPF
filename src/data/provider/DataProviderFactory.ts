@@ -10,10 +10,6 @@ import { FileHandler } from '../handlers/FileHandler';
 import { logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Factory for creating appropriate data handlers
- * Implements factory pattern for data source abstraction
- */
 export class DataProviderFactory {
     private handlers: Map<DataSource, new() => DataHandler>;
     private customHandlers: Map<string, new() => DataHandler> = new Map();
@@ -30,20 +26,15 @@ export class DataProviderFactory {
         logger.debug('DataProviderFactory initialized with handlers:', Array.from(this.handlers.keys()));
     }
 
-    /**
-     * Create handler for specified data source type
-     */
     createHandler(type: DataSource | string): DataHandler {
         ActionLogger.logInfo('Data provider operation: create_handler', { operation: 'data_provider_create_handler', type });
         
-        // Check custom handlers first
         const CustomHandler = this.customHandlers.get(type);
         if (CustomHandler) {
             logger.debug(`Creating custom handler for type: ${type}`);
             return new CustomHandler();
         }
         
-        // Check built-in handlers
         const Handler = this.handlers.get(type as DataSource);
         if (!Handler) {
             const availableTypes = [
@@ -62,9 +53,6 @@ export class DataProviderFactory {
         return new Handler();
     }
 
-    /**
-     * Register custom data handler
-     */
     registerHandler(type: string, handler: new() => DataHandler): void {
         if (this.handlers.has(type as DataSource)) {
             logger.warn(`Overriding built-in handler for type: ${type}`);
@@ -76,16 +64,10 @@ export class DataProviderFactory {
         ActionLogger.logInfo('Data provider operation: register_handler', { operation: 'data_provider_register_handler', type });
     }
 
-    /**
-     * Check if handler exists for type
-     */
     hasHandler(type: string): boolean {
         return this.handlers.has(type as DataSource) || this.customHandlers.has(type);
     }
 
-    /**
-     * Get all available handler types
-     */
     getAvailableTypes(): string[] {
         return [
             ...Array.from(this.handlers.keys()),
@@ -93,22 +75,15 @@ export class DataProviderFactory {
         ];
     }
 
-    /**
-     * Create multiple handlers for batch processing
-     */
     createHandlers(types: (DataSource | string)[]): DataHandler[] {
         return types.map(type => this.createHandler(type));
     }
 
-    /**
-     * Get handler capabilities
-     */
     getHandlerCapabilities(type: DataSource | string): string[] {
         const handler = this.createHandler(type);
         
         const capabilities: string[] = [];
         
-        // Check method existence to determine capabilities
         if ('stream' in handler && typeof handler.stream === 'function') {
             capabilities.push('streaming');
         }
@@ -132,17 +107,11 @@ export class DataProviderFactory {
         return capabilities;
     }
 
-    /**
-     * Clear all registered custom handlers
-     */
     clearCustomHandlers(): void {
         this.customHandlers.clear();
         logger.info('Cleared all custom handlers');
     }
 
-    /**
-     * Get handler statistics
-     */
     getStatistics(): Record<string, any> {
         return {
             builtInHandlers: this.handlers.size,

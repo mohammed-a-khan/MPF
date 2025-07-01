@@ -10,10 +10,6 @@ import {
     ResponseModifierOptions
 } from './types/network.types';
 
-/**
- * ResponseModifier - Real-time response modification engine
- * Modifies API responses dynamically for testing edge cases
- */
 export class ResponseModifier {
     private page: Page;
     private modifierRules: Map<string, ModifierRule[]> = new Map();
@@ -33,9 +29,6 @@ export class ResponseModifier {
         };
     }
 
-    /**
-     * Enable response modification
-     */
     async enable(): Promise<void> {
         if (this.isEnabled) {
             const logger = Logger.getInstance();
@@ -58,16 +51,12 @@ export class ResponseModifier {
         }
     }
 
-    /**
-     * Disable response modification
-     */
     async disable(): Promise<void> {
         if (!this.isEnabled) {
             return;
         }
 
         try {
-            // Clear all routes to remove modifications
             await this.page.unroute('**/*');
             this.isEnabled = false;
             
@@ -81,9 +70,6 @@ export class ResponseModifier {
         }
     }
 
-    /**
-     * Modify response for specific pattern
-     */
     async modifyResponse(
         pattern: URLPattern, 
         modifier: ResponseHandler
@@ -98,13 +84,11 @@ export class ResponseModifier {
             id: `mod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         };
 
-        // Add to rules
         if (!this.modifierRules.has(patternKey)) {
             this.modifierRules.set(patternKey, []);
         }
         this.modifierRules.get(patternKey)!.push(rule);
 
-        // Re-apply interceptor if enabled
         if (this.isEnabled) {
             await this.setupGlobalInterceptor();
         }
@@ -115,9 +99,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Inject header into responses
-     */
     async injectHeader(
         pattern: URLPattern, 
         name: string, 
@@ -144,9 +125,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Remove header from responses
-     */
     async removeHeader(
         pattern: URLPattern, 
         name: string
@@ -170,9 +148,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Transform response body with custom function
-     */
     async transformBody(
         pattern: URLPattern, 
         transformer: BodyTransformer
@@ -182,20 +157,16 @@ export class ResponseModifier {
                 let body = await response.text();
                 const contentType = response.headers()['content-type'] || '';
                 
-                // Parse JSON if applicable
                 let data = body;
                 if (contentType.includes('application/json')) {
                     try {
                         data = JSON.parse(body);
                     } catch {
-                        // Not valid JSON, use as string
                     }
                 }
 
-                // Apply transformation
                 const transformed = await transformer(data);
                 
-                // Convert back to string if needed
                 if (typeof transformed !== 'string') {
                     body = JSON.stringify(transformed);
                 } else {
@@ -221,7 +192,6 @@ export class ResponseModifier {
             } catch (error) {
                 const logger = Logger.getInstance();
                 logger.error('ResponseModifier: Body transformation failed', error as Error);
-                // Fallback to original response
                 await route.fulfill({
                     status: response.status(),
                     headers: response.headers(),
@@ -231,9 +201,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Inject field into JSON response
-     */
     async injectField(
         pattern: URLPattern, 
         path: string, 
@@ -244,7 +211,6 @@ export class ResponseModifier {
                 const paths = path.split('.');
                 let current = body;
                 
-                // Navigate to parent of target field
                 for (let i = 0; i < paths.length - 1; i++) {
                     const pathSegment = paths[i];
                     if (!pathSegment || !(pathSegment in current)) {
@@ -257,7 +223,6 @@ export class ResponseModifier {
                     }
                 }
                 
-                // Set the value
                 const lastPath = paths[paths.length - 1];
                 if (lastPath) {
                     current[lastPath] = value;
@@ -268,9 +233,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Remove field from JSON response
-     */
     async removeField(
         pattern: URLPattern, 
         path: string
@@ -280,16 +242,14 @@ export class ResponseModifier {
                 const paths = path.split('.');
                 let current = body;
                 
-                // Navigate to parent of target field
                 for (let i = 0; i < paths.length - 1; i++) {
                     const pathSegment = paths[i];
                     if (!pathSegment || !(pathSegment in current)) {
-                        return body; // Path doesn't exist
+                        return body;
                     }
                     current = current[pathSegment];
                 }
                 
-                // Remove the field
                 const lastPath = paths[paths.length - 1];
                 if (lastPath) {
                     delete current[lastPath];
@@ -300,9 +260,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Replace text in response body
-     */
     async replaceText(
         pattern: URLPattern, 
         searchText: string, 
@@ -316,9 +273,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Simulate error response
-     */
     async simulateError(
         pattern: URLPattern, 
         statusCode: number,
@@ -350,18 +304,13 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Simulate timeout
-     */
     async simulateTimeout(
         pattern: URLPattern,
         delay: number = 30000
     ): Promise<void> {
         await this.modifyResponse(pattern, async (route) => {
-            // Wait for delay
             await new Promise(resolve => setTimeout(resolve, delay));
             
-            // Then abort the request
             await route.abort('timedout');
 
             this.recordModification({
@@ -373,15 +322,11 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Simulate slow response
-     */
     async simulateSlowResponse(
         pattern: URLPattern,
         delay: number
     ): Promise<void> {
         await this.modifyResponse(pattern, async (route, response) => {
-            // Add delay before responding
             await new Promise(resolve => setTimeout(resolve, delay));
             
             await route.fulfill({ response });
@@ -395,9 +340,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Modify status code
-     */
     async modifyStatusCode(
         pattern: URLPattern,
         newStatusCode: number
@@ -421,9 +363,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Clear all modifiers
-     */
     async clearModifiers(): Promise<void> {
         const rulesCount = this.modifierRules.size;
         
@@ -440,9 +379,6 @@ export class ResponseModifier {
         });
     }
 
-    /**
-     * Clear modifiers for specific pattern
-     */
     async clearModifier(pattern: URLPattern): Promise<void> {
         const patternKey = this.createPatternKey(pattern);
         this.modifierRules.delete(patternKey);
@@ -452,57 +388,41 @@ export class ResponseModifier {
         }
     }
 
-    /**
-     * Get modification history
-     */
     getModificationHistory(): ResponseModification[] {
         return [...this.modificationHistory];
     }
 
-    /**
-     * Get active modifications
-     */
     getActiveModifications(): Map<string, ResponseModification> {
         return new Map(this.activeModifications);
     }
 
-    /**
-     * Clear modification history
-     */
     clearHistory(): void {
         this.modificationHistory = [];
         this.activeModifications.clear();
     }
 
-    // Private helper methods
 
     private async setupGlobalInterceptor(): Promise<void> {
-        // Remove existing routes
         await this.page.unroute('**/*');
         
-        // Set up new interceptor
         await this.page.route('**/*', async (route) => {
             const request = route.request();
             const url = request.url();
             
-            // Find matching rules
             const matchingRules = this.findMatchingRules(url, request);
             
             if (matchingRules.length === 0) {
-                // No modifications, continue normally
                 await route.continue();
                 return;
             }
 
             try {
-                // Fetch the original response
                 const response = await route.fetch();
                 
-                // Apply modifications in order of priority
                 for (const rule of matchingRules) {
                     if (rule.enabled) {
                         await rule.handler(route, response);
-                        break; // Only apply first matching rule
+                        break;
                     }
                 }
             } catch (error) {
@@ -524,12 +444,10 @@ export class ResponseModifier {
             }
         }
         
-        // Sort by priority (higher first)
         return matchingRules.sort((a, b) => b.priority - a.priority);
     }
 
     private matchesPattern(url: string, request: any, pattern: URLPattern): boolean {
-        // Check URL
         if (pattern.url) {
             if (pattern.url instanceof RegExp) {
                 if (!pattern.url.test(url)) return false;
@@ -538,13 +456,11 @@ export class ResponseModifier {
             }
         }
         
-        // Check method
         if (pattern.method) {
             const methods = Array.isArray(pattern.method) ? pattern.method : [pattern.method];
             if (!methods.includes(request.method())) return false;
         }
         
-        // Check resource type
         if (pattern.resourceType) {
             if (!pattern.resourceType.includes(request.resourceType())) return false;
         }
@@ -566,7 +482,6 @@ export class ResponseModifier {
         this.modificationHistory.push(modification);
         this.activeModifications.set(modification.url, modification);
         
-        // Limit history size
         if (this.modificationHistory.length > this.options.maxHistorySize!) {
             this.modificationHistory.shift();
         }

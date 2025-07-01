@@ -5,10 +5,6 @@ import { logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import * as crypto from 'crypto';
 
-/**
- * Cache manager for test data
- * Implements LRU cache with TTL support
- */
 export class DataCache {
     private static instance: DataCache;
     private cache: Map<string, CacheEntry<TestData[]>>;
@@ -26,9 +22,6 @@ export class DataCache {
         logger.debug(`DataCache initialized with max size: ${this.maxSize}`);
     }
 
-    /**
-     * Get singleton instance
-     */
     static getInstance(): DataCache {
         if (!DataCache.instance) {
             DataCache.instance = new DataCache();
@@ -36,9 +29,6 @@ export class DataCache {
         return DataCache.instance;
     }
 
-    /**
-     * Get data from cache
-     */
     get(key: string): TestData[] | null {
         const entry = this.cache.get(key);
         
@@ -48,7 +38,6 @@ export class DataCache {
             return null;
         }
         
-        // Check if expired
         if (this.isExpired(entry)) {
             this.cache.delete(key);
             this.removeFromAccessOrder(key);
@@ -57,7 +46,6 @@ export class DataCache {
             return null;
         }
         
-        // Update access order for LRU
         this.updateAccessOrder(key);
         this.hits++;
         entry.lastAccessed = Date.now();
@@ -73,11 +61,7 @@ export class DataCache {
         return entry.data;
     }
 
-    /**
-     * Set data in cache
-     */
     set(key: string, data: TestData[], ttl?: number): void {
-        // Ensure cache size limit
         if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
             this.evictLRU();
         }
@@ -85,7 +69,7 @@ export class DataCache {
         const entry: CacheEntry<TestData[]> = {
             data,
             timestamp: Date.now(),
-            ttl: ttl || 3600000, // Default 1 hour
+            ttl: ttl || 3600000,
             lastAccessed: Date.now(),
             accessCount: 0,
             size: this.calculateSize(data)
@@ -103,9 +87,6 @@ export class DataCache {
         });
     }
 
-    /**
-     * Check if key exists in cache
-     */
     has(key: string): boolean {
         const entry = this.cache.get(key);
         if (!entry) return false;
@@ -119,9 +100,6 @@ export class DataCache {
         return true;
     }
 
-    /**
-     * Delete from cache
-     */
     delete(key: string): boolean {
         const deleted = this.cache.delete(key);
         if (deleted) {
@@ -131,9 +109,6 @@ export class DataCache {
         return deleted;
     }
 
-    /**
-     * Clear entire cache
-     */
     clear(): void {
         const size = this.cache.size;
         this.cache.clear();
@@ -145,9 +120,6 @@ export class DataCache {
         ActionLogger.logInfo('Cache operation: clear', { operation: 'cache_clear', clearedEntries: size });
     }
 
-    /**
-     * Clear cache entries matching pattern
-     */
     clearPattern(pattern: string): void {
         const regex = new RegExp(pattern);
         const keysToDelete: string[] = [];
@@ -170,9 +142,6 @@ export class DataCache {
         });
     }
 
-    /**
-     * Get cache statistics
-     */
     getStatistics(): CacheStatistics {
         const validEntries = this.getValidEntries();
         
@@ -192,16 +161,10 @@ export class DataCache {
         };
     }
 
-    /**
-     * Get all valid cache keys
-     */
     getKeys(): string[] {
         return this.getValidEntries().map(([key]) => key);
     }
 
-    /**
-     * Warm up cache with preloaded data
-     */
     warmUp(entries: Array<{ key: string; data: TestData[]; ttl?: number }>): void {
         for (const { key, data, ttl } of entries) {
             this.set(key, data, ttl);
@@ -213,32 +176,20 @@ export class DataCache {
         });
     }
 
-    /**
-     * Generate cache key from options
-     */
     static generateKey(options: Record<string, any>): string {
         const normalized = JSON.stringify(options, Object.keys(options).sort());
         return crypto.createHash('sha256').update(normalized).digest('hex');
     }
 
-    /**
-     * Check if entry is expired
-     */
     private isExpired(entry: CacheEntry<TestData[]>): boolean {
         return Date.now() - entry.timestamp > entry.ttl;
     }
 
-    /**
-     * Update access order for LRU
-     */
     private updateAccessOrder(key: string): void {
         this.removeFromAccessOrder(key);
         this.accessOrder.push(key);
     }
 
-    /**
-     * Remove from access order
-     */
     private removeFromAccessOrder(key: string): void {
         const index = this.accessOrder.indexOf(key);
         if (index > -1) {
@@ -246,9 +197,6 @@ export class DataCache {
         }
     }
 
-    /**
-     * Evict least recently used entry
-     */
     private evictLRU(): void {
         if (this.accessOrder.length === 0) return;
         
@@ -262,17 +210,10 @@ export class DataCache {
         ActionLogger.logInfo('Cache operation: evict', { operation: 'cache_evict', key: keyToEvict || 'unknown' });
     }
 
-    /**
-     * Calculate size of data
-     */
     private calculateSize(data: TestData[]): number {
-        // Rough estimation of memory usage
         return JSON.stringify(data).length;
     }
 
-    /**
-     * Calculate total cache size
-     */
     private calculateTotalSize(): number {
         let total = 0;
         const values = Array.from(this.cache.values());
@@ -282,9 +223,6 @@ export class DataCache {
         return total;
     }
 
-    /**
-     * Get valid (non-expired) entries
-     */
     private getValidEntries(): Array<[string, CacheEntry<TestData[]>]> {
         const valid: Array<[string, CacheEntry<TestData[]>]> = [];
         
@@ -298,9 +236,6 @@ export class DataCache {
         return valid;
     }
 
-    /**
-     * Get oldest cache entry
-     */
     private getOldestEntry(): { key: string; age: number } | null {
         let oldest: { key: string; timestamp: number } | null = null;
         
@@ -316,9 +251,6 @@ export class DataCache {
         } : null;
     }
 
-    /**
-     * Get newest cache entry
-     */
     private getNewestEntry(): { key: string; age: number } | null {
         let newest: { key: string; timestamp: number } | null = null;
         
@@ -334,9 +266,6 @@ export class DataCache {
         } : null;
     }
 
-    /**
-     * Get most accessed entry
-     */
     private getMostAccessedEntry(): { key: string; count: number } | null {
         let mostAccessed: { key: string; count: number } | null = null;
         
@@ -349,18 +278,12 @@ export class DataCache {
         return mostAccessed;
     }
 
-    /**
-     * Start cleanup timer to remove expired entries
-     */
     private startCleanupTimer(): void {
         setInterval(() => {
             this.cleanupExpired();
-        }, 60000); // Run every minute
+        }, 60000);
     }
 
-    /**
-     * Clean up expired entries
-     */
     private cleanupExpired(): void {
         const keysToDelete: string[] = [];
         
@@ -381,9 +304,6 @@ export class DataCache {
         }
     }
 
-    /**
-     * Export cache for persistence
-     */
     exportCache(): Array<{ key: string; entry: CacheEntry<TestData[]> }> {
         const exported: Array<{ key: string; entry: CacheEntry<TestData[]> }> = [];
         
@@ -394,14 +314,10 @@ export class DataCache {
         return exported;
     }
 
-    /**
-     * Import cache from persistence
-     */
     importCache(data: Array<{ key: string; entry: CacheEntry<TestData[]> }>): void {
         this.clear();
         
         for (const { key, entry } of data) {
-            // Adjust TTL based on age
             const age = Date.now() - entry.timestamp;
             const remainingTTL = Math.max(0, entry.ttl - age);
             

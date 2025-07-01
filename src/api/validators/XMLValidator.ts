@@ -2,10 +2,6 @@ import { ValidationResult, XMLValidationOptions, XPathResult, XMLNode as APIXMLN
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { FileUtils } from '../../core/utils/FileUtils';
 
-/**
- * XML validator with XPath 1.0 support
- * Provides XML validation, XPath queries, and schema validation
- */
 export class XMLValidator {
     private static instance: XMLValidator;
     private schemaCache: Map<string, string> = new Map();
@@ -15,9 +11,6 @@ export class XMLValidator {
         this.initializeCommonNamespaces();
     }
 
-    /**
-     * Convert internal XMLNode to API XMLNode
-     */
     private convertToAPINode(node: XMLNode): APIXMLNode {
         return {
             nodeName: node.nodeName,
@@ -29,9 +22,6 @@ export class XMLValidator {
         };
     }
 
-    /**
-     * Convert XMLAttribute array to Record<string, string>
-     */
     private convertAttributes(attributes: XMLAttribute[]): Record<string, string> {
         const result: Record<string, string> = {};
         attributes.forEach(attr => {
@@ -40,9 +30,6 @@ export class XMLValidator {
         return result;
     }
 
-    /**
-     * Convert API XMLNode back to internal XMLNode
-     */
     private convertFromAPINode(apiNode: APIXMLNode): XMLNode {
         const node: XMLNode = {
             nodeName: apiNode.nodeName,
@@ -59,9 +46,6 @@ export class XMLValidator {
         return node;
     }
 
-    /**
-     * Convert Record<string, string> to XMLAttribute array
-     */
     private convertAttributesFromRecord(attributes: Record<string, string>): XMLAttribute[] {
         return Object.entries(attributes).map(([name, value]) => ({
             nodeType: 2,
@@ -79,9 +63,6 @@ export class XMLValidator {
         return XMLValidator.instance;
     }
 
-    /**
-     * Validate XML response using XPath
-     */
     public async validateXPath(
         xml: string,
         xpath: string,
@@ -97,20 +78,16 @@ export class XMLValidator {
                 namespaces: options.namespaces
             });
 
-            // Parse XML
             const doc = this.parseXML(xml);
 
-            // Register namespaces
             if (options.namespaces) {
                 Object.entries(options.namespaces).forEach(([prefix, uri]) => {
                     this.namespaces.set(prefix, uri);
                 });
             }
 
-            // Execute XPath query
             const result = this.executeXPath(doc, xpath, options);
 
-            // Validate result
             let valid = false;
             let actual: any;
             let message = '';
@@ -165,9 +142,6 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * Validate XML against XSD schema
-     */
     public async validateSchema(
         xml: string,
         schemaPath: string,
@@ -178,13 +152,10 @@ export class XMLValidator {
         try {
             ActionLogger.getInstance().debug('XML schema validation started', { schemaPath });
 
-            // Load schema
             const schema = await this.loadSchema(schemaPath);
 
-            // Parse XML
             const doc = this.parseXML(xml);
 
-            // Validate against schema
             const errors = this.validateAgainstSchema(doc, schema, options);
 
             const validationResult: ValidationResult = {
@@ -220,9 +191,6 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * Extract value using XPath
-     */
     public extractValue(xml: string, xpath: string, options: XMLValidationOptions = {}): any {
         try {
             const doc = this.parseXML(xml);
@@ -241,9 +209,6 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * Count nodes matching XPath
-     */
     public countNodes(xml: string, xpath: string, options: XMLValidationOptions = {}): number {
         try {
             const doc = this.parseXML(xml);
@@ -255,28 +220,19 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * Check if XPath exists
-     */
     public pathExists(xml: string, xpath: string, options: XMLValidationOptions = {}): boolean {
         return this.countNodes(xml, xpath, options) > 0;
     }
 
-    /**
-     * Parse XML string to document
-     */
     private parseXML(xml: string): XMLDocument {
-        // Remove BOM if present
         if (xml.charCodeAt(0) === 0xFEFF) {
             xml = xml.substring(1);
         }
 
-        // Basic XML parsing implementation
         const ParserClass = this.createDOMParser();
         const parser = new ParserClass();
         const doc = parser.parseFromString(xml);
 
-        // Check for parsing errors
         const parseErrors = this.getParseErrors(doc as any);
         if (parseErrors.length > 0) {
             throw new Error(`XML parsing failed: ${parseErrors.join(', ')}`);
@@ -285,17 +241,12 @@ export class XMLValidator {
         return doc as unknown as XMLDocument;
     }
 
-    /**
-     * Execute XPath query on document
-     */
     private executeXPath(doc: XMLDocument, xpath: string, _options: XMLValidationOptions): XPathResult {
-        // Create XPath expression with namespaces
         const expression = new this.XPathExpression(xpath, this.namespaces);
         const nodes: XMLNode[] = [];
         const nodeTypes: string[] = [];
 
         try {
-            // Start evaluation from document element
             const result = expression.evaluate(doc.documentElement);
 
             if (Array.isArray(result)) {
@@ -307,7 +258,6 @@ export class XMLValidator {
                 nodes.push(xmlNode);
                 nodeTypes.push(this.getNodeType(xmlNode));
             } else if (typeof result === 'string' || typeof result === 'number' || typeof result === 'boolean') {
-                // Create a text node for primitive results
                 const textNode: XMLNode = {
                     nodeType: 3,
                     nodeName: '#text',
@@ -325,9 +275,6 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * XPath Expression implementation
-     */
     private XPathExpression = class {
         constructor(private xpath: string, private namespaces: Map<string, string>) { }
 
@@ -342,13 +289,11 @@ export class XMLValidator {
             let current = 0;
 
             while (current < xpath.length) {
-                // Skip whitespace
                 if (/\s/.test(xpath[current] || '')) {
                     current++;
                     continue;
                 }
 
-                // Operators
                 if (xpath[current] === '/') {
                     if (xpath[current + 1] === '/') {
                         tokens.push({ type: 'DOUBLE_SLASH', value: '//' });
@@ -419,7 +364,6 @@ export class XMLValidator {
                     tokens.push({ type: 'DOUBLE_COLON', value: '::' });
                     current += 2;
                 } else if (xpath[current] === '"' || xpath[current] === "'") {
-                    // String literal
                     const quote = xpath[current];
                     let value = '';
                     current++;
@@ -427,10 +371,9 @@ export class XMLValidator {
                         value += xpath[current];
                         current++;
                     }
-                    current++; // Skip closing quote
+                    current++;
                     tokens.push({ type: 'STRING', value });
                 } else if (/\d/.test(xpath[current] || '')) {
-                    // Number
                     let value = '';
                     while (current < xpath.length && /[\d.]/.test(xpath[current] || '')) {
                         value += xpath[current];
@@ -438,14 +381,12 @@ export class XMLValidator {
                     }
                     tokens.push({ type: 'NUMBER', value });
                 } else if (/[a-zA-Z_]/.test(xpath[current] || '')) {
-                    // Name or function
                     let value = '';
                     while (current < xpath.length && /[a-zA-Z0-9_\-:]/.test(xpath[current] || '')) {
                         value += xpath[current];
                         current++;
                     }
 
-                    // Check if it's a function
                     const nextNonSpace = this.skipWhitespaceAt(xpath, current);
                     if (nextNonSpace < xpath.length && xpath[nextNonSpace] === '(') {
                         tokens.push({ type: 'FUNCTION', value });
@@ -479,7 +420,7 @@ export class XMLValidator {
                 let left = parseAndExpr();
 
                 while (current < tokens.length && tokens[current]?.type === 'PIPE') {
-                    current++; // Skip |
+                    current++;
                     const right = parseAndExpr();
                     left = { type: 'union', left, right };
                 }
@@ -491,7 +432,7 @@ export class XMLValidator {
                 let left = parseEqualityExpr();
 
                 while (current < tokens.length && tokens[current]?.value === 'and') {
-                    current++; // Skip and
+                    current++;
                     const right = parseEqualityExpr();
                     left = { type: 'and', left, right };
                 }
@@ -537,7 +478,6 @@ export class XMLValidator {
             };
 
             const parsePathExpr = (): XPathAST => {
-                // Check for literal values first
                 if (current < tokens.length) {
                     const token = tokens[current];
                     if (token?.type === 'STRING') {
@@ -552,7 +492,6 @@ export class XMLValidator {
                 const steps: XPathStep[] = [];
                 let isAbsolute = false;
 
-                // Check for absolute path
                 if (current < tokens.length && tokens[current]?.type === 'SLASH') {
                     isAbsolute = true;
                     current++;
@@ -562,7 +501,6 @@ export class XMLValidator {
                     current++;
                 }
 
-                // Parse steps
                 do {
                     const step = parseStep();
                     if (!step) break;
@@ -592,7 +530,6 @@ export class XMLValidator {
                 let nodeTest: NodeTest | undefined;
                 const predicates: XPathAST[] = [];
 
-                // Check for axis
                 if (current < tokens.length && tokens[current]?.type === 'AT') {
                     axis = 'attribute';
                     current++;
@@ -606,7 +543,6 @@ export class XMLValidator {
                     nodeTest = { type: 'node' };
                 }
 
-                // Parse node test
                 if (!nodeTest) {
                     if (current < tokens.length && tokens[current]?.type === 'STAR') {
                         nodeTest = { type: 'wildcard' };
@@ -615,10 +551,9 @@ export class XMLValidator {
                         const name = tokens[current]?.value || '';
                         current++;
 
-                        // Check for axis specifier
                         if (current < tokens.length && tokens[current]?.type === 'DOUBLE_COLON') {
                             axis = name;
-                            current++; // Skip ::
+                            current++;
 
                             if (current < tokens.length && tokens[current]?.type === 'STAR') {
                                 nodeTest = { type: 'wildcard' };
@@ -629,7 +564,7 @@ export class XMLValidator {
                             } else if (current < tokens.length && tokens[current]?.type === 'FUNCTION') {
                                 const funcName = tokens[current]?.value || '';
                                 current++;
-                                current++; // Skip (
+                                current++;
 
                                 const args: XPathAST[] = [];
                                 while (current < tokens.length && tokens[current]?.type !== 'RPAREN') {
@@ -638,7 +573,7 @@ export class XMLValidator {
                                         current++;
                                     }
                                 }
-                                current++; // Skip )
+                                current++;
 
                                 nodeTest = { type: 'function', name: funcName, args };
                             }
@@ -648,7 +583,7 @@ export class XMLValidator {
                     } else if (current < tokens.length && tokens[current]?.type === 'FUNCTION') {
                         const funcName = tokens[current]?.value || '';
                         current++;
-                        current++; // Skip (
+                        current++;
 
                         const args: XPathAST[] = [];
                         while (current < tokens.length && tokens[current]?.type !== 'RPAREN') {
@@ -657,7 +592,7 @@ export class XMLValidator {
                                 current++;
                             }
                         }
-                        current++; // Skip )
+                        current++;
 
                         nodeTest = { type: 'function', name: funcName, args };
                     } else {
@@ -665,14 +600,13 @@ export class XMLValidator {
                     }
                 }
 
-                // Parse predicates
                 while (current < tokens.length && tokens[current]?.type === 'LBRACKET') {
-                    current++; // Skip [
+                    current++;
                     predicates.push(parseExpression());
                     if (current >= tokens.length || tokens[current]?.type !== 'RBRACKET') {
                         throw new Error('Expected ] in predicate');
                     }
-                    current++; // Skip ]
+                    current++;
                 }
 
                 return { axis, nodeTest: nodeTest || { type: 'node' }, predicates };
@@ -722,7 +656,6 @@ export class XMLValidator {
             let nodes = this.getAxisNodes(step.axis, context);
             nodes = this.filterByNodeTest(nodes, step.nodeTest);
 
-            // Apply predicates
             for (const predicate of step.predicates) {
                 nodes = this.filterByPredicate(nodes, predicate);
             }
@@ -735,7 +668,7 @@ export class XMLValidator {
 
             switch (axis) {
                 case 'child':
-                    if (context.nodeType === 1) { // Element
+                    if (context.nodeType === 1) {
                         nodes.push(...Array.from(context.childNodes));
                     }
                     break;
@@ -808,25 +741,23 @@ export class XMLValidator {
         private filterByNodeTest(nodes: XMLNode[], nodeTest: NodeTest): XMLNode[] {
             switch (nodeTest.type) {
                 case 'wildcard':
-                    return nodes.filter(n => n.nodeType === 1 || n.nodeType === 2); // Elements and attributes
+                    return nodes.filter(n => n.nodeType === 1 || n.nodeType === 2);
                 case 'name':
                     return nodes.filter(n => {
                         const testName = nodeTest.name || '';
 
-                        if (n.nodeType === 1) { // Element
-                            // Handle namespace prefixes
+                        if (n.nodeType === 1) {
                             if (testName.includes(':')) {
                                 const colonIndex = testName.indexOf(':');
                                 const prefix = testName.substring(0, colonIndex);
                                 const localName = testName.substring(colonIndex + 1);
                                 const namespaceURI = this.namespaces.get(prefix);
 
-                                // Check both full name and local name with namespace
                                 return n.nodeName === testName ||
                                     (n.localName === localName && namespaceURI !== undefined);
                             }
                             return n.nodeName === testName || n.localName === testName;
-                        } else if (n.nodeType === 2) { // Attribute
+                        } else if (n.nodeType === 2) {
                             return (n as any).name === testName;
                         }
                         return false;
@@ -834,7 +765,6 @@ export class XMLValidator {
                 case 'node':
                     return nodes;
                 case 'function':
-                    // Handle node test functions like text(), comment(), etc.
                     return this.filterByNodeTestFunction(nodes, nodeTest);
                 default:
                     return nodes;
@@ -846,15 +776,14 @@ export class XMLValidator {
 
             switch (funcName) {
                 case 'text':
-                    return nodes.filter(n => n.nodeType === 3); // Text nodes
+                    return nodes.filter(n => n.nodeType === 3);
                 case 'comment':
-                    return nodes.filter(n => n.nodeType === 8); // Comment nodes
+                    return nodes.filter(n => n.nodeType === 8);
                 case 'node':
-                    return nodes; // All nodes
+                    return nodes;
                 case 'processing-instruction':
-                    return nodes.filter(n => n.nodeType === 7); // Processing instruction nodes
+                    return nodes.filter(n => n.nodeType === 7);
                 default:
-                    // For other functions, return empty as node test
                     return [];
             }
         }
@@ -936,18 +865,15 @@ export class XMLValidator {
         }
 
         private compareValues(left: any, right: any, op: string): boolean {
-            // Handle node-set comparisons
             if (Array.isArray(left) || Array.isArray(right)) {
                 return this.compareNodeSets(left, right, op);
             }
 
-            // Convert to comparable values
             const leftVal = this.toComparableValue(left);
             const rightVal = this.toComparableValue(right);
 
             switch (op) {
                 case '=':
-                    // Special handling for boolean comparisons
                     if (typeof leftVal === 'boolean' || typeof rightVal === 'boolean') {
                         return this.toBoolean(leftVal) === this.toBoolean(rightVal);
                     }
@@ -964,7 +890,6 @@ export class XMLValidator {
             const leftArray = Array.isArray(left) ? left : [left];
             const rightArray = Array.isArray(right) ? right : [right];
 
-            // For node-set comparisons, return true if any combination satisfies
             for (const l of leftArray) {
                 for (const r of rightArray) {
                     const leftVal = this.toComparableValue(l);
@@ -996,22 +921,19 @@ export class XMLValidator {
         }
 
         private getNodeStringValue(node: XMLNode): string {
-            if (node.nodeType === 1) { // Element
+            if (node.nodeType === 1) {
                 return node.textContent || '';
-            } else if (node.nodeType === 2) { // Attribute
+            } else if (node.nodeType === 2) {
                 return (node as any).value || '';
-            } else if (node.nodeType === 3) { // Text
+            } else if (node.nodeType === 3) {
                 return node.nodeValue || '';
-            } else if (node.nodeType === 8) { // Comment
+            } else if (node.nodeType === 8) {
                 return node.nodeValue || '';
             }
             return '';
         }
     };
 
-    /**
-     * Native XML Document implementation
-     */
     private XMLDocumentImpl = class implements XMLDocument {
         documentElement: XMLElement;
         nodeType = 9;
@@ -1035,9 +957,6 @@ export class XMLValidator {
         }
     } as any;
 
-    /**
-     * Native XML Element implementation
-     */
     private XMLElementImpl = class implements XMLElement {
         nodeType = 1;
         childNodes: XMLNode[] = [];
@@ -1083,9 +1002,6 @@ export class XMLValidator {
         }
     } as any;
 
-    /**
-     * Native XML Text Node implementation
-     */
     private XMLTextNodeImpl = class implements XMLTextNode {
         nodeType = 3;
         nodeName = '#text';
@@ -1097,9 +1013,6 @@ export class XMLValidator {
         constructor(public nodeValue: string) { }
     } as any;
 
-    /**
-     * Native XML Attribute implementation
-     */
     private XMLAttributeImpl = class implements XMLAttribute {
         nodeType = 2;
         nodeName: string;
@@ -1110,9 +1023,6 @@ export class XMLValidator {
         }
     } as any;
 
-    /**
-     * Full DOM Parser implementation
-     */
     private createDOMParser() {
         return class {
             parseFromString(xml: string): XMLDocument {
@@ -1125,9 +1035,6 @@ export class XMLValidator {
         };
     }
 
-    /**
-     * Complete XML Parser
-     */
     private XMLParser = class {
         private pos = 0;
         private xml = '';
@@ -1136,13 +1043,10 @@ export class XMLValidator {
             this.xml = xml;
             this.pos = 0;
 
-            // Skip XML declaration
             this.skipDeclaration();
 
-            // Skip whitespace and comments
             this.skipWhitespaceAndComments();
 
-            // Parse root element
             return this.parseElement();
         }
 
@@ -1150,13 +1054,11 @@ export class XMLValidator {
             if (this.xml[this.pos] !== '<') {
                 throw new Error(`Expected < at position ${this.pos}`);
             }
-            this.pos++; // Skip <
+            this.pos++;
 
-            // Get tag name
             const tagName = this.parseName();
             const element = new (XMLValidator.getInstance().XMLElementImpl)(tagName);
 
-            // Parse attributes
             this.skipWhitespace();
             while (this.pos < this.xml.length && this.xml[this.pos] !== '>' && this.xml[this.pos] !== '/') {
                 const attrName = this.parseName();
@@ -1164,35 +1066,32 @@ export class XMLValidator {
                 if (this.xml[this.pos] !== '=') {
                     throw new Error(`Expected = after attribute name at position ${this.pos}`);
                 }
-                this.pos++; // Skip =
+                this.pos++;
                 this.skipWhitespace();
                 const attrValue = this.parseAttributeValue();
                 element.setAttribute(attrName, attrValue);
                 this.skipWhitespace();
             }
 
-            // Check for self-closing tag
             if (this.xml[this.pos] === '/') {
-                this.pos++; // Skip /
+                this.pos++;
                 if (this.xml[this.pos] !== '>') {
                     throw new Error(`Expected > after / at position ${this.pos}`);
                 }
-                this.pos++; // Skip >
+                this.pos++;
                 return element;
             }
 
             if (this.xml[this.pos] !== '>') {
                 throw new Error(`Expected > at position ${this.pos}`);
             }
-            this.pos++; // Skip >
+            this.pos++;
 
-            // Parse content
             while (this.pos < this.xml.length) {
                 this.skipWhitespaceAndComments();
 
                 if (this.xml.substring(this.pos, this.pos + 2) === '</') {
-                    // End tag
-                    this.pos += 2; // Skip </
+                    this.pos += 2;
                     const endTagName = this.parseName();
                     if (endTagName !== tagName) {
                         throw new Error(`Mismatched end tag: expected ${tagName}, got ${endTagName}`);
@@ -1201,14 +1100,12 @@ export class XMLValidator {
                     if (this.xml[this.pos] !== '>') {
                         throw new Error(`Expected > at position ${this.pos}`);
                     }
-                    this.pos++; // Skip >
+                    this.pos++;
                     break;
                 } else if (this.xml[this.pos] === '<') {
-                    // Child element
                     const child = this.parseElement();
                     element.appendChild(child);
                 } else {
-                    // Text content
                     const text = this.parseText();
                     if (text.trim()) {
                         const textNode = new (XMLValidator.getInstance().XMLTextNodeImpl)(text);
@@ -1237,7 +1134,7 @@ export class XMLValidator {
             if (quote !== '"' && quote !== "'") {
                 throw new Error(`Expected quote at position ${this.pos}`);
             }
-            this.pos++; // Skip quote
+            this.pos++;
 
             let value = '';
             while (this.pos < this.xml.length && this.xml[this.pos] !== quote) {
@@ -1252,7 +1149,7 @@ export class XMLValidator {
             if (this.xml[this.pos] !== quote) {
                 throw new Error(`Expected closing quote at position ${this.pos}`);
             }
-            this.pos++; // Skip closing quote
+            this.pos++;
 
             return value;
         }
@@ -1271,13 +1168,13 @@ export class XMLValidator {
         }
 
         private parseEntity(): string {
-            this.pos++; // Skip &
+            this.pos++;
             let entity = '';
             while (this.pos < this.xml.length && this.xml[this.pos] !== ';') {
                 entity += this.xml[this.pos];
                 this.pos++;
             }
-            this.pos++; // Skip ;
+            this.pos++;
 
             switch (entity) {
                 case 'lt': return '<';
@@ -1306,7 +1203,6 @@ export class XMLValidator {
                 this.skipWhitespace();
 
                 if (this.xml.substring(this.pos, this.pos + 4) === '<!--') {
-                    // Skip comment
                     this.pos += 4;
                     while (this.pos < this.xml.length - 2) {
                         if (this.xml.substring(this.pos, this.pos + 3) === '-->') {
@@ -1336,21 +1232,18 @@ export class XMLValidator {
         }
     };
 
-    /**
-     * Get node value based on validation options
-     */
     private getNodeValue(node: XMLNode, options: XMLValidationOptions): any {
-        if (node.nodeType === 1) { // Element
+        if (node.nodeType === 1) {
             const textContent = node.textContent || '';
             return options.convertNumbers && this.isNumeric(textContent)
                 ? parseFloat(textContent)
                 : textContent;
-        } else if (node.nodeType === 2) { // Attribute
+        } else if (node.nodeType === 2) {
             const value = (node as XMLAttribute).value || '';
             return options.convertNumbers && this.isNumeric(value)
                 ? parseFloat(value)
                 : value;
-        } else if (node.nodeType === 3) { // Text
+        } else if (node.nodeType === 3) {
             const value = node.nodeValue || '';
             return options.convertNumbers && this.isNumeric(value)
                 ? parseFloat(value)
@@ -1359,15 +1252,11 @@ export class XMLValidator {
         return '';
     }
 
-    /**
-     * Compare values with type conversion
-     */
     private compareValues(actual: any, expected: any, options: XMLValidationOptions): boolean {
         if (options.strictComparison) {
             return actual === expected;
         }
 
-        // Type conversion for loose comparison
         if (typeof actual === 'string' && typeof expected === 'number') {
             return parseFloat(actual) === expected;
         }
@@ -1381,12 +1270,9 @@ export class XMLValidator {
             return actual.toString() === expected.toLowerCase();
         }
 
-        return actual == expected; // Loose equality
+        return actual == expected;
     }
 
-    /**
-     * Compare multiple values
-     */
     private compareMultipleValues(actualArray: any[], expected: any, options: XMLValidationOptions): boolean {
         if (Array.isArray(expected)) {
             if (actualArray.length !== expected.length) return false;
@@ -1398,9 +1284,6 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * Get node type string
-     */
     private getNodeType(node: XMLNode): string {
         switch (node.nodeType) {
             case 1: return 'element';
@@ -1413,20 +1296,13 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * Check if string is numeric
-     */
     private isNumeric(str: string): boolean {
         return !isNaN(parseFloat(str)) && isFinite(parseFloat(str));
     }
 
-    /**
-     * Get parse errors from document
-     */
     private getParseErrors(doc: XMLDocument): string[] {
         const errors: string[] = [];
         // Note: In a real implementation, you would check for parser errors
-        // This is a simplified version for this framework
 
         if (!doc.documentElement) {
             errors.push('No root element found');
@@ -1435,9 +1311,6 @@ export class XMLValidator {
         return errors;
     }
 
-    /**
-     * Load schema from file or cache
-     */
     private async loadSchema(schemaPath: string): Promise<string> {
         if (this.schemaCache.has(schemaPath)) {
             return this.schemaCache.get(schemaPath)!;
@@ -1453,18 +1326,13 @@ export class XMLValidator {
         }
     }
 
-    /**
-     * Validate XML against XSD schema (simplified implementation)
-     */
     private validateAgainstSchema(doc: XMLDocument, schema: string, _options: XMLValidationOptions): Array<{ message: string, line?: number, column?: number }> {
         const errors: Array<{ message: string, line?: number, column?: number }> = [];
 
         try {
-            // Parse schema to extract validation rules
             const schemaDoc = this.parseXML(schema);
             const rules = this.extractSchemaRules(schemaDoc);
 
-            // Validate document against rules
             this.validateElementAgainstRules(doc.documentElement, rules, errors);
 
         } catch (error) {
@@ -1474,14 +1342,9 @@ export class XMLValidator {
         return errors;
     }
 
-    /**
-     * Extract validation rules from XSD schema
-     */
     private extractSchemaRules(schemaDoc: XMLDocument): Map<string, any> {
         const rules = new Map<string, any>();
 
-        // This is a simplified implementation
-        // In production, you would use a full XSD parser
         const elements = this.executeXPath(schemaDoc, '//xs:element', {});
 
         elements.nodes.forEach(element => {
@@ -1503,9 +1366,6 @@ export class XMLValidator {
         return rules;
     }
 
-    /**
-     * Validate element against schema rules
-     */
     private validateElementAgainstRules(
         element: XMLElement,
         rules: Map<string, any>,
@@ -1519,7 +1379,6 @@ export class XMLValidator {
             return;
         }
 
-        // Validate child elements
         const childElements = Array.from(element.childNodes).filter(n => n.nodeType === 1) as XMLElement[];
         const childCounts = new Map<string, number>();
 
@@ -1529,7 +1388,6 @@ export class XMLValidator {
             this.validateElementAgainstRules(child, rules, errors);
         });
 
-        // Validate occurrence constraints
         childCounts.forEach((count, childName) => {
             const childRule = rules.get(childName);
             if (childRule) {
@@ -1547,9 +1405,6 @@ export class XMLValidator {
         });
     }
 
-    /**
-     * Initialize common XML namespaces
-     */
     private initializeCommonNamespaces(): void {
         this.namespaces.set('xml', 'http://www.w3.org/XML/1998/namespace');
         this.namespaces.set('xmlns', 'http://www.w3.org/2000/xmlns/');
@@ -1560,7 +1415,6 @@ export class XMLValidator {
     }
 }
 
-// Type definitions for the XML validator
 interface XMLNode {
     nodeType: number;
     nodeName: string;

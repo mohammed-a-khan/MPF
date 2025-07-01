@@ -7,10 +7,6 @@ import { CSDatabase } from '../../database/client/CSDatabase';
 import { CSHttpClient } from '../../api/client/CSHttpClient';
 import * as fs from 'fs/promises';
 
-/**
- * Manages cleanup of test data after test execution
- * Supports various cleanup strategies and rollback capabilities
- */
 export class DataCleanupManager {
     private static instance: DataCleanupManager;
     private cleanupTasks: Map<string, CleanupTask[]> = new Map();
@@ -33,7 +29,6 @@ export class DataCleanupManager {
             cleanupOrder: this.parseCleanupOrder()
         };
         
-        // Register cleanup on process exit
         if (this.config.autoCleanup) {
             this.registerExitHandlers();
         }
@@ -41,9 +36,6 @@ export class DataCleanupManager {
         logger.debug('DataCleanupManager initialized with config:', this.config);
     }
 
-    /**
-     * Get singleton instance
-     */
     static getInstance(): DataCleanupManager {
         if (!DataCleanupManager.instance) {
             DataCleanupManager.instance = new DataCleanupManager();
@@ -51,9 +43,6 @@ export class DataCleanupManager {
         return DataCleanupManager.instance;
     }
 
-    /**
-     * Register data for cleanup
-     */
     registerData(dataId: string, data: TestData[], strategy?: CleanupStrategy): void {
         const tasks = this.createCleanupTasks(data, strategy);
         
@@ -71,9 +60,6 @@ export class DataCleanupManager {
         });
     }
 
-    /**
-     * Register custom cleanup task
-     */
     registerTask(dataId: string, task: CleanupTask): void {
         if (!this.cleanupTasks.has(dataId)) {
             this.cleanupTasks.set(dataId, []);
@@ -89,9 +75,6 @@ export class DataCleanupManager {
         });
     }
 
-    /**
-     * Execute cleanup for specific data ID
-     */
     async cleanup(dataId: string): Promise<void> {
         const tasks = this.cleanupTasks.get(dataId);
         if (!tasks || tasks.length === 0) {
@@ -108,7 +91,6 @@ export class DataCleanupManager {
         const executedInSession: CleanupTask[] = [];
         
         try {
-            // Execute tasks in configured order
             for (const strategy of this.config.cleanupOrder) {
                 const strategyTasks = tasks.filter(t => t.type === strategy);
                 
@@ -118,7 +100,6 @@ export class DataCleanupManager {
                 }
             }
             
-            // Execute remaining tasks not in configured order
             const remainingTasks = tasks.filter(
                 t => !this.config.cleanupOrder.includes(t.type)
             );
@@ -128,7 +109,6 @@ export class DataCleanupManager {
                 executedInSession.push(task);
             }
             
-            // Remove from pending tasks
             this.cleanupTasks.delete(dataId);
             
             ActionLogger.logInfo('Cleanup operation: complete', { 
@@ -140,7 +120,6 @@ export class DataCleanupManager {
         } catch (error) {
             ActionLogger.logError('Cleanup operation failed', error as Error);
             
-            // Rollback if configured
             if (this.config.rollbackOnFailure) {
                 await this.rollbackTasks(executedInSession);
             }
@@ -149,9 +128,6 @@ export class DataCleanupManager {
         }
     }
 
-    /**
-     * Execute all pending cleanup tasks
-     */
     async cleanupAll(): Promise<void> {
         const dataIds = Array.from(this.cleanupTasks.keys());
         
@@ -179,9 +155,6 @@ export class DataCleanupManager {
         }
     }
 
-    /**
-     * Execute single cleanup task
-     */
     private async executeTask(task: CleanupTask): Promise<void> {
         let attempt = 0;
         let lastError: Error | null = null;
@@ -209,12 +182,11 @@ export class DataCleanupManager {
                 
                 if (attempt < this.config.maxRetries) {
                     logger.warn(`Cleanup task failed, retrying... (${attempt}/${this.config.maxRetries}`);
-                    await this.delay(1000 * attempt); // Exponential backoff
+                    await this.delay(1000 * attempt);
                 }
             }
         }
         
-        // Task failed after all retries
         task.error = lastError || new Error('Unknown error');
         this.failedTasks.push(task);
         
@@ -223,9 +195,6 @@ export class DataCleanupManager {
         );
     }
 
-    /**
-     * Perform actual cleanup based on task type
-     */
     private async performCleanup(task: CleanupTask): Promise<void> {
         switch (task.type) {
             case 'database':
@@ -253,18 +222,13 @@ export class DataCleanupManager {
         }
     }
 
-    /**
-     * Database cleanup
-     */
     private async cleanupDatabase(task: CleanupTask): Promise<void> {
         const db = await CSDatabase.getInstance(task.target);
         
         try {
             if (task.data.query) {
-                // Execute cleanup query
                 await db.query(task.data.query, task.data.params);
             } else if (task.data.ids && task.data.table) {
-                // Delete by IDs
                 const placeholders = task.data.ids.map(() => '?').join(',');
                 const query = `DELETE FROM ${task.data.table} WHERE id IN (${placeholders})`;
                 await db.query(query, task.data.ids);
@@ -277,9 +241,6 @@ export class DataCleanupManager {
         }
     }
 
-    /**
-     * API cleanup
-     */
     private async cleanupAPI(task: CleanupTask): Promise<void> {
         const client = CSHttpClient.getInstance();
         
@@ -297,9 +258,6 @@ export class DataCleanupManager {
         logger.debug(`API cleanup completed for task: ${task.id}`);
     }
 
-    /**
-     * File cleanup
-     */
     private async cleanupFile(task: CleanupTask): Promise<void> {
         if (task.data.files) {
             for (const file of task.data.files) {
@@ -328,16 +286,12 @@ export class DataCleanupManager {
         }
     }
 
-    /**
-     * Cache cleanup
-     */
     private async cleanupCache(task: CleanupTask): Promise<void> {
         const { DataCache } = await import('./DataCache');
         const { LocalStorageManager } = await import('../../core/storage/LocalStorageManager');
         const { SessionStorageManager } = await import('../../core/storage/SessionStorageManager');
         const cache = DataCache.getInstance();
         
-        // Clear data provider cache
         if (task.data.cacheKeys) {
             for (const key of task.data.cacheKeys) {
                 cache.delete(key);
@@ -350,7 +304,6 @@ export class DataCleanupManager {
             logger.debug(`Cleared cache pattern: ${task.data.cachePattern}`);
         }
         
-        // Clear browser storage if specified
         if (task.data.clearLocalStorage && task.data.page) {
             const localStorageManager = new LocalStorageManager();
             await localStorageManager.clear(task.data.page);
@@ -363,7 +316,6 @@ export class DataCleanupManager {
             logger.debug('Cleared sessionStorage');
         }
         
-        // Clear Redis cache if specified
         if (task.data.redisKeys && task.data.redisConnection) {
             const { RedisAdapter } = await import('../../database/adapters/RedisAdapter');
             const redis = new RedisAdapter();
@@ -394,7 +346,6 @@ export class DataCleanupManager {
             }
         }
         
-        // Clear in-memory application cache if specified
         if (task.data.applicationCache) {
             const cacheManager = task.data.applicationCache;
             if (typeof cacheManager.clear === 'function') {
@@ -405,9 +356,6 @@ export class DataCleanupManager {
         logger.debug(`Cache cleanup completed for task: ${task.id}`);
     }
 
-    /**
-     * Custom cleanup
-     */
     private async cleanupCustom(task: CleanupTask): Promise<void> {
         if (task.data.handler && typeof task.data.handler === 'function') {
             await task.data.handler(task);
@@ -416,15 +364,10 @@ export class DataCleanupManager {
         }
     }
 
-    /**
-     * Create cleanup tasks from test data
-     */
     private createCleanupTasks(data: TestData[], strategy?: CleanupStrategy): CleanupTask[] {
         const tasks: CleanupTask[] = [];
         
-        // Analyze data to determine cleanup needs
         for (const record of data) {
-            // Database cleanup tasks
             if (record.__dbId || record.__tableName) {
                 tasks.push({
                     id: `db_${record.__dbId || Math.random().toString(36).substr(2, 9)}`,
@@ -441,7 +384,6 @@ export class DataCleanupManager {
                 });
             }
             
-            // API cleanup tasks
             if (record.__apiEndpoint || record.__resourceUrl) {
                 tasks.push({
                     id: `api_${record.__resourceId || Math.random().toString(36).substr(2, 9)}`,
@@ -459,7 +401,6 @@ export class DataCleanupManager {
                 });
             }
             
-            // File cleanup tasks
             if (record.__createdFiles || record.__uploadedFiles) {
                 const files = [
                     ...(record.__createdFiles || []),
@@ -479,7 +420,6 @@ export class DataCleanupManager {
                 });
             }
             
-            // Cache cleanup tasks
             if (record.__cacheKeys || record.__cachePattern) {
                 tasks.push({
                     id: `cache_${Math.random().toString(36).substr(2, 9)}`,
@@ -497,7 +437,6 @@ export class DataCleanupManager {
                 });
             }
             
-            // Custom cleanup handler
             if (record.__cleanupHandler) {
                 tasks.push({
                     id: `custom_${Math.random().toString(36).substr(2, 9)}`,
@@ -513,22 +452,16 @@ export class DataCleanupManager {
             }
         }
         
-        // Apply strategy override if specified
         if (strategy) {
             return tasks.filter(t => t.type === strategy);
         }
         
-        // Sort by priority
         return tasks.sort((a, b) => (a.priority || 0) - (b.priority || 0));
     }
 
-    /**
-     * Rollback executed tasks
-     */
     private async rollbackTasks(tasks: CleanupTask[]): Promise<void> {
         logger.warn(`Rolling back ${tasks.length} cleanup tasks`);
         
-        // Execute rollback in reverse order
         const reversedTasks = [...tasks].reverse();
         
         for (const task of reversedTasks) {
@@ -545,9 +478,6 @@ export class DataCleanupManager {
         }
     }
 
-    /**
-     * Get total pending tasks
-     */
     private getTotalPendingTasks(): number {
         let total = 0;
         const taskArrays = Array.from(this.cleanupTasks.values());
@@ -557,17 +487,11 @@ export class DataCleanupManager {
         return total;
     }
 
-    /**
-     * Parse cleanup order from configuration
-     */
     private parseCleanupOrder(): CleanupStrategy[] {
         const orderStr = ConfigurationManager.get('DATA_CLEANUP_ORDER', 'database,api,file,cache,custom');
         return orderStr.split(',').map(s => s.trim() as CleanupStrategy);
     }
 
-    /**
-     * Register exit handlers
-     */
     private registerExitHandlers(): void {
         const cleanup = async () => {
             if (this.getTotalPendingTasks() > 0) {
@@ -580,9 +504,7 @@ export class DataCleanupManager {
             }
         };
         
-        // Handle different exit scenarios
         process.on('exit', () => {
-            // Synchronous cleanup if needed
             const pendingCount = this.getTotalPendingTasks();
             if (pendingCount > 0) {
                 logger.warn(`Exiting with ${pendingCount} pending cleanup tasks`);
@@ -612,16 +534,10 @@ export class DataCleanupManager {
         });
     }
 
-    /**
-     * Delay execution
-     */
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /**
-     * Get cleanup statistics
-     */
     getStatistics(): CleanupStatistics {
         const pendingByType: Record<CleanupStrategy, number> = {
             database: 0,
@@ -650,9 +566,6 @@ export class DataCleanupManager {
         };
     }
 
-    /**
-     * Get task count by type
-     */
     private getTaskCountByType(tasks: CleanupTask[]): Record<CleanupStrategy, number> {
         const counts: Record<CleanupStrategy, number> = {
             database: 0,
@@ -669,9 +582,6 @@ export class DataCleanupManager {
         return counts;
     }
 
-    /**
-     * Export cleanup plan
-     */
     exportCleanupPlan(): Array<{
         dataId: string;
         tasks: Array<{
@@ -701,19 +611,14 @@ export class DataCleanupManager {
         return plan;
     }
 
-    /**
-     * Sanitize data for export
-     */
     private sanitizeDataForExport(data: any): any {
         const sanitized = { ...data };
         
-        // Remove sensitive information
         delete sanitized.password;
         delete sanitized.apiKey;
         delete sanitized.token;
         delete sanitized.credentials;
         
-        // Remove function references
         if (sanitized.handler && typeof sanitized.handler === 'function') {
             sanitized.handler = '[Function]';
         }
@@ -721,9 +626,6 @@ export class DataCleanupManager {
         return sanitized;
     }
 
-    /**
-     * Clear all cleanup tasks
-     */
     clear(): void {
         this.cleanupTasks.clear();
         this.executedTasks = [];
@@ -732,9 +634,6 @@ export class DataCleanupManager {
         logger.info('Cleared all cleanup tasks');
     }
 
-    /**
-     * Get failed task details
-     */
     getFailedTasks(): Array<{
         task: CleanupTask;
         error: string;

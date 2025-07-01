@@ -4,24 +4,18 @@ import * as readline from 'readline';
 import * as os from 'os';
 import { ExecutionOptions, TestResult, TestStatus, StepResult, ExecutionSummary, WorkerResult } from './ExecutionOptions';
 
-/**
-* Production-ready CLI reporter with real-time progress, animations,
-* and beautiful console output with full ANSI color support
-*/
 export class CLIReporter {
  private static instance: CLIReporter;
  private readonly stdout: NodeJS.WriteStream;
  private readonly stderr: NodeJS.WriteStream;
  private readonly stdin: NodeJS.ReadStream;
  
- // Terminal capabilities
  private readonly isInteractive: boolean;
  private readonly hasColors: boolean;
  private readonly terminalWidth: number;
  private readonly terminalHeight: number;
  private readonly isCIEnvironment: boolean;
  
- // Execution state
  private startTime: number = 0;
  private currentFeature: string = '';
  private currentScenario: string = '';
@@ -37,33 +31,28 @@ export class CLIReporter {
  private skippedSteps: number = 0;
  private pendingSteps: number = 0;
  
- // Progress tracking
  private progressBarWidth: number = 40;
  private lastProgressUpdate: number = 0;
- private progressUpdateInterval: number = 100; // ms
+ private progressUpdateInterval: number = 100;
  private spinnerIndex: number = 0;
  private spinnerInterval: NodeJS.Timeout | null = null;
  
- // Output buffering
  private outputBuffer: string[] = [];
  private errorBuffer: string[] = [];
  private isBuffering: boolean = false;
  private lastLineLength: number = 0;
  
- // Worker tracking for parallel execution
  private workers: Map<string, WorkerState> = new Map();
  private workerColors: string[] = [
-   '\x1b[36m', // Cyan
-   '\x1b[35m', // Magenta
-   '\x1b[34m', // Blue
-   '\x1b[33m', // Yellow
-   '\x1b[32m', // Green
-   '\x1b[31m', // Red
+   '\x1b[36m',
+   '\x1b[35m',
+   '\x1b[34m',
+   '\x1b[33m',
+   '\x1b[32m',
+   '\x1b[31m',
  ];
  
- // ANSI escape codes
  private readonly ANSI = {
-   // Cursor movement
    CURSOR_UP: '\x1b[A',
    CURSOR_DOWN: '\x1b[B',
    CURSOR_FORWARD: '\x1b[C',
@@ -83,7 +72,6 @@ export class CLIReporter {
    HIDE_CURSOR: '\x1b[?25l',
    SHOW_CURSOR: '\x1b[?25h',
    
-   // Colors
    RESET: '\x1b[0m',
    BRIGHT: '\x1b[1m',
    DIM: '\x1b[2m',
@@ -92,7 +80,6 @@ export class CLIReporter {
    REVERSE: '\x1b[7m',
    HIDDEN: '\x1b[8m',
    
-   // Foreground colors
    FG_BLACK: '\x1b[30m',
    FG_RED: '\x1b[31m',
    FG_GREEN: '\x1b[32m',
@@ -110,7 +97,6 @@ export class CLIReporter {
    FG_BRIGHT_CYAN: '\x1b[96m',
    FG_BRIGHT_WHITE: '\x1b[97m',
    
-   // Background colors
    BG_BLACK: '\x1b[40m',
    BG_RED: '\x1b[41m',
    BG_GREEN: '\x1b[42m',
@@ -129,7 +115,6 @@ export class CLIReporter {
    BG_BRIGHT_WHITE: '\x1b[107m',
  };
  
- // Unicode symbols
  private readonly SYMBOLS = {
    SUCCESS: '✓',
    FAILURE: '✗',
@@ -170,7 +155,6 @@ export class CLIReporter {
    GRAPH: '📊',
  };
  
- // Spinner frames
  private readonly SPINNERS = {
    dots: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
    dots2: ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'],
@@ -234,17 +218,14 @@ export class CLIReporter {
    this.stderr = process.stderr;
    this.stdin = process.stdin;
    
-   // Detect terminal capabilities
    this.isInteractive = this.stdout.isTTY && !options.ci;
    this.hasColors = this.stdout.hasColors?.() ?? false;
    this.terminalWidth = this.stdout.columns || 80;
    this.terminalHeight = this.stdout.rows || 24;
    this.isCIEnvironment = options.ci || !!process.env['CI'];
    
-   // Configure colors
    this.useColors = this.hasColors && !options.noColors;
    
-   // Select spinner based on environment
    if (this.isCIEnvironment) {
      this.spinner = this.SPINNERS.simpleDots;
    } else if (process.platform === 'win32') {
@@ -253,16 +234,11 @@ export class CLIReporter {
      this.spinner = this.SPINNERS.dots;
    }
    
-   // Configure progress bar width
    this.progressBarWidth = Math.min(40, Math.floor(this.terminalWidth * 0.5));
    
-   // Setup signal handlers for cleanup
    this.setupSignalHandlers();
  }
 
- /**
-  * Get singleton instance
-  */
  public static getInstance(options?: ExecutionOptions): CLIReporter {
    if (!CLIReporter.instance) {
      CLIReporter.instance = new CLIReporter(options || {} as ExecutionOptions);
@@ -270,16 +246,12 @@ export class CLIReporter {
    return CLIReporter.instance;
  }
  
- /**
-  * Initialize reporter and show header
-  */
  public initialize(totalFeatures: number, totalScenarios: number, totalSteps: number): void {
    this.totalFeatures = totalFeatures;
    this.totalScenarios = totalScenarios;
    this.totalSteps = totalSteps;
    this.startTime = Date.now();
    
-   // Clear screen and show header
    if (this.isInteractive && !this.options.debug) {
      this.clearScreen();
    }
@@ -287,15 +259,11 @@ export class CLIReporter {
    this.showHeader();
    this.showExecutionInfo();
    
-   // Start progress updates
    if (this.isInteractive && !this.options.quiet) {
      this.startProgressUpdates();
    }
  }
  
- /**
-  * Show framework header with branding
-  */
  private showHeader(): void {
    const logo = [
      '╔═══════════════════════════════════════════════════════════════╗',
@@ -313,7 +281,6 @@ export class CLIReporter {
    ];
    
    if (this.useColors) {
-     // Apply brand color #93186C
      logo.forEach((line: string) => {
        this.writeLine(this.colorize(line, 'brand'));
      });
@@ -324,9 +291,6 @@ export class CLIReporter {
    this.writeLine('');
  }
  
- /**
-  * Show execution information
-  */
  private showExecutionInfo(): void {
    const info = [
      `${this.SYMBOLS.ROCKET} Execution ID: ${this.options.executionId}`,
@@ -348,23 +312,16 @@ export class CLIReporter {
    this.writeLine('');
  }
  
- /**
-  * Start progress update loop
-  */
  private startProgressUpdates(): void {
    if (this.isInteractive) {
      this.hideCursor();
      
-     // Start spinner
      this.spinnerInterval = setInterval(() => {
        this.updateProgress();
      }, this.progressUpdateInterval);
    }
  }
  
- /**
-  * Stop progress updates
-  */
  private stopProgressUpdates(): void {
    if (this.spinnerInterval) {
      clearInterval(this.spinnerInterval);
@@ -376,11 +333,7 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Update progress display
-  */
  public updateProgress(progress?: any): void {
-   // Use progress if provided
    if (progress) {
      this.currentFeature = progress.feature || this.currentFeature;
      this.currentScenario = progress.scenario || this.currentScenario;
@@ -398,42 +351,31 @@ export class CLIReporter {
    
    this.lastProgressUpdate = now;
    
-   // Build progress display
    const lines: string[] = [];
    
    if (this.options.parallel && this.workers.size > 0) {
-     // Parallel execution - show worker status
      lines.push(this.buildParallelProgress());
    } else {
-     // Sequential execution - show single progress
      lines.push(this.buildSequentialProgress());
    }
    
-   // Add current activity
    if (this.currentStep) {
      lines.push('');
      lines.push(this.formatCurrentActivity());
    }
    
-   // Add statistics
    lines.push('');
    lines.push(this.buildStatistics());
    
-   // Clear previous output and write new
    this.clearProgressArea(lines.length);
    lines.forEach(line => this.writeLine(line));
    
-   // Move cursor back up
    this.moveCursorUp(lines.length);
  }
  
- /**
-  * Build parallel execution progress
-  */
  private buildParallelProgress(): string {
    const lines: string[] = [];
    
-   // Overall progress
    const overallProgress = this.completedScenarios / this.totalScenarios;
    const progressBar = this.buildProgressBar(overallProgress, this.progressBarWidth);
    const percentage = Math.floor(overallProgress * 100);
@@ -442,7 +384,6 @@ export class CLIReporter {
    lines.push(`Overall Progress: ${progressBar} ${percentage}% | ${elapsed}`);
    lines.push('');
    
-   // Worker status
    lines.push('Workers:');
    
    let workerIndex = 0;
@@ -457,23 +398,18 @@ export class CLIReporter {
    return lines.join('\n');
  }
  
- /**
-  * Build sequential execution progress
-  */
  private buildSequentialProgress(): string {
-   // 🔥 FIX: Add null checks to prevent NaN calculations
    const safeCompletedSteps = this.completedSteps || 0;
-   const safeTotalSteps = this.totalSteps || 1; // Prevent division by zero
+   const safeTotalSteps = this.totalSteps || 1;
    const safeCompletedScenarios = this.completedScenarios || 0;
-   const safeTotalScenarios = this.totalScenarios || 1; // Prevent division by zero
+   const safeTotalScenarios = this.totalScenarios || 1;
    const safeCompletedFeatures = this.completedFeatures || 0;
-   const safeTotalFeatures = this.totalFeatures || 1; // Prevent division by zero
+   const safeTotalFeatures = this.totalFeatures || 1;
    
    const overallProgress = Math.min(1, Math.max(0, safeCompletedSteps / safeTotalSteps));
    const scenarioProgress = Math.min(1, Math.max(0, safeCompletedScenarios / safeTotalScenarios));
    const featureProgress = Math.min(1, Math.max(0, safeCompletedFeatures / safeTotalFeatures));
    
-   // Include progress indicators in display
    const progressIndicators = `F:${Math.floor(featureProgress * 100)}% S:${Math.floor(scenarioProgress * 100)}%`;
    
    const progressBar = this.buildProgressBar(overallProgress, this.progressBarWidth);
@@ -490,9 +426,6 @@ export class CLIReporter {
           `Steps: ${safeCompletedSteps}/${safeTotalSteps}`;
  }
  
- /**
-  * Build progress bar
-  */
  private buildProgressBar(progress: number, width: number): string {
    const filled = Math.floor(progress * width);
    const empty = width - filled;
@@ -500,7 +433,6 @@ export class CLIReporter {
    let bar = '[';
    
    if (this.useColors) {
-     // Gradient progress bar
      for (let i = 0; i < filled; i++) {
        if (i < width * 0.33) {
          bar += this.ANSI.FG_RED + '█';
@@ -523,9 +455,6 @@ export class CLIReporter {
    return bar;
  }
  
- /**
-  * Format current activity
-  */
  private formatCurrentActivity(): string {
    let activity = 'Current: ';
    
@@ -538,7 +467,6 @@ export class CLIReporter {
    }
    
    if (this.currentStep) {
-     // Use clearLastLine for smooth updates
      this.clearLastLine();
      activity += '\n         ' + this.colorize('└─ ', 'gray') + 
                  this.truncate(this.currentStep, 60);
@@ -547,9 +475,6 @@ export class CLIReporter {
    return activity;
  }
  
- /**
-  * Build statistics line
-  */
  private buildStatistics(): string {
    const stats = [
      `${this.SYMBOLS.SUCCESS} ${this.colorize(this.passedSteps.toString(), 'green')}`,
@@ -561,9 +486,6 @@ export class CLIReporter {
    return `Status: ${stats.join(' | ')}`;
  }
  
- /**
-  * Report feature started
-  */
  public onFeatureStart(featureName: string): void {
    this.currentFeature = featureName;
    
@@ -573,11 +495,8 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report feature completed
-  */
  public onFeatureEnd(featureName: string, duration: number): void {
-   this.currentFeature = ''; // Clear current feature
+   this.currentFeature = '';
    this.completedFeatures++;
    
    if (!this.isInteractive || this.options.verbose) {
@@ -586,9 +505,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report scenario started
-  */
  public onScenarioStart(scenarioName: string, tags: string[]): void {
    this.currentScenario = scenarioName;
    
@@ -598,9 +514,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report scenario completed
-  */
  public onScenarioEnd(scenarioName: string, result: TestResult): void {
    this.completedScenarios++;
    
@@ -617,9 +530,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report step started
-  */
  public onStepStart(step: StepResult): void {
    this.currentStep = `${step.keyword} ${step.name}`;
    
@@ -628,9 +538,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report step completed
-  */
  public onStepEnd(step: StepResult): void {
    this.completedSteps++;
    
@@ -660,7 +567,6 @@ export class CLIReporter {
        this.writeError(step.error);
      }
    } else if (!this.isInteractive && step.status === 'failed') {
-     // Always show failures
      this.writeLine(`    ${this.colorize('✗', 'red')} ${step.keyword} ${step.name}`);
      if (step.error) {
        this.writeError(step.error);
@@ -668,9 +574,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report worker started (parallel execution)
-  */
  public onWorkerStart(workerId: string, features: string[]): void {
    this.workers.set(workerId, {
      id: workerId,
@@ -687,9 +590,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report worker progress
-  */
  public onWorkerProgress(workerId: string, feature: string, scenario: string): void {
    const worker = this.workers.get(workerId);
    if (worker) {
@@ -698,11 +598,7 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Report worker completed
-  */
  public onWorkerEnd(workerId: string, result: WorkerResult): void {
-   // Use result to update worker stats
    const workerScenarios = result.results.length;
    const workerPassed = result.results.filter(r => r.status === 'passed').length;
    const workerFailed = result.results.filter(r => r.status === 'failed').length;
@@ -718,19 +614,14 @@ export class CLIReporter {
      this.writeLine(this.colorize(`Worker ${workerId} completed in ${duration} - ${workerScenarios} scenarios (${workerPassed} passed, ${workerFailed} failed)`, 'gray'));
    }
    
-   // Debug logging  
    if (this.options.debug) {
      console.debug(`Worker ${workerId} completed: ${workerScenarios} scenarios, ${workerPassed} passed, ${workerFailed} failed`);
    }
  }
  
- /**
-  * Report execution completed
-  */
  public onExecutionComplete(summary: ExecutionSummary): void {
    this.stopProgressUpdates();
    
-   // Clear progress area
    if (this.isInteractive) {
      this.clearProgressArea(10);
    }
@@ -739,19 +630,16 @@ export class CLIReporter {
    this.writeLine(this.createSeparator('═'));
    this.showExecutionSummary(summary);
    
-   // Show detailed results if verbose
    if (this.options.verbose && summary.metadata?.['detailedResults']) {
      this.showDetailedResults(summary.metadata['detailedResults']);
    }
    
-   // Show failure details
    if (summary.failed > 0 && !this.options.quiet) {
      this.showFailureDetails(summary);
    }
    
    this.writeLine(this.createSeparator('═'));
    
-   // Final status
    const status = summary.status === 'passed' ? 
      this.colorize('✓ ALL TESTS PASSED', 'green', 'bright') :
      this.colorize('✗ TESTS FAILED', 'red', 'bright');
@@ -761,9 +649,6 @@ export class CLIReporter {
    this.writeLine('');
  }
  
- /**
-  * Show execution summary
-  */
  private showExecutionSummary(summary: ExecutionSummary): void {
    const duration = this.formatDuration(summary.duration);
    const throughput = (summary.totalSteps / (summary.duration / 1000)).toFixed(2);
@@ -796,13 +681,8 @@ export class CLIReporter {
    this.writeLine(box);
  }
  
- /**
-  * Show detailed results
-  */
  private showDetailedResults(results: any): void {
-   // Implementation would show detailed breakdown by feature/scenario
    this.writeLine(this.colorize('Detailed Results:', 'cyan', 'bright'));
-   // Use results to display details
    if (results && results.features) {
      results.features.forEach((feature: any) => {
        this.writeLine(`  ${feature.name}: ${feature.status}`);
@@ -810,15 +690,11 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Show failure details
-  */
  private showFailureDetails(summary: ExecutionSummary): void {
    this.writeLine('');
    this.writeLine(this.colorize('Failed Tests:', 'red', 'bright'));
    this.writeLine(this.createSeparator('-'));
    
-   // Use summary to show failure count
    if (summary.failed > 0) {
      this.writeLine(`Total failures: ${summary.failed}`);
      this.writeLine(`Failed steps: ${summary.failed}`);
@@ -826,9 +702,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Write error with formatting
-  */
  private writeError(error: any): void {
    const errorLines = this.formatError(error);
    errorLines.forEach(line => {
@@ -840,9 +713,6 @@ export class CLIReporter {
    });
  }
  
- /**
-  * Format error for display
-  */
  private formatError(error: any): string[] {
    const lines: string[] = [];
    
@@ -868,9 +738,6 @@ export class CLIReporter {
    return lines;
  }
  
- /**
-  * Format worker status
-  */
  private formatWorkerStatus(state: WorkerState): string {
    if (state.status === 'completed') {
      return this.colorize('Completed', 'green');
@@ -884,9 +751,6 @@ export class CLIReporter {
    return `${current} (${elapsed})`;
  }
  
- /**
-  * Create a box around content
-  */
  private createBox(lines: string[], title?: string, style: 'single' | 'double' = 'single'): string {
    const maxLength = Math.max(
      ...lines.map(l => this.stripAnsi(l).length),
@@ -903,7 +767,6 @@ export class CLIReporter {
    
    const result: string[] = [];
    
-   // Top border
    if (title) {
      const titleStr = ` ${title} `;
      const leftPad = Math.floor((maxLength - titleStr.length) / 2);
@@ -920,38 +783,27 @@ export class CLIReporter {
      result.push(chars.tl + chars.h.repeat(maxLength) + chars.tr);
    }
    
-   // Content
    lines.forEach((line: string) => {
      const stripped = this.stripAnsi(line);
      const padding = maxLength - stripped.length;
      result.push(chars.v + line + ' '.repeat(padding) + chars.v);
    });
    
-   // Bottom border
    result.push(chars.bl + chars.h.repeat(maxLength) + chars.br);
    
    return result.join('\n');
  }
  
- /**
-  * Create separator line
-  */
  private createSeparator(char: string = '─'): string {
    return char.repeat(this.terminalWidth);
  }
  
- /**
-  * Center text
-  */
  private center(text: string): string {
    const stripped = this.stripAnsi(text);
    const padding = Math.floor((this.terminalWidth - stripped.length) / 2);
    return ' '.repeat(padding) + text;
  }
  
- /**
-  * Truncate text with ellipsis
-  */
  private truncate(text: string, maxLength: number): string {
    if (text.length <= maxLength) {
      return text;
@@ -960,20 +812,13 @@ export class CLIReporter {
    return text.substring(0, maxLength - 3) + '...';
  }
  
- /**
-  * Strip ANSI codes from string
-  */
  private stripAnsi(text: string): string {
-   // Comprehensive ANSI escape code regex
    return text.replace(
      /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
      ''
    );
  }
  
- /**
-  * Colorize text
-  */
  private colorize(text: string, color: string, style?: string): string {
    if (!this.useColors) {
      return text;
@@ -981,7 +826,6 @@ export class CLIReporter {
    
    let result = '';
    
-   // Apply style
    if (style === 'bright') {
      result += this.ANSI.BRIGHT;
    } else if (style === 'dim') {
@@ -990,7 +834,6 @@ export class CLIReporter {
      result += this.ANSI.UNDERSCORE;
    }
    
-   // Apply color
    switch (color) {
      case 'red':
        result += this.ANSI.FG_RED;
@@ -1014,7 +857,6 @@ export class CLIReporter {
        result += this.ANSI.FG_GRAY;
        break;
      case 'brand':
-       // Approximate #93186C
        result += '\x1b[38;2;147;24;108m';
        break;
      default:
@@ -1026,9 +868,6 @@ export class CLIReporter {
    return result;
  }
  
- /**
-  * Format duration
-  */
  private formatDuration(ms: number): string {
    if (ms < 1000) {
      return `${ms}ms`;
@@ -1047,11 +886,7 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Calculate ETA
-  */
  private calculateETA(progress: number, elapsed: string): string {
-   // Log elapsed for debugging (elapsed is used for logging)
    if (this.options.debug) {
      console.debug(`Progress: ${Math.floor(progress * 100)}%, Elapsed: ${elapsed}`);
    }
@@ -1071,9 +906,6 @@ export class CLIReporter {
    return this.formatDuration(remainingMs);
  }
  
- /**
-  * Get status symbol
-  */
  private getStatusSymbol(status: TestStatus): string {
    switch (status) {
      case 'passed':
@@ -1089,9 +921,6 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Get status color
-  */
  private getStatusColor(status: TestStatus): string {
    switch (status) {
      case 'passed':
@@ -1107,21 +936,14 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Clear screen
-  */
  private clearScreen(): void {
    if (this.isInteractive) {
      this.write(this.ANSI.ERASE_SCREEN + this.ANSI.CURSOR_POSITION);
    }
  }
  
- /**
-  * Clear progress area
-  */
  private clearProgressArea(lines: number): void {
    if (this.isInteractive) {
-     // Use terminal dimensions to ensure we don't clear beyond screen
      const dims = this.getTerminalDimensions();
      const linesToClear = Math.min(lines, dims.height - 2);
      
@@ -1131,36 +953,24 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Move cursor up
-  */
  private moveCursorUp(lines: number): void {
    if (this.isInteractive) {
      this.write(`\x1b[${lines}A`);
    }
  }
  
- /**
-  * Hide cursor
-  */
  private hideCursor(): void {
    if (this.isInteractive) {
      this.write(this.ANSI.HIDE_CURSOR);
    }
  }
  
- /**
-  * Show cursor
-  */
  private showCursor(): void {
    if (this.isInteractive) {
      this.write(this.ANSI.SHOW_CURSOR);
    }
  }
  
- /**
-  * Write to stdout
-  */
  private write(text: string): void {
    if (this.isBuffering) {
      this.outputBuffer.push(text);
@@ -1171,17 +981,11 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Write line to stdout
-  */
  private writeLine(text: string = ''): void {
    this.lastLineLength = text.length;
    this.write(text + '\n');
  }
  
- /**
-  * Setup signal handlers for cleanup
-  */
  private setupSignalHandlers(): void {
    const cleanup = () => {
      this.stopProgressUpdates();
@@ -1195,28 +999,18 @@ export class CLIReporter {
    process.on('SIGHUP', cleanup);
  }
 
- /**
-  * Start buffering output
-  */
  public startBuffering(): void {
    this.isBuffering = true;
    this.outputBuffer = [];
    this.errorBuffer = [];
  }
 
- /**
-  * Stop buffering and flush
-  */
  public stopBuffering(): void {
    this.isBuffering = false;
    this.flushBuffers();
  }
 
- /**
-  * Flush buffers to stdout
-  */
  private flushBuffers(): void {
-   // Flush output buffer
    if (this.outputBuffer.length > 0) {
      this.outputBuffer.forEach(text => {
        if (!this.options.quiet || text.includes('Error')) {
@@ -1226,7 +1020,6 @@ export class CLIReporter {
      this.outputBuffer = [];
    }
 
-   // Flush error buffer
    if (this.errorBuffer.length > 0) {
      this.errorBuffer.forEach(text => {
        this.stderr.write(text + '\n');
@@ -1235,18 +1028,12 @@ export class CLIReporter {
    }
  }
  
- /**
-  * Clear last line
-  */
  private clearLastLine(): void {
    if (this.isInteractive && this.lastLineLength > 0) {
      this.write(this.ANSI.CURSOR_UP + this.ANSI.ERASE_LINE);
    }
  }
  
- /**
-  * Get terminal dimensions
-  */
  private getTerminalDimensions(): { width: number; height: number } {
    return {
      width: this.terminalWidth,
@@ -1254,9 +1041,6 @@ export class CLIReporter {
    };
  }
 
- /**
-  * Start execution reporting
-  */
  public startExecution(totalScenarios: number): void {
    this.totalScenarios = totalScenarios;
    this.startTime = Date.now();
@@ -1266,11 +1050,7 @@ export class CLIReporter {
    }
  }
 
- /**
-  * End execution reporting
-  */
  public endExecution(progress: any): void {
-   // Use progress to show final stats
    if (progress && progress.completed) {
      this.completedScenarios = progress.completed;
    }
@@ -1290,9 +1070,6 @@ export class CLIReporter {
    });
  }
 
- /**
-  * Start feature reporting
-  */
  public startFeature(feature: any): void {
    this.currentFeature = feature.name;
    if (!this.isInteractive) {
@@ -1300,9 +1077,6 @@ export class CLIReporter {
    }
  }
 
- /**
-  * End feature reporting
-  */
  public endFeature(feature: any, status: string): void {
    if (!this.isInteractive) {
      const symbol = this.getStatusSymbol(status as any);
@@ -1311,9 +1085,6 @@ export class CLIReporter {
    this.completedFeatures++;
  }
 
- /**
-  * Start scenario reporting
-  */
  public startScenario(scenario: any): void {
    this.currentScenario = scenario.name;
    if (!this.isInteractive) {
@@ -1321,9 +1092,6 @@ export class CLIReporter {
    }
  }
 
- /**
-  * End scenario reporting
-  */
  public endScenario(scenario: any, status: string): void {
    if (!this.isInteractive) {
      const symbol = this.getStatusSymbol(status as any);
@@ -1332,9 +1100,6 @@ export class CLIReporter {
    this.completedScenarios++;
  }
 
- /**
-  * Start step reporting
-  */
  public startStep(step: any): void {
    this.currentStep = `${step.keyword} ${step.text}`;
    if (!this.isInteractive && this.options.verbose) {
@@ -1342,11 +1107,7 @@ export class CLIReporter {
    }
  }
 
- /**
-  * End step reporting
-  */
  public endStep(step: any, status: string, error?: any): void {
-   // Log step details
    if (this.options.debug) {
      console.debug(`Step completed: ${step.keyword} ${step.text} - ${status}`);
    }
@@ -1380,16 +1141,10 @@ export class CLIReporter {
    }
  }
 
-  /**
-   * Helper method to get color
-   */
   private color(color: string, text: string): string {
     return this.colorize(text, color);
   }
 
-  /**
-   * Start spinner animation
-   */
   private startSpinner(): void {
     if (this.isInteractive && !this.spinnerInterval) {
       this.spinnerInterval = setInterval(() => {
@@ -1398,17 +1153,12 @@ export class CLIReporter {
     }
   }
 
-  /**
-   * Show summary
-   */
   private showSummary(summary: any): void {
-    // Use readline to create interactive line updates
     const rl = readline.createInterface({
       input: this.stdin,
       output: this.stdout
     });
     
-    // Use os to get system info for the summary  
     const systemInfo = {
       platform: os.platform(),
       arch: os.arch(),
@@ -1428,14 +1178,10 @@ export class CLIReporter {
     this.writeLine(`System: ${systemInfo.platform} ${systemInfo.arch} (${systemInfo.cpus} CPUs)`);
     this.writeLine(this.createSeparator('='));
     
-    // Close readline interface
     rl.close();
   }
 }
 
-/**
-* Worker state for parallel execution
-*/
 interface WorkerState {
  id: string;
  status: 'running' | 'completed' | 'failed';

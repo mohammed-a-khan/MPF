@@ -5,7 +5,6 @@ import { DateUtils } from '../../core/utils/DateUtils';
 import { Logger } from '../../core/utils/Logger';
 import { FeatureReport, ScenarioReport, TestStatus } from '../types/reporting.types';
 
-// Define missing types locally
 interface ExecutionTimeline {
   events: TimelineEvent[];
   groups: TimelineGroup[];
@@ -55,9 +54,6 @@ export class TimelineGenerator {
     this.theme = theme;
   }
 
-  /**
-   * Generate interactive execution timeline
-   */
   async generateTimeline(data: TimelineDataWithFeatures): Promise<string> {
     TimelineGenerator.logger.info('Generating execution timeline');
 
@@ -75,19 +71,14 @@ export class TimelineGenerator {
     `;
   }
 
-  /**
-   * Build timeline data structure
-   */
   private buildTimelineData(data: TimelineDataWithFeatures): ExecutionTimeline {
     const events: TimelineEvent[] = [];
     const groups: TimelineGroup[] = [];
     
-    // Calculate overall time bounds
     const startTime = new Date(data.startTime);
     const endTime = new Date(data.endTime);
     const totalDuration = endTime.getTime() - startTime.getTime();
 
-    // Process features
     data.features?.forEach((feature: FeatureReport, featureIndex: number) => {
       const featureGroup: TimelineGroup = {
         id: `feature-${featureIndex}`,
@@ -98,7 +89,6 @@ export class TimelineGenerator {
       };
       groups.push(featureGroup);
 
-      // Add feature event
       const featureEvent: TimelineEvent = {
         id: `event-feature-${featureIndex}`,
         groupId: featureGroup.id,
@@ -118,7 +108,6 @@ export class TimelineGenerator {
       events.push(featureEvent);
       featureGroup.items.push(featureEvent);
 
-      // Process scenarios
       feature.scenarios.forEach((scenario: any, scenarioIndex: number) => {
         const scenarioEvent: TimelineEvent = {
           id: `event-scenario-${featureIndex}-${scenarioIndex}`,
@@ -138,7 +127,6 @@ export class TimelineGenerator {
         events.push(scenarioEvent);
         featureGroup.items.push(scenarioEvent);
 
-        // Process steps for failed scenarios
         if (scenario.status === TestStatus.FAILED && scenario.steps) {
           scenario.steps.forEach((step: any, stepIndex: number) => {
             const stepEvent: TimelineEvent = {
@@ -162,7 +150,6 @@ export class TimelineGenerator {
       });
     });
 
-    // Add parallel execution lanes if applicable
     if (data.parallelExecutions) {
       data.parallelExecutions.forEach((worker: any, index: number) => {
         const workerGroup: TimelineGroup = {
@@ -208,9 +195,6 @@ export class TimelineGenerator {
     };
   }
 
-  /**
-   * Generate timeline HTML
-   */
   private generateTimelineHTML(timeline: ExecutionTimeline): string {
     return `
       <div class="timeline-header">
@@ -306,9 +290,6 @@ export class TimelineGenerator {
     `;
   }
 
-  /**
-   * Generate timeline CSS
-   */
   private generateTimelineCSS(): string {
     return `
       .cs-timeline-container {
@@ -652,9 +633,6 @@ export class TimelineGenerator {
     `;
   }
 
-  /**
-   * Generate timeline JavaScript
-   */
   private generateTimelineJS(): string {
     return `
       (function() {
@@ -672,22 +650,19 @@ export class TimelineGenerator {
         
         const timeline = window.timelineData;
         const timeRange = timeline.endTime.getTime() - timeline.startTime.getTime();
-        const pixelsPerMs = 0.05; // Base scale
+        const pixelsPerMs = 0.05;
         
-        // Initialize timeline
         function initTimeline() {
           renderScale();
           renderEvents();
           setupInteractions();
         }
         
-        // Render time scale
         function renderScale() {
           scale.innerHTML = '';
           const width = timeRange * pixelsPerMs * currentZoom;
           scale.style.width = width + 'px';
           
-          // Calculate tick interval
           const tickInterval = calculateTickInterval(timeRange);
           const tickCount = Math.floor(timeRange / tickInterval);
           
@@ -710,17 +685,13 @@ export class TimelineGenerator {
           }
         }
         
-        // Render timeline events
         function renderEvents() {
-          // Clear existing events
           document.querySelectorAll('.timeline-event').forEach(el => el.remove());
           document.querySelectorAll('.timeline-connection').forEach(el => el.remove());
           
-          // Set canvas width
           const width = timeRange * pixelsPerMs * currentZoom;
           canvas.style.width = width + 200 + 'px';
           
-          // Render events
           timeline.events.forEach(event => {
             if (event.type === 'step' && !showSteps) return;
             if (event.groupId.startsWith('worker-') && !showParallel) return;
@@ -731,7 +702,6 @@ export class TimelineGenerator {
             const eventEl = createEventElement(event);
             track.appendChild(eventEl);
             
-            // Add connection to parent
             if (event.parent) {
               const parentEvent = timeline.events.find(e => e.id === event.parent);
               if (parentEvent) {
@@ -742,7 +712,6 @@ export class TimelineGenerator {
           });
         }
         
-        // Create event element
         function createEventElement(event) {
           const el = document.createElement('div');
           el.className = \`timeline-event \${event.status} \${event.type}\`;
@@ -756,7 +725,6 @@ export class TimelineGenerator {
           
           el.innerHTML = \`<span>\${event.title}</span>\`;
           
-          // Add event listeners
           el.addEventListener('mouseenter', (e) => showTooltip(e, event));
           el.addEventListener('mouseleave', hideTooltip);
           el.addEventListener('click', () => selectEvent(event));
@@ -764,7 +732,6 @@ export class TimelineGenerator {
           return el;
         }
         
-        // Create connection line
         function createConnection(parent, child) {
           const el = document.createElement('div');
           el.className = 'timeline-connection';
@@ -780,7 +747,6 @@ export class TimelineGenerator {
           return el;
         }
         
-        // Show tooltip
         function showTooltip(e, event) {
           const rect = e.target.getBoundingClientRect();
           
@@ -808,14 +774,11 @@ export class TimelineGenerator {
           tooltip.querySelector('.tooltip-details').innerHTML = details;
         }
         
-        // Hide tooltip
         function hideTooltip() {
           tooltip.style.display = 'none';
         }
         
-        // Setup interactions
         function setupInteractions() {
-          // Drag to scroll
           canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
             startX = e.pageX - canvas.offsetLeft;
@@ -841,7 +804,6 @@ export class TimelineGenerator {
             canvas.style.cursor = 'grab';
           });
           
-          // Zoom with mouse wheel
           viewport.addEventListener('wheel', (e) => {
             if (e.ctrlKey) {
               e.preventDefault();
@@ -859,20 +821,19 @@ export class TimelineGenerator {
           });
         }
         
-        // Calculate tick interval
         function calculateTickInterval(range) {
           const intervals = [
-            100,      // 100ms
-            500,      // 500ms
-            1000,     // 1s
-            5000,     // 5s
-            10000,    // 10s
-            30000,    // 30s
-            60000,    // 1m
-            300000,   // 5m
-            600000,   // 10m
-            1800000,  // 30m
-            3600000   // 1h
+            100,
+            500,
+            1000,
+            5000,
+            10000,
+            30000,
+            60000,
+            300000,
+            600000,
+            1800000,
+            3600000
           ];
           
           const targetTicks = 20;
@@ -881,7 +842,6 @@ export class TimelineGenerator {
           return intervals.find(i => i >= idealInterval) || intervals[intervals.length - 1];
         }
         
-        // Format scale time
         function formatScaleTime(timestamp) {
           const date = new Date(timestamp);
           const elapsed = timestamp - timeline.startTime.getTime();
@@ -895,7 +855,6 @@ export class TimelineGenerator {
           }
         }
         
-        // Format duration
         function formatDuration(ms) {
           if (ms < 1000) return ms + 'ms';
           if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
@@ -903,25 +862,20 @@ export class TimelineGenerator {
           return Math.floor(ms / 3600000) + 'h ' + Math.floor((ms % 3600000) / 60000) + 'm';
         }
         
-        // Select event
         function selectEvent(event) {
-          // Remove previous selection
           document.querySelectorAll('.timeline-event.selected').forEach(el => {
             el.classList.remove('selected');
           });
           
-          // Add selection
           const el = document.querySelector(\`[data-event-id="\${event.id}"]\`);
           if (el) {
             el.classList.add('selected');
             el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
           }
           
-          // Trigger custom event
           window.dispatchEvent(new CustomEvent('timeline-event-selected', { detail: event }));
         }
         
-        // Public functions
         window.timelineZoomIn = function() {
           currentZoom = Math.min(5, currentZoom * 1.5);
           renderScale();
@@ -954,19 +908,14 @@ export class TimelineGenerator {
           renderEvents();
         };
         
-        // Initialize
         initTimeline();
       })();
     `;
   }
 
-  /**
-   * Get theme color with fallback
-   */
   private getThemeColor(colorPath: string, fallback: string): string {
     const colors = this.theme.colors;
     if (!colors) {
-      // Use direct theme properties as fallback
       switch (colorPath) {
         case 'primary': return this.theme.primaryColor;
         case 'secondary': return this.theme.secondaryColor;
@@ -980,7 +929,6 @@ export class TimelineGenerator {
       }
     }
     
-    // Navigate through nested color object
     const parts = colorPath.split('.');
     let current: any = colors;
     for (const part of parts) {
@@ -993,9 +941,6 @@ export class TimelineGenerator {
     return current || fallback;
   }
 
-  /**
-   * Get feature color based on status
-   */
   private getFeatureColor(status: TestStatus | string): string {
     switch (status) {
       case TestStatus.PASSED:
@@ -1012,9 +957,6 @@ export class TimelineGenerator {
     }
   }
 
-  /**
-   * Format duration for display
-   */
   private formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
     if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;

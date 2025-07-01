@@ -5,9 +5,6 @@ import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { TagParser } from '../parser/TagParser';
 
-/**
- * Options for hook registration
- */
 export interface HookOptions {
   name?: string;
   order?: number;
@@ -18,9 +15,6 @@ export interface HookOptions {
   line?: number;
 }
 
-/**
- * Extended Hook interface with additional metadata
- */
 interface ExtendedHook extends Hook {
   id: string;
   condition?: (() => boolean) | undefined;
@@ -30,10 +24,6 @@ interface ExtendedHook extends Hook {
   } | undefined;
 }
 
-/**
- * Registry for all BDD hooks
- * Manages Before, After, BeforeStep, AfterStep, BeforeAll, AfterAll hooks
- */
 export class HookRegistry {
   private static instance: HookRegistry;
   private readonly hooks: Map<HookType, ExtendedHook[]>;
@@ -48,9 +38,6 @@ export class HookRegistry {
     this.initializeHookTypes();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): HookRegistry {
     if (!HookRegistry.instance) {
       HookRegistry.instance = new HookRegistry();
@@ -58,9 +45,6 @@ export class HookRegistry {
     return HookRegistry.instance;
   }
 
-  /**
-   * Initialize hook type maps
-   */
   private initializeHookTypes(): void {
     const hookTypes: HookType[] = [
       HookType.Before,
@@ -76,9 +60,6 @@ export class HookRegistry {
     });
   }
 
-  /**
-   * Register a hook
-   */
   public registerHook(
     type: HookType,
     implementation: HookFn,
@@ -100,7 +81,6 @@ export class HookRegistry {
       }
     };
 
-    // Add optional properties only if provided
     if (options?.tags) {
       hook.tags = options.tags;
     }
@@ -117,7 +97,6 @@ export class HookRegistry {
     const hooksOfType = this.hooks.get(type) || [];
     hooksOfType.push(hook);
 
-    // Sort by order (lower order executes first)
     hooksOfType.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
     this.hooks.set(type, hooksOfType);
@@ -126,25 +105,18 @@ export class HookRegistry {
     this.logger.debug(`Registered ${type} hook: ${hook.name} (order: ${hook.order})`);
   }
 
-  /**
-   * Get hooks of specific type filtered by tags
-   */
   public getHooks(type: HookType, tags?: string[]): Hook[] {
     const allHooks = this.hooks.get(type) || [];
 
-    // Filter by tags
     const filteredHooks = allHooks.filter(hook => {
-      // If hook has no tag filter, it applies to all
       if (!hook.tags) {
         return true;
       }
 
-      // If scenario has no tags, hook with tags doesn't apply
       if (!tags || tags.length === 0) {
         return false;
       }
 
-      // Evaluate tag expression
       try {
         return this.tagParser.evaluateTagExpression(hook.tags.join(' '), tags);
       } catch (error) {
@@ -153,7 +125,6 @@ export class HookRegistry {
       }
     });
 
-    // Apply condition filter if present
     const conditionalHooks = filteredHooks.filter(hook => {
       if (!hook.condition) {
         return true;
@@ -174,7 +145,6 @@ export class HookRegistry {
         implementation: hook.implementation
       };
       
-      // Only add optional properties if they exist or have meaningful values
       if (hook.order !== undefined) {
         result.order = hook.order;
       }
@@ -192,16 +162,10 @@ export class HookRegistry {
     });
   }
 
-  /**
-   * Get all hooks for specific type
-   */
   public getAllHooks(type: HookType): Hook[] {
     return this.getHooks(type);
   }
 
-  /**
-   * Remove a specific hook
-   */
   public removeHook(type: HookType, hookId: string): boolean {
     const hooksOfType = this.hooks.get(type);
     if (!hooksOfType) {
@@ -220,9 +184,6 @@ export class HookRegistry {
     return false;
   }
 
-  /**
-   * Remove all hooks of specific type
-   */
   public removeAllHooks(_type?: HookType): void {
     if (_type) {
       this.hooks.set(_type, []);
@@ -234,17 +195,11 @@ export class HookRegistry {
     }
   }
 
-  /**
-   * Check if hook exists
-   */
   public hasHook(type: HookType, hookId: string): boolean {
     const hooksOfType = this.hooks.get(type) || [];
     return hooksOfType.some(hook => hook.id === hookId);
   }
 
-  /**
-   * Get hook count by type
-   */
   public getHookCount(type?: HookType): number {
     if (type) {
       return (this.hooks.get(type) || []).length;
@@ -253,33 +208,21 @@ export class HookRegistry {
     return Array.from(this.hooks.values()).reduce((total, hooks) => total + hooks.length, 0);
   }
 
-  /**
-   * Lock registry to prevent further registrations
-   */
   public lock(): void {
     this.isLocked = true;
     this.logger.debug('HookRegistry locked');
   }
 
-  /**
-   * Unlock registry to allow registrations
-   */
   public unlock(): void {
     this.isLocked = false;
     this.logger.debug('HookRegistry unlocked');
   }
 
-  /**
-   * Check if registry is locked
-   */
   public isRegistryLocked(): boolean {
     return this.isLocked;
   }
 
 
-  /**
-   * Get all registered hooks
-   */
   public getAllRegisteredHooks(): Map<HookType, Hook[]> {
     const result = new Map<HookType, Hook[]>();
     
@@ -291,7 +234,6 @@ export class HookRegistry {
           implementation: hook.implementation
         };
         
-        // Only add optional properties if they exist or have meaningful values
         if (hook.order !== undefined) {
           hookResult.order = hook.order;
         }
@@ -312,9 +254,6 @@ export class HookRegistry {
     return result;
   }
 
-  /**
-   * Get hook statistics
-   */
   public getStatistics(): HookRegistryStatistics {
     const stats: HookRegistryStatistics = {
       totalHooks: 0,
@@ -334,15 +273,11 @@ export class HookRegistry {
     return stats;
   }
 
-  /**
-   * Validate all registered hooks
-   */
   public validateHooks(): ValidationResult {
     const errors: string[] = [];
     const warnings: string[] = [];
 
     this.hooks.forEach((hooks, type) => {
-      // Check for duplicate names
       const names = hooks.map(h => h.name);
       const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
       
@@ -350,7 +285,6 @@ export class HookRegistry {
         warnings.push(`Duplicate hook names found for type ${type}: ${duplicates.join(', ')}`);
       }
 
-      // Check for hooks with invalid configurations
       hooks.forEach(hook => {
         if (!hook.name || hook.name.trim() === '') {
           errors.push(`Hook of type ${type} has empty or missing name`);
@@ -373,9 +307,6 @@ export class HookRegistry {
     };
   }
 
-  /**
-   * Export hook registry for debugging
-   */
   public export(): any {
     return {
       hooks: Object.fromEntries(
@@ -399,18 +330,12 @@ export class HookRegistry {
     };
   }
 
-  /**
-   * Generate unique hook ID
-   */
   private generateHookId(type: HookType, name?: string): string {
     const timestamp = Date.now();
     const hookName = name || 'anonymous';
     return `${type}_${hookName}_${timestamp}`;
   }
 
-  /**
-   * Clear all hooks and reset registry
-   */
   public reset(): void {
     this.hooks.clear();
     this.initializeHookTypes();
@@ -419,9 +344,6 @@ export class HookRegistry {
   }
 }
 
-/**
- * Hook registry statistics interface
- */
 interface HookRegistryStatistics {
   totalHooks: number;
   hooksByType: Record<string, number>;
@@ -429,14 +351,10 @@ interface HookRegistryStatistics {
   isLocked: boolean;
 }
 
-/**
- * Validation result interface
- */
 interface ValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
 }
 
-// Export singleton instance
 export const hookRegistry = HookRegistry.getInstance();

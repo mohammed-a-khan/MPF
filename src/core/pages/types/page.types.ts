@@ -1,10 +1,8 @@
 import { Page } from 'playwright';
 import { CSBasePage } from '../CSBasePage';
 
-// LoadState type definition
 export type LoadState = 'load' | 'domcontentloaded' | 'networkidle';
 
-// Page creation and management
 export interface PageCreationOptions {
     useCache?: boolean;
     cacheTTL?: number;
@@ -20,7 +18,6 @@ export interface PageCacheEntry {
     expiresAt: number | null;
 }
 
-// Page registration
 export interface PageRegistration {
     name: string;
     pageClass: typeof CSBasePage;
@@ -41,7 +38,6 @@ export interface PageRegistryStats {
     }>;
 }
 
-// Page context and state
 export interface PageState {
     url: string;
     data: Map<string, any>;
@@ -85,7 +81,6 @@ export interface ContextData {
     [key: string]: any;
 }
 
-// Validation
 export interface ValidationError {
     field: string;
     message: string;
@@ -93,14 +88,12 @@ export interface ValidationError {
     details?: any;
 }
 
-// Wait options
 export interface WaitOptions {
     timeout?: number;
     state?: 'attached' | 'detached' | 'visible' | 'hidden';
     waitUntil?: LoadState;
 }
 
-// Popup management
 export interface PopupInfo {
     id: string;
     page: Page;
@@ -115,7 +108,6 @@ export interface PopupOptions {
     maxPopups?: number;
 }
 
-// Dialog handling
 export interface DialogHandler {
     type: DialogType;
     action: DialogAction;
@@ -126,7 +118,6 @@ export interface DialogHandler {
 export type DialogType = 'alert' | 'confirm' | 'prompt' | 'beforeunload';
 export type DialogAction = 'accept' | 'dismiss';
 
-// Frame management
 export interface FrameTree {
     url: string;
     name: string;
@@ -143,21 +134,18 @@ export interface FrameInfo {
     depth: number;
 }
 
-// Page navigation
 export interface NavigationOptions {
     timeout?: number;
     waitUntil?: 'load' | 'domcontentloaded' | 'networkidle' | 'commit';
     referer?: string;
 }
 
-// Page events
 export interface PageEvent {
     type: 'navigation' | 'load' | 'error' | 'console' | 'dialog' | 'download' | 'popup';
     timestamp: Date;
     details: any;
 }
 
-// Page performance
 export interface PagePerformanceMetrics {
     navigation: {
         loadEventEnd: number;
@@ -186,7 +174,6 @@ export interface PagePerformanceMetrics {
     }>;
 }
 
-// Page screenshot options
 export interface PageScreenshotOptions {
     fullPage?: boolean;
     clip?: {
@@ -195,7 +182,7 @@ export interface PageScreenshotOptions {
         width: number;
         height: number;
     };
-    quality?: number;  // For JPEG
+    quality?: number;
     type?: 'png' | 'jpeg';
     omitBackground?: boolean;
     animations?: 'disabled' | 'allow';
@@ -203,7 +190,6 @@ export interface PageScreenshotOptions {
     scale?: 'css' | 'device';
 }
 
-// Page PDF options
 export interface PagePDFOptions {
     path?: string;
     scale?: number;
@@ -225,7 +211,6 @@ export interface PagePDFOptions {
     preferCSSPageSize?: boolean;
 }
 
-// Page interaction options
 export interface PageClickOptions {
     button?: 'left' | 'right' | 'middle';
     clickCount?: number;
@@ -238,7 +223,6 @@ export interface PageClickOptions {
     timeout?: number;
 }
 
-// Page lifecycle
 export interface PageLifecycle {
     created: Date;
     initialized?: Date;
@@ -249,7 +233,6 @@ export interface PageLifecycle {
     navigations: number;
 }
 
-// Page metadata
 export interface PageMetadata {
     title?: string;
     description?: string;
@@ -262,7 +245,6 @@ export interface PageMetadata {
     ogImage?: string;
 }
 
-// Page accessibility
 export interface PageAccessibilitySnapshot {
     role: string;
     name: string;
@@ -291,7 +273,6 @@ export interface PageAccessibilitySnapshot {
     orientation?: string;
 }
 
-// Page coverage
 export interface PageCoverage {
     js: Array<{
         url: string;
@@ -311,7 +292,6 @@ export interface PageCoverage {
     }>;
 }
 
-// Page resource
 export interface PageResource {
     url: string;
     type: 'document' | 'stylesheet' | 'image' | 'media' | 'font' | 'script' | 'texttrack' | 'xhr' | 'fetch' | 'eventsource' | 'websocket' | 'manifest' | 'other';

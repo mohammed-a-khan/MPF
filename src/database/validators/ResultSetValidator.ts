@@ -11,9 +11,6 @@ export class ResultSetValidator {
         this.dataTypeValidator = new DataTypeValidator();
     }
 
-    /**
-     * Validate row count
-     */
     validateRowCount(result: QueryResult, expected: number): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -44,9 +41,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate row count range
-     */
     validateRowCountRange(result: QueryResult, min: number, max: number): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -78,9 +72,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate specific cell value
-     */
     validateCellValue(
         result: QueryResult, 
         row: number, 
@@ -91,7 +82,6 @@ export class ResultSetValidator {
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logValidation('cellValue', expected, null, true, { row, column, expected });
 
-        // Validate row exists
         if (row < 0 || row >= result.rowCount) {
             return {
                 passed: false,
@@ -102,11 +92,9 @@ export class ResultSetValidator {
             };
         }
 
-        // Get actual value
         const rowData = result.rows[row];
         const actual = rowData[column];
 
-        // Validate column exists
         if (actual === undefined && !rowData.hasOwnProperty(column)) {
             return {
                 passed: false,
@@ -123,7 +111,6 @@ export class ResultSetValidator {
             };
         }
 
-        // Compare values
         const passed = this.compareValues(actual, expected);
         const details = {
             row,
@@ -151,9 +138,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate column values
-     */
     validateColumnValues(
         result: QueryResult,
         column: string,
@@ -163,7 +147,6 @@ export class ResultSetValidator {
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logValidation('columnValues', rule.type, column, true, { column, rule: rule.type });
 
-        // Check if column exists
         if (result.rows.length > 0 && !result.rows[0].hasOwnProperty(column)) {
             return {
                 passed: false,
@@ -178,10 +161,8 @@ export class ResultSetValidator {
             };
         }
 
-        // Extract column values
         const values = result.rows.map(row => row[column]);
 
-        // Apply validation rule
         let passed = true;
         let failedRows: number[] = [];
         let message = '';
@@ -342,9 +323,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate entire result set against schema
-     */
     validateResultSchema(
         result: QueryResult,
         expectedSchema: Array<{ name: string; dataType: string; nullable?: boolean }>
@@ -356,13 +334,11 @@ export class ResultSetValidator {
         let passed = true;
         const issues: string[] = [];
 
-        // Check field count
         if (result.fields.length !== expectedSchema.length) {
             passed = false;
             issues.push(`Field count mismatch. Expected: ${expectedSchema.length}, Actual: ${result.fields.length}`);
         }
 
-        // Check each field
         expectedSchema.forEach((expectedField) => {
             const actualField = result.fields.find(f => f.name === expectedField.name);
             
@@ -370,7 +346,6 @@ export class ResultSetValidator {
                 passed = false;
                 issues.push(`Missing field: ${expectedField.name}`);
             } else {
-                // Check data type if specified
                 if (expectedField.dataType && actualField.dataType !== expectedField.dataType) {
                     passed = false;
                     issues.push(`Field '${expectedField.name}' type mismatch. Expected: ${expectedField.dataType}, Actual: ${actualField.dataType}`);
@@ -378,7 +353,6 @@ export class ResultSetValidator {
             }
         });
 
-        // Check for unexpected fields
         result.fields.forEach(actualField => {
             if (!expectedSchema.find(f => f.name === actualField.name)) {
                 passed = false;
@@ -410,9 +384,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate aggregate functions
-     */
     validateAggregate(
         result: QueryResult,
         column: string,
@@ -423,7 +394,6 @@ export class ResultSetValidator {
         const actionLogger = ActionLogger.getInstance();
         actionLogger.logValidation('aggregate', aggregateType, expected, true, { column, aggregateType, expected });
 
-        // Extract column values
         const values = result.rows
             .map(row => row[column])
             .filter(val => val !== null && val !== undefined)
@@ -449,7 +419,7 @@ export class ResultSetValidator {
                 break;
         }
 
-        const passed = Math.abs(actual - expected) < 0.0001; // Floating point comparison
+        const passed = Math.abs(actual - expected) < 0.0001;
         const details = {
             column,
             aggregateType,
@@ -477,9 +447,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate relationships between columns
-     */
     validateRelationship(
         result: QueryResult,
         column1: string,
@@ -557,9 +524,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate result against custom function
-     */
     validateCustom(
         result: QueryResult,
         validator: (result: QueryResult) => boolean,
@@ -603,9 +567,6 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    /**
-     * Validate multiple rules and return combined result
-     */
     async validateMultiple(
         _result: QueryResult,
         validations: Array<() => ValidationResult | Promise<ValidationResult>>
@@ -654,31 +615,25 @@ export class ResultSetValidator {
         return validationResult;
     }
 
-    // Private helper methods
 
     private compareValues(actual: any, expected: any): boolean {
-        // Handle null/undefined
         if (actual === null || actual === undefined) {
             return expected === null || expected === undefined;
         }
 
-        // Handle dates
         if (actual instanceof Date || expected instanceof Date) {
             return new Date(actual).getTime() === new Date(expected).getTime();
         }
 
-        // Handle numbers (with precision)
         if (typeof actual === 'number' && typeof expected === 'number') {
             return Math.abs(actual - expected) < 0.0001;
         }
 
-        // Handle arrays
         if (Array.isArray(actual) && Array.isArray(expected)) {
             if (actual.length !== expected.length) return false;
             return actual.every((val, index) => this.compareValues(val, expected[index]));
         }
 
-        // Handle objects
         if (typeof actual === 'object' && typeof expected === 'object') {
             const actualKeys = Object.keys(actual).sort();
             const expectedKeys = Object.keys(expected).sort();
@@ -686,7 +641,6 @@ export class ResultSetValidator {
             return actualKeys.every(key => this.compareValues(actual[key], expected[key]));
         }
 
-        // Default comparison
         return actual === expected;
     }
 

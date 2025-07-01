@@ -7,10 +7,6 @@ import * as xml2js from 'xml2js';
 import * as xpath from 'xpath';
 import { DOMParser } from '@xmldom/xmldom';
 
-/**
- * Parser for XML files
- * Supports XPath queries and namespace handling
- */
 export class XMLParser {
     private typeConverter: TypeConverter;
     private defaultParserOptions: xml2js.ParserOptions;
@@ -28,11 +24,9 @@ export class XMLParser {
             charkey: '_',
             valueProcessors: [
                 (value: any) => {
-                    // Try to parse numbers
                     if (/^-?\d+(\.\d+)?$/.test(value)) {
                         return parseFloat(value);
                     }
-                    // Try to parse booleans
                     if (value === 'true') return true;
                     if (value === 'false') return false;
                     return value;
@@ -41,9 +35,6 @@ export class XMLParser {
         };
     }
 
-    /**
-     * Parse XML content
-     */
     async parse(content: string, options: ParserOptions = {}): Promise<{
         data: any;
         metadata?: Record<string, any>;
@@ -51,7 +42,6 @@ export class XMLParser {
         const startTime = Date.now();
         
         try {
-            // Configure parser
             const parserOptions: xml2js.ParserOptions = {
                 ...this.defaultParserOptions,
                 attrkey: options.attributePrefix || this.defaultParserOptions.attrkey,
@@ -63,23 +53,19 @@ export class XMLParser {
                 preserveChildrenOrder: true
             };
             
-            // Parse XML
             const parser = new xml2js.Parser(parserOptions);
             let parsed = await parser.parseStringPromise(content);
             
-            // Apply XPath if specified
             let data = parsed;
             if (options.xmlPath) {
                 data = this.queryXPath(content, options.xmlPath, options.namespaces);
             }
             
-            // Normalize data structure
             const parseOptions = options as any;
             if (parseOptions.normalize !== false) {
                 data = this.normalizeData(data, options);
             }
             
-            // Convert types if requested
             if (parseOptions.parseNumbers || parseOptions.parseDates) {
                 data = await this.convertTypes(data, options);
             }
@@ -108,21 +94,16 @@ export class XMLParser {
         }
     }
 
-    /**
-     * Query XML using XPath
-     */
     private queryXPath(content: string, xpathQuery: string, namespaces?: Record<string, string>): any[] {
         try {
             const doc = new DOMParser().parseFromString(content, 'text/xml');
             
-            // Check for parse errors
             const parseError = doc.getElementsByTagName('parsererror');
             if (parseError.length > 0) {
                 const errorNode = parseError[0];
                 throw new Error(`XML parsing error: ${errorNode?.textContent || 'Unknown error'}`);
             }
             
-            // Execute XPath query with namespace support
             let nodes: xpath.SelectReturnType;
             if (namespaces) {
                 const select = xpath.useNamespaces(namespaces);
@@ -131,7 +112,6 @@ export class XMLParser {
                 nodes = xpath.select(xpathQuery, doc as any);
             }
             
-            // Convert nodes to objects
             const results: any[] = [];
             
             if (Array.isArray(nodes)) {
@@ -157,13 +137,9 @@ export class XMLParser {
         }
     }
 
-    /**
-     * Convert DOM node to object
-     */
     private nodeToObject(node: any): any {
         const obj: any = {};
         
-        // Add attributes
         if (node.attributes && node.attributes.length > 0) {
             for (let i = 0; i < node.attributes.length; i++) {
                 const attr = node.attributes[i];
@@ -173,18 +149,16 @@ export class XMLParser {
             }
         }
         
-        // Process child nodes
         let textContent = '';
         
         for (let i = 0; i < node.childNodes.length; i++) {
             const child = node.childNodes[i];
             
-            if (child.nodeType === 1) { // Element node
+            if (child.nodeType === 1) {
                 const childObj = this.nodeToObject(child as Element);
                 const tagName = (child as Element).tagName;
                 
                 if (obj[tagName]) {
-                    // Multiple children with same tag
                     if (!Array.isArray(obj[tagName])) {
                         obj[tagName] = [obj[tagName]];
                     }
@@ -192,7 +166,7 @@ export class XMLParser {
                 } else {
                     obj[tagName] = childObj;
                 }
-            } else if (child.nodeType === 3) { // Text node
+            } else if (child.nodeType === 3) {
                 const text = child.nodeValue?.trim();
                 if (text) {
                     textContent += text;
@@ -200,9 +174,8 @@ export class XMLParser {
             }
         }
         
-        // Add text content
         if (textContent && Object.keys(obj).filter(k => !k.startsWith('@')).length === 0) {
-            return textContent; // Pure text node
+            return textContent;
         } else if (textContent) {
             obj['#text'] = textContent;
         }
@@ -210,15 +183,11 @@ export class XMLParser {
         return obj;
     }
 
-    /**
-     * Parse XSD schema
-     */
     async parseXSD(content: string): Promise<DataSchema> {
         try {
             const parser = new xml2js.Parser(this.defaultParserOptions);
             const xsd = await parser.parseStringPromise(content);
             
-            // Extract schema information
             const schema = xsd['xs:schema'] || xsd['xsd:schema'] || xsd.schema;
             if (!schema) {
                 throw new Error('Invalid XSD: No schema element found');
@@ -226,7 +195,6 @@ export class XMLParser {
             
             const fields: any[] = [];
             
-            // Process elements
             const elements = schema['xs:element'] || schema['xsd:element'] || schema.element || [];
             const elementsArray = Array.isArray(elements) ? elements : [elements];
             
@@ -237,7 +205,6 @@ export class XMLParser {
                 }
             }
             
-            // Process complex types
             const complexTypes = schema['xs:complexType'] || schema['xsd:complexType'] || schema.complexType || [];
             const typesArray = Array.isArray(complexTypes) ? complexTypes : [complexTypes];
             
@@ -257,9 +224,6 @@ export class XMLParser {
         }
     }
 
-    /**
-     * Parse XSD element
-     */
     private parseXSDElement(element: any): any {
         const field: any = {
             name: element.$.name,
@@ -268,7 +232,6 @@ export class XMLParser {
             maxOccurs: element.$.maxOccurs
         };
         
-        // Handle restrictions
         if (element['xs:simpleType'] || element['xsd:simpleType']) {
             const simpleType = element['xs:simpleType'] || element['xsd:simpleType'];
             const restriction = simpleType['xs:restriction'] || simpleType['xsd:restriction'];
@@ -295,14 +258,10 @@ export class XMLParser {
         return field;
     }
 
-    /**
-     * Parse XSD complex type
-     */
     private parseXSDComplexType(complexType: any): any[] {
         const fields: any[] = [];
         const typeName = complexType.$.name;
         
-        // Process sequence
         const sequence = complexType['xs:sequence'] || complexType['xsd:sequence'];
         if (sequence) {
             const elements = sequence['xs:element'] || sequence['xsd:element'] || [];
@@ -317,7 +276,6 @@ export class XMLParser {
             }
         }
         
-        // Process attributes
         const attributes = complexType['xs:attribute'] || complexType['xsd:attribute'] || [];
         const attributesArray = Array.isArray(attributes) ? attributes : [attributes];
         
@@ -333,9 +291,6 @@ export class XMLParser {
         return fields;
     }
 
-    /**
-     * Map XSD type to data type
-     */
     private mapXSDType(xsdType: string): string {
         if (!xsdType) return 'string';
         
@@ -364,9 +319,6 @@ export class XMLParser {
         return typeMap[xsdType] || 'string';
     }
 
-    /**
-     * Get metadata from XML
-     */
     async getMetadata(content: string): Promise<Record<string, any>> {
         try {
             const doc = new DOMParser().parseFromString(content, 'text/xml');
@@ -394,9 +346,6 @@ export class XMLParser {
         }
     }
 
-    /**
-     * Infer schema from XML data
-     */
     async inferSchema(data: any[], options: {
         sampleSize?: number;
         detectTypes?: boolean;
@@ -405,7 +354,6 @@ export class XMLParser {
         const sample = data.slice(0, options.sampleSize || Math.min(100, data.length));
         const fieldAnalysis = new Map<string, any>();
         
-        // Analyze structure
         const analyzeObject = (obj: any, path: string[] = []) => {
             if (typeof obj !== 'object' || obj === null) return;
             
@@ -445,16 +393,13 @@ export class XMLParser {
             }
         };
         
-        // Analyze all samples
         for (const item of sample) {
             analyzeObject(item);
         }
         
-        // Build schema
         const fields: any[] = [];
         
         for (const [fieldPath, analysis] of fieldAnalysis.entries()) {
-            // Skip nested fields
             if (fieldPath.includes('.') && !fieldPath.endsWith('[]')) continue;
             
             const field: any = {
@@ -471,7 +416,6 @@ export class XMLParser {
                 field.xmlText = true;
             }
             
-            // Add enum for limited values
             if (analysis.values.size <= 10 && analysis.values.size > 1) {
                 field.enum = Array.from(analysis.values);
             }
@@ -485,9 +429,6 @@ export class XMLParser {
         };
     }
 
-    /**
-     * Normalize XML data structure
-     */
     private normalizeData(data: any, options: ParserOptions): any {
         if (Array.isArray(data)) {
             return data.map(item => this.normalizeData(item, options));
@@ -495,7 +436,6 @@ export class XMLParser {
             const normalized: any = {};
             
             for (const [key, value] of Object.entries(data)) {
-                // Flatten single-child arrays
                 if (Array.isArray(value) && value.length === 1) {
                     normalized[key] = this.normalizeData(value[0], options);
                 } else {
@@ -503,17 +443,14 @@ export class XMLParser {
                 }
             }
             
-            // Extract text content for simple elements
             const keys = Object.keys(normalized);
             const nonAttrKeys = keys.filter(k => !k.startsWith('@'));
             
             if (nonAttrKeys.length === 1 && (nonAttrKeys[0] === '_' || nonAttrKeys[0] === '#text')) {
-                // Element with attributes and text
                 if (keys.length > 1) {
                     normalized.value = normalized[nonAttrKeys[0]];
                     delete normalized[nonAttrKeys[0]];
                 } else {
-                    // Pure text element
                     return normalized[nonAttrKeys[0]];
                 }
             }
@@ -524,9 +461,6 @@ export class XMLParser {
         return data;
     }
 
-    /**
-     * Convert types in XML data
-     */
     private async convertTypes(data: any, options: ParserOptions): Promise<any> {
         if (data === null || data === undefined) {
             return data;
@@ -549,9 +483,6 @@ export class XMLParser {
         }
     }
 
-    /**
-     * Get root element name
-     */
     private getRootElement(parsed: any): string {
         if (typeof parsed === 'object' && parsed !== null) {
             const keys = Object.keys(parsed);
@@ -562,9 +493,6 @@ export class XMLParser {
         return 'root';
     }
 
-    /**
-     * Extract namespaces from XML
-     */
     private extractNamespaces(content: string): Record<string, string> {
         const namespaces: Record<string, string> = {};
         const regex = /xmlns:?([^=]*)="([^"]+)"/g;
@@ -578,25 +506,16 @@ export class XMLParser {
         return namespaces;
     }
 
-    /**
-     * Get XML encoding
-     */
     private getXMLEncoding(content: string): string {
         const match = content.match(/<\?xml[^>]+encoding=["']([^"']+)["']/i);
         return match ? match[1] || 'UTF-8' : 'UTF-8';
     }
 
-    /**
-     * Get XML version
-     */
     private getXMLVersion(content: string): string {
         const match = content.match(/<\?xml[^>]+version=["']([^"']+)["']/i);
         return match ? match[1] || '1.0' : '1.0';
     }
 
-    /**
-     * Check if element has attributes
-     */
     private hasAttributes(element: any): boolean {
         if (element.attributes && element.attributes.length > 0) {
             return true;
@@ -612,9 +531,6 @@ export class XMLParser {
         return false;
     }
 
-    /**
-     * Consolidate types
-     */
     private consolidateTypes(types: string[]): string {
         if (types.length === 0) return 'string';
         if (types.length === 1) return types[0] || 'string';
@@ -625,9 +541,6 @@ export class XMLParser {
         return 'string';
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, operation: string): Error {
         const message = error instanceof Error ? error.message : String(error);
         const enhancedError = new Error(

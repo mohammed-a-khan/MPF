@@ -1,11 +1,3 @@
-/**
- * CS Test Automation Framework - File Utilities
- * 
- * Comprehensive file operations with async/sync methods, streaming,
- * watching, and advanced file manipulation capabilities
- * 
- * FULL PRODUCTION IMPLEMENTATION - NO EXTERNAL DEPENDENCIES
- */
 
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
@@ -19,7 +11,7 @@ import { promisify } from 'util';
 const pipelineAsync = promisify(pipeline);
 
 export interface FileStats {
-  [key: string]: any; // Allow additional properties
+  [key: string]: any;
   size: number;
   isFile: boolean;
   isDirectory: boolean;
@@ -33,7 +25,7 @@ export interface FileStats {
 }
 
 export interface CopyOptions {
-  [key: string]: any; // Allow additional properties
+  [key: string]: any;
   overwrite?: boolean;
   preserveTimestamps?: boolean;
   filter?: (src: string, dest: string) => boolean | Promise<boolean>;
@@ -43,7 +35,7 @@ export interface CopyOptions {
 }
 
 export interface WalkOptions {
-  [key: string]: any; // Allow additional properties
+  [key: string]: any;
   maxDepth?: number;
   followSymlinks?: boolean;
   filter?: (path: string, stats: FileStats) => boolean;
@@ -51,7 +43,7 @@ export interface WalkOptions {
 }
 
 export interface WatchOptions {
-  [key: string]: any; // Allow additional properties
+  [key: string]: any;
   persistent?: boolean;
   recursive?: boolean;
   encoding?: BufferEncoding;
@@ -60,14 +52,14 @@ export interface WatchOptions {
 }
 
 export interface CompareOptions {
-  [key: string]: any; // Allow additional properties
+  [key: string]: any;
   checksum?: boolean;
   metadata?: boolean;
   content?: boolean;
 }
 
 export interface TarHeader {
-  [key: string]: any; // Allow additional properties
+  [key: string]: any;
   name: string;
   mode: number;
   uid: number;
@@ -87,7 +79,6 @@ export interface TarHeader {
 }
 
 export class FileUtils {
-  // File existence checks
   public static async exists(filePath: string): Promise<boolean> {
     try {
       await fsp.access(filePath);
@@ -106,7 +97,6 @@ export class FileUtils {
     }
   }
 
-  // Read operations
   public static async readFile(filePath: string, encoding?: BufferEncoding): Promise<string | Buffer> {
     return encoding
       ? await fsp.readFile(filePath, encoding)
@@ -164,7 +154,6 @@ export class FileUtils {
     }
   }
 
-  // Write operations
   public static async writeFile(
     filePath: string,
     data: string | Buffer | Uint8Array,
@@ -219,7 +208,6 @@ export class FileUtils {
     fs.appendFileSync(filePath, data, options);
   }
 
-  // Directory operations
   public static async createDir(dirPath: string): Promise<void> {
     await fsp.mkdir(dirPath, { recursive: true });
   }
@@ -259,7 +247,6 @@ export class FileUtils {
     return results;
   }
 
-  // Copy operations
   public static async copy(src: string, dest: string, options: CopyOptions = {}): Promise<void> {
     const {
       overwrite = true,
@@ -269,14 +256,12 @@ export class FileUtils {
       recursive = true
     } = options;
 
-    // Check filter
     if (filter && !await filter(src, dest)) {
       return;
     }
 
     const srcStats = await this.getStats(src, { followSymlinks: dereference });
 
-    // Handle existing destination
     if (await this.exists(dest)) {
       if (errorOnExist) {
         throw new Error(`Destination already exists: ${dest}`);
@@ -301,9 +286,8 @@ export class FileUtils {
   private static async copyFile(src: string, dest: string, options: CopyOptions): Promise<void> {
     await this.ensureDir(path.dirname(dest));
 
-    // Use streams for large files
     const srcStats = await fsp.stat(src);
-    if (srcStats.size > 64 * 1024 * 1024) { // 64MB
+    if (srcStats.size > 64 * 1024 * 1024) {
       await this.copyFileStream(src, dest);
     } else {
       await fsp.copyFile(src, dest);
@@ -352,7 +336,6 @@ export class FileUtils {
     await fsp.symlink(linkTarget, dest);
   }
 
-  // Move operations
   public static async move(src: string, dest: string, options: { overwrite?: boolean } = {}): Promise<void> {
     const { overwrite = true } = options;
 
@@ -366,10 +349,8 @@ export class FileUtils {
     await this.ensureDir(path.dirname(dest));
 
     try {
-      // Try rename first (fastest)
       await fsp.rename(src, dest);
     } catch (error: any) {
-      // If rename fails (e.g, across devices), copy then delete
       if (error.code === 'EXDEV') {
         await this.copy(src, dest);
         await this.remove(src);
@@ -379,7 +360,6 @@ export class FileUtils {
     }
   }
 
-  // Delete operations
   public static async remove(pathToRemove: string): Promise<void> {
     if (!await this.exists(pathToRemove)) {
       return;
@@ -418,7 +398,6 @@ export class FileUtils {
     );
   }
 
-  // Stats operations
   public static async getStats(filePath: string, options?: { followSymlinks?: boolean }): Promise<FileStats> {
     const stats = options?.followSymlinks
       ? await fsp.stat(filePath)
@@ -457,7 +436,6 @@ export class FileUtils {
     };
   }
 
-  // File comparison
   public static async compare(file1: string, file2: string, options: CompareOptions = {}): Promise<boolean> {
     const {
       checksum = true,
@@ -465,7 +443,6 @@ export class FileUtils {
       content = true
     } = options;
 
-    // Check existence
     const [exists1, exists2] = await Promise.all([
       this.exists(file1),
       this.exists(file2)
@@ -475,18 +452,15 @@ export class FileUtils {
       return false;
     }
 
-    // Check stats
     const [stats1, stats2] = await Promise.all([
       this.getStats(file1),
       this.getStats(file2)
     ]);
 
-    // Quick size check
     if (stats1.size !== stats2.size) {
       return false;
     }
 
-    // Metadata comparison
     if (metadata) {
       if (stats1.mode !== stats2.mode ||
           stats1.uid !== stats2.uid ||
@@ -495,7 +469,6 @@ export class FileUtils {
       }
     }
 
-    // Content comparison
     if (content) {
       if (checksum) {
         const [hash1, hash2] = await Promise.all([
@@ -549,7 +522,6 @@ export class FileUtils {
     });
   }
 
-  // Checksum operations
   public static async getChecksum(filePath: string, algorithm: string = 'sha256'): Promise<string> {
     return new Promise((resolve, reject) => {
       const hash = crypto.createHash(algorithm);
@@ -570,7 +542,6 @@ export class FileUtils {
     return actualChecksum === expectedChecksum;
   }
 
-  // Walk directory tree
   public static async *walk(
     dirPath: string,
     options: WalkOptions = {}
@@ -594,7 +565,6 @@ export class FileUtils {
       for (const entry of entries) {
         const fullPath = path.join(currentPath, entry);
 
-        // Check exclusions
         if (Array.isArray(exclude)) {
           const shouldExclude = exclude.some(pattern => {
             if (typeof pattern === 'string') {
@@ -617,19 +587,16 @@ export class FileUtils {
         try {
           const stats = await FileUtils.getStats(fullPath, { followSymlinks });
 
-          // Apply filter
           if (filter && !filter(fullPath, stats)) {
             continue;
           }
 
           yield { path: fullPath, stats, depth };
 
-          // Recurse into directories
           if (stats.isDirectory) {
             yield* walkRecursive(fullPath, depth + 1);
           }
         } catch (error: any) {
-          // Skip inaccessible files
           console.warn(`Cannot access ${fullPath}: ${error.message}`);
         }
       }
@@ -638,7 +605,6 @@ export class FileUtils {
     yield* walkRecursive(dirPath, 0);
   }
 
-  // Find files
   public static async find(
     dirPath: string,
     pattern: string | RegExp,
@@ -656,7 +622,6 @@ export class FileUtils {
     return matches;
   }
 
-  // Watch operations
   public static watch(
     pathToWatch: string,
     callback: (event: 'add' | 'change' | 'delete', filePath: string) => void,
@@ -682,7 +647,6 @@ export class FileUtils {
 
       const fullPath = path.join(pathToWatch, filename as string);
 
-      // Debounce events
       if (timeouts.has(fullPath)) {
         clearTimeout(timeouts.get(fullPath)!);
       }
@@ -690,7 +654,6 @@ export class FileUtils {
       timeouts.set(fullPath, setTimeout(() => {
         timeouts.delete(fullPath);
 
-        // Determine actual event
         fs.access(fullPath, (err) => {
           if (err) {
             callback('delete', fullPath);
@@ -704,7 +667,6 @@ export class FileUtils {
     return watcher;
   }
 
-  // Compression operations
   public static async compress(
     source: string,
     destination: string,
@@ -743,7 +705,6 @@ export class FileUtils {
     let decompressor: Transform;
 
     if (format === 'auto') {
-      // Detect format from file extension
       const ext = path.extname(source).toLowerCase();
       switch (ext) {
         case '.gz':
@@ -782,7 +743,6 @@ export class FileUtils {
     await pipelineAsync(source$, decompressor, destination$);
   }
 
-  // TAR Archive operations - FULL IMPLEMENTATION
   public static async createTarArchive(
     sourceDir: string,
     archivePath: string,
@@ -790,11 +750,9 @@ export class FileUtils {
   ): Promise<void> {
     const { compress = false, format = compress ? 'tar.gz' : 'tar' } = options;
 
-    // Create TAR file
     const tarPath = format === 'tar.gz' ? archivePath.replace(/\.gz$/, '') : archivePath;
     const output = fs.createWriteStream(tarPath);
 
-    // Collect all files
     const files: Array<{ path: string; stats: FileStats; relativePath: string }> = [];
     
     for await (const { path: filePath, stats } of this.walk(sourceDir)) {
@@ -807,12 +765,10 @@ export class FileUtils {
       }
     }
 
-    // Write TAR archive
     for (const file of files) {
       await this.writeTarEntry(output, file.path, file.relativePath, file.stats);
     }
 
-    // Write end-of-archive marker (two 512-byte blocks of zeros)
     const endMarker = Buffer.alloc(1024);
     output.write(endMarker);
     
@@ -822,7 +778,6 @@ export class FileUtils {
       output.end();
     });
 
-    // Compress if requested
     if (compress || format === 'tar.gz') {
       await this.compress(tarPath, archivePath, { format: 'gzip' });
       await this.remove(tarPath);
@@ -835,60 +790,42 @@ export class FileUtils {
     entryName: string,
     stats: FileStats
   ): Promise<void> {
-    // Create TAR header (512 bytes)
     const header = Buffer.alloc(512);
     
-    // name (100 bytes)
     header.write(entryName.slice(0, 100), 0, 100);
     
-    // mode (8 bytes)
     header.write(this.padOctal(stats.mode & 0o7777, 8), 100, 8);
     
-    // uid (8 bytes)
     header.write(this.padOctal(stats.uid, 8), 108, 8);
     
-    // gid (8 bytes)
     header.write(this.padOctal(stats.gid, 8), 116, 8);
     
-    // size (12 bytes)
     header.write(this.padOctal(stats.size, 12), 124, 12);
     
-    // mtime (12 bytes)
     header.write(this.padOctal(Math.floor(stats.modifiedAt.getTime() / 1000), 12), 136, 12);
     
-    // checksum placeholder (8 bytes)
     header.write('        ', 148, 8);
     
-    // typeflag (1 byte) - '0' for regular file
     header.write('0', 156, 1);
     
-    // linkname (100 bytes) - empty for regular files
     
-    // magic (6 bytes)
     header.write('ustar', 257, 5);
     
-    // version (2 bytes)
     header.write('00', 263, 2);
     
-    // uname (32 bytes)
     header.write('root', 265, 32);
     
-    // gname (32 bytes)
     header.write('root', 297, 32);
     
-    // devmajor (8 bytes)
     header.write(this.padOctal(0, 8), 329, 8);
     
-    // devminor (8 bytes)
     header.write(this.padOctal(0, 8), 337, 8);
     
-    // prefix (155 bytes) - for long filenames
     if (entryName.length > 100) {
       const prefix = entryName.slice(0, 155);
       header.write(prefix, 345, 155);
     }
     
-    // Calculate checksum
     let checksum = 0;
     for (let i = 0; i < 512; i++) {
       const byte = header[i];
@@ -897,17 +834,13 @@ export class FileUtils {
       }
     }
     
-    // Write checksum
     header.write(this.padOctal(checksum, 7) + '\0', 148, 8);
     
-    // Write header
     output.write(header);
     
-    // Write file content
     const fileContent = await this.readFile(filePath);
     output.write(fileContent);
     
-    // Pad to 512-byte boundary
     const padding = 512 - (stats.size % 512);
     if (padding < 512) {
       output.write(Buffer.alloc(padding));
@@ -927,13 +860,11 @@ export class FileUtils {
 
     let tarPath = archivePath;
     
-    // Decompress if needed
     if (decompress) {
       tarPath = archivePath.replace(/\.gz$/, '');
       await this.decompress(archivePath, tarPath);
     }
 
-    // Read TAR file
     const tarContent = await this.readFile(tarPath);
     if (typeof tarContent === 'string') {
       throw new Error('TAR content must be a Buffer');
@@ -942,15 +873,12 @@ export class FileUtils {
     let offset = 0;
 
     while (offset < tarContent.length - 1024) {
-      // Read header
       const header = tarContent.slice(offset, offset + 512);
       
-      // Check for end-of-archive
       if (header.every((byte: number) => byte === 0)) {
         break;
       }
 
-      // Parse header
       const name = this.parseString(header, 0, 100);
       const mode = this.parseOctal(header, 100, 8);
       const size = this.parseOctal(header, 124, 12);
@@ -958,28 +886,23 @@ export class FileUtils {
 
       if (!name) break;
 
-      // Skip to file content
       offset += 512;
 
       if (type === '0' || type === '\0') {
-        // Regular file
         const filePath = path.join(destinationDir, name);
         const fileContent = tarContent.slice(offset, offset + size);
         
         await this.ensureDir(path.dirname(filePath));
         await this.writeFile(filePath, fileContent);
         
-        // Set permissions
         if (mode) {
           await this.chmod(filePath, mode);
         }
       }
 
-      // Move to next entry (align to 512-byte boundary)
       offset += Math.ceil(size / 512) * 512;
     }
 
-    // Clean up temporary file
     if (decompress && tarPath !== archivePath) {
       await this.remove(tarPath);
     }
@@ -996,7 +919,6 @@ export class FileUtils {
     return parseInt(str, 8) || 0;
   }
 
-  // ZIP Archive operations - FULL IMPLEMENTATION
   public static async createZipArchive(
     sourceDir: string,
     archivePath: string,
@@ -1010,7 +932,6 @@ export class FileUtils {
       relativePath: string;
     }> = [];
 
-    // Collect all files
     for await (const { path: filePath, stats } of this.walk(sourceDir)) {
       if (stats.isFile) {
         files.push({
@@ -1025,7 +946,6 @@ export class FileUtils {
     const centralDirectory: Buffer[] = [];
     let offset = 0;
 
-    // Write file entries
     for (const file of files) {
       const result = await this.writeZipEntry(
         output,
@@ -1040,14 +960,12 @@ export class FileUtils {
       offset = result.nextOffset;
     }
 
-    // Write central directory
     const centralDirStart = offset;
     for (const entry of centralDirectory) {
       output.write(entry);
       offset += entry.length;
     }
 
-    // Write end of central directory
     const endRecord = this.createEndOfCentralDirectory(
       centralDirectory.length,
       offset - centralDirStart,
@@ -1075,53 +993,39 @@ export class FileUtils {
     
     const useCompression = compressed.length < (fileContent as Buffer).length;
     const data = useCompression ? compressed : fileContent;
-    const method = useCompression ? 8 : 0; // 8 = deflate, 0 = store
+    const method = useCompression ? 8 : 0;
 
-    // Local file header
     const header = Buffer.alloc(30 + entryName.length);
     let pos = 0;
 
-    // Signature
     header.writeUInt32LE(0x04034b50, pos); pos += 4;
     
-    // Version needed
     header.writeUInt16LE(20, pos); pos += 2;
     
-    // Flags
     header.writeUInt16LE(0, pos); pos += 2;
     
-    // Compression method
     header.writeUInt16LE(method, pos); pos += 2;
     
-    // Modification time/date
     const dosTime = this.toDosTime(stats.modifiedAt);
     header.writeUInt16LE(dosTime.time, pos); pos += 2;
     header.writeUInt16LE(dosTime.date, pos); pos += 2;
     
-    // CRC32
     const crc = this.crc32(fileContent as Buffer);
     header.writeUInt32LE(crc, pos); pos += 4;
     
-    // Compressed size
     header.writeUInt32LE(data.length, pos); pos += 4;
     
-    // Uncompressed size
     header.writeUInt32LE((fileContent as Buffer).length, pos); pos += 4;
     
-    // Filename length
     header.writeUInt16LE(entryName.length, pos); pos += 2;
     
-    // Extra field length
     header.writeUInt16LE(0, pos); pos += 2;
     
-    // Filename
     header.write(entryName, pos);
 
-    // Write local header and data
     output.write(header);
     output.write(data);
 
-    // Create central directory entry
     const centralDirEntry = this.createCentralDirectoryEntry(
       entryName,
       method,
@@ -1152,52 +1056,37 @@ export class FileUtils {
     const entry = Buffer.alloc(46 + filename.length);
     let pos = 0;
 
-    // Signature
     entry.writeUInt32LE(0x02014b50, pos); pos += 4;
     
-    // Version made by
-    entry.writeUInt16LE(0x031e, pos); pos += 2; // Unix, version 3.0
+    entry.writeUInt16LE(0x031e, pos); pos += 2;
     
-    // Version needed
     entry.writeUInt16LE(20, pos); pos += 2;
     
-    // Flags
     entry.writeUInt16LE(0, pos); pos += 2;
     
-    // Method
     entry.writeUInt16LE(method, pos); pos += 2;
     
-    // Time/date
     entry.writeUInt16LE(dosTime.time, pos); pos += 2;
     entry.writeUInt16LE(dosTime.date, pos); pos += 2;
     
-    // CRC
     entry.writeUInt32LE(crc, pos); pos += 4;
     
-    // Sizes
     entry.writeUInt32LE(compressedSize, pos); pos += 4;
     entry.writeUInt32LE(uncompressedSize, pos); pos += 4;
     
-    // Filename length
     entry.writeUInt16LE(filename.length, pos); pos += 2;
     
-    // Extra/comment lengths
-    entry.writeUInt16LE(0, pos); pos += 2; // Extra
-    entry.writeUInt16LE(0, pos); pos += 2; // Comment
-    
-    // Disk number
+    entry.writeUInt16LE(0, pos); pos += 2;
     entry.writeUInt16LE(0, pos); pos += 2;
     
-    // Internal attributes
     entry.writeUInt16LE(0, pos); pos += 2;
     
-    // External attributes (Unix mode)
+    entry.writeUInt16LE(0, pos); pos += 2;
+    
     entry.writeUInt32LE((mode & 0xffff) << 16, pos); pos += 4;
     
-    // Offset
     entry.writeUInt32LE(offset, pos); pos += 4;
     
-    // Filename
     entry.write(filename, pos);
 
     return entry;
@@ -1211,22 +1100,17 @@ export class FileUtils {
     const record = Buffer.alloc(22);
     let pos = 0;
 
-    // Signature
     record.writeUInt32LE(0x06054b50, pos); pos += 4;
     
-    // Disk numbers
-    record.writeUInt16LE(0, pos); pos += 2; // This disk
-    record.writeUInt16LE(0, pos); pos += 2; // Central dir disk
+    record.writeUInt16LE(0, pos); pos += 2;
+    record.writeUInt16LE(0, pos); pos += 2;
     
-    // Entry counts
-    record.writeUInt16LE(entryCount, pos); pos += 2; // Entries on disk
-    record.writeUInt16LE(entryCount, pos); pos += 2; // Total entries
+    record.writeUInt16LE(entryCount, pos); pos += 2;
+    record.writeUInt16LE(entryCount, pos); pos += 2;
     
-    // Central directory size and offset
     record.writeUInt32LE(centralDirSize, pos); pos += 4;
     record.writeUInt32LE(centralDirOffset, pos); pos += 4;
     
-    // Comment length
     record.writeUInt16LE(0, pos);
 
     return record;
@@ -1300,19 +1184,15 @@ export class FileUtils {
 
     for (const entry of entries) {
       if (entry.filename.endsWith('/')) {
-        // Directory
         await this.ensureDir(path.join(destinationDir, entry.filename));
       } else {
-        // File
         const filePath = path.join(destinationDir, entry.filename);
         await this.ensureDir(path.dirname(filePath));
 
-        // Read local header
         const localHeader = this.readZipLocalHeader(zipContent as Buffer, entry.offset);
         const dataStart = entry.offset + 30 + localHeader.filenameLength + localHeader.extraLength;
         const data = (zipContent as Buffer).slice(dataStart, dataStart + entry.compressedSize);
 
-        // Decompress if needed
         let content: Buffer;
         if (entry.method === 8) {
           content = await new Promise((resolve, reject) => {
@@ -1327,7 +1207,6 @@ export class FileUtils {
 
         await this.writeFile(filePath, content);
 
-        // Set permissions if available
         if (entry.externalAttributes) {
           const mode = (entry.externalAttributes >> 16) & 0xffff;
           if (mode) {
@@ -1348,7 +1227,6 @@ export class FileUtils {
   }> {
     const entries = [];
     
-    // Find end of central directory
     let endOffset = buffer.length - 22;
     while (endOffset >= 0) {
       if (buffer.readUInt32LE(endOffset) === 0x06054b50) {
@@ -1361,11 +1239,9 @@ export class FileUtils {
       throw new Error('Invalid ZIP file: End of central directory not found');
     }
 
-    // Read end of central directory
     const centralDirOffset = buffer.readUInt32LE(endOffset + 16);
     let offset = centralDirOffset;
 
-    // Parse central directory entries
     while (offset < endOffset) {
       if (buffer.readUInt32LE(offset) !== 0x02014b50) {
         break;
@@ -1410,7 +1286,6 @@ export class FileUtils {
     };
   }
 
-  // Permission operations
   public static async chmod(filePath: string, mode: number | string): Promise<void> {
     const numericMode = typeof mode === 'string' ? parseInt(mode, 8) : mode;
     await fsp.chmod(filePath, numericMode);
@@ -1429,7 +1304,6 @@ export class FileUtils {
     fs.chownSync(filePath, uid, gid);
   }
 
-  // Link operations
   public static async createSymlink(target: string, linkPath: string, type?: 'file' | 'dir' | 'junction'): Promise<void> {
     await this.ensureDir(path.dirname(linkPath));
     await fsp.symlink(target, linkPath, type);
@@ -1466,7 +1340,6 @@ export class FileUtils {
     return fs.realpathSync(filePath);
   }
 
-  // Temporary file operations
   public static async createTempFile(prefix: string = 'tmp', extension: string = ''): Promise<string> {
     const tmpDir = require('os').tmpdir();
     const filename = `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}${extension}`;
@@ -1517,7 +1390,6 @@ export class FileUtils {
     }
   }
 
-  // File locking (advisory locks using lock files)
   private static locks = new Map<string, { pid: number; acquired: Date }>();
 
   public static async lockFile(filePath: string, options: { timeout?: number; retryInterval?: number } = {}): Promise<() => Promise<void>> {
@@ -1527,7 +1399,6 @@ export class FileUtils {
 
     while (true) {
       try {
-        // Try to create lock file exclusively
         const fd = await new Promise<number>((resolve, reject) => {
           fs.open(lockPath, 'wx', (err, fd) => {
             if (err) reject(err);
@@ -1535,7 +1406,6 @@ export class FileUtils {
           });
         });
 
-        // Write lock info
         const lockInfo = {
           pid: process.pid,
           acquired: new Date().toISOString(),
@@ -1558,13 +1428,11 @@ export class FileUtils {
 
         this.locks.set(filePath, { pid: process.pid, acquired: new Date() });
 
-        // Return unlock function
         return async () => {
           this.locks.delete(filePath);
           try {
             await this.remove(lockPath);
           } catch {
-            // Ignore errors during unlock
           }
         };
 
@@ -1573,34 +1441,27 @@ export class FileUtils {
           throw error;
         }
 
-        // Check if lock is stale
         try {
           const lockContent = await this.readFile(lockPath, 'utf8');
           const lockInfo = JSON.parse(lockContent as string) as any;
           
-          // Check if process is still running
           try {
             process.kill(lockInfo.pid, 0);
           } catch {
-            // Process doesn't exist, remove stale lock
             await this.remove(lockPath);
             continue;
           }
         } catch {
-          // Can't read lock file, try to remove it
           try {
             await this.remove(lockPath);
           } catch {
-            // Ignore
           }
         }
 
-        // Check timeout
         if (Date.now() - startTime > timeout) {
           throw new Error(`Failed to acquire lock on ${filePath} within ${timeout}ms`);
         }
 
-        // Wait before retry
         await new Promise(resolve => setTimeout(resolve, retryInterval));
       }
     }
@@ -1610,7 +1471,6 @@ export class FileUtils {
     return this.locks.has(filePath) || this.existsSync(`${filePath}.lock`);
   }
 
-  // Stream utilities
   public static createReadStream(filePath: string, options?: Parameters<typeof fs.createReadStream>[1]): fs.ReadStream {
     return fs.createReadStream(filePath, options);
   }
@@ -1632,7 +1492,6 @@ export class FileUtils {
     }
   }
 
-  // Size utilities
   public static async getSize(filePath: string): Promise<number> {
     const stats = await this.getStats(filePath);
     
@@ -1666,7 +1525,6 @@ export class FileUtils {
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 
-  // Path utilities
   public static normalizePath(filePath: string): string {
     return path.normalize(filePath).replace(/\\/g, '/');
   }
@@ -1707,7 +1565,6 @@ export class FileUtils {
     return path.format(pathObject);
   }
 
-  // Alias methods for backward compatibility
   public static async pathExists(filePath: string): Promise<boolean> {
     return this.exists(filePath);
   }

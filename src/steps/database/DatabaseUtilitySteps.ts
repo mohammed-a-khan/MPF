@@ -117,7 +117,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
 
         try {
             const db = this.getCurrentDatabase();
-            // Get database statistics - this is a custom implementation
             const stats = await this.getDatabaseStatistics(db);
 
             console.log('\n=== Database Statistics ===');
@@ -161,7 +160,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             const resolvedPath = this.resolveOutputPath(interpolatedPath);
 
             const startTime = Date.now();
-            // Backup implementation - export all tables to SQL file
             await this.backupDatabaseToFile(db, resolvedPath);
             const duration = Date.now() - startTime;
 
@@ -234,7 +232,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             const db = this.getCurrentDatabase();
             const interpolatedTable = this.interpolateVariables(tableName);
 
-            // Execute TRUNCATE TABLE query
             await db.execute(`TRUNCATE TABLE ${interpolatedTable}`);
 
             const logger = ActionLogger.getInstance();
@@ -259,7 +256,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             const db = this.getCurrentDatabase();
             const interpolatedTable = this.interpolateVariables(tableName);
 
-            // Check if table exists and drop it
             try {
                 await db.execute(`DROP TABLE IF EXISTS ${interpolatedTable}`);
                 const logger = ActionLogger.getInstance();
@@ -267,7 +263,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
                     tableName: interpolatedTable
                 });
             } catch (e) {
-                // Table might not exist, which is fine
                 const logger = ActionLogger.getInstance();
                 logger.logDatabase('table_not_exists', '', 0, undefined, {
                     tableName: interpolatedTable
@@ -293,7 +288,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             const interpolatedTable = this.interpolateVariables(tableName);
             const interpolatedColumn = this.interpolateVariables(columnName);
 
-            // Create index using SQL
             await db.execute(`CREATE INDEX ${interpolatedIndex} ON ${interpolatedTable} (${interpolatedColumn})`);
 
             const logger = ActionLogger.getInstance();
@@ -320,7 +314,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             const db = this.getCurrentDatabase();
             const interpolatedTable = this.interpolateVariables(tableName);
 
-            // Analyze table - get table statistics
             const stats = await this.analyzeTableStats(db, interpolatedTable);
 
             console.log(`\n=== Table Analysis: ${interpolatedTable} ===`);
@@ -428,13 +421,11 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    // Helper methods
     private getCurrentDatabase(): CSDatabase {
         const adapter = this.databaseContext.getActiveAdapter();
         if (!adapter) {
             throw new Error('No database connection established. Use "Given user connects to ... database" first');
         }
-        // Return the adapter as CSDatabase instance
         return adapter as unknown as CSDatabase;
     }
 
@@ -451,12 +442,11 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
     }
 
     private resolveOutputPath(filePath: string): string {
-        // Ensure output directory exists
         const dir = './output/database/';
         FileUtils.ensureDirSync(dir);
         
         if (filePath.startsWith('/') || filePath.includes(':')) {
-            return filePath; // Absolute path
+            return filePath;
         }
         
         return `${dir}${filePath}`;
@@ -492,11 +482,9 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
     private async exportToCSV(result: ResultSet, filePath: string, delimiter: string = ','): Promise<void> {
         const lines: string[] = [];
         
-        // Header
         const headers = (result.columns || []).map(col => this.escapeCSV(col.name, delimiter));
         lines.push(headers.join(delimiter));
         
-        // Data
         for (const row of result.rows) {
             const values = (result.columns || []).map(col => {
                 const value = row[col.name];
@@ -543,8 +531,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
     }
 
     private async exportToExcel(result: ResultSet, filePath: string): Promise<void> {
-        // This would require xlsx package in real implementation
-        // For now, export as CSV with .xlsx extension
         await this.exportToCSV(result, filePath.replace('.xlsx', '.csv'));
         console.warn('Excel export currently saves as CSV format');
     }
@@ -552,7 +538,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
     private async exportToText(result: ResultSet, filePath: string): Promise<void> {
         const lines: string[] = [];
         
-        // Calculate column widths
         const widths: number[] = (result.columns || []).map(col => col.name.length);
         
         for (const row of result.rows) {
@@ -562,14 +547,12 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             });
         }
         
-        // Header
         const headerLine = (result.columns || [])
             .map((col, i) => col.name.padEnd(widths[i] || 0))
             .join(' | ');
         lines.push(headerLine);
         lines.push('-'.repeat(headerLine.length));
         
-        // Data
         for (const row of result.rows) {
             const rowLine = (result.columns || [])
                 .map((col, i) => this.formatValue(row[col.name]).padEnd(widths[i] || 0))
@@ -577,7 +560,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             lines.push(rowLine);
         }
         
-        // Footer
         lines.push('-'.repeat(headerLine.length));
         lines.push(`Total Rows: ${result.rowCount}`);
         
@@ -650,7 +632,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
         const contentStr = typeof content === 'string' ? content : content.toString();
         const parsed = JSON.parse(contentStr);
         
-        // Handle different JSON structures
         if (Array.isArray(parsed)) {
             return parsed;
         } else if (parsed.data && Array.isArray(parsed.data)) {
@@ -663,7 +644,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
     }
 
     private async parseExcel(_filePath: string): Promise<any[]> {
-        // This would require xlsx package in real implementation
         throw new Error('Excel import requires xlsx package. Please use CSV format instead');
     }
 
@@ -759,7 +739,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
     }
 
     private async getDatabaseStatistics(db: CSDatabase): Promise<any> {
-        // Custom implementation to get database statistics
         const result = await db.execute(`
             SELECT 
                 COUNT(DISTINCT table_name) as tableCount,
@@ -770,17 +749,16 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
         
         return {
             databaseName: result.rows[0]?.databaseName || 'Unknown',
-            version: '1.0.0', // Would need specific query per database type
-            size: 0, // Would need specific query per database type
+            version: '1.0.0',
+            size: 0,
             tableCount: result.rows[0]?.tableCount || 0,
-            activeConnections: 1, // Would need specific query per database type
-            uptime: Date.now(), // Would need specific query per database type
+            activeConnections: 1,
+            uptime: Date.now(),
             additionalInfo: {}
         };
     }
 
     private async backupDatabaseToFile(db: CSDatabase, filePath: string): Promise<void> {
-        // Simple backup implementation - export schema and data
         const tables = await db.execute(`
             SELECT table_name 
             FROM information_schema.tables 
@@ -793,14 +771,12 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
         for (const table of tables.rows) {
             const tableName = table.table_name;
             
-            // Get table structure
             const createTable = await db.execute(`SHOW CREATE TABLE ${tableName}`);
             if (createTable.rows.length > 0) {
                 backupContent += `\n-- Table: ${tableName}\n`;
                 backupContent += createTable.rows[0]['Create Table'] + ';\n\n';
             }
             
-            // Get table data
             const data = await db.execute(`SELECT * FROM ${tableName}`);
             if (data.rowCount > 0) {
                 backupContent += `-- Data for table ${tableName}\n`;
@@ -819,7 +795,6 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
     }
 
     private async analyzeTableStats(db: CSDatabase, tableName: string): Promise<any> {
-        // Get table statistics
         const result = await db.execute(`
             SELECT 
                 COUNT(*) as rowCount,
@@ -845,20 +820,16 @@ export class DatabaseUtilitySteps extends CSBDDBaseStepDefinition {
             return [];
         }
 
-        // If it's a simple array of values
         if (dataTable.rows.length > 0 && !dataTable.headers) {
             return dataTable.rows.map((row: any) => row[0]);
         }
 
-        // If it has headers, create objects
         const params: any[] = [];
         for (const row of dataTable.rows) {
             if (dataTable.headers && dataTable.headers.length === 2) {
-                // Key-value pairs
                 const value = this.parseValue(row[1]);
                 params.push(value);
             } else {
-                // Just values
                 params.push(...row.map((v: any) => this.parseValue(v)));
             }
         }

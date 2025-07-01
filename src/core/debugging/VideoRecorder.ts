@@ -19,10 +19,6 @@ import {
 
 const execAsync = promisify(exec);
 
-/**
- * Records test execution videos for debugging and evidence
- * Supports multiple formats and quality settings
- */
 export class VideoRecorder {
     private static instance: VideoRecorder;
     private activeRecordings: Map<string, VideoSession> = new Map();
@@ -60,19 +56,16 @@ export class VideoRecorder {
             includeAudio: ConfigurationManager.getBoolean('VIDEO_INCLUDE_AUDIO', false),
             highlightClicks: ConfigurationManager.getBoolean('VIDEO_HIGHLIGHT_CLICKS', true),
             watermark: ConfigurationManager.get('VIDEO_WATERMARK', ''),
-            maxDuration: ConfigurationManager.getInt('VIDEO_MAX_DURATION', 3600) // 1 hour
+            maxDuration: ConfigurationManager.getInt('VIDEO_MAX_DURATION', 3600)
         };
     }
     
     private async initialize(): Promise<void> {
         try {
-            // Ensure video directory exists
             await FileUtils.ensureDir(this.videoPath);
             
-            // Check if ffmpeg is available for advanced features
             await this.checkFFmpegAvailability();
             
-            // Clean old videos if needed
             if (!this.defaultOptions.preserveOutput) {
                 await this.cleanOldVideos();
             }
@@ -84,9 +77,6 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Start video recording for a page
-     */
     async startRecording(page: Page): Promise<void> {
         if (this.isRecording) {
             return;
@@ -101,9 +91,6 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Stop video recording
-     */
     async stopRecording(): Promise<string | null> {
         if (!this.isRecording || !this.currentPage) {
             return null;
@@ -120,9 +107,6 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Save current video without stopping
-     */
     async saveVideo(sessionId?: string): Promise<string> {
         const session = sessionId 
             ? this.activeRecordings.get(sessionId)
@@ -138,7 +122,6 @@ export class VideoRecorder {
             throw new Error('Video not available yet');
         }
         
-        // Create a copy of the current video
         const timestamp = DateUtils.toTimestamp(new Date());
         const checkpointPath = path.join(
             this.videoPath,
@@ -152,9 +135,6 @@ export class VideoRecorder {
         return checkpointPath;
     }
     
-    /**
-     * Attach video to test report
-     */
     async attachVideoToReport(videoPath: string): Promise<VideoAttachment> {
         try {
             const stats = await fs.promises.stat(videoPath);
@@ -177,9 +157,6 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Get active video recordings
-     */
     getActiveRecordings(): VideoInfo[] {
         return Array.from(this.activeRecordings.values()).map(session => ({
             id: session.id,
@@ -191,9 +168,6 @@ export class VideoRecorder {
         }));
     }
     
-    /**
-     * Compress video file
-     */
     async compressVideo(
         inputPath: string,
         outputPath?: string,
@@ -208,9 +182,9 @@ export class VideoRecorder {
             const output = outputPath || inputPath.replace(/\.[^.]+$/, '-compressed.$&');
             
             const crf = {
-                low: 18,    // Higher quality, larger file
-                medium: 23, // Balanced
-                high: 28    // Lower quality, smaller file
+                low: 18,
+                medium: 23,
+                high: 28
             }[compressionLevel];
             
             const command = `ffmpeg -i "${inputPath}" -c:v libx264 -crf ${crf} -preset medium -c:a copy "${output}" -y`;
@@ -230,7 +204,6 @@ export class VideoRecorder {
             
             this.logger.info(`Video compressed in ${duration}ms (${reduction}% reduction)`);
             
-            // Delete original if compressing in place
             if (!outputPath && output !== inputPath) {
                 await fs.promises.unlink(inputPath);
                 await fs.promises.rename(output, inputPath);
@@ -245,16 +218,12 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Merge multiple video files
-     */
     async mergeVideos(videoPaths: string[], outputPath: string): Promise<string> {
         try {
             if (!this.ffmpegAvailable) {
                 throw new Error('FFmpeg required for video merging');
             }
             
-            // Create file list for ffmpeg
             const listFile = path.join(this.videoPath, `merge-list-${Date.now()}.txt`);
             const fileList = videoPaths.map(p => `file '${p}'`).join('\n');
             await fs.promises.writeFile(listFile, fileList);
@@ -264,7 +233,6 @@ export class VideoRecorder {
             this.logger.info(`Merging ${videoPaths.length} videos...`);
             await execAsync(command);
             
-            // Clean up
             await fs.promises.unlink(listFile);
             
             this.logger.info(`Videos merged: ${path.basename(outputPath)}`);
@@ -277,15 +245,12 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Extract video frames
-     */
     async extractFrames(
         videoPath: string,
         outputDir: string,
         options?: {
-            interval?: number; // Extract every N seconds
-            count?: number;    // Total frames to extract
+            interval?: number;
+            count?: number;
             format?: 'png' | 'jpg';
         }
     ): Promise<string[]> {
@@ -306,17 +271,14 @@ export class VideoRecorder {
             
             let command: string;
             if (opts.count) {
-                // Extract specific number of frames
                 command = `ffmpeg -i "${videoPath}" -vframes ${opts.count} "${outputPattern}" -y`;
             } else {
-                // Extract frames at interval
                 command = `ffmpeg -i "${videoPath}" -vf fps=1/${opts.interval} "${outputPattern}" -y`;
             }
             
             this.logger.info('Extracting video frames...');
             await execAsync(command);
             
-            // Get list of extracted frames
             const files = await fs.promises.readdir(outputDir);
             const frames = files
                 .filter(f => f.startsWith('frame-') && f.endsWith(`.${opts.format}`))
@@ -333,9 +295,6 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Add annotations to video
-     */
     async annotateVideo(
         videoPath: string,
         annotations: VideoAnnotation[],
@@ -349,7 +308,6 @@ export class VideoRecorder {
             
             const output = outputPath || videoPath.replace(/\.[^.]+$/, '-annotated.$&');
             
-            // Build FFmpeg filter for annotations
             const drawTextFilters = annotations
                 .filter(a => a.type === 'text')
                 .map(a => {
@@ -384,9 +342,6 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Generate GIF from video
-     */
     async generateGIF(
         videoPath: string,
         outputPath?: string,
@@ -411,7 +366,6 @@ export class VideoRecorder {
                 ...options
             };
             
-            // Generate palette for better quality
             const palettePath = path.join(this.videoPath, `palette-${Date.now()}.png`);
             
             const paletteCommand = `ffmpeg -ss ${opts.startTime} -t ${opts.duration} -i "${videoPath}" ` +
@@ -419,7 +373,6 @@ export class VideoRecorder {
             
             await execAsync(paletteCommand);
             
-            // Generate GIF using palette
             const gifCommand = `ffmpeg -ss ${opts.startTime} -t ${opts.duration} -i "${videoPath}" -i "${palettePath}" ` +
                               `-filter_complex "fps=${opts.fps},scale=${opts.width}:-1:flags=lanczos[x];[x][1:v]paletteuse" ` +
                               `"${output}" -y`;
@@ -427,7 +380,6 @@ export class VideoRecorder {
             this.logger.info('Generating GIF from video...');
             await execAsync(gifCommand);
             
-            // Clean up palette
             await fs.promises.unlink(palettePath);
             
             const stats = await fs.promises.stat(output);
@@ -441,9 +393,6 @@ export class VideoRecorder {
         }
     }
     
-    /**
-     * Clean up old video files
-     */
     async cleanOldVideos(daysToKeep: number = 7): Promise<number> {
         try {
             const files = await fs.promises.readdir(this.videoPath);
@@ -461,7 +410,6 @@ export class VideoRecorder {
                     if (stats.mtime < cutoffDate) {
                         await fs.promises.unlink(filePath);
                         
-                        // Also delete metadata and thumbnail if exists
                         const metadataPath = filePath.replace(/\.[^.]+$/, '-metadata.json');
                         const thumbnailPath = filePath.replace(/\.[^.]+$/, '-thumbnail.png');
                         
@@ -490,7 +438,6 @@ export class VideoRecorder {
         }
     }
     
-    // Private helper methods
     
     private async checkFFmpegAvailability(): Promise<void> {
         try {
@@ -506,7 +453,6 @@ export class VideoRecorder {
     private setupEventTracking(session: VideoSession): void {
         const page = session.page;
         
-        // Track page events
         page.on('load', () => {
             session.events.push({
                 type: 'pageLoad',
@@ -515,7 +461,6 @@ export class VideoRecorder {
             });
         });
         
-        // Track errors
         page.on('pageerror', error => {
             session.events.push({
                 type: 'error',
@@ -524,10 +469,9 @@ export class VideoRecorder {
             });
         });
         
-        // Track frame count (approximate)
         const frameInterval = setInterval(() => {
             if (this.activeRecordings.has(session.id)) {
-                session.frameCount += session.options.fps / 10; // Update every 100ms
+                session.frameCount += session.options.fps / 10;
             } else {
                 clearInterval(frameInterval);
             }
@@ -610,12 +554,10 @@ export class VideoRecorder {
             try {
                 const stats = await fs.promises.stat(videoPath);
                 if (stats.size > 0) {
-                    // Wait a bit more to ensure writing is complete
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     return;
                 }
             } catch (error) {
-                // File doesn't exist yet
             }
             
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -627,17 +569,14 @@ export class VideoRecorder {
     private async postProcessVideo(session: VideoSession): Promise<string> {
         let videoPath = session.filePath;
         
-        // Compress if enabled
         if (session.options.compressVideo && this.ffmpegAvailable) {
             videoPath = await this.compressVideo(videoPath);
         }
         
-        // Add watermark if not already added during recording
         if (session.options.watermark && this.ffmpegAvailable && !session.options.highlightClicks) {
             videoPath = await this.addWatermarkToVideo(videoPath, session.options.watermark);
         }
         
-        // Trim if exceeded max duration
         if (session.duration > session.options.maxDuration) {
             videoPath = await this.trimVideo(videoPath, session.options.maxDuration);
         }
@@ -658,7 +597,6 @@ export class VideoRecorder {
             
             await execAsync(command);
             
-            // Replace original
             await fs.promises.unlink(videoPath);
             await fs.promises.rename(output, videoPath);
             
@@ -679,7 +617,6 @@ export class VideoRecorder {
             
             await execAsync(command);
             
-            // Replace original
             await fs.promises.unlink(videoPath);
             await fs.promises.rename(output, videoPath);
             
@@ -723,7 +660,6 @@ export class VideoRecorder {
         try {
             const thumbnailPath = videoPath.replace(/\.[^.]+$/, '-thumbnail.png');
             
-            // Extract frame at 1 second (or 0 if video is shorter)
             const command = `ffmpeg -i "${videoPath}" -ss 00:00:01 -vframes 1 "${thumbnailPath}" -y`;
             
             await execAsync(command);
@@ -785,7 +721,7 @@ export class VideoRecorder {
         
         return {
             totalFrames: session.frameCount,
-            estimatedSize: session.frameCount * 50000, // Rough estimate
+            estimatedSize: session.frameCount * 50000,
             errors,
             pageLoads,
             averageFPS: session.frameCount / (session.duration || 1)
@@ -857,7 +793,6 @@ export class VideoRecorder {
     }
 }
 
-// Type definitions
 interface VideoSession {
     id: string;
     startTime: Date;

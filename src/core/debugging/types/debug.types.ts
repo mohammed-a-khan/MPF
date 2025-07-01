@@ -2,9 +2,6 @@
 
 import { Page, BrowserContext } from 'playwright';
 
-/**
- * Debug Manager Types
- */
 export interface DebugOptions {
     enabled: boolean;
     breakOnError: boolean;
@@ -52,9 +49,6 @@ export interface DebugCommand {
     breakpointId?: string;
 }
 
-/**
- * Trace Recorder Types
- */
 export interface TraceOptions {
     screenshots: boolean;
     snapshots: boolean;
@@ -175,9 +169,6 @@ export interface TraceFileInfo {
     metadata?: TraceMetadata;
 }
 
-/**
- * Video Recorder Types
- */
 export type VideoFormat = 'webm' | 'mp4' | 'avi';
 export type VideoQuality = 'low' | 'medium' | 'high' | 'ultra';
 
@@ -222,9 +213,6 @@ export interface VideoMetadata {
     annotations: VideoAnnotation[];
 }
 
-/**
- * Screenshot Manager Types
- */
 export interface ScreenshotOptions {
     type?: 'png' | 'jpeg';
     quality?: number;
@@ -316,9 +304,6 @@ export interface ScreenshotMask {
     blur?: boolean;
 }
 
-/**
- * Console Logger Types
- */
 export type ConsoleLogLevel = 'error' | 'warning' | 'info' | 'log' | 'debug' | 'trace';
 
 export interface ConsoleLogEntry {
@@ -356,9 +341,6 @@ export interface ConsoleReport {
     filtered: boolean;
 }
 
-/**
- * Common Debug Types
- */
 export interface DebugMetrics {
     executionTime: number;
     memoryUsage: {
@@ -426,9 +408,6 @@ export interface DebugConfiguration {
     };
 }
 
-/**
- * Debug Events
- */
 export interface DebugEvent {
     type: 'breakpoint-hit' | 'step-complete' | 'error' | 'warning' | 'pause' | 'resume';
     timestamp: Date;

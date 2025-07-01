@@ -33,7 +33,6 @@ export class TagParser {
       return tags;
     }
     
-    // Split by whitespace and filter valid tags
     const parts = tagLine.trim().split(/\s+/);
     
     for (const part of parts) {
@@ -49,7 +48,7 @@ export class TagParser {
   
   evaluateTagExpression(expression: string, scenarioTags: string[]): boolean {
     if (!expression || expression.trim() === '') {
-      return true; // No filter means all scenarios pass
+      return true;
     }
     
     try {
@@ -95,7 +94,6 @@ export class TagParser {
       } else if (char === ' ' && inParentheses === 0) {
         if (current.trim()) {
           const trimmed = current.trim();
-          // Check if it's an operator
           if (this.isOperator(trimmed)) {
             tokens.push(trimmed.toLowerCase());
           } else {
@@ -132,28 +130,22 @@ export class TagParser {
       
       if (!token) continue;
       
-      // Handle 'not' operator which can be prefix
       if (token === 'not') {
         normalized.push(token);
       } 
-      // Handle 'and' and 'or' operators
       else if (token === 'and' || token === 'or') {
         normalized.push(token);
       }
-      // Handle parentheses
       else if (token === '(' || token === ')') {
         normalized.push(token);
       }
-      // Handle tags
       else if (token.startsWith('@')) {
         if (!this.isValidTag(token)) {
           throw new Error(`Invalid tag format: ${token}`);
         }
         normalized.push(token);
       }
-      // Handle bare words as tags
       else if (!this.isOperator(token)) {
-        // Add @ prefix if not present
         const tag = token.startsWith('@') ? token : `@${token}`;
         if (!this.isValidTag(tag)) {
           throw new Error(`Invalid tag format: ${tag}`);
@@ -179,7 +171,7 @@ export class TagParser {
         if (operators.length === 0) {
           throw new Error('Mismatched parentheses');
         }
-        operators.pop(); // Remove '('
+        operators.pop();
       } else if (this.isOperator(token)) {
         while (
           operators.length > 0 &&
@@ -190,7 +182,7 @@ export class TagParser {
         }
         operators.push(token);
       } else {
-        output.push(token); // Tag
+        output.push(token);
       }
     }
     
@@ -337,7 +329,7 @@ export class TagParser {
       const ast = this.parseExpression(expression);
       return this.astToString(ast);
     } catch (error) {
-      return expression; // Return original if parsing fails
+      return expression;
     }
   }
   
@@ -369,7 +361,6 @@ export class TagParser {
       return expressions[0] || '';
     }
     
-    // Combine with OR operator
     return expressions.map(expr => `(${expr})`).join(' or ');
   }
   
@@ -383,7 +374,6 @@ export class TagParser {
       const negated = this.negateAST(ast);
       return this.astToString(negated);
     } catch (error) {
-      // If parsing fails, just wrap with not
       return `not (${expression})`;
     }
   }
@@ -397,11 +387,9 @@ export class TagParser {
         };
         
       case 'not':
-        // Double negation cancels out
         return ast.operand!;
         
       case 'and':
-        // De Morgan's law: not (A and B) = (not A) or (not B)
         return {
           type: 'or',
           left: this.negateAST(ast.left!),
@@ -409,7 +397,6 @@ export class TagParser {
         };
         
       case 'or':
-        // De Morgan's law: not (A or B) = (not A) and (not B)
         return {
           type: 'and',
           left: this.negateAST(ast.left!),
@@ -421,9 +408,6 @@ export class TagParser {
     }
   }
 
-  /**
-   * Parse annotation lines and extract structured data
-   */
   parseAnnotations(lines: string[]): { tags: string[]; metadata: Record<string, any> } {
     const tags: string[] = [];
     const metadata: Record<string, any> = {};
@@ -448,7 +432,6 @@ export class TagParser {
       } else if (trimmedLine.startsWith('@Environment:')) {
         metadata['environment'] = trimmedLine.replace('@Environment:', '');
       } else if (trimmedLine.startsWith('@')) {
-        // Regular tag
         const parsedTags = this.parseTags(trimmedLine);
         tags.push(...parsedTags);
       }
@@ -458,5 +441,4 @@ export class TagParser {
   }
 }
 
-// Export singleton instance
 export const tagParser = TagParser.getInstance();

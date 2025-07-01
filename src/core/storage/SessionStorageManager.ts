@@ -3,19 +3,11 @@ import { logger } from '../utils/Logger';
 import { ActionLogger } from '../logging/ActionLogger';
 import { StorageQuota, StorageItemInfo } from './types/storage.types';
 
-/**
- * SessionStorageManager - Complete sessionStorage management
- * Handles all sessionStorage operations (same interface as LocalStorage)
- */
 export class SessionStorageManager {
-    private readonly STORAGE_LIMIT = 5 * 1024 * 1024; // 5MB typical limit
+    private readonly STORAGE_LIMIT = 5 * 1024 * 1024;
 
-    /**
-     * Set sessionStorage item
-     */
     async setItem(page: Page, key: string, value: string): Promise<void> {
         try {
-            // Check quota before setting
             await this.checkQuotaBeforeSet(page, key, value);
             
             await page.evaluate(([k, v]) => {
@@ -36,9 +28,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Set JSON value in sessionStorage
-     */
     async setJSON(page: Page, key: string, value: any): Promise<void> {
         try {
             const jsonString = JSON.stringify(value);
@@ -49,9 +38,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Get sessionStorage item
-     */
     async getItem(page: Page, key: string): Promise<string | null> {
         try {
             const value = await page.evaluate((k) => {
@@ -72,9 +58,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Get JSON value from sessionStorage
-     */
     async getJSON(page: Page, key: string): Promise<any> {
         try {
             const value = await this.getItem(page, key);
@@ -87,7 +70,7 @@ export class SessionStorageManager {
                 return JSON.parse(value);
             } catch (parseError) {
                 logger.warn(`SessionStorageManager: Failed to parse JSON for key '${key}'`);
-                return value; // Return as string if not valid JSON
+                return value;
             }
         } catch (error) {
             logger.error('SessionStorageManager: Failed to get JSON', error as Error);
@@ -95,9 +78,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Remove sessionStorage item
-     */
     async removeItem(page: Page, key: string): Promise<void> {
         try {
             await page.evaluate((k) => {
@@ -115,9 +95,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Clear all sessionStorage
-     */
     async clear(page: Page): Promise<void> {
         try {
             const itemCount = await this.getItemCount(page);
@@ -137,9 +114,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Get all sessionStorage items
-     */
     async getAllItems(page: Page): Promise<Record<string, string>> {
         try {
             const items = await page.evaluate(() => {
@@ -166,9 +140,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Get all sessionStorage keys
-     */
     async getKeys(page: Page): Promise<string[]> {
         try {
             const keys = await page.evaluate(() => {
@@ -187,9 +158,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Get sessionStorage size in bytes
-     */
     async getSize(page: Page): Promise<number> {
         try {
             const size = await page.evaluate(() => {
@@ -211,9 +179,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Check if sessionStorage has item
-     */
     async hasItem(page: Page, key: string): Promise<boolean> {
         try {
             const value = await this.getItem(page, key);
@@ -224,9 +189,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Export sessionStorage data
-     */
     async exportData(page: Page): Promise<Record<string, string>> {
         try {
             const data = await this.getAllItems(page);
@@ -245,15 +207,10 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Import sessionStorage data
-     */
     async importData(page: Page, data: Record<string, string>): Promise<void> {
         try {
-            // Clear existing data
             await this.clear(page);
             
-            // Import new data
             await page.evaluate((items) => {
                 Object.entries(items).forEach(([key, value]) => {
                     sessionStorage.setItem(key, value);
@@ -271,9 +228,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Get storage quota information
-     */
     async getQuota(page: Page): Promise<StorageQuota> {
         try {
             const currentSize = await this.getSize(page);
@@ -298,12 +252,8 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Set multiple items
-     */
     async setItems(page: Page, items: Record<string, string>): Promise<void> {
         try {
-            // Check total size first
             const totalSize = Object.entries(items).reduce(
                 (sum, [key, value]) => sum + key.length + value.length, 
                 0
@@ -332,9 +282,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Remove multiple items
-     */
     async removeItems(page: Page, keys: string[]): Promise<void> {
         try {
             await page.evaluate((keys) => {
@@ -352,9 +299,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Get item info (size, type, etc.)
-     */
     async getItemInfo(page: Page, key: string): Promise<StorageItemInfo | null> {
         try {
             const value = await this.getItem(page, key);
@@ -366,7 +310,6 @@ export class SessionStorageManager {
             let type: 'string' | 'json' | 'number' | 'boolean' = 'string';
             let parsed: any = value;
             
-            // Try to determine type
             try {
                 parsed = JSON.parse(value);
                 if (typeof parsed === 'object') {
@@ -377,7 +320,6 @@ export class SessionStorageManager {
                     type = 'boolean';
                 }
             } catch {
-                // Not JSON, keep as string
             }
             
             const info: StorageItemInfo = {
@@ -385,7 +327,7 @@ export class SessionStorageManager {
                 value,
                 size: key.length + value.length,
                 type,
-                lastModified: new Date() // sessionStorage doesn't track this
+                lastModified: new Date()
             };
             
             return info;
@@ -395,9 +337,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Search items by key pattern
-     */
     async searchItems(page: Page, pattern: string | RegExp): Promise<Record<string, string>> {
         try {
             const allItems = await this.getAllItems(page);
@@ -418,9 +357,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Transfer sessionStorage to localStorage
-     */
     async transferToLocalStorage(page: Page): Promise<void> {
         try {
             const items = await this.getAllItems(page);
@@ -442,9 +378,6 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Copy sessionStorage from one tab to another
-     */
     async copyToPage(sourcePage: Page, targetPage: Page): Promise<void> {
         try {
             const items = await this.getAllItems(sourcePage);
@@ -462,14 +395,10 @@ export class SessionStorageManager {
         }
     }
 
-    /**
-     * Monitor sessionStorage changes
-     */
     async monitorChanges(
         page: Page, 
         callback: (event: any) => void
     ): Promise<() => void> {
-        // Inject monitoring script
         await page.addInitScript(() => {
             const originalSetItem = sessionStorage.setItem.bind(sessionStorage);
             const originalRemoveItem = sessionStorage.removeItem.bind(sessionStorage);
@@ -506,7 +435,6 @@ export class SessionStorageManager {
             };
         });
         
-        // Listen for changes
         await page.exposeFunction('onSessionStorageChange', callback);
         await page.evaluate(() => {
             window.addEventListener('sessionStorageChange', (event: any) => {
@@ -514,7 +442,6 @@ export class SessionStorageManager {
             });
         });
         
-        // Return cleanup function
         return async () => {
             await page.evaluate(() => {
                 window.removeEventListener('sessionStorageChange', () => {});
@@ -522,13 +449,11 @@ export class SessionStorageManager {
         };
     }
 
-    // Private helper methods
 
     private async checkQuotaBeforeSet(page: Page, key: string, value: string): Promise<void> {
         const currentSize = await this.getSize(page);
         const newItemSize = key.length + value.length;
         
-        // Check if key exists (for replacement)
         const existingValue = await this.getItem(page, key);
         const existingSize = existingValue ? key.length + existingValue.length : 0;
         

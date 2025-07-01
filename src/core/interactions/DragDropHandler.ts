@@ -45,7 +45,6 @@ export class DragDropHandler {
       const sourcePoint = this.getPositionPoint(sourceBox, options?.sourcePosition || 'center');
       const targetPoint = this.getPositionPoint(targetBox, options?.targetPosition || 'center');
       
-      // Check if we should use HTML5 drag or mouse drag
       const useHTML5 = await this.shouldUseHTML5Drag(source.page, sourcePoint);
       
       if (useHTML5) {
@@ -146,7 +145,6 @@ export class DragDropHandler {
         options 
       });
       
-      // Apply modifiers if specified
       if (options?.modifiers) {
         for (const modifier of options.modifiers) {
           await page.keyboard.down(modifier);
@@ -173,7 +171,6 @@ export class DragDropHandler {
             await page.waitForTimeout(step.delay || 100);
             break;
           default:
-            // Default is move
             await page.mouse.move(step.x || 0, step.y || 0, {
               steps: options?.smooth ? 10 : 1
             });
@@ -184,7 +181,6 @@ export class DragDropHandler {
         }
       }
       
-      // Release modifiers
       if (options?.modifiers) {
         for (const modifier of options.modifiers.reverse()) {
           await page.keyboard.up(modifier);
@@ -226,7 +222,6 @@ export class DragDropHandler {
         throw new Error('Invalid path points');
       }
       
-      // Mouse down at first point
       steps.push({
         x: firstPoint.x,
         y: firstPoint.y,
@@ -238,7 +233,6 @@ export class DragDropHandler {
         action: 'down'
       });
       
-      // Move through all points
       for (let i = 1; i < path.length; i++) {
         const point = path[i];
         if (!point) continue;
@@ -256,7 +250,6 @@ export class DragDropHandler {
         steps.push(step);
       }
       
-      // Mouse up at last point
       steps.push({
         x: lastPoint.x,
         y: lastPoint.y,
@@ -339,11 +332,9 @@ export class DragDropHandler {
     targetPoint: Point,
     _options?: DragOptions
   ): Promise<void> {
-    // Get locators for source and target
     const sourceLocator = await this.getElementLocator(source);
     const targetLocator = await this.getElementLocator(target);
     
-    // Perform HTML5 drag and drop using page evaluation
     await source.page.evaluate(
       async ({ srcSelector, tgtSelector, srcPoint, tgtPoint }) => {
         const sourceEl = document.querySelector(srcSelector);
@@ -353,7 +344,6 @@ export class DragDropHandler {
           throw new Error('Could not find source or target element');
         }
         
-        // Create drag events
         const dataTransfer = new DataTransfer();
         
         const dragStartEvent = new DragEvent('dragstart', {
@@ -402,8 +392,6 @@ export class DragDropHandler {
   }
 
   private async getElementLocator(element: CSWebElement): Promise<Locator> {
-    // Since resolve is private, we need to use a different approach
-    // We'll create a new locator based on the element's options
     const options = element.options;
     const page = element.page;
     
@@ -422,13 +410,10 @@ export class DragDropHandler {
   }
 
   private async getSelectorForLocator(locator: Locator): Promise<string> {
-    // Get a unique selector for the locator
-    // This is a simplified approach - in production you might want more sophisticated logic
     try {
       const handle = await locator.elementHandle();
       if (handle) {
         const selector = await handle.evaluate((el) => {
-          // Try to get a unique selector
           if (el.id) return `#${el.id}`;
           if (el.className) return `.${el.className.split(' ')[0]}`;
           return el.tagName.toLowerCase();
@@ -437,7 +422,6 @@ export class DragDropHandler {
         return selector;
       }
     } catch {
-      // Fallback to a generic selector
     }
     return '*';
   }
@@ -447,7 +431,6 @@ export class DragDropHandler {
       const element = document.elementFromPoint(p.x, p.y);
       if (!element) return false;
       
-      // Check if element or its parents have draggable attribute
       let current: Element | null = element;
       while (current) {
         if (current.hasAttribute('draggable') && current.getAttribute('draggable') === 'true') {
@@ -456,7 +439,6 @@ export class DragDropHandler {
         current = current.parentElement;
       }
       
-      // Check for common drag-enabled elements
       const tagName = element.tagName.toLowerCase();
       return tagName === 'img' || tagName === 'a';
     }, point);
@@ -568,7 +550,6 @@ export class DragDropHandler {
       const sourcePoint = this.getPositionPoint(sourceBox, 'center');
       const hoverPoints: Point[] = [sourcePoint];
       
-      // Get hover points for all targets
       for (const target of hoverTargets) {
         const targetBox = await target.getBoundingBox();
         if (targetBox) {
@@ -576,10 +557,8 @@ export class DragDropHandler {
         }
       }
       
-      // Add return to source
       hoverPoints.push(sourcePoint);
       
-      // Create hover path
       const path: Point[] = [];
       for (let i = 0; i < hoverPoints.length - 1; i++) {
         const start = hoverPoints[i];
@@ -590,7 +569,6 @@ export class DragDropHandler {
         }
       }
       
-      // Perform drag along path
       await this.performCustomDrag(source, path);
       
       ActionLogger.logInfo(`Drag hover simulation completed: ${source.description}`, {

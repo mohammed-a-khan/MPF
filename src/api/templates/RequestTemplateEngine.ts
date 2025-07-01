@@ -4,10 +4,6 @@ import { TemplateCache } from './TemplateCache';
 import { FileUtils } from '../../core/utils/FileUtils';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Request template engine for processing dynamic request templates
- * Supports variables, functions, conditionals, and loops
- */
 export class RequestTemplateEngine {
     private static instance: RequestTemplateEngine;
     private placeholderResolver: PlaceholderResolver;
@@ -28,9 +24,6 @@ export class RequestTemplateEngine {
         return RequestTemplateEngine.instance;
     }
 
-    /**
-     * Process template with given context
-     */
     public async processTemplate(
         template: string,
         context: TemplateContext = {},
@@ -44,10 +37,8 @@ export class RequestTemplateEngine {
                 contextKeys: Object.keys(context)
             });
 
-            // Merge contexts
             const fullContext = this.mergeContexts(this.globalContext, context);
 
-            // Check cache if enabled
             const cacheKey = this.generateCacheKey(template, fullContext);
             if (options.useCache !== false) {
                 const cached = this.templateCache.get(cacheKey);
@@ -57,25 +48,18 @@ export class RequestTemplateEngine {
                 }
             }
 
-            // Process template
             let result = template;
 
-            // Process includes first
             result = await this.processIncludes(result, fullContext, options);
 
-            // Process conditionals
             result = this.processConditionals(result, fullContext);
 
-            // Process loops
             result = this.processLoops(result, fullContext);
 
-            // Process functions
             result = await this.processFunctions(result, fullContext);
 
-            // Process variables (placeholders)
             result = await this.placeholderResolver.resolve(result, fullContext);
 
-            // Post-process
             if (options.trimWhitespace) {
                 result = this.trimWhitespace(result);
             }
@@ -86,7 +70,6 @@ export class RequestTemplateEngine {
                 result = this.formatXML(result);
             }
 
-            // Cache result if enabled
             if (options.useCache !== false) {
                 this.templateCache.set(cacheKey, result, options.cacheTTL);
             }
@@ -104,9 +87,6 @@ export class RequestTemplateEngine {
         }
     }
 
-    /**
-     * Load and process template from file
-     */
     public async loadTemplate(
         filePath: string,
         context: TemplateContext = {},
@@ -115,14 +95,13 @@ export class RequestTemplateEngine {
         try {
             ActionLogger.getInstance().debug(`Loading template from: ${filePath}`);
 
-            // Check cache for loaded template
             const cacheKey = `file:${filePath}`;
             let template = this.templateCache.get(cacheKey);
 
             if (!template) {
                 const fileContent = await FileUtils.readFile(filePath);
                 template = typeof fileContent === 'string' ? fileContent : fileContent.toString();
-                this.templateCache.set(cacheKey, template, 300000); // Cache for 5 minutes
+                this.templateCache.set(cacheKey, template, 300000);
             }
 
             return await this.processTemplate(template, context, options);
@@ -132,9 +111,6 @@ export class RequestTemplateEngine {
         }
     }
 
-    /**
-     * Process includes in template
-     */
     private async processIncludes(
         template: string,
         context: TemplateContext,
@@ -149,7 +125,7 @@ export class RequestTemplateEngine {
             try {
                 const includedContent = await this.loadTemplate(filePath || '', context, {
                     ...options,
-                    useCache: true // Always cache includes
+                    useCache: true
                 });
                 
                 template = template.replace(fullMatch, includedContent);
@@ -165,11 +141,7 @@ export class RequestTemplateEngine {
         return template;
     }
 
-    /**
-     * Process conditional blocks
-     */
     private processConditionals(template: string, context: TemplateContext): string {
-        // Process if-else blocks
         const ifPattern = /\{\{\s*#if\s+(.+?)\s*\}\}([\s\S]*?)(?:\{\{\s*#else\s*\}\}([\s\S]*?))?\{\{\s*\/if\s*\}\}/g;
 
         return template.replace(ifPattern, (match, condition, ifContent, elseContent = '') => {
@@ -178,16 +150,12 @@ export class RequestTemplateEngine {
                 return result ? ifContent : elseContent;
             } catch (error) {
                 ActionLogger.getInstance().warn(`Failed to evaluate condition: ${condition}`, { error: (error as Error).message });
-                return match; // Return original if evaluation fails
+                return match;
             }
         });
     }
 
-    /**
-     * Process loops
-     */
     private processLoops(template: string, context: TemplateContext): string {
-        // Process for-each loops
         const forEachPattern = /\{\{\s*#each\s+(\w+)\s+in\s+(.+?)\s*\}\}([\s\S]*?)\{\{\s*\/each\s*\}\}/g;
 
         return template.replace(forEachPattern, (match, itemName, arrayExpression, loopContent) => {
@@ -208,10 +176,9 @@ export class RequestTemplateEngine {
                         [`${itemName}Last`]: index === array.length - 1
                     };
 
-                    // Process nested templates
                     let result = loopContent;
                     result = this.processConditionals(result, loopContext);
-                    result = this.processLoops(result, loopContext); // Allow nested loops
+                    result = this.processLoops(result, loopContext);
                     result = this.placeholderResolver.resolve(result, loopContext);
                     
                     return result;
@@ -219,16 +186,12 @@ export class RequestTemplateEngine {
 
             } catch (error) {
                 ActionLogger.getInstance().warn(`Failed to process loop: ${arrayExpression}`, { error: (error as Error).message });
-                return match; // Return original if processing fails
+                return match;
             }
         });
     }
 
-    /**
-     * Process function calls
-     */
     private async processFunctions(template: string, context: TemplateContext): Promise<string> {
-        // Process function calls: {{functionName(arg1, arg2)}}
         const functionPattern = /\{\{\s*(\w+)\s*\((.*?)\)\s*\}\}/g;
 
         const matches = Array.from(template.matchAll(functionPattern));
@@ -249,9 +212,6 @@ export class RequestTemplateEngine {
         return template;
     }
 
-    /**
-     * Parse function arguments
-     */
     private parseArguments(argsString: string, context: TemplateContext): any[] {
         if (!argsString.trim()) return [];
 
@@ -292,35 +252,24 @@ export class RequestTemplateEngine {
         return args;
     }
 
-    /**
-     * Evaluate single argument
-     */
     private evaluateArgument(arg: string, context: TemplateContext): any {
-        // String literal
         if ((arg.startsWith('"') && arg.endsWith('"')) || 
             (arg.startsWith("'") && arg.endsWith("'"))) {
             return arg.slice(1, -1).replace(/\\(.)/g, '$1');
         }
 
-        // Number literal
         if (/^-?\d+(\.\d+)?$/.test(arg)) {
             return parseFloat(arg);
         }
 
-        // Boolean literal
         if (arg === 'true') return true;
         if (arg === 'false') return false;
 
-        // Null literal
         if (arg === 'null') return null;
 
-        // Variable reference
         return this.evaluateExpression(arg, context);
     }
 
-    /**
-     * Execute template function
-     */
     private async executeFunction(
         name: string, 
         args: any[], 
@@ -335,12 +284,8 @@ export class RequestTemplateEngine {
         return await func(args, context);
     }
 
-    /**
-     * Evaluate condition expression
-     */
     private evaluateCondition(condition: string, context: TemplateContext): boolean {
         try {
-            // Parse condition
             const tokens = this.tokenizeExpression(condition);
             return this.evaluateTokens(tokens, context) as boolean;
         } catch (error) {
@@ -348,16 +293,11 @@ export class RequestTemplateEngine {
         }
     }
 
-    /**
-     * Evaluate expression
-     */
     private evaluateExpression(expression: string, context: TemplateContext): any {
-        // Handle dot notation for nested properties
         const parts = expression.split('.');
         let value: any = context;
 
         for (const part of parts) {
-            // Handle array indexing
             const arrayMatch = part.match(/^(\w+)\[(\d+)\]$/);
             if (arrayMatch) {
                 const [, prop, index] = arrayMatch;
@@ -383,22 +323,17 @@ export class RequestTemplateEngine {
         return value;
     }
 
-    /**
-     * Tokenize expression for evaluation
-     */
     private tokenizeExpression(expression: string): Token[] {
         const tokens: Token[] = [];
         let current = 0;
 
         while (current < expression.length) {
-            // Skip whitespace
             const char = expression[current];
             if (char && /\s/.test(char)) {
                 current++;
                 continue;
             }
 
-            // Operators
             if (expression.substring(current, current + 2) === '==') {
                 tokens.push({ type: 'EQUALS', value: '==' });
                 current += 2;
@@ -433,7 +368,6 @@ export class RequestTemplateEngine {
                 tokens.push({ type: 'RPAREN', value: ')' });
                 current++;
             } else if (expression[current] === '"' || expression[current] === "'") {
-                // String literal
                 const quote = expression[current];
                 let value = '';
                 current++;
@@ -446,10 +380,9 @@ export class RequestTemplateEngine {
                     }
                     current++;
                 }
-                current++; // Skip closing quote
+                current++;
                 tokens.push({ type: 'STRING', value });
             } else if (char && /\d/.test(char)) {
-                // Number literal
                 let value = '';
                 while (current < expression.length) {
                     const nextChar = expression[current];
@@ -459,7 +392,6 @@ export class RequestTemplateEngine {
                 }
                 tokens.push({ type: 'NUMBER', value });
             } else if (char && /[a-zA-Z_$]/.test(char)) {
-                // Identifier
                 let value = '';
                 while (current < expression.length) {
                     const nextChar = expression[current];
@@ -468,7 +400,6 @@ export class RequestTemplateEngine {
                     current++;
                 }
                 
-                // Check for boolean literals
                 if (value === 'true' || value === 'false') {
                     tokens.push({ type: 'BOOLEAN', value });
                 } else if (value === 'null') {
@@ -484,9 +415,6 @@ export class RequestTemplateEngine {
         return tokens;
     }
 
-    /**
-     * Evaluate tokenized expression
-     */
     private evaluateTokens(tokens: Token[], context: TemplateContext): any {
         let position = 0;
 
@@ -500,7 +428,7 @@ export class RequestTemplateEngine {
             while (position < tokens.length) {
                 const token = tokens[position];
                 if (!token || token.type !== 'OR') break;
-                position++; // Skip ||
+                position++;
                 const right = parseAnd();
                 left = left || right;
             }
@@ -514,7 +442,7 @@ export class RequestTemplateEngine {
             while (position < tokens.length) {
                 const token = tokens[position];
                 if (!token || token.type !== 'AND') break;
-                position++; // Skip &&
+                position++;
                 const right = parseEquality();
                 left = left && right;
             }
@@ -568,7 +496,7 @@ export class RequestTemplateEngine {
         const parseUnary = (): any => {
             const token = tokens[position];
             if (position < tokens.length && token && token.type === 'NOT') {
-                position++; // Skip !
+                position++;
                 return !parseUnary();
             }
 
@@ -586,13 +514,13 @@ export class RequestTemplateEngine {
             }
 
             if (token.type === 'LPAREN') {
-                position++; // Skip (
+                position++;
                 const value = parseExpression();
                 const closeToken = tokens[position];
                 if (position >= tokens.length || !closeToken || closeToken.type !== 'RPAREN') {
                     throw new Error('Expected closing parenthesis');
                 }
-                position++; // Skip )
+                position++;
                 return value;
             }
 
@@ -624,11 +552,7 @@ export class RequestTemplateEngine {
         return result;
     }
 
-    /**
-     * Register built-in template functions
-     */
     private registerBuiltInFunctions(): void {
-        // Random functions
         this.registerFunction('random', async (args) => {
             const min = args[0] || 0;
             const max = args[1] || 1;
@@ -661,7 +585,6 @@ export class RequestTemplateEngine {
             });
         });
 
-        // Date functions
         this.registerFunction('now', async () => {
             return new Date().toISOString();
         });
@@ -693,7 +616,6 @@ export class RequestTemplateEngine {
             return date.toISOString();
         });
 
-        // String functions
         this.registerFunction('upper', async (args) => {
             return String(args[0] || '').toUpperCase();
         });
@@ -732,7 +654,6 @@ export class RequestTemplateEngine {
             return args.join('');
         });
 
-        // Math functions
         this.registerFunction('add', async (args) => {
             return args.reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
         });
@@ -780,7 +701,6 @@ export class RequestTemplateEngine {
             return Math.max(...args.map(v => parseFloat(v) || 0));
         });
 
-        // Array functions
         this.registerFunction('join', async (args) => {
             const array = args[0];
             const separator = args[1] || ',';
@@ -810,7 +730,6 @@ export class RequestTemplateEngine {
             return Array.isArray(array) ? array.slice(start, end) : [];
         });
 
-        // Type conversion
         this.registerFunction('toString', async (args) => {
             return String(args[0] || '');
         });
@@ -840,7 +759,6 @@ export class RequestTemplateEngine {
             }
         });
 
-        // Encoding functions
         this.registerFunction('base64Encode', async (args) => {
             return Buffer.from(String(args[0] || '')).toString('base64');
         });
@@ -867,7 +785,6 @@ export class RequestTemplateEngine {
                 .replace(/'/g, '&#39;');
         });
 
-        // Conditional functions
         this.registerFunction('if', async (args) => {
             const condition = args[0];
             const trueValue = args[1];
@@ -893,7 +810,6 @@ export class RequestTemplateEngine {
             return null;
         });
 
-        // Hash functions
         this.registerFunction('md5', async (args) => {
             const crypto = require('crypto');
             return crypto.createHash('md5').update(String(args[0] || '')).digest('hex');
@@ -909,7 +825,6 @@ export class RequestTemplateEngine {
             return crypto.createHash('sha256').update(String(args[0] || '')).digest('hex');
         });
 
-        // Environment function
         this.registerFunction('env', async (args, context) => {
             const key = args[0];
             const defaultValue = args[1];
@@ -917,38 +832,23 @@ export class RequestTemplateEngine {
         });
     }
 
-    /**
-     * Register custom function
-     */
     public registerFunction(name: string, func: TemplateFunction): void {
         this.customFunctions.set(name, func);
         ActionLogger.getInstance().debug(`Registered template function: ${name}`);
     }
 
-    /**
-     * Set global context
-     */
     public setGlobalContext(context: TemplateContext): void {
         this.globalContext = { ...this.globalContext, ...context };
     }
 
-    /**
-     * Clear global context
-     */
     public clearGlobalContext(): void {
         this.globalContext = {};
     }
 
-    /**
-     * Merge contexts
-     */
     private mergeContexts(...contexts: TemplateContext[]): TemplateContext {
         return contexts.reduce((merged, context) => ({ ...merged, ...context }), {});
     }
 
-    /**
-     * Generate cache key
-     */
     private generateCacheKey(template: string, context: TemplateContext): string {
         const crypto = require('crypto');
         const hash = crypto.createHash('md5');
@@ -957,9 +857,6 @@ export class RequestTemplateEngine {
         return hash.digest('hex');
     }
 
-    /**
-     * Format date
-     */
     private formatDate(date: Date, format: string): string {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -979,11 +876,7 @@ export class RequestTemplateEngine {
             .replace('SSS', milliseconds);
     }
 
-    /**
-     * Trim whitespace from template
-     */
     private trimWhitespace(template: string): string {
-        // Remove leading/trailing whitespace from lines
         return template
             .split('\n')
             .map(line => line.trim())
@@ -991,9 +884,6 @@ export class RequestTemplateEngine {
             .join('\n');
     }
 
-    /**
-     * Format JSON string
-     */
     private formatJSON(template: string): string {
         try {
             const json = JSON.parse(template);
@@ -1003,40 +893,29 @@ export class RequestTemplateEngine {
         }
     }
 
-    /**
-     * Format XML string
-     */
     private formatXML(template: string): string {
-        // Simple XML formatting
         let formatted = '';
         let indent = 0;
         
         template.split(/>\s*</).forEach(node => {
-            if (node.match(/^\/\w/)) indent--; // Closing tag
+            if (node.match(/^\/\w/)) indent--;
             formatted += '\t'.repeat(Math.max(0, indent)) + '<' + node + '>\n';
-            if (node.match(/^<?\w[^>]*[^\/]$/) && !node.startsWith("?")) indent++; // Opening tag
+            if (node.match(/^<?\w[^>]*[^\/]$/) && !node.startsWith("?")) indent++;
         });
         
         return formatted.substring(1, formatted.length - 2);
     }
 
-    /**
-     * Clear all caches
-     */
     public clearCache(): void {
         this.templateCache.clear();
         this.placeholderResolver.clearCache();
     }
 
-    /**
-     * Get function names
-     */
     public getFunctionNames(): string[] {
         return Array.from(this.customFunctions.keys());
     }
 }
 
-// Type definitions
 interface Token {
     type: string;
     value: string;

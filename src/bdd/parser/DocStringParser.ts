@@ -33,7 +33,6 @@ export class DocStringParser {
       throw new Error('DocString cannot be empty');
     }
     
-    // First line should be the opening delimiter
     const firstLine = lines[0];
     if (!firstLine) {
       throw new Error('DocString cannot be empty');
@@ -45,7 +44,6 @@ export class DocStringParser {
       throw new Error(`DocString must start with one of: ${this.delimiters.join(', ')}`);
     }
     
-    // Check for content type
     let contentType: string | undefined;
     const afterDelimiter = trimmedFirstLine.substring(delimiter.length).trim();
     
@@ -56,7 +54,6 @@ export class DocStringParser {
       }
     }
     
-    // Find closing delimiter
     let closingIndex = -1;
     let contentLines: string[] = [];
     
@@ -75,10 +72,8 @@ export class DocStringParser {
       throw new Error(`Unclosed DocString starting at line ${startLine}`);
     }
     
-    // Process content
     let content = this.processContent(contentLines, opts);
     
-    // Apply content type specific processing
     if (contentType) {
       content = this.processContentType(content, contentType);
     }
@@ -102,7 +97,6 @@ export class DocStringParser {
     
     let processedLines = [...lines];
     
-    // Calculate common indent
     if (!options.preserveIndent) {
       const commonIndent = this.calculateCommonIndent(lines);
       processedLines = lines.map(line => {
@@ -113,20 +107,16 @@ export class DocStringParser {
       });
     }
     
-    // Trim lines if requested
     if (options.trimLines) {
       processedLines = processedLines.map(line => line.trimEnd());
     }
     
-    // Process escape sequences
     if (options.processEscapes) {
       processedLines = processedLines.map(line => this.processEscapeSequences(line));
     }
     
-    // Join lines
     let content = processedLines.join('\n');
     
-    // Trim leading and trailing empty lines
     content = content.replace(/^\n+/, '').replace(/\n+$/, '');
     
     return content;
@@ -136,7 +126,6 @@ export class DocStringParser {
     let minIndent = Infinity;
     
     for (const line of lines) {
-      // Skip empty lines
       if (line.trim() === '') {
         continue;
       }
@@ -176,14 +165,12 @@ export class DocStringParser {
         return this.formatCSV(content);
       
       default:
-        // Unknown content type, return as-is
         return content;
     }
   }
   
   private formatJSON(content: string): string {
     try {
-      // Parse and reformat JSON
       const parsed = JSON.parse(content);
       return JSON.stringify(parsed, null, 2);
     } catch (error) {
@@ -193,12 +180,9 @@ export class DocStringParser {
   }
   
   private formatXML(content: string): string {
-    // Basic XML formatting
     try {
-      // Remove extra whitespace between tags
       let formatted = content.replace(/>\s+</g, '><');
       
-      // Add newlines and indentation
       let indent = 0;
       formatted = formatted.replace(/(<[^>]+>)/g, (match) => {
         if (match.startsWith('</')) {
@@ -221,16 +205,13 @@ export class DocStringParser {
   }
   
   private formatHTML(content: string): string {
-    // Similar to XML but preserve certain inline elements
     
     try {
       let formatted = content;
       
-      // Format block-level elements
       formatted = formatted.replace(/<(div|p|h[1-6]|ul|ol|li|table|tr|td|th)[^>]*>/gi, '\n$&');
       formatted = formatted.replace(/<\/(div|p|h[1-6]|ul|ol|li|table|tr|td|th)>/gi, '$&\n');
       
-      // Clean up multiple newlines
       formatted = formatted.replace(/\n{3,}/g, '\n\n');
       
       return formatted.trim();
@@ -240,7 +221,6 @@ export class DocStringParser {
   }
   
   private formatSQL(content: string): string {
-    // Basic SQL formatting
     const keywords = [
       'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER BY', 
       'GROUP BY', 'HAVING', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 
@@ -250,26 +230,22 @@ export class DocStringParser {
     
     let formatted = content;
     
-    // Add newlines before major keywords
     keywords.forEach(keyword => {
       const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
       formatted = formatted.replace(regex, `\n${keyword}`);
     });
     
-    // Clean up multiple newlines
     formatted = formatted.replace(/\n{2,}/g, '\n');
     
     return formatted.trim();
   }
   
   private formatCSV(content: string): string {
-    // Ensure consistent CSV formatting
     const lines = content.split('\n');
     const formatted: string[] = [];
     
     for (const line of lines) {
       if (line.trim()) {
-        // Ensure proper CSV quoting
         const cells = this.parseCSVLine(line);
         const formattedLine = cells.map(cell => {
           if (cell.includes(',') || cell.includes('"') || cell.includes('\n')) {
@@ -297,7 +273,7 @@ export class DocStringParser {
       if (char === '"') {
         if (inQuotes && nextChar === '"') {
           current += '"';
-          i++; // Skip next quote
+          i++;
         } else {
           inQuotes = !inQuotes;
         }
@@ -314,21 +290,17 @@ export class DocStringParser {
   }
   
   detectContentType(content: string): string | undefined {
-    // Try to detect content type from content
     const trimmed = content.trim();
     
-    // JSON
     if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
         (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
       try {
         JSON.parse(trimmed);
         return 'json';
       } catch {
-        // Not valid JSON
       }
     }
     
-    // XML/HTML
     if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
       if (trimmed.includes('<!DOCTYPE html') || trimmed.includes('<html')) {
         return 'html';
@@ -336,14 +308,12 @@ export class DocStringParser {
       return 'xml';
     }
     
-    // SQL
     const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP'];
     const upperContent = trimmed.toUpperCase();
     if (sqlKeywords.some(keyword => upperContent.startsWith(keyword))) {
       return 'sql';
     }
     
-    // CSV (simple detection)
     const lines = trimmed.split('\n');
     if (lines.length > 1) {
       const firstLine = lines[0];
@@ -376,19 +346,16 @@ export class DocStringParser {
   formatDocString(docString: DocString, delimiter: string = '"""'): string {
     const lines: string[] = [];
     
-    // Opening delimiter with content type
     if (docString.contentType) {
       lines.push(`${delimiter} ${docString.contentType}`);
     } else {
       lines.push(delimiter);
     }
     
-    // Content
     if (docString.content) {
       lines.push(...docString.content.split('\n'));
     }
     
-    // Closing delimiter
     lines.push(delimiter);
     
     return lines.join('\n');
@@ -402,7 +369,6 @@ export class DocStringParser {
     }
     
     if (docString.contentType) {
-      // Validate content against type
       switch (docString.contentType) {
         case 'json':
           try {
@@ -413,7 +379,6 @@ export class DocStringParser {
           break;
           
         case 'xml':
-          // Basic XML validation
           const openTags = (docString.content.match(/<[^\/][^>]*>/g) || []).length;
           const closeTags = (docString.content.match(/<\/[^>]+>/g) || []).length;
           if (openTags !== closeTags) {
@@ -430,5 +395,4 @@ export class DocStringParser {
   }
 }
 
-// Export singleton instance
 export const docStringParser = DocStringParser.getInstance();

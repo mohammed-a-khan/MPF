@@ -17,7 +17,7 @@ export class ElementCache {
   private static instance: ElementCache;
   private cache: Map<string, CacheEntry> = new Map();
   private maxSize: number = 1000;
-  private readonly defaultTTL: number = 300000; // 5 minutes
+  private readonly defaultTTL: number = 300000;
   private stats = {
     hits: 0,
     misses: 0,
@@ -38,7 +38,6 @@ export class ElementCache {
   }
 
   set(key: string, locator: Locator): void {
-    // Check cache size and evict if necessary
     if (this.cache.size >= this.maxSize) {
       this.evictLRU();
     }
@@ -64,14 +63,12 @@ export class ElementCache {
       return null;
     }
 
-    // Check if entry is expired
     if (this.isExpired(entry)) {
       this.cache.delete(key);
       this.stats.invalidations++;
       return null;
     }
 
-    // Check if page URL has changed
     try {
       const currentUrl = entry.locator.page().url();
       if (currentUrl !== entry.pageUrl) {
@@ -80,13 +77,11 @@ export class ElementCache {
         return null;
       }
     } catch (error) {
-      // Page might be closed
       this.cache.delete(key);
       this.stats.invalidations++;
       return null;
     }
 
-    // Update stats
     entry.hits++;
     entry.lastAccessed = Date.now();
     this.stats.hits++;
@@ -168,7 +163,6 @@ export class ElementCache {
   setMaxSize(size: number): void {
     this.maxSize = size;
     
-    // Evict entries if current size exceeds new max
     while (this.cache.size > this.maxSize) {
       this.evictLRU();
     }
@@ -252,7 +246,7 @@ export class ElementCache {
         ttl: this.defaultTTL,
         autoCleanup: !!this.cleanupInterval
       },
-      entries: entries.slice(0, 10), // Top 10 entries
+      entries: entries.slice(0, 10),
       totalEntries: this.cache.size
     };
   }

@@ -29,7 +29,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         ActionLogger.logInfo('Navigate to URL', { url, type: 'navigation_step' });
         
         try {
-            // Handle relative and absolute URLs
             const fullUrl = this.resolveUrl(url);
             
             await this.page.goto(fullUrl, {
@@ -37,7 +36,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
                 timeout: ConfigurationManager.getInt('NAVIGATION_TIMEOUT', 30000)
             });
 
-            // Wait for any custom page load conditions
             const waitSelector = ConfigurationManager.get('PAGE_LOAD_SELECTOR', '');
             if (waitSelector) {
                 await this.page.waitForSelector(waitSelector, {
@@ -46,7 +44,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
                 });
             }
 
-            // Clear current page object as we've navigated
             this.currentPage = null;
 
             ActionLogger.logInfo('Navigation completed', { 
@@ -67,12 +64,10 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         ActionLogger.logInfo('Navigate to page by name', { pageName, type: 'navigation_step' });
         
         try {
-            // Get page URL from configuration
             const pageUrlKey = `${pageName.toUpperCase().replace(/\s+/g, '_')}_PAGE_URL`;
             let pageUrl = ConfigurationManager.get(pageUrlKey, '');
             
             if (!pageUrl) {
-                // Try alternate key format
                 pageUrl = ConfigurationManager.get(`PAGE_${pageName.toUpperCase()}`, '');
             }
             
@@ -82,7 +77,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
 
             await this.navigateToUrl(pageUrl);
 
-            // Try to create page object if registered
             try {
                 this.currentPage = await PageFactory.createPageByName(pageName, this.page);
                 this.context.store('currentPage', this.currentPage, 'scenario');
@@ -110,7 +104,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
                 timeout: ConfigurationManager.getInt('NAVIGATION_TIMEOUT', 30000)
             });
 
-            // Wait for page to be ready after refresh
             await this.page.waitForLoadState('domcontentloaded');
 
             ActionLogger.logInfo('Page refreshed', { url: currentUrl, type: 'navigation_success' });
@@ -140,7 +133,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
                 ActionLogger.logWarn('Navigation back had no effect (possibly at first page in history)');
             }
 
-            // Clear current page object as we've navigated
             this.currentPage = null;
 
             ActionLogger.logInfo('Navigated back', { 
@@ -174,7 +166,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
                 ActionLogger.logWarn('Navigation forward had no effect (possibly at last page in history)');
             }
 
-            // Clear current page object as we've navigated
             this.currentPage = null;
 
             ActionLogger.logInfo('Navigated forward', { 
@@ -239,17 +230,14 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         try {
             const fullUrl = this.resolveUrl(url);
             
-            // Create new page (tab)
             const browserContext = this.context.getCurrentBrowserContext();
             const newPage = await browserContext.newPage();
             
-            // Navigate in new tab
             await newPage.goto(fullUrl, {
                 waitUntil: ConfigurationManager.get('NAVIGATION_WAIT_UNTIL', 'networkidle') as any,
                 timeout: ConfigurationManager.getInt('NAVIGATION_TIMEOUT', 30000)
             });
 
-            // Store new page in context
             this.context.store('currentPage', newPage, 'scenario');
 
             ActionLogger.logInfo('Navigated to URL in new tab', { 
@@ -270,7 +258,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         try {
             await this.page.close();
             
-            // Get remaining pages
             const browserContext = this.context.getCurrentBrowserContext();
             const pages = browserContext.pages();
             
@@ -279,7 +266,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
                 if (!lastPage) {
                     throw new Error('Failed to get last page reference');
                 }
-                // Switch to last page
                 await lastPage.bringToFront();
                 this.context.store('currentPage', lastPage, 'scenario');
             }
@@ -323,8 +309,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         }
     }
 
-    // Removed duplicate step definition - using SauceDemoSteps.loginWithCredentials() instead
-    // which provides more detailed action logging
 
     @CSBDDStepDef('I should see the products page')
     async validateProductsPage(): Promise<void> {
@@ -332,7 +316,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         try {
             const page = BDDContext.getCurrentPage();
             
-            // Verify products page elements
             await page.locator('.inventory_list').waitFor({
                 state: 'visible',
                 timeout: 5000
@@ -358,7 +341,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         try {
             const page = BDDContext.getCurrentPage();
             
-            // Count products
             const products = page.locator('.inventory_item');
             const count = await products.count();
             
@@ -381,7 +363,6 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         try {
             const page = BDDContext.getCurrentPage();
             
-            // Click first add to cart button
             await page.locator('[data-test^="add-to-cart"]').first().click();
             
             await actionLogger.logAction('add_product_to_cart', {
@@ -416,13 +397,11 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
         try {
             const page = BDDContext.getCurrentPage();
             
-            // Wait for cart item
             await page.locator('.cart_item').waitFor({
                 state: 'visible',
                 timeout: 5000
             });
             
-            // Count cart items
             const count = await page.locator('.cart_item').count();
             
             await actionLogger.logAction('validate_item_in_cart', {
@@ -435,17 +414,14 @@ export class NavigationSteps extends CSBDDBaseStepDefinition {
     }
 
     private resolveUrl(url: string): string {
-        // If URL is absolute, return as is
         if (url.startsWith('http://') || url.startsWith('https://')) {
             return url;
         }
         
-        // If base URL is not set, return URL as is
         if (!this.baseUrl) {
             return url;
         }
         
-        // Join base URL and relative URL
         return new URL(url, this.baseUrl).toString();
     }
 }

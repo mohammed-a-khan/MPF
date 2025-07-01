@@ -37,21 +37,16 @@ export class NaturalLanguageProcessor {
     const startTime = Date.now();
     
     try {
-      // Step 1: Tokenize
       const tokens = this.tokenAnalyzer.tokenize(description);
       
-      // Step 2: Parse sentence structure
       const parseTree = this.sentenceParser.parseSentence(tokens);
       
-      // Step 3: Extract keywords
       const keywords = await this.keywordExtractor.extractKeywords(description);
       
-      // Step 4: Classify intent
       const intent = await this.intentClassifier.classifyIntent(description);
       const actionType = this.intentClassifier.identifyAction(intent);
       const targetType = this.intentClassifier.identifyTarget(intent);
       
-      // Step 5: Extract specific patterns
       const mappedIntent = this.mapActionTypeToNLPIntent(actionType);
       const result: NLPResult = {
         intent: mappedIntent,
@@ -61,7 +56,7 @@ export class NaturalLanguageProcessor {
         semanticTokens: this.extractSemanticTokens(tokens),
         expectedRoles: this.identifyExpectedRoles(targetType),
         expectsInteractive: this.isInteractiveIntent(actionType),
-        expectsVisible: true, // Most UI elements should be visible
+        expectsVisible: true,
         formElement: this.isFormElement(targetType),
         expectedPosition: this.extractPosition(description),
         positionKeywords: this.extractPositionKeywords(description),
@@ -89,7 +84,6 @@ export class NaturalLanguageProcessor {
   }
   
   quickProcess(description: string): NLPResult {
-    // Quick processing for confidence scoring
     const keywords = description.toLowerCase().split(/\s+/);
     
     return {
@@ -103,7 +97,6 @@ export class NaturalLanguageProcessor {
   private identifyElementType(description: string, _parseTree: any): string | undefined {
     const lowerDesc = description.toLowerCase();
     
-    // Direct element type mentions
     const elementTypes: Record<string, string[]> = {
       button: ['button', 'btn', 'submit', 'click'],
       link: ['link', 'hyperlink', 'anchor'],
@@ -125,7 +118,6 @@ export class NaturalLanguageProcessor {
       }
     }
     
-    // Infer from action words
     if (lowerDesc.includes('click') || lowerDesc.includes('press')) {
       return 'button';
     }
@@ -142,14 +134,12 @@ export class NaturalLanguageProcessor {
   }
   
   private extractExactText(description: string): string | undefined {
-    // Extract text in quotes
     const singleQuoteMatch = description.match(/'([^']+)'/);
     if (singleQuoteMatch) return singleQuoteMatch[1];
     
     const doubleQuoteMatch = description.match(/"([^"]+)"/);
     if (doubleQuoteMatch) return doubleQuoteMatch[1];
     
-    // Extract text after common patterns
     const patterns = [
       /text\s+["']?([^"']+)["']?/i,
       /labeled\s+["']?([^"']+)["']?/i,
@@ -167,7 +157,6 @@ export class NaturalLanguageProcessor {
   }
   
   private extractSemanticTokens(tokens: any[]): string[] {
-    // Extract meaningful tokens for semantic matching
     return tokens
       .filter(token => 
         token.type === 'word' && 
@@ -234,7 +223,6 @@ export class NaturalLanguageProcessor {
       }
     }
     
-    // Check for ordinal positions
     if (lowerDesc.match(/first|1st/)) return 'first';
     if (lowerDesc.match(/second|2nd/)) return 'second';
     if (lowerDesc.match(/third|3rd/)) return 'third';
@@ -304,7 +292,6 @@ export class NaturalLanguageProcessor {
   private identifyUIPattern(description: string, targetType: string): UIPattern | undefined {
     const lowerDesc = description.toLowerCase();
     
-    // Common UI patterns
     if (lowerDesc.includes('primary') && targetType === 'button') {
       return {
         name: 'primary-button',
@@ -358,13 +345,11 @@ export class NaturalLanguageProcessor {
   }
   
   private extractMainSubject(tokens: any[]): string {
-    // Find the main noun that represents the element
     const nouns = tokens.filter(t => t.pos === 'NOUN');
     if (nouns.length > 0) {
-      return nouns[nouns.length - 1].value; // Usually the last noun
+      return nouns[nouns.length - 1].value;
     }
     
-    // Fallback to any significant word
     const significantWords = tokens.filter(t => 
       t.type === 'word' && 
       t.value.length > 3 &&
@@ -375,7 +360,6 @@ export class NaturalLanguageProcessor {
   }
   
   private extractModifiers(tokens: any[]): string[] {
-    // Extract adjectives and other modifiers
     return tokens
       .filter(t => t.pos === 'ADJ' || t.pos === 'ADV')
       .map(t => t.value);
@@ -384,19 +368,16 @@ export class NaturalLanguageProcessor {
   private extractAttributes(description: string): Record<string, string> {
     const attributes: Record<string, string> = {};
     
-    // Extract color mentions
     const colorMatch = description.match(/(red|blue|green|yellow|black|white|gray|grey)/i);
     if (colorMatch && colorMatch[1]) {
       attributes['color'] = colorMatch[1].toLowerCase();
     }
     
-    // Extract size mentions
     const sizeMatch = description.match(/(large|big|small|tiny|huge)/i);
     if (sizeMatch && sizeMatch[1]) {
       attributes['size'] = sizeMatch[1].toLowerCase();
     }
     
-    // Extract state mentions
     const stateMatch = description.match(/(enabled|disabled|active|inactive|selected)/i);
     if (stateMatch && stateMatch[1]) {
       attributes['state'] = stateMatch[1].toLowerCase();
@@ -432,19 +413,16 @@ export class NaturalLanguageProcessor {
   }
   
   private calculateDescriptionConfidence(description: string, keywords: {word: string; score: number}[]): number {
-    let confidence = 0.5; // Base confidence
+    let confidence = 0.5;
     
-    // Increase confidence for specific element types
     if (this.identifyElementType(description, {}) !== undefined) {
       confidence += 0.2;
     }
     
-    // Increase confidence for exact text
     if (this.extractExactText(description) !== undefined) {
       confidence += 0.2;
     }
     
-    // Increase confidence based on keyword quality
     const highValueKeywords = keywords.filter(k => (k.score ?? 0) > 0.7);
     confidence += Math.min(highValueKeywords.length * 0.05, 0.1);
     

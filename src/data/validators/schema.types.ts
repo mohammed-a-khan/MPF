@@ -2,9 +2,6 @@
 
 import { TestData } from '../types/data.types';
 
-/**
- * JSON Schema definition following JSON Schema Draft-07
- */
 export interface Schema {
     $id?: string;
     $schema?: string;
@@ -47,13 +44,9 @@ export interface Schema {
     propertyNames?: Schema;
     minProperties?: number;
     maxProperties?: number;
-    // Custom keywords
     [key: string]: any;
 }
 
-/**
- * Schema validation result
- */
 export interface SchemaValidationResult {
     valid: boolean;
     errors: SchemaValidationError[];
@@ -71,9 +64,6 @@ export interface SchemaValidationResult {
     };
 }
 
-/**
- * Schema validation error
- */
 export interface SchemaValidationError {
     path: string;
     message: string;
@@ -86,9 +76,6 @@ export interface SchemaValidationError {
     instancePath?: string;
 }
 
-/**
- * Schema validation warning
- */
 export interface SchemaValidationWarning {
     path: string;
     message: string;
@@ -96,9 +83,6 @@ export interface SchemaValidationWarning {
     suggestion?: string;
 }
 
-/**
- * Schema validation options
- */
 export interface SchemaOptions {
     strict?: boolean;
     coerceTypes?: boolean;
@@ -128,25 +112,18 @@ export interface SchemaOptions {
     };
     messages?: boolean;
     loadSchema?: (uri: string) => Promise<Schema>;
-    // Custom validation
     customFormats?: Record<string, (value: any) => boolean>;
     customKeywords?: Record<string, (value: any, schema: any, parentSchema: any) => boolean>;
     beforeValidate?: (data: any, schema: Schema) => void;
     afterValidate?: (data: any, schema: Schema, result: boolean) => void;
 }
 
-/**
- * Schema format validators
- */
 export interface FormatValidator {
     name: string;
     validate: (value: any) => boolean;
     message?: string;
 }
 
-/**
- * Schema keyword definition
- */
 export interface KeywordDefinition {
     name: string;
     type?: string | string[];
@@ -161,18 +138,12 @@ export interface KeywordDefinition {
     metaSchema?: Schema;
 }
 
-/**
- * Schema reference
- */
 export interface SchemaReference {
     $ref: string;
     resolved?: Schema;
     circular?: boolean;
 }
 
-/**
- * Schema compilation context
- */
 export interface SchemaCompilationContext {
     schemas: Map<string, Schema>;
     refs: Map<string, SchemaReference>;

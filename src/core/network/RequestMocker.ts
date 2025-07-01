@@ -24,9 +24,6 @@ export class RequestMocker {
     this.networkInterceptor = new NetworkInterceptor(page);
   }
 
-  /**
-   * Mock endpoint with static response
-   */
   async mockEndpoint(url: string, response: MockResponse): Promise<void> {
     try {
       ActionLogger.logInfo('mockEndpoint', {
@@ -37,10 +34,8 @@ export class RequestMocker {
 
       const pattern: URLPattern = { url };
       
-      // Track mock setup
       this.initializeMockTracking(url);
 
-      // Set up interception
       await this.networkInterceptor.mockResponse(pattern, response);
 
       ActionLogger.logInfo('mockEndpoint.registered', {
@@ -53,9 +48,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Mock endpoint from file
-   */
   async mockFromFile(url: string, filePath: string): Promise<void> {
     try {
       ActionLogger.logInfo('mockFromFile', {
@@ -63,14 +55,12 @@ export class RequestMocker {
         filePath
       });
 
-      // Read file content
       const fileContent = await FileUtils.readFile(filePath);
       const contentType = this.getContentTypeFromFile(filePath);
 
       let response: MockResponse;
 
       if (contentType.includes('json')) {
-        // Parse JSON file
         try {
           const json = JSON.parse(fileContent.toString());
           response = {
@@ -82,7 +72,6 @@ export class RequestMocker {
           throw new Error(`Invalid JSON in file ${filePath}: ${(parseError as Error).message}`);
         }
       } else {
-        // Use as text/binary
         response = {
           status: 200,
           body: fileContent,
@@ -104,9 +93,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Mock from template with data interpolation
-   */
   async mockFromTemplate(
     url: string, 
     template: string, 
@@ -119,17 +105,13 @@ export class RequestMocker {
         dataKeys: Object.keys(data)
       });
 
-      // Store template for reuse
       this.mockTemplates.set(url, template);
 
-      // Process template
       const processedContent = this.processTemplate(template, data);
 
-      // Determine response type
       let response: MockResponse;
       
       try {
-        // Try to parse as JSON
         const json = JSON.parse(processedContent);
         response = {
           status: 200,
@@ -137,7 +119,6 @@ export class RequestMocker {
           contentType: 'application/json'
         };
       } catch {
-        // Treat as text
         response = {
           status: 200,
           text: processedContent,
@@ -157,9 +138,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Mock error response
-   */
   async mockError(url: string, error: NetworkError): Promise<void> {
     try {
       ActionLogger.logInfo('mockError', {
@@ -182,9 +160,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Mock with delay
-   */
   async mockDelay(url: string, delay: number): Promise<void> {
     try {
       ActionLogger.logInfo('mockDelay', {
@@ -206,9 +181,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Mock sequence of responses
-   */
   async mockSequence(url: string, responses: MockResponse[]): Promise<void> {
     try {
       ActionLogger.logInfo('mockSequence', {
@@ -220,7 +192,6 @@ export class RequestMocker {
         throw new Error('Response sequence cannot be empty');
       }
 
-      // Initialize sequence tracking
       this.mockSequences.set(url, {
         items: responses.map((response, index) => ({
           response,
@@ -230,7 +201,6 @@ export class RequestMocker {
         currentIndex: 0
       });
 
-      // Set up dynamic mock
       const pattern: URLPattern = { url };
       
       await this.networkInterceptor.interceptRequest(pattern, async (route, request) => {
@@ -241,7 +211,6 @@ export class RequestMocker {
           return;
         }
 
-        // Get current response
         const currentItem = sequence.items[sequence.currentIndex];
         if (!currentItem) {
           await route.continue();
@@ -249,10 +218,8 @@ export class RequestMocker {
         }
         const response = currentItem.response;
 
-        // Mark as used
         currentItem.used = true;
 
-        // Advance to next response (loop if at end)
         sequence.currentIndex = (sequence.currentIndex + 1) % sequence.items.length;
 
         ActionLogger.logInfo('mockSequence.serving', {
@@ -261,12 +228,10 @@ export class RequestMocker {
           status: response.status
         });
 
-        // Apply delay if specified
         if (response.delay) {
           await new Promise(resolve => setTimeout(resolve, response.delay));
         }
 
-        // Fulfill with response
         await route.fulfill({
           status: response.status || 200,
           headers: {
@@ -276,7 +241,6 @@ export class RequestMocker {
           body: this.getResponseBody(response)
         });
 
-        // Track call
         this.recordMockCall(url, request, response);
       });
 
@@ -290,9 +254,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Mock with conditional logic
-   */
   async mockConditional(
     url: string, 
     condition: MockCondition, 
@@ -304,14 +265,12 @@ export class RequestMocker {
         hasCondition: true
       });
 
-      // Store conditional mock
       if (!this.conditionalMocks.has(url)) {
         this.conditionalMocks.set(url, []);
       }
       
       this.conditionalMocks.get(url)!.push({ condition, response });
 
-      // Set up interception
       const pattern: URLPattern = { url };
       
       await this.networkInterceptor.interceptRequest(pattern, async (route, request) => {
@@ -322,7 +281,6 @@ export class RequestMocker {
           return;
         }
 
-        // Find matching condition
         let matchedResponse: MockResponse | null = null;
         
         for (const { condition, response } of conditions) {
@@ -333,7 +291,6 @@ export class RequestMocker {
         }
 
         if (!matchedResponse) {
-          // No condition matched, continue normally
           await route.continue();
           return;
         }
@@ -343,12 +300,10 @@ export class RequestMocker {
           status: matchedResponse.status
         });
 
-        // Apply delay if specified
         if (matchedResponse.delay) {
           await new Promise(resolve => setTimeout(resolve, matchedResponse.delay));
         }
 
-        // Fulfill with matched response
         await route.fulfill({
           status: matchedResponse.status || 200,
           headers: {
@@ -358,7 +313,6 @@ export class RequestMocker {
           body: this.getResponseBody(matchedResponse)
         });
 
-        // Track call
         this.recordMockCall(url, request, matchedResponse);
       });
 
@@ -372,9 +326,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Mock with dynamic response generator
-   */
   async mockDynamic(
     url: string,
     responseGenerator: (request: any) => MockResponse
@@ -385,10 +336,8 @@ export class RequestMocker {
         hasDynamicGenerator: true
       });
 
-      // Store dynamic mock
       this.dynamicMocks.set(url, responseGenerator);
 
-      // Set up interception
       const pattern: URLPattern = { url };
       
       await this.networkInterceptor.interceptRequest(pattern, async (route, request) => {
@@ -400,7 +349,6 @@ export class RequestMocker {
         }
 
         try {
-          // Generate response based on request
           const requestData = {
             url: request.url(),
             method: request.method(),
@@ -416,12 +364,10 @@ export class RequestMocker {
             status: response.status
           });
 
-          // Apply delay if specified
           if (response.delay) {
             await new Promise(resolve => setTimeout(resolve, response.delay));
           }
 
-          // Fulfill with generated response
           await route.fulfill({
             status: response.status || 200,
             headers: {
@@ -431,7 +377,6 @@ export class RequestMocker {
             body: this.getResponseBody(response)
           });
 
-          // Track call
           this.recordMockCall(url, request, response);
         } catch (generatorError) {
           ActionLogger.logError('RequestMocker.mockDynamic.generator', generatorError as Error);
@@ -446,9 +391,6 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Clear all mocks
-   */
   async clearMocks(): Promise<void> {
     try {
       ActionLogger.logInfo('clearMocks', {
@@ -470,14 +412,10 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Clear specific mock
-   */
   async clearMock(url: string): Promise<void> {
     try {
       ActionLogger.logInfo('clearMock', { url });
 
-      // Remove from tracking
       this.mockCallHistory.delete(url);
       this.mockSequences.delete(url);
       this.conditionalMocks.delete(url);
@@ -485,7 +423,6 @@ export class RequestMocker {
       this.dynamicMocks.delete(url);
 
       // Note: Individual route removal not supported in Playwright
-      // Would need to re-register all other mocks
 
       ActionLogger.logInfo('clearMock.complete', { url });
     } catch (error) {
@@ -494,16 +431,10 @@ export class RequestMocker {
     }
   }
 
-  /**
-   * Get mock call history
-   */
   getMockCalls(url: string): MockCall[] {
     return this.mockCallHistory.get(url) || [];
   }
 
-  /**
-   * Verify mock was called
-   */
   verifyMockCalled(url: string, times?: number): boolean {
     const calls = this.getMockCalls(url);
     
@@ -514,16 +445,10 @@ export class RequestMocker {
     return calls.length === times;
   }
 
-  /**
-   * Get all mock calls
-   */
   getAllMockCalls(): Map<string, MockCall[]> {
     return new Map(this.mockCallHistory);
   }
 
-  /**
-   * Reset mock sequences
-   */
   resetMockSequences(): void {
     this.mockSequences.forEach(sequence => {
       sequence.currentIndex = 0;
@@ -537,9 +462,6 @@ export class RequestMocker {
     });
   }
 
-  /**
-   * Get mock statistics
-   */
   getMockStats(): Record<string, any> {
     const totalCalls = Array.from(this.mockCallHistory.values())
       .reduce((sum, calls) => sum + calls.length, 0);
@@ -565,7 +487,6 @@ export class RequestMocker {
     };
   }
 
-  // Private helper methods
 
   private initializeMockTracking(url: string): void {
     if (!this.mockCallHistory.has(url)) {
@@ -598,7 +519,6 @@ export class RequestMocker {
 
     this.mockCallHistory.get(url)!.push(call);
 
-    // Limit history
     const calls = this.mockCallHistory.get(url)!;
     if (calls.length > 100) {
       calls.shift();
@@ -649,7 +569,6 @@ export class RequestMocker {
   private processTemplate(template: string, data: any): string {
     let processed = template;
 
-    // Replace placeholders {{key}} with data values
     const placeholderRegex = /\{\{(\w+(?:\.\w+)*)\}\}/g;
     
     processed = processed.replace(placeholderRegex, (match, key) => {
@@ -657,7 +576,6 @@ export class RequestMocker {
       return value !== undefined ? String(value) : match;
     });
 
-    // Handle loops {#each items}...{/each}
     const loopRegex = /\{#each\s+(\w+)\}([\s\S]*?)\{\/each\}/g;
     
     processed = processed.replace(loopRegex, (_match, arrayKey, loopContent) => {
@@ -667,19 +585,16 @@ export class RequestMocker {
       return array.map((item, index) => {
         let itemContent = loopContent;
         
-        // Replace item placeholders
         itemContent = itemContent.replace(/\{\{item\.(\w+)\}\}/g, (m: string, prop: string) => {
           return item[prop] !== undefined ? String(item[prop]) : m;
         });
         
-        // Replace index
         itemContent = itemContent.replace(/\{\{index\}\}/g, String(index));
         
         return itemContent;
       }).join('');
     });
 
-    // Handle conditionals {#if condition}...{/if}
     const conditionalRegex = /\{#if\s+(\w+)\}([\s\S]*?)\{\/if\}/g;
     
     processed = processed.replace(conditionalRegex, (_match, condition, content) => {
@@ -703,7 +618,6 @@ export class RequestMocker {
         params[key] = value;
       });
     } catch {
-      // Invalid URL, return empty params
     }
     
     return params;

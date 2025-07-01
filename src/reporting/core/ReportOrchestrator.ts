@@ -18,9 +18,6 @@ import { ConfigurationManager } from '../../core/configuration/ConfigurationMana
 import { ReportDataConverter } from '../utils/ReportDataConverter';
 import * as path from 'path';
 
-/**
- * Orchestrates the generation of all report formats
- */
 export class ReportOrchestrator {
     private logger: Logger;
     private config!: ReportConfig;
@@ -37,13 +34,9 @@ export class ReportOrchestrator {
         this.initializeGenerators();
     }
 
-    /**
-     * Initialize the orchestrator
-     */
     public async initialize(config: ReportConfig): Promise<void> {
         this.config = config;
         
-        // Initialize unified HTML generator with all features
         const reportConfig = {
             path: this.config.get('reportPath') || './reports',
             themePrimaryColor: this.config.get('themePrimaryColor') || '#93186C',
@@ -62,39 +55,30 @@ export class ReportOrchestrator {
         this.logger.info('Report orchestrator initialized');
     }
 
-    /**
-     * Generate all configured report formats
-     */
     public async generateReports(reportData: ReportData): Promise<ReportResult> {
         try {
             const startTime = Date.now();
             this.logger.info('Starting report generation');
 
-            // Generate a unique report ID
             const reportId = this.generateReportId();
             
-            // Store execution start time for filtering screenshots
             let executionStartTime: Date;
             if (reportData.metadata?.startTime) {
                 executionStartTime = new Date(reportData.metadata.startTime);
             } else if (reportData.metadata?.executionDate) {
                 executionStartTime = new Date(reportData.metadata.executionDate);
             } else {
-                executionStartTime = new Date(Date.now() - 3600000); // Default to 1 hour ago if not set
+                executionStartTime = new Date(Date.now() - 3600000);
             }
             
-            // Create report directory structure with execution context
             const reportDir = await this.createReportStructure(reportId, executionStartTime);
 
-            // Save report data for debugging and future reference
             const reportDataPath = path.join(reportDir, 'report-data.json');
             await FileUtils.writeJSON(reportDataPath, reportData);
             this.logger.debug(`Saved report data to ${reportDataPath}`);
 
-            // Generate HTML report
             const htmlPath = await this.generateHTMLReport(reportData, reportDir);
 
-            // Generate other formats based on configuration
             const reportPaths: ReportPath[] = [{
                 format: ExportFormat.HTML,
                 path: htmlPath,
@@ -146,7 +130,6 @@ export class ReportOrchestrator {
                 success: true
             };
 
-            // Cache the result
             this.reportCache.set(reportId, reportResult);
 
             this.logger.info(`Report generation completed in ${reportResult.duration}ms`);
@@ -158,12 +141,8 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Generate live report during execution
-     */
     public async generateLiveReport(_partialData: any, _evidence: any): Promise<string> {
         try {
-            // Simple HTML generation for live preview
             const html = `
                 <!DOCTYPE html>
                 <html>
@@ -197,14 +176,10 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Update existing report
-     */
     public async updateReport(report: ReportResult, updatedData: Partial<ReportData>): Promise<void> {
         this.logger.info(`Updating report: ${report.reportId}`);
         
         try {
-            // Get existing report data
             const reportDataPath = path.join(report.reportPath, 'report-data.json');
             let existingData: ReportData;
             
@@ -214,7 +189,6 @@ export class ReportOrchestrator {
                 throw new Error(`Report data not found for report: ${report.reportId}`);
             }
             
-            // Merge updated data
             const mergedData: ReportData = {
                 ...existingData,
                 ...updatedData,
@@ -225,17 +199,14 @@ export class ReportOrchestrator {
                 }
             };
             
-            // Save updated data
             await FileUtils.writeJSON(reportDataPath, mergedData);
             
-            // Regenerate HTML report with updated data
             const htmlPath = report.reportPaths.find(p => p.format === ExportFormat.HTML)?.path;
             if (htmlPath) {
                 const htmlContent = await this.htmlGenerator.generate(mergedData);
                 await FileUtils.writeFile(htmlPath, htmlContent);
             }
             
-            // Update other formats if they exist
             for (const reportPath of report.reportPaths) {
                 if (reportPath.format !== ExportFormat.HTML && await FileUtils.pathExists(reportPath.path)) {
                     switch (reportPath.format) {
@@ -262,14 +233,10 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Export report to different format
-     */
     public async exportReport(report: ReportResult, format: 'pdf' | 'excel' | 'json' | 'xml'): Promise<string> {
         this.logger.info(`Exporting report ${report.reportId} to ${format} format`);
         
         try {
-            // Get report data
             const reportDataPath = path.join(report.reportPath, 'report-data.json');
             let reportData: ReportData;
             
@@ -279,7 +246,6 @@ export class ReportOrchestrator {
                 throw new Error(`Report data not found for report: ${report.reportId}`);
             }
             
-            // Get HTML content if needed for PDF
             const htmlPath = report.reportPaths.find(p => p.format === ExportFormat.HTML)?.path;
             let htmlContent = '';
             if (htmlPath && await FileUtils.pathExists(htmlPath)) {
@@ -300,7 +266,6 @@ export class ReportOrchestrator {
                     
                 case 'excel':
                     const excelPath = path.join(report.reportPath, 'exports', `report_${Date.now()}.xlsx`);
-                    // Convert ReportData to ExecutionResult format
                     const executionResult = ReportDataConverter.toExecutionResult(reportData);
                     const excelResult = await this.excelExporter.export(executionResult, excelPath, {
                         format: ExportFormat.EXCEL,
@@ -318,7 +283,6 @@ export class ReportOrchestrator {
                     
                 case 'json':
                     const jsonPath = path.join(report.reportPath, 'exports', `report_${Date.now()}.json`);
-                    // Convert ReportData to ExecutionResult format
                     const executionResultForJson = ReportDataConverter.toExecutionResult(reportData);
                     const jsonResult = await this.jsonExporter.export(executionResultForJson, jsonPath);
                     exportPath = jsonResult.filePath || '';
@@ -343,20 +307,12 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Finalize report generation
-     */
     public async finalize(): Promise<void> {
-        // Clear cache
         this.reportCache.clear();
         this.logger.info('Report orchestrator finalized');
     }
 
-    /**
-     * Initialize generators
-     */
     private initializeGenerators(): void {
-        // Use ImprovedProductionHTMLReportGenerator for beautiful reports
         this.htmlGenerator = new ImprovedProductionHTMLReportGenerator();
         this.pdfExporter = new PDFExporter();
         this.professionalPdfExporter = new ProfessionalPDFExporter();
@@ -365,9 +321,6 @@ export class ReportOrchestrator {
         this.xmlExporter = new XMLExporter();
     }
 
-    /**
-     * Create report directory structure
-     */
     private async createReportStructure(reportId: string, executionStartTime?: Date): Promise<string> {
         const reportPath = path.join(this.config.get('reportPath'), reportId);
         
@@ -383,7 +336,6 @@ export class ReportOrchestrator {
             await FileUtils.createDir(dir);
         }
 
-        // Set the current report directory in configuration for screenshot manager
         ConfigurationManager.set('CURRENT_REPORT_DIR', reportPath);
         
         // CRITICAL FIX: Collect evidence (screenshots, logs, videos) for the report
@@ -394,23 +346,17 @@ export class ReportOrchestrator {
         return reportPath;
     }
 
-    /**
-     * CRITICAL FIX: Collect all evidence for the report
-     */
     private async collectEvidence(reportPath: string, executionStartTime?: Date): Promise<void> {
         try {
             const evidenceDir = path.join(reportPath, 'evidence');
             const assetsDir = path.join(reportPath, 'assets');
             
-            // Ensure directories exist
             await FileUtils.ensureDir(evidenceDir);
             await FileUtils.ensureDir(assetsDir);
             
-            // 1. Copy screenshots from screenshots directory to evidence
             const screenshotsDir = path.join(process.cwd(), 'screenshots');
             await this.copyScreenshotsRecursively(screenshotsDir, evidenceDir, executionStartTime);
             
-            // 2. Copy videos if they exist
             const videosDir = path.join(process.cwd(), 'videos');
             if (await FileUtils.pathExists(videosDir)) {
                 const videoFiles = await FileUtils.readDir(videosDir);
@@ -424,33 +370,25 @@ export class ReportOrchestrator {
                 }
             }
             
-            // 3. Export comprehensive logs from ActionLogger
             await this.exportComprehensiveLogs(evidenceDir);
             
             this.logger.info(`Evidence collection completed for report: ${reportPath}`);
             
         } catch (error) {
             this.logger.warn(`Evidence collection failed: ${error}`);
-            // Don't fail the entire report generation if evidence collection fails
         }
     }
 
-    /**
-     * CRITICAL FIX: Export comprehensive logs from ActionLogger
-     */
     private async exportComprehensiveLogs(evidenceDir: string): Promise<void> {
         try {
             const { ActionLogger } = await import('../../core/logging/ActionLogger');
             const actionLogger = ActionLogger.getInstance();
             
-            // Generate comprehensive log report
             const logReport = await actionLogger.generateReport();
             
-            // Export logs in multiple formats
             const logsPath = path.join(evidenceDir, 'execution-logs.json');
             await FileUtils.writeFile(logsPath, JSON.stringify(logReport, null, 2));
             
-            // Export text format logs for easy reading
             const textLogsPath = path.join(evidenceDir, 'execution-logs.txt');
             const textLogs = this.formatLogsAsText(logReport);
             await FileUtils.writeFile(textLogsPath, textLogs);
@@ -462,9 +400,6 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Format logs as readable text
-     */
     private formatLogsAsText(logReport: any): string {
         let text = `CS Test Automation Framework - Execution Logs\n`;
         text += `=============================================\n\n`;
@@ -499,30 +434,21 @@ export class ReportOrchestrator {
         return text;
     }
 
-    /**
-     * Generate HTML report
-     */
     private async generateHTMLReport(reportData: ReportData, reportDir: string): Promise<string> {
         const htmlPath = path.join(reportDir, 'html', 'index.html');
         
-        // Use unified HTML generator with all features
         const html = await this.htmlGenerator.generate(reportData);
         await this.htmlGenerator.saveReport(html, htmlPath);
         
         return htmlPath;
     }
 
-    /**
-     * Generate PDF report
-     */
     private async generatePDFReport(reportData: ReportData, reportDir: string): Promise<string> {
         const pdfPath = path.join(reportDir, 'exports', 'report.pdf');
         
         try {
-            // Ensure exports directory exists
             await FileUtils.createDir(path.join(reportDir, 'exports'));
             
-            // Generate HTML content first if not available
             const htmlPath = path.join(reportDir, 'html', 'index.html');
             let htmlContent: string;
             
@@ -533,7 +459,6 @@ export class ReportOrchestrator {
                 htmlContent = await this.htmlGenerator.generate(reportData);
             }
             
-            // Export to PDF using professional exporter
             const result = await this.professionalPdfExporter.export(reportData, htmlContent, {
                 outputPath: pdfPath,
                 format: ExportFormat.PDF
@@ -541,10 +466,8 @@ export class ReportOrchestrator {
             
             return result.filePath || '';
         } catch (error) {
-            // 🔥 FIX: Don't crash the framework if PDF generation fails
             this.logger.warn(`⚠️ PDF export failed but continuing with HTML report: ${error}`);
             
-            // Create a placeholder PDF error file
             const errorPath = path.join(reportDir, 'exports', 'pdf-error.txt');
             await FileUtils.writeFile(errorPath, 
                 `PDF Export Failed\n` +
@@ -559,20 +482,14 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Generate Excel report
-     */
     private async generateExcelReport(reportData: ReportData, reportDir: string): Promise<string> {
         const excelPath = path.join(reportDir, 'exports', 'report.xlsx');
         
         try {
-            // Ensure exports directory exists
             await FileUtils.createDir(path.join(reportDir, 'exports'));
             
-            // Convert ReportData to ExecutionResult format expected by ExcelExporter
             const executionResult = ReportDataConverter.toExecutionResult(reportData);
             
-            // Export to Excel with additional options
             const result = await this.excelExporter.export(executionResult, excelPath, {
                 format: ExportFormat.EXCEL,
                 includeCharts: true,
@@ -587,10 +504,8 @@ export class ReportOrchestrator {
             
             return result.filePath || '';
         } catch (error) {
-            // Don't crash the framework if Excel generation fails
             this.logger.warn(`Excel export failed but continuing with other reports: ${error}`);
             
-            // Create a placeholder error file
             const errorPath = path.join(reportDir, 'exports', 'excel-error.txt');
             await FileUtils.writeFile(errorPath, 
                 `Excel Export Failed\n` +
@@ -605,32 +520,22 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Generate JSON report
-     */
     private async generateJSONReport(reportData: ReportData, reportDir: string): Promise<string> {
         const jsonPath = path.join(reportDir, 'exports', 'report.json');
         
-        // Ensure exports directory exists
         await FileUtils.createDir(path.join(reportDir, 'exports'));
         
-        // Export to JSON
         const executionResultForJson = ReportDataConverter.toExecutionResult(reportData);
         const result = await this.jsonExporter.export(executionResultForJson, jsonPath);
         
         return result.filePath || '';
     }
 
-    /**
-     * Generate XML report
-     */
     private async generateXMLReport(reportData: ReportData, reportDir: string): Promise<string> {
         const xmlPath = path.join(reportDir, 'exports', 'report.xml');
         
-        // Ensure exports directory exists
         await FileUtils.createDir(path.join(reportDir, 'exports'));
         
-        // Export to XML
         const result = await this.xmlExporter.export(reportData as any, xmlPath, {
             format: ExportFormat.XML,
             pretty: true
@@ -639,18 +544,12 @@ export class ReportOrchestrator {
         return result.filePath || '';
     }
 
-    /**
-     * Generate unique report ID
-     */
     private generateReportId(): string {
         const timestamp = DateUtils.format(new Date(), 'YYYYMMDD-HHmmss');
         const random = Math.random().toString(36).substring(2, 8);
         return `report-${timestamp}-${random}`;
     }
 
-    /**
-     * Get file size
-     */
     private async getFileSize(filePath: string): Promise<number> {
         try {
             const stats = await FileUtils.getStats(filePath);
@@ -660,41 +559,31 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Recursively copy screenshots from all subdirectories
-     */
     private async copyScreenshotsRecursively(sourceDir: string, evidenceDir: string, executionStartTime?: Date): Promise<void> {
         try {
             if (!(await FileUtils.pathExists(sourceDir))) {
                 return;
             }
 
-            const startTime = executionStartTime ? executionStartTime.getTime() : Date.now() - 3600000; // Default to 1 hour ago
+            const startTime = executionStartTime ? executionStartTime.getTime() : Date.now() - 3600000;
             let copiedCount = 0;
             let skippedCount = 0;
 
-            // Use the walk method to recursively find all image files
             for await (const { path: filePath, stats } of FileUtils.walk(sourceDir)) {
                 if (stats.isFile && this.isImageFile(filePath)) {
-                    // Check if the file was created after the execution start time
                     const fileModifiedTime = stats.modifiedAt ? stats.modifiedAt.getTime() : 0;
                     
                     if (fileModifiedTime >= startTime) {
-                        // Get just the filename, not the full relative path
                         const fileName = path.basename(filePath);
-                        // Put all screenshots in evidence/screenshots folder
                         const screenshotsDir = path.join(evidenceDir, 'screenshots');
                         const destPath = path.join(screenshotsDir, fileName);
                         
-                        // Check if file already exists to avoid duplicates
                         if (await FileUtils.pathExists(destPath)) {
                             this.logger.debug(`Skipping duplicate screenshot: ${fileName}`);
                             skippedCount++;
                         } else {
-                            // Ensure screenshots directory exists
                             await FileUtils.ensureDir(screenshotsDir);
                             
-                            // Copy the file
                             await FileUtils.copy(filePath, destPath, { overwrite: false });
                             this.logger.debug(`Copied screenshot: ${fileName}`);
                             copiedCount++;
@@ -712,9 +601,6 @@ export class ReportOrchestrator {
         }
     }
 
-    /**
-     * Check if file is an image file
-     */
     private isImageFile(filePath: string): boolean {
         const ext = path.extname(filePath).toLowerCase();
         return ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'].includes(ext);

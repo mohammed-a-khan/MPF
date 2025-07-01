@@ -1,9 +1,3 @@
-/**
- * CS Test Automation Framework - Authentication Type Definitions
- * 
- * Comprehensive type definitions for all authentication mechanisms
- * supporting 10+ authentication methods with full configuration options.
- */
 
 export type AuthenticationType = 
   | 'none'
@@ -51,7 +45,6 @@ export type APIKeyLocation =
   | 'query'
   | 'cookie';
 
-// Base AuthConfig interface
 export interface AuthConfig {
   type: AuthType;
   enabled?: boolean | undefined;
@@ -90,8 +83,8 @@ export interface BasicAuthConfig {
 
 export interface BearerAuthConfig {
   token: string;
-  scheme?: string | undefined; // Default: 'Bearer'
-  headerName?: string | undefined; // Default: 'Authorization'
+  scheme?: string | undefined;
+  headerName?: string | undefined;
   expiresAt?: Date | undefined;
   refreshToken?: string | undefined;
   refreshUrl?: string | undefined;
@@ -104,7 +97,6 @@ export interface APIKeyAuthConfig {
   value: string;
   location: APIKeyLocation;
   parameterName?: string | undefined;
-  // Extended properties
   apiKey?: string | undefined;
   keyName?: string | undefined;
   type?: AuthType | undefined;
@@ -155,7 +147,6 @@ export interface CertificateAuthConfig {
   checkServerIdentity?: boolean | undefined;
   ciphers?: string | undefined;
   minVersion?: 'TLSv1' | 'TLSv1.1' | 'TLSv1.2' | 'TLSv1.3' | undefined;
-  // Additional properties for extended functionality
   cert?: string | Buffer | undefined;
   key?: string | Buffer | undefined;
   ca?: string | Buffer | undefined;
@@ -163,7 +154,6 @@ export interface CertificateAuthConfig {
   type?: AuthType | undefined;
 }
 
-// Certificate Result Interface for APIAuthenticationHandler
 export interface CertificateAuthResult {
   agent?: any;
   headers?: Record<string, string> | undefined;
@@ -174,7 +164,6 @@ export interface CertificateAuthResult {
   fingerprint?: string | undefined;
 }
 
-// Certificate-related interfaces
 export interface CertificateInfo {
   certificate: string;
   privateKey: string;
@@ -331,7 +320,6 @@ export interface CertificateConstraints {
   extendedKeyUsage?: string[] | undefined;
 }
 
-// Additional certificate-related types
 export interface CertificateBundle {
   certificates: CertificateInfo[];
   trustChain: string[];
@@ -342,7 +330,6 @@ export interface CertificateValidityPeriod {
   notAfter: Date;
 }
 
-// OAuth2 specific types
 export enum OAuth2GrantType {
   AUTHORIZATION_CODE = 'authorization_code',
   IMPLICIT = 'implicit',
@@ -436,7 +423,6 @@ export interface OAuth2TokenResponse {
     issuer?: string | undefined;
     audience?: string | string[] | undefined;
   } | undefined;
-  // Legacy properties for backward compatibility
   access_token?: string | undefined;
   token_type?: string | undefined;
 }
@@ -618,7 +604,6 @@ export interface OAuth2UserInfo {
   updated_at?: number | undefined;
 }
 
-// Original interfaces continue...
 export interface NTLMAuthConfig {
   username: string;
   password: string;
@@ -660,7 +645,6 @@ export interface DigestAuthConfig {
   type?: AuthType | undefined;
 }
 
-// AWS Authentication Types
 export interface AWSAuthConfig {
   accessKeyId?: string | undefined;
   secretAccessKey?: string | undefined;
@@ -808,7 +792,6 @@ export interface AWSPresignedUrl {
   headers: Record<string, string>;
 }
 
-// Azure Authentication Types
 export interface AzureAuthConfig {
   tenantId: string;
   clientId: string;
@@ -828,7 +811,6 @@ export interface AzureManagedIdentityConfig {
   miResId?: string | undefined;
 }
 
-// Hawk Authentication
 export interface HawkAuthConfig {
   keyId: string;
   key: string;
@@ -840,7 +822,6 @@ export interface HawkAuthConfig {
   type?: AuthType | undefined;
 }
 
-// JWT Authentication
 export interface JWTAuthConfig {
   token?: string | undefined;
   privateKey?: string | undefined;
@@ -1053,7 +1034,6 @@ export interface AuthenticationMetrics {
   averageAuthTime: number;
   authMethodBreakdown: Record<AuthenticationType, number>;
   errorBreakdown: Record<string, number>;
-  // Extended properties
   totalAuthentications?: number | undefined;
   cacheHits?: number | undefined;
   cacheMisses?: number | undefined;
@@ -1091,7 +1071,6 @@ export interface SecurityPolicy {
   tokenLifetime?: number | undefined;
   refreshTokenLifetime?: number | undefined;
   sessionTimeout?: number | undefined;
-  // Extended properties
   id?: string | undefined;
   name?: string | undefined;
   enabled?: boolean | undefined;
@@ -1145,7 +1124,6 @@ export interface AuthenticationProvider {
   refresh?(token: string, config: AuthTypeConfig): Promise<AuthResult>;
   revoke?(token: string, config: AuthTypeConfig): Promise<void>;
   validate?(token: string, config: AuthTypeConfig): Promise<boolean>;
-  // Extended properties
   id?: string | undefined;
   name?: string | undefined;
   enabled?: boolean | undefined;
@@ -1199,7 +1177,6 @@ export interface AuthenticationEvent {
   type: AuthenticationEventType;
   timestamp: Date;
   data: any;
-  // Extended properties
   success?: boolean | undefined;
   duration?: number | undefined;
   error?: string | undefined;
@@ -1227,7 +1204,6 @@ export interface AuthenticationEventEmitter {
   emit(event: AuthenticationEventType, data: any): void;
 }
 
-// Extended types for APIAuthenticationHandler
 export interface AuthenticationResult {
   success: boolean;
   type: AuthType;
@@ -1333,7 +1309,6 @@ export interface AuthenticationChallenge {
   request: any;
 }
 
-// Type guards
 export function isBasicAuth(config: AuthTypeConfig): config is BasicAuthConfig {
   return 'username' in config && 'password' in config && !('domain' in config);
 }
@@ -1354,7 +1329,6 @@ export function isAWSAuth(config: AuthTypeConfig): config is AWSAuthConfig {
   return 'accessKeyId' in config && 'secretAccessKey' in config && 'region' in config;
 }
 
-// Utility types
 export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
 };
@@ -1363,7 +1337,6 @@ export type AuthConfigWithDefaults<T extends AuthTypeConfig> = T & {
   _defaults: Partial<T>;
 };
 
-// Proxy types for OAuth2Handler
 export interface ProxySettings {
   server: string;
   username?: string | undefined;
@@ -1373,7 +1346,6 @@ export interface ProxySettings {
   agent?: any;
 }
 
-// OAuth2Error class
 export class OAuth2Error extends Error {
   public code: string;
   

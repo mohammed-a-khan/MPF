@@ -15,9 +15,6 @@ export class PageFactory {
 
   private constructor() {}
 
-  /**
-   * Get singleton instance
-   */
   static getInstance(): PageFactory {
     if (!PageFactory.instance) {
       PageFactory.instance = new PageFactory();
@@ -25,22 +22,15 @@ export class PageFactory {
     return PageFactory.instance;
   }
 
-  /**
-   * Create a new page
-   */
   async createPage(context: BrowserContext): Promise<Page> {
     try {
       const pageId = this.generatePageId();
       ActionLogger.logInfo(`Creating new page: ${pageId}`);
       
-      // Create page
       const page = await context.newPage();
       
-      // Store page
       this.pages.set(pageId, page);
       
-      // Maximize browser if configured
-      // Check both ConfigurationManager and process.env as fallback
       let isMaximized = false;
       let isHeadless = false;
       
@@ -49,7 +39,6 @@ export class PageFactory {
         isMaximized = ConfigurationManager.getBoolean('BROWSER_MAXIMIZED', false);
         isHeadless = ConfigurationManager.getBoolean('HEADLESS', false);
       } catch (error) {
-        // Fallback to process.env if ConfigurationManager is not available
         isMaximized = process.env['BROWSER_MAXIMIZED'] === 'true';
         isHeadless = process.env['HEADLESS'] === 'true';
       }
@@ -60,7 +49,6 @@ export class PageFactory {
       if (isMaximized && !isHeadless) {
         console.log('🔍 DEBUG PageFactory: Attempting to maximize browser...');
         try {
-          // Cross-browser solution: Set viewport to screen size
           const screenSize = await page.evaluate(() => {
             return {
               width: window.screen.width,
@@ -72,7 +60,6 @@ export class PageFactory {
           
           console.log(`🔍 DEBUG PageFactory: Screen size detected - ${screenSize.availWidth}x${screenSize.availHeight}`);
           
-          // Use available dimensions to account for taskbar/dock
           await page.setViewportSize({
             width: screenSize.availWidth,
             height: screenSize.availHeight
@@ -88,10 +75,8 @@ export class PageFactory {
         console.log(`🔍 DEBUG PageFactory: Skipping maximization - maximized=${isMaximized}, headless=${isHeadless}`);
       }
       
-      // Register default event handlers
       this.registerPageEvents(page, pageId);
       
-      // Setup page listeners
       this.setupPageListeners(page, pageId);
       
       ActionLogger.logInfo(`Page created: ${pageId}`, {
@@ -105,26 +90,19 @@ export class PageFactory {
     }
   }
 
-  /**
-   * Create page for a specific scenario
-   */
   async createPageForScenario(scenarioId: string): Promise<Page> {
     try {
-      // Get or create context for scenario
       const contextManager = ContextManager.getInstance();
       let context: BrowserContext;
       
       try {
         context = contextManager.getContext(`scenario-${scenarioId}`);
       } catch {
-        // Create new context if not exists
         context = await contextManager.createScenarioContext(scenarioId);
       }
       
-      // Create page
       const page = await this.createPage(context);
       
-      // Map scenario to page
       this.pages.set(`scenario-${scenarioId}`, page);
       
       return page;
@@ -134,19 +112,12 @@ export class PageFactory {
     }
   }
 
-  /**
-   * Assign page to element (for element framework integration)
-   */
   assignPageToElement(page: Page, element: any): void {
-    // This will be used by CSWebElement
     if (element && typeof element === 'object') {
       element.page = page;
     }
   }
 
-  /**
-   * Get page for scenario
-   */
   getPageForScenario(scenarioId: string): Page {
     const page = this.pages.get(`scenario-${scenarioId}`);
     if (!page) {
@@ -155,9 +126,6 @@ export class PageFactory {
     return page;
   }
 
-  /**
-   * Get page by ID
-   */
   getPage(pageId: string): Page {
     const page = this.pages.get(pageId);
     if (!page) {
@@ -166,19 +134,12 @@ export class PageFactory {
     return page;
   }
 
-  /**
-   * Get page by key (alias for getPage)
-   */
   getPageByKey(key: string): Page | undefined {
     return this.pages.get(key);
   }
 
-  /**
-   * Close a specific page
-   */
   async closePage(page: Page): Promise<void> {
     try {
-      // Find page ID
       let pageId: string | undefined;
       this.pages.forEach((p, id) => {
         if (p === page && !pageId) {
@@ -193,10 +154,8 @@ export class PageFactory {
       
       ActionLogger.logInfo(`Closing page: ${pageId}`);
       
-      // Close page
       await page.close();
       
-      // Clean up
       this.pages.delete(pageId);
       this.pageEventHandlers.delete(pageId);
       this.dialogHandlers.delete(pageId);
@@ -209,9 +168,6 @@ export class PageFactory {
     }
   }
 
-  /**
-   * Close all pages
-   */
   async closeAllPages(): Promise<void> {
     ActionLogger.logInfo('Closing all pages');
     
@@ -231,57 +187,35 @@ export class PageFactory {
     ActionLogger.logInfo('All pages closed');
   }
 
-  /**
-   * Set event handlers for a page
-   */
   setPageEventHandlers(pageId: string, handlers: PageEventHandlers): void {
     this.pageEventHandlers.set(pageId, handlers);
     
-    // Apply handlers to existing page if available
     const page = this.pages.get(pageId);
     if (page) {
       this.applyEventHandlers(page, pageId);
     }
   }
 
-  /**
-   * Handle dialog for page
-   */
   async handleDialog(pageId: string, handler: (dialog: Dialog) => Promise<void>): Promise<void> {
     this.dialogHandlers.set(pageId, handler);
   }
 
-  /**
-   * Get downloads for page
-   */
   getDownloads(pageId: string): Download[] {
     return this.downloadTrackers.get(pageId) || [];
   }
 
-  /**
-   * Get all active pages
-   */
   getAllPages(): Map<string, Page> {
     return new Map(this.pages);
   }
 
-  /**
-   * Get page count
-   */
   getPageCount(): number {
     return this.pages.size;
   }
 
-  /**
-   * Register page events
-   */
   private registerPageEvents(page: Page, pageId: string): void {
-    // Start console capture for this page
     ConsoleLogger.getInstance().startCapture(page, pageId);
     
-    // Console messages
     page.on('console', async (msg: ConsoleMessage) => {
-      // ConsoleLogger handles console messages internally through startCapture
       await ActionLogger.getInstance().logBrowserConsole(msg.type(), msg.text());
       
       const handlers = this.pageEventHandlers.get(pageId);
@@ -290,7 +224,6 @@ export class PageFactory {
       }
     });
     
-    // Page errors
     page.on('pageerror', (error: Error) => {
       ActionLogger.logPageError(error.message, { 
         stack: error.stack,
@@ -303,9 +236,7 @@ export class PageFactory {
       }
     });
     
-    // Network requests
     page.on('request', (request: Request) => {
-      // NetworkCollector handles requests through collectForScenario
       ActionLogger.logInfo('Network request', {
         url: request.url(),
         method: request.method(),
@@ -318,9 +249,7 @@ export class PageFactory {
       }
     });
     
-    // Network responses
     page.on('response', (response: Response) => {
-      // NetworkCollector handles responses through collectForScenario
       ActionLogger.logInfo('Network response', {
         url: response.url(),
         status: response.status(),
@@ -333,7 +262,6 @@ export class PageFactory {
       }
     });
     
-    // Dialogs
     page.on('dialog', async (dialog: Dialog) => {
       ActionLogger.logDialog(dialog.type(), dialog.message());
       
@@ -341,7 +269,6 @@ export class PageFactory {
       if (handler) {
         await handler(dialog);
       } else {
-        // Default: dismiss dialog
         await dialog.dismiss();
       }
       
@@ -351,14 +278,12 @@ export class PageFactory {
       }
     });
     
-    // Downloads
     page.on('download', (download: Download) => {
       ActionLogger.logInfo('Download started', {
         url: download.url(),
         suggestedFilename: download.suggestedFilename()
       });
       
-      // Track download
       const downloads = this.downloadTrackers.get(pageId) || [];
       downloads.push(download);
       this.downloadTrackers.set(pageId, downloads);
@@ -369,7 +294,6 @@ export class PageFactory {
       }
     });
     
-    // Popups
     page.on('popup', (popup: Page) => {
       ActionLogger.logInfo('Popup opened', { url: popup.url() });
       
@@ -379,7 +303,6 @@ export class PageFactory {
       }
     });
     
-    // Frame events
     page.on('frameattached', (frame: Frame) => {
       ActionLogger.logInfo('Frame attached', {
         name: frame.name(),
@@ -405,11 +328,7 @@ export class PageFactory {
     });
   }
 
-  /**
-   * Setup additional page listeners
-   */
   private setupPageListeners(page: Page, pageId: string): void {
-    // Page navigation
     page.on('load', () => {
       ActionLogger.logInfo(`Page loaded: ${pageId}`, { url: page.url() });
     });
@@ -418,12 +337,10 @@ export class PageFactory {
       ActionLogger.logDebug(`DOM content loaded: ${pageId}`, { url: page.url() });
     });
     
-    // Page crash
     page.on('crash', () => {
       ActionLogger.logError(`Page crashed: ${pageId}`);
     });
     
-    // Page close
     page.on('close', () => {
       ActionLogger.logInfo(`Page closed: ${pageId}`);
       this.pages.delete(pageId);
@@ -433,18 +350,12 @@ export class PageFactory {
     });
   }
 
-  /**
-   * Apply event handlers to page
-   */
   private applyEventHandlers(page: Page, pageId: string): void {
     const handlers = this.pageEventHandlers.get(pageId);
     if (!handlers) return;
     
-    // Apply custom handlers in addition to default ones
     // Note: These handlers are already set up in registerPageEvents
-    // This method can be used to update handlers dynamically
     
-    // Verify page is still valid
     if (!page.isClosed()) {
       ActionLogger.logInfo(`Event handlers applied for page: ${pageId}`, {
         hasConsoleHandler: !!handlers.onConsole,
@@ -458,16 +369,10 @@ export class PageFactory {
     }
   }
 
-  /**
-   * Generate unique page ID
-   */
   private generatePageId(): string {
     return `page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Get page statistics
-   */
   getStatistics(): any {
     const stats: any = {
       totalPages: this.pages.size,

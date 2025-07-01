@@ -25,9 +25,7 @@ export class IntentClassifier {
   private static instance: IntentClassifier;
   private keywordExtractor: KeywordExtractor;
   
-  // Intent patterns ordered by priority
   private readonly intentPatterns: IntentPattern[] = [
-    // Interaction intents
     { pattern: /^(click|tap|press|push|hit)\s+(?:on\s+)?(.+)$/i, intent: 'interaction', action: 'click', confidence: 0.95 },
     { pattern: /^(type|enter|input|fill|write)\s+['"]?(.+?)['"]?\s+(?:in(?:to)?|on)\s+(.+)$/i, intent: 'interaction', action: 'type', confidence: 0.95 },
     { pattern: /^(select|choose|pick)\s+['"]?(.+?)['"]?\s+(?:from|in)\s+(.+)$/i, intent: 'interaction', action: 'select', confidence: 0.95 },
@@ -50,7 +48,6 @@ export class IntentClassifier {
     { pattern: /^(right\s*click|context\s*click)\s+(?:on\s+)?(.+)$/i, intent: 'interaction', action: 'rightclick', confidence: 0.95 },
     { pattern: /^(double\s*click|dbl\s*click)\s+(?:on\s+)?(.+)$/i, intent: 'interaction', action: 'doubleclick', confidence: 0.95 },
     
-    // Validation intents
     { pattern: /^(?:verify|check|ensure|validate|assert|confirm)\s+(?:that\s+)?(.+?)\s+(?:is|are|has|have|should\s+be|equals?|contains?)\s+(.+)$/i, intent: 'validation', action: 'assert', confidence: 0.95 },
     { pattern: /^(.+?)\s+should\s+(?:be\s+)?(.+)$/i, intent: 'validation', action: 'assert', confidence: 0.9 },
     { pattern: /^(.+?)\s+(?:is|are)\s+(?:visible|displayed|shown)$/i, intent: 'validation', action: 'assertVisible', confidence: 0.95 },
@@ -63,7 +60,6 @@ export class IntentClassifier {
     { pattern: /^(.+?)\s+(?:exists?|is\s+present)$/i, intent: 'validation', action: 'assertExists', confidence: 0.9 },
     { pattern: /^(.+?)\s+(?:does\s+not\s+exist|is\s+not\s+present|is\s+absent)$/i, intent: 'validation', action: 'assertNotExists', confidence: 0.9 },
     
-    // Navigation intents
     { pattern: /^(?:go|navigate|browse)\s+(?:to\s+)?(.+)$/i, intent: 'navigation', action: 'navigate', confidence: 0.95 },
     { pattern: /^(?:visit|open)\s+(?:the\s+)?(.+?)\s+(?:page|url|link)$/i, intent: 'navigation', action: 'navigate', confidence: 0.95 },
     { pattern: /^(?:go\s+)?back$/i, intent: 'navigation', action: 'back', confidence: 0.95 },
@@ -71,7 +67,6 @@ export class IntentClassifier {
     { pattern: /^refresh(?:\s+the\s+page)?$/i, intent: 'navigation', action: 'refresh', confidence: 0.95 },
     { pattern: /^switch\s+to\s+(.+?)\s+(?:tab|window|frame)$/i, intent: 'navigation', action: 'switch', confidence: 0.9 },
     
-    // Wait intents
     { pattern: /^wait\s+(?:for\s+)?(.+?)\s+(?:to\s+be\s+)?(?:visible|appear|show)$/i, intent: 'wait', action: 'waitVisible', confidence: 0.95 },
     { pattern: /^wait\s+(?:for\s+)?(.+?)\s+(?:to\s+)?(?:disappear|hide|be\s+hidden)$/i, intent: 'wait', action: 'waitHidden', confidence: 0.95 },
     { pattern: /^wait\s+(?:for\s+)?(.+?)\s+(?:to\s+be\s+)?(?:enabled|clickable)$/i, intent: 'wait', action: 'waitEnabled', confidence: 0.95 },
@@ -79,13 +74,11 @@ export class IntentClassifier {
     { pattern: /^wait\s+(?:for\s+)?(.+?)\s+(?:to\s+)?(?:load|be\s+ready)$/i, intent: 'wait', action: 'waitReady', confidence: 0.9 },
     { pattern: /^wait\s+until\s+(.+)$/i, intent: 'wait', action: 'waitCondition', confidence: 0.85 },
     
-    // Data intents
     { pattern: /^(?:get|extract|read)\s+(.+?)\s+(?:from\s+)?(.+)$/i, intent: 'data', action: 'get', confidence: 0.9 },
     { pattern: /^(?:save|store)\s+(.+?)\s+(?:as|to)\s+(.+)$/i, intent: 'data', action: 'store', confidence: 0.9 },
     { pattern: /^(?:use|apply)\s+(.+?)\s+(?:from\s+)?(.+)$/i, intent: 'data', action: 'use', confidence: 0.85 }
   ];
 
-  // Action verb mappings
   private readonly actionVerbs = new Map<string, ActionType>([
     ['click', 'click'], ['tap', 'click'], ['press', 'click'], ['push', 'click'], ['hit', 'click'],
     ['type', 'type'], ['enter', 'type'], ['input', 'type'], ['fill', 'type'], ['write', 'type'],
@@ -104,19 +97,16 @@ export class IntentClassifier {
     ['clear', 'clear'], ['empty', 'clear'], ['delete', 'clear'], ['remove', 'clear']
   ]);
 
-  // Question words for detecting interrogative sentences
   private readonly questionWords = new Set([
     'what', 'which', 'who', 'whom', 'whose', 'where', 'when', 'why', 'how',
     'is', 'are', 'was', 'were', 'do', 'does', 'did', 'have', 'has', 'had',
     'can', 'could', 'will', 'would', 'should', 'shall', 'may', 'might'
   ]);
 
-  // Modal verbs
   private readonly modalVerbs = new Set([
     'can', 'could', 'may', 'might', 'must', 'shall', 'should', 'will', 'would'
   ]);
 
-  // Imperative verb indicators
   private readonly imperativeVerbs = new Set([
     'click', 'type', 'enter', 'select', 'check', 'uncheck', 'hover', 'scroll',
     'drag', 'drop', 'upload', 'download', 'wait', 'verify', 'validate', 'navigate',
@@ -139,13 +129,10 @@ export class IntentClassifier {
     ActionLogger.logAIOperation('intent-classification start', { text });
 
     try {
-      // Normalize text
       const normalizedText = this.normalizeText(text);
       
-      // Extract features
       const features = await this.extractFeatures(normalizedText);
       
-      // Try pattern matching first
       const patternMatch = this.matchPatterns(normalizedText);
       if (patternMatch) {
         const intent = this.createIntentFromPattern(patternMatch, normalizedText, features);
@@ -159,7 +146,6 @@ export class IntentClassifier {
         return intent;
       }
       
-      // Fall back to feature-based classification
       const intent = await this.classifyByFeatures(normalizedText, features);
       
       ActionLogger.logAIOperation('intent-classification complete', {
@@ -180,19 +166,17 @@ export class IntentClassifier {
       .trim()
       .replace(/\s+/g, ' ')
       .replace(/['"]/g, '"') // Normalize quotes
-      .replace(/\s*\.\s*$/, ''); // Remove trailing period
+      .replace(/\s*\.\s*$/, '');
   }
 
   private async extractFeatures(text: string): Promise<IntentFeatures> {
     const words = text.toLowerCase().split(/\s+/);
     const firstWord = words[0];
     
-    // Extract keywords
     const keywords = await this.keywordExtractor.extractKeywords(text);
     const actionKeywords = keywords.filter(k => k.type === 'action').map(k => k.word);
     const targetKeywords = keywords.filter(k => k.type === 'element' || k.type === 'identifier').map(k => k.word);
     
-    // Detect sentence type
     let sentenceType: IntentFeatures['sentenceType'] = 'declarative';
     if (text.endsWith('?') || (firstWord && this.questionWords.has(firstWord))) {
       sentenceType = 'interrogative';
@@ -202,7 +186,6 @@ export class IntentClassifier {
       sentenceType = 'exclamatory';
     }
     
-    // Find verb position
     let verbPosition = -1;
     for (let i = 0; i < words.length; i++) {
       const word = words[i];
@@ -225,13 +208,11 @@ export class IntentClassifier {
   }
 
   private isImperativeStructure(words: string[]): boolean {
-    // Check if sentence starts with a verb
     const firstWord = words[0];
     return firstWord ? (this.actionVerbs.has(firstWord) || this.imperativeVerbs.has(firstWord)) : false;
   }
 
   private isVerb(word: string): boolean {
-    // Simple verb detection based on common patterns
     const verbEndings = ['ing', 'ed', 'es', 's'];
     const commonVerbs = new Set([
       'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -241,7 +222,6 @@ export class IntentClassifier {
     
     if (commonVerbs.has(word)) return true;
     
-    // Check verb endings
     for (const ending of verbEndings) {
       if (word.endsWith(ending) && word.length > ending.length + 2) {
         return true;
@@ -268,7 +248,6 @@ export class IntentClassifier {
   ): Intent {
     const { pattern, matches } = patternMatch;
     
-    // Extract parameters from regex groups
     const parameters: string[] = [];
     for (let i = 1; i < matches.length; i++) {
       const match = matches[i];
@@ -277,7 +256,6 @@ export class IntentClassifier {
       }
     }
     
-    // Determine target
     let target: TargetType = 'element';
     if (pattern.intent === 'navigation') {
       target = 'page';
@@ -314,46 +292,38 @@ export class IntentClassifier {
   }
 
   private async classifyByFeatures(text: string, features: IntentFeatures): Promise<Intent> {
-    // Determine intent type based on features
     let intentType: IntentType = 'unknown';
     let action: ActionType = 'unknown';
     let confidence = 0.5;
     
-    // Check for validation patterns
     if (this.isValidationIntent(text, features)) {
       intentType = 'validation';
       action = this.extractValidationAction(text, features);
       confidence = 0.8;
     }
-    // Check for interaction patterns
     else if (features.hasImperativeVerb || features.sentenceType === 'imperative') {
       intentType = 'interaction';
       action = this.extractInteractionAction(text, features);
       confidence = 0.85;
     }
-    // Check for navigation patterns
     else if (this.isNavigationIntent(text, features)) {
       intentType = 'navigation';
       action = 'navigate';
       confidence = 0.75;
     }
-    // Check for wait patterns
     else if (this.isWaitIntent(text, features)) {
       intentType = 'wait';
       action = 'wait';
       confidence = 0.75;
     }
-    // Check for data patterns
     else if (this.isDataIntent(text, features)) {
       intentType = 'data';
       action = this.extractDataAction(text, features);
       confidence = 0.7;
     }
     
-    // Extract parameters
     const parameters = await this.extractParameters(text, intentType, action, features);
     
-    // Determine target
     const target = this.determineTarget(text, intentType, features, parameters);
     
     const intent: Intent = {
@@ -452,7 +422,6 @@ export class IntentClassifier {
   }
 
   private extractInteractionAction(text: string, features: IntentFeatures): ActionType {
-    // Check action keywords first
     if (features.actionKeywords.length > 0) {
       const firstAction = features.actionKeywords[0];
       if (firstAction) {
@@ -463,7 +432,6 @@ export class IntentClassifier {
       }
     }
     
-    // Check first word
     const words = text.toLowerCase().split(/\s+/);
     const firstWord = words[0];
     if (firstWord) {
@@ -473,7 +441,6 @@ export class IntentClassifier {
       }
     }
     
-    // Default to click for imperative sentences
     return 'click';
   }
 
@@ -501,7 +468,6 @@ export class IntentClassifier {
   ): Promise<string[]> {
     const parameters: string[] = [];
     
-    // Extract quoted strings first
     const quotedStrings = text.match(/["']([^"']+)["']/g);
     if (quotedStrings) {
       quotedStrings.forEach(quoted => {
@@ -509,25 +475,21 @@ export class IntentClassifier {
       });
     }
     
-    // Extract based on intent type
     switch (intentType) {
       case 'interaction':
         if (action === 'type' && parameters.length === 0) {
-          // Extract text to type (everything after "type" and before "in/into")
           const typeMatch = text.match(/type\s+(.+?)\s+(?:in|into)/i);
           if (typeMatch && typeMatch[1]) {
             parameters.push(typeMatch[1]);
           }
         }
         
-        // Extract target element
         if (features.targetKeywords.length > 0) {
           parameters.push(...features.targetKeywords);
         }
         break;
         
       case 'validation':
-        // Extract expected value
         const shouldMatch = text.match(/should\s+(?:be|have|contain)\s+(.+)$/i);
         if (shouldMatch && shouldMatch[1]) {
           parameters.push(shouldMatch[1]);
@@ -535,7 +497,6 @@ export class IntentClassifier {
         break;
         
       case 'navigation':
-        // Extract URL or page name
         const navMatch = text.match(/(?:to|visit|open)\s+(.+?)(?:\s+page)?$/i);
         if (navMatch && navMatch[1]) {
           parameters.push(navMatch[1]);
@@ -543,7 +504,6 @@ export class IntentClassifier {
         break;
         
       case 'wait':
-        // Extract wait duration
         const timeMatch = text.match(/(\d+)\s*(?:seconds?|secs?|ms|milliseconds?)/i);
         if (timeMatch && timeMatch[1]) {
           parameters.push(timeMatch[1]);
@@ -621,7 +581,6 @@ export class IntentClassifier {
   }
 
   public mapToFrameworkAction(intent: Intent): string {
-    // Map intent to actual framework step definition pattern
     const mapping: Record<string, string> = {
       'click': 'user clicks {string}',
       'type': 'user types {string} in {string}',
@@ -652,7 +611,6 @@ export class IntentClassifier {
   public addCustomPattern(pattern: RegExp, intent: IntentType, action: ActionType, confidence: number = 0.9): void {
     this.intentPatterns.push({ pattern, intent, action, confidence });
     
-    // Sort by confidence to prioritize higher confidence patterns
     this.intentPatterns.sort((a, b) => b.confidence - a.confidence);
   }
 
@@ -687,7 +645,6 @@ export class IntentClassifier {
     const features = await this.extractFeatures(normalizedText);
     const results: Array<{intent: IntentType, action: ActionType, confidence: number, reason: string}> = [];
     
-    // Check all patterns
     for (const pattern of this.intentPatterns) {
       const matches = normalizedText.match(pattern.pattern);
       if (matches) {
@@ -700,7 +657,6 @@ export class IntentClassifier {
       }
     }
     
-    // Add feature-based classifications
     if (this.isValidationIntent(normalizedText, features)) {
       results.push({
         intent: 'validation',
@@ -737,7 +693,6 @@ export class IntentClassifier {
      });
    }
    
-   // Sort by confidence
    results.sort((a, b) => b.confidence - a.confidence);
    
    return results;

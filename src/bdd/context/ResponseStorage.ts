@@ -4,16 +4,12 @@ import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 import { JSONPathValidator } from '../../api/validators/JSONPathValidator';
 
-/**
- * Storage for API responses to enable chaining between requests
- * Supports JSONPath extraction and response reuse
- */
 export class ResponseStorage {
   private static instance: ResponseStorage;
   private readonly storage: Map<string, Map<string, any>>;
   private readonly logger: Logger;
   private readonly jsonPathValidator: JSONPathValidator;
-  private readonly maxStorageSize: number = 1000; // Maximum responses to store
+  private readonly maxStorageSize: number = 1000;
 
   private constructor() {
     this.storage = new Map();
@@ -21,9 +17,6 @@ export class ResponseStorage {
     this.jsonPathValidator = JSONPathValidator.getInstance();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): ResponseStorage {
     if (!ResponseStorage.instance) {
       ResponseStorage.instance = new ResponseStorage();
@@ -31,25 +24,19 @@ export class ResponseStorage {
     return ResponseStorage.instance;
   }
 
-  /**
-   * Store response with alias
-   */
   public store(alias: string, response: any, scenarioId: string = 'global'): void {
-    // Get or create scenario storage
     if (!this.storage.has(scenarioId)) {
       this.storage.set(scenarioId, new Map());
     }
 
     const scenarioStorage = this.storage.get(scenarioId)!;
 
-    // Store response
     scenarioStorage.set(alias, {
       response: this.cloneResponse(response),
       timestamp: new Date(),
       size: this.calculateSize(response)
     });
 
-    // Check storage limit
     if (scenarioStorage.size > this.maxStorageSize) {
       this.evictOldest(scenarioStorage);
     }
@@ -58,14 +45,10 @@ export class ResponseStorage {
     this.logger.debug(`Stored response "${alias}" for scenario "${scenarioId}"`);
   }
 
-  /**
-   * Retrieve response by alias
-   */
   public retrieve<T = any>(alias: string, scenarioId: string = 'global'): T {
     const scenarioStorage = this.storage.get(scenarioId);
     
     if (!scenarioStorage || !scenarioStorage.has(alias)) {
-      // Try global storage as fallback
       if (scenarioId !== 'global') {
         return this.retrieve<T>(alias, 'global');
       }
@@ -79,9 +62,6 @@ export class ResponseStorage {
     return stored.response as T;
   }
 
-  /**
-   * Extract value from stored response using JSONPath
-   */
   public extractValue(
     alias: string,
     jsonPath: string,
@@ -104,9 +84,6 @@ export class ResponseStorage {
     }
   }
 
-  /**
-   * Check if alias exists
-   */
   public has(alias: string, scenarioId: string = 'global'): boolean {
     const scenarioStorage = this.storage.get(scenarioId);
     
@@ -114,7 +91,6 @@ export class ResponseStorage {
       return true;
     }
     
-    // Check global storage if not found in scenario
     if (scenarioId !== 'global') {
       const globalStorage = this.storage.get('global');
       return globalStorage ? globalStorage.has(alias) : false;
@@ -123,9 +99,6 @@ export class ResponseStorage {
     return false;
   }
 
-  /**
-   * Delete response
-   */
   public delete(alias: string, scenarioId: string = 'global'): boolean {
     const scenarioStorage = this.storage.get(scenarioId);
     
@@ -142,9 +115,6 @@ export class ResponseStorage {
     return result;
   }
 
-  /**
-   * Clear scenario responses
-   */
   public clearScenario(scenarioId: string): void {
     const scenarioStorage = this.storage.get(scenarioId);
     
@@ -156,9 +126,6 @@ export class ResponseStorage {
     }
   }
 
-  /**
-   * Clear all responses
-   */
   public clear(): void {
     const totalCount = this.getTotalCount();
     this.storage.clear();
@@ -166,17 +133,11 @@ export class ResponseStorage {
     this.logger.info(`Cleared all ${totalCount} responses from storage`);
   }
 
-  /**
-   * Get all aliases for scenario
-   */
   public getAliases(scenarioId: string = 'global'): string[] {
     const scenarioStorage = this.storage.get(scenarioId);
     return scenarioStorage ? Array.from(scenarioStorage.keys()) : [];
   }
 
-  /**
-   * Get storage statistics
-   */
   public getStats(): {
     scenarios: number;
     totalResponses: number;
@@ -204,9 +165,6 @@ export class ResponseStorage {
     };
   }
 
-  /**
-   * Chain responses - use value from one response in another
-   */
   public chainValue(
     fromAlias: string,
     fromPath: string,
@@ -216,7 +174,6 @@ export class ResponseStorage {
   ): void {
     const value = this.extractValue(fromAlias, fromPath, scenarioId);
     
-    // Store for use in next request
     const chainKey = `${toAlias}.${toPath}`;
     this.store(chainKey, value, scenarioId);
     
@@ -225,9 +182,6 @@ export class ResponseStorage {
     );
   }
 
-  /**
-   * Get chained value
-   */
   public getChainedValue(alias: string, path: string, scenarioId: string = 'global'): any {
     const chainKey = `${alias}.${path}`;
     
@@ -238,9 +192,6 @@ export class ResponseStorage {
     return undefined;
   }
 
-  /**
-   * Clone response to prevent modifications
-   */
   private cloneResponse(response: any): any {
     if (response === null || response === undefined) {
       return response;
@@ -251,18 +202,13 @@ export class ResponseStorage {
     }
 
     try {
-      // Deep clone using JSON
       return JSON.parse(JSON.stringify(response));
     } catch (error) {
-      // Fallback for non-JSON serializable objects
       this.logger.warn('Response contains non-JSON serializable data, storing reference');
       return response;
     }
   }
 
-  /**
-   * Calculate response size
-   */
   private calculateSize(response: any): number {
     try {
       return JSON.stringify(response).length;
@@ -271,20 +217,15 @@ export class ResponseStorage {
     }
   }
 
-  /**
-   * Evict oldest responses when limit reached
-   */
   private evictOldest(scenarioStorage: Map<string, any>): void {
     const entries = Array.from(scenarioStorage.entries());
     
-    // Sort by timestamp (oldest first)
     entries.sort((a, b) => {
       const timeA = a[1].timestamp?.getTime() || 0;
       const timeB = b[1].timestamp?.getTime() || 0;
       return timeA - timeB;
     });
 
-    // Remove oldest 10%
     const toRemove = Math.ceil(entries.length * 0.1);
     
     for (let i = 0; i < toRemove; i++) {
@@ -297,9 +238,6 @@ export class ResponseStorage {
     this.logger.debug(`Evicted ${toRemove} old responses due to storage limit`);
   }
 
-  /**
-   * Get total response count
-   */
   private getTotalCount(): number {
     let count = 0;
     for (const scenarioStorage of this.storage.values()) {
@@ -308,9 +246,6 @@ export class ResponseStorage {
     return count;
   }
 
-  /**
-   * Export storage for debugging
-   */
   public export(): any {
     const stats = this.getStats();
     const scenarios: Record<string, string[]> = {};
@@ -327,5 +262,4 @@ export class ResponseStorage {
   }
 }
 
-// Export singleton instance
 export const responseStorage = ResponseStorage.getInstance();

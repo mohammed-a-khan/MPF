@@ -2,9 +2,6 @@
 
 import { TestData } from '../types/data.types';
 
-/**
- * Execution flag validation result
- */
 export interface ExecutionFlagValidationResult {
     valid: boolean;
     executeRecords: TestData[];
@@ -28,9 +25,6 @@ export interface ExecutionFlagValidationResult {
     };
 }
 
-/**
- * Extended execution flag options for internal use
- */
 export interface ExtendedExecutionFlagOptions {
     flagColumn: string;
     executeValues: string[];

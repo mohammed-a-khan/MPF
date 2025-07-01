@@ -70,7 +70,6 @@ export class ElementActionLogger {
     try {
       await fs.mkdir(this.screenshotPath, { recursive: true });
     } catch (error) {
-      // Directory might already exist, which is fine
       if ((error as any).code !== 'EEXIST') {
         throw error;
       }
@@ -78,7 +77,6 @@ export class ElementActionLogger {
   }
 
   logAction(action: ActionRecord): void {
-    // Add to global history
     const elementId = action.elementDescription;
     if (!this.actionHistory.has(elementId)) {
       this.actionHistory.set(elementId, []);
@@ -87,15 +85,12 @@ export class ElementActionLogger {
     const history = this.actionHistory.get(elementId)!;
     history.push(action);
     
-    // Maintain max history size
     if (history.length > this.maxHistorySize) {
       history.shift();
     }
     
-    // Update metrics
     this.updateMetrics(action);
     
-    // Log to main logger
     const message = `[${action.action}] ${action.elementDescription} - ${action.success ? 'SUCCESS' : 'FAILED'}`;
     
     if (action.success) {
@@ -133,7 +128,6 @@ export class ElementActionLogger {
       
       ActionLogger.logDebug(`Screenshot saved: ${fileName}`);
       
-      // Add screenshot reference to last action
       const elementId = element.description;
       const history = this.actionHistory.get(elementId);
       if (history && history.length > 0) {
@@ -174,16 +168,13 @@ export class ElementActionLogger {
     const failedActions = allActions.filter(a => !a.success);
     const successfulActions = allActions.filter(a => a.success);
     
-    // Calculate average duration
     const totalDuration = successfulActions.reduce((sum, action) => sum + action.duration, 0);
     const averageDuration = successfulActions.length > 0 ? totalDuration / successfulActions.length : 0;
     
-    // Find slowest actions
     const slowestActions = [...successfulActions]
       .sort((a, b) => b.duration - a.duration)
       .slice(0, 10);
     
-    // Find most failed elements
     const failureCount = new Map<string, number>();
     for (const action of failedActions) {
       const count = failureCount.get(action.elementDescription) || 0;
@@ -195,7 +186,6 @@ export class ElementActionLogger {
       .sort((a, b) => b.failures - a.failures)
       .slice(0, 10);
     
-    // Generate timeline
     const timeline = this.generateTimeline();
     
     return {
@@ -248,7 +238,7 @@ export class ElementActionLogger {
         element: action.elementDescription,
         duration: action.duration,
         success: action.success,
-        gap: gap > 1000 ? gap : 0 // Show gap if > 1 second, otherwise 0
+        gap: gap > 1000 ? gap : 0
       });
       
       previousTimestamp = action.timestamp;
@@ -298,11 +288,11 @@ export class ElementActionLogger {
       id: `action_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: action.timestamp,
       elementDescription: action.element,
-      elementLocator: '', // Will be filled by element
+      elementLocator: '',
       action: action.name,
       parameters: action.parameters,
-      duration: 0, // Will be calculated
-      success: true // Will be updated
+      duration: 0,
+      success: true
     };
   }
 
@@ -379,4 +369,3 @@ export class ElementActionLogger {
     this.clearHistory();
   }
 }
-

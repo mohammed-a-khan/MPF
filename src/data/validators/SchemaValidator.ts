@@ -3,10 +3,6 @@ import { TestData } from '../types/data.types';
 import { Schema, SchemaValidationResult, SchemaOptions, SchemaValidationError } from './schema.types';
 import { logger } from '../../core/utils/Logger';
 
-/**
- * Validate data against JSON Schema
- * Comprehensive schema validation with detailed error reporting
- */
 export class SchemaValidator {
     private readonly defaultOptions: SchemaOptions = {
         strict: true,
@@ -27,9 +23,6 @@ export class SchemaValidator {
         this.initializeKeywords();
     }
 
-    /**
-     * Validate data against schema
-     */
     async validate(
         data: TestData | TestData[],
         schema: Schema,
@@ -77,9 +70,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate data recursively
-     */
     private async validateData(
         data: any,
         schema: Schema,
@@ -88,23 +78,19 @@ export class SchemaValidator {
         errors: any[],
         options: SchemaOptions
     ): Promise<boolean> {
-        // Handle schema references
         if (schema.$ref) {
             const resolvedSchema = await this.resolveReference(schema.$ref);
             return this.validateData(data, resolvedSchema, dataPath, schemaPath, errors, options);
         }
 
-        // Type validation
         if (schema.type) {
             if (!this.validateType(data, schema.type, dataPath, schemaPath, errors, options)) {
                 return false;
             }
         }
 
-        // Run all validations based on type
         const validators: Array<() => Promise<boolean>> = [];
 
-        // Common validations
         if (schema.enum !== undefined) {
             validators.push(() => this.validateEnum(data, schema.enum!, dataPath, schemaPath, errors));
         }
@@ -113,7 +99,6 @@ export class SchemaValidator {
             validators.push(() => this.validateConst(data, schema.const!, dataPath, schemaPath, errors));
         }
 
-        // Type-specific validations
         if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
             validators.push(() => this.validateObject(data, schema, dataPath, schemaPath, errors, options));
         } else if (Array.isArray(data)) {
@@ -124,12 +109,10 @@ export class SchemaValidator {
             validators.push(() => this.validateNumber(data, schema, dataPath, schemaPath, errors, options));
         }
 
-        // Conditional validations
         if (schema.if) {
             validators.push(() => this.validateConditional(data, schema, dataPath, schemaPath, errors, options));
         }
 
-        // Custom keywords
         for (const [keyword, validator] of this.customKeywords) {
             if (keyword in schema) {
                 validators.push(async () => {
@@ -149,14 +132,10 @@ export class SchemaValidator {
             }
         }
 
-        // Run all validations
         const results = await Promise.all(validators.map(v => v()));
         return options.allErrors ? results.every(r => r !== false) : !results.includes(false);
     }
 
-    /**
-     * Validate data type
-     */
     private validateType(
         data: any,
         expectedType: string | string[],
@@ -170,7 +149,6 @@ export class SchemaValidator {
 
         if (!types.includes(actualType)) {
             if (options.coerceTypes) {
-                // Try type coercion
                 for (const type of types) {
                     const coerced = this.coerceType(data, type);
                     if (coerced !== undefined && this.getType(coerced) === type) {
@@ -193,18 +171,12 @@ export class SchemaValidator {
         return true;
     }
 
-    /**
-     * Get JSON Schema type
-     */
     private getType(value: any): string {
         if (value === null) return 'null';
         if (Array.isArray(value)) return 'array';
         return typeof value;
     }
 
-    /**
-     * Coerce value to type
-     */
     private coerceType(value: any, targetType: string): any {
         switch (targetType) {
             case 'string':
@@ -223,9 +195,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Validate object
-     */
     private async validateObject(
         data: Record<string, any>,
         schema: Schema,
@@ -236,7 +205,6 @@ export class SchemaValidator {
     ): Promise<boolean> {
         let valid = true;
 
-        // Properties validation
         if (schema.properties) {
             for (const [prop, propSchema] of Object.entries(schema.properties)) {
                 if (prop in data) {
@@ -253,7 +221,6 @@ export class SchemaValidator {
             }
         }
 
-        // Required properties
         if (schema.required) {
             for (const required of schema.required) {
                 if (!(required in data)) {
@@ -270,7 +237,6 @@ export class SchemaValidator {
             }
         }
 
-        // Additional properties
         if (schema.additionalProperties !== undefined) {
             const definedProps = new Set(Object.keys(schema.properties || {}));
             const additionalProps = Object.keys(data).filter(p => !definedProps.has(p));
@@ -308,7 +274,6 @@ export class SchemaValidator {
             }
         }
 
-        // Property count constraints
         if (schema.minProperties !== undefined && Object.keys(data).length < schema.minProperties) {
             errors.push({
                 path: dataPath,
@@ -333,12 +298,10 @@ export class SchemaValidator {
             valid = false;
         }
 
-        // Dependencies
         if (schema.dependencies) {
             for (const [prop, dependency] of Object.entries(schema.dependencies)) {
                 if (prop in data) {
                     if (Array.isArray(dependency)) {
-                        // Property dependencies
                         for (const dep of dependency) {
                             if (!(dep in data)) {
                                 errors.push({
@@ -353,7 +316,6 @@ export class SchemaValidator {
                             }
                         }
                     } else {
-                        // Schema dependencies
                         const depValid = await this.validateData(
                             data,
                             dependency,
@@ -371,9 +333,6 @@ export class SchemaValidator {
         return valid;
     }
 
-    /**
-     * Validate array
-     */
     private async validateArray(
         data: any[],
         schema: Schema,
@@ -384,10 +343,8 @@ export class SchemaValidator {
     ): Promise<boolean> {
         let valid = true;
 
-        // Items validation
         if (schema.items) {
             if (Array.isArray(schema.items)) {
-                // Tuple validation
                 for (let i = 0; i < Math.min(data.length, schema.items.length); i++) {
                     const itemValid = await this.validateData(
                         data[i],
@@ -400,7 +357,6 @@ export class SchemaValidator {
                     if (!itemValid) valid = false;
                 }
 
-                // Additional items
                 if (schema.additionalItems !== undefined && data.length > schema.items.length) {
                     if (schema.additionalItems === false) {
                         errors.push({
@@ -427,7 +383,6 @@ export class SchemaValidator {
                     }
                 }
             } else {
-                // List validation
                 for (let i = 0; i < data.length; i++) {
                     const itemValid = await this.validateData(
                         data[i],
@@ -442,7 +397,6 @@ export class SchemaValidator {
             }
         }
 
-        // Array length constraints
         if (schema.minItems !== undefined && data.length < schema.minItems) {
             errors.push({
                 path: dataPath,
@@ -467,7 +421,6 @@ export class SchemaValidator {
             valid = false;
         }
 
-        // Unique items
         if (schema.uniqueItems) {
             const seen = new Set<string>();
             for (let i = 0; i < data.length; i++) {
@@ -487,7 +440,6 @@ export class SchemaValidator {
             }
         }
 
-        // Contains validation
         if (schema.contains) {
             let containsValid = false;
             for (let i = 0; i < data.length; i++) {
@@ -521,9 +473,6 @@ export class SchemaValidator {
         return valid;
     }
 
-    /**
-     * Validate string
-     */
     private async validateString(
         data: string,
         schema: Schema,
@@ -534,7 +483,6 @@ export class SchemaValidator {
     ): Promise<boolean> {
         let valid = true;
 
-        // Length constraints
         if (schema.minLength !== undefined && data.length < schema.minLength) {
             errors.push({
                 path: dataPath,
@@ -559,7 +507,6 @@ export class SchemaValidator {
             valid = false;
         }
 
-        // Pattern matching
         if (schema.pattern) {
             const regex = new RegExp(schema.pattern);
             if (!regex.test(data)) {
@@ -575,7 +522,6 @@ export class SchemaValidator {
             }
         }
 
-        // Format validation
         if (schema.format && options.validateFormats) {
             const formatValidator = this.customFormats.get(schema.format);
             if (formatValidator) {
@@ -606,9 +552,6 @@ export class SchemaValidator {
         return valid;
     }
 
-    /**
-     * Validate number
-     */
     private async validateNumber(
         data: number,
         schema: Schema,
@@ -619,7 +562,6 @@ export class SchemaValidator {
     ): Promise<boolean> {
         let valid = true;
 
-        // Range constraints
         if (schema.minimum !== undefined) {
             if (schema.exclusiveMinimum === true && data <= schema.minimum) {
                 errors.push({
@@ -668,7 +610,6 @@ export class SchemaValidator {
             }
         }
 
-        // Multiple of
         if (schema.multipleOf !== undefined) {
             const division = data / schema.multipleOf;
             if (division !== Math.floor(division)) {
@@ -687,9 +628,6 @@ export class SchemaValidator {
         return valid;
     }
 
-    /**
-     * Validate enum
-     */
     private async validateEnum(
         data: any,
         enumValues: any[],
@@ -714,9 +652,6 @@ export class SchemaValidator {
         return true;
     }
 
-    /**
-     * Validate const
-     */
     private async validateConst(
         data: any,
         constValue: any,
@@ -739,9 +674,6 @@ export class SchemaValidator {
         return true;
     }
 
-    /**
-     * Validate conditional schema
-     */
     private async validateConditional(
         data: any,
         schema: Schema,
@@ -785,9 +717,6 @@ export class SchemaValidator {
         return true;
     }
 
-    /**
-     * Deep equality check
-     */
     private deepEqual(a: any, b: any): boolean {
         if (a === b) return true;
         
@@ -815,25 +744,15 @@ export class SchemaValidator {
         return false;
     }
 
-    /**
-     * Resolve schema reference
-     */
     private async resolveReference(ref: string): Promise<Schema> {
-        // Simple implementation - in production, this would resolve from a schema registry
         if (ref.startsWith('#/definitions/')) {
-            // const _definitionName = ref.substring('#/definitions/'.length);
-            // Would look up in definitions
             throw new Error(`Schema reference resolution not implemented: ${ref}`);
         }
 
         throw new Error(`Cannot resolve schema reference: ${ref}`);
     }
 
-    /**
-     * Initialize format validators
-     */
     private initializeFormats(): void {
-        // Date-time formats
         this.customFormats.set('date-time', (value: string) => {
             const regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
             return regex.test(value) && !isNaN(Date.parse(value));
@@ -849,7 +768,6 @@ export class SchemaValidator {
             return regex.test(value);
         });
 
-        // Internet formats
         this.customFormats.set('email', (value: string) => {
             const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return regex.test(value);
@@ -888,7 +806,6 @@ export class SchemaValidator {
             }
         });
 
-        // Other formats
         this.customFormats.set('uuid', (value: string) => {
             const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
             return regex.test(value);
@@ -912,11 +829,7 @@ export class SchemaValidator {
         });
     }
 
-    /**
-     * Initialize custom keywords
-     */
     private initializeKeywords(): void {
-        // Range keyword
         this.customKeywords.set('range', (value: any, range: { min?: number; max?: number }) => {
             if (typeof value !== 'number') return false;
             if (range.min !== undefined && value < range.min) return false;
@@ -924,7 +837,6 @@ export class SchemaValidator {
             return true;
         });
 
-        // Not empty keyword
         this.customKeywords.set('notEmpty', (value: any, notEmpty: boolean) => {
             if (!notEmpty) return true;
             
@@ -936,7 +848,6 @@ export class SchemaValidator {
             return true;
         });
 
-        // Unique by property (for arrays of objects)
         this.customKeywords.set('uniqueBy', (value: any[], property: string) => {
             if (!Array.isArray(value)) return true;
             
@@ -953,17 +864,11 @@ export class SchemaValidator {
         });
     }
 
-    /**
-     * Register custom format
-     */
     registerFormat(name: string, validator: (value: any) => boolean): void {
         this.customFormats.set(name, validator);
         logger.debug(`Registered custom format: ${name}`);
     }
 
-    /**
-     * Register custom keyword
-     */
     registerKeyword(
         name: string,
         validator: (value: any, schema: any, parentSchema: any) => boolean
@@ -972,9 +877,6 @@ export class SchemaValidator {
         logger.debug(`Registered custom keyword: ${name}`);
     }
 
-    /**
-     * Create schema from sample data
-     */
     createSchemaFromData(
         data: any,
         options?: {
@@ -999,9 +901,6 @@ export class SchemaValidator {
         return schema;
     }
 
-    /**
-     * Generate schema recursively
-     */
     private generateSchema(data: any, options: any): Schema {
         if (data === null) {
             return { type: 'null' };
@@ -1036,14 +935,12 @@ export class SchemaValidator {
                 };
 
                 if (data.length > 0) {
-                    // Check if all items have same type
                     const firstType = this.getType(data[0]);
                     const sameType = data.every((item: any) => this.getType(item) === firstType);
 
                     if (sameType) {
                         arraySchema.items = this.generateSchema(data[0], options);
                     } else {
-                        // Generate union schema
                         const schemas = data.map((item: any) => this.generateSchema(item, options));
                         arraySchema.items = { oneOf: schemas };
                     }
@@ -1054,7 +951,6 @@ export class SchemaValidator {
             case 'string':
                 const stringSchema: Schema = { type: 'string' };
                 
-                // Detect format
                 if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data)) {
                     stringSchema.format = 'email';
                 } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(data)) {
@@ -1087,9 +983,6 @@ export class SchemaValidator {
         }
     }
 
-    /**
-     * Merge schemas
-     */
     mergeSchemas(schemas: Schema[]): Schema {
         if (schemas.length === 0) {
             return {};
@@ -1099,12 +992,10 @@ export class SchemaValidator {
             return schemas[0]!;
         }
 
-        // Check if all schemas have same type
         const types = schemas.map(s => s.type).filter(Boolean);
         const uniqueTypes = [...new Set(types)];
 
         if (uniqueTypes.length === 1) {
-            // Same type - merge properties
             const type = uniqueTypes[0];
             
             if (type === 'object') {
@@ -1114,7 +1005,6 @@ export class SchemaValidator {
                     required: []
                 };
 
-                // Merge properties
                 for (const schema of schemas) {
                     if (schema.properties) {
                         for (const [key, propSchema] of Object.entries(schema.properties)) {
@@ -1122,7 +1012,6 @@ export class SchemaValidator {
                             if (!mergedProps[key]) {
                                 mergedProps[key] = propSchema;
                             } else {
-                                // Merge property schemas
                                 mergedProps[key] = this.mergeSchemas([
                                     mergedProps[key]!,
                                     propSchema
@@ -1131,7 +1020,6 @@ export class SchemaValidator {
                         }
                     }
 
-                    // Merge required
                     if (schema.required) {
                         for (const req of schema.required) {
                             if (!merged.required!.includes(req)) {
@@ -1145,7 +1033,6 @@ export class SchemaValidator {
             }
         }
 
-        // Different types - use anyOf
         return {
             anyOf: schemas
         };

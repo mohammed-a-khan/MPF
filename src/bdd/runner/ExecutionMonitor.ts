@@ -8,10 +8,6 @@ import { CLIReporter } from '../../core/cli/CLIReporter';
 import { WebSocketServer } from 'ws';
 import * as os from 'os';
 
-/**
- * Monitors test execution progress in real-time
- * Provides live updates, metrics collection, and progress reporting
- */
 export class ExecutionMonitor extends EventEmitter {
   private static instance: ExecutionMonitor;
   private startTime: number;
@@ -73,25 +69,18 @@ export class ExecutionMonitor extends EventEmitter {
     this.setupEventHandlers();
   }
 
-  /**
-   * Initialize monitoring systems
-   */
   private initializeMonitoring(): void {
     const logger = ActionLogger.getInstance();
     
-    // Initialize CLI reporter if in interactive mode
     const isInteractive = process.stdout.isTTY && !process.env['CI'];
     if (isInteractive && !process.env['CS_NO_CLI']) {
       try {
-        // 🔥 FIX: Temporarily disable CLI reporter to prevent memory leak
-        // this.cliReporter = CLIReporter.getInstance();
         logger.info('ExecutionMonitor - CLI reporter disabled to prevent memory issues');
       } catch (error) {
         logger.warn('ExecutionMonitor - Failed to initialize CLI reporter: ' + (error as Error).message);
       }
     }
 
-    // Initialize WebSocket server for dashboard
     if (process.env['CS_DASHBOARD'] === 'true') {
       try {
         this.initializeWebSocketServer();
@@ -100,13 +89,9 @@ export class ExecutionMonitor extends EventEmitter {
       }
     }
 
-    // Setup event handlers
     this.setupEventHandlers();
   }
 
-  /**
-   * Initialize system metrics
-   */
   private initializeSystemMetrics(): SystemMetrics {
     return {
       cpuUsage: 0,
@@ -120,9 +105,6 @@ export class ExecutionMonitor extends EventEmitter {
     };
   }
 
-  /**
-   * Initialize WebSocket server for live dashboard
-   */
   private initializeWebSocketServer(): void {
     const port = ConfigurationManager.getInt('DASHBOARD_PORT', 3001);
     
@@ -132,7 +114,6 @@ export class ExecutionMonitor extends EventEmitter {
       const logger = ActionLogger.getInstance();
       logger.debug('ExecutionMonitor - Dashboard client connected');
       
-      // Send current state to new client
       ws.send(JSON.stringify({
         type: 'state',
         data: this.getExecutionSnapshot()
@@ -152,11 +133,7 @@ export class ExecutionMonitor extends EventEmitter {
     logger.info(`ExecutionMonitor - Live dashboard server started on port ${port}`);
   }
 
-  /**
-   * Start monitoring execution
-   */
   startMonitoring(): void {
-    // Initialize monitoring on first use if not already done
     if (!this.cliReporter && !this.wsServer) {
       this.initializeMonitoring();
     }
@@ -167,30 +144,23 @@ export class ExecutionMonitor extends EventEmitter {
     this.startTime = Date.now();
     this.executionState = 'running';
     
-    // Start progress updates
     this.updateInterval = setInterval(() => {
       this.updateProgress();
-    }, 1000); // Update every second
+    }, 1000);
 
-    // Start system metrics collection
     this.metricsInterval = setInterval(() => {
       this.collectSystemMetrics();
-    }, 5000); // Collect every 5 seconds
+    }, 5000);
 
-    // Notify listeners
     this.emit('monitoringStarted');
   }
 
-  /**
-   * Stop monitoring
-   */
   stopMonitoring(): void {
     const logger = ActionLogger.getInstance();
     logger.info('ExecutionMonitor - Stopping execution monitoring');
     
     this.executionState = 'completed';
     
-    // Clear intervals
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = undefined as any;
@@ -201,21 +171,15 @@ export class ExecutionMonitor extends EventEmitter {
       this.metricsInterval = undefined as any;
     }
 
-    // Close WebSocket server
     if (this.wsServer) {
       this.wsServer.close();
     }
 
-    // Generate final report
     this.generateFinalReport();
 
-    // Notify listeners
     this.emit('monitoringStopped');
   }
 
-  /**
-   * Handle execution start
-   */
   private handleExecutionStart(data: { totalFeatures: number; totalScenarios: number }): void {
     const logger = ActionLogger.getInstance();
     logger.info(`ExecutionMonitor - Execution started: ${data.totalFeatures} features, ${data.totalScenarios} scenarios`);
@@ -224,8 +188,6 @@ export class ExecutionMonitor extends EventEmitter {
     this.executionState = 'running';
     
     if (this.cliReporter) {
-      // CLI reporter start execution - method not available
-      // this.cliReporter.startExecution(data.totalScenarios);
     }
 
     this.broadcastUpdate({
@@ -234,9 +196,6 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle execution end
-   */
   private handleExecutionEnd(result: ExecutionResult): void {
     const duration = Date.now() - this.startTime;
     
@@ -255,9 +214,6 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle feature start
-   */
   private handleFeatureStart(feature: Feature): void {
     const logger = ActionLogger.getInstance();
     logger.info(`ExecutionMonitor - Feature: ${feature.name}`);
@@ -284,9 +240,6 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle feature end
-   */
   private handleFeatureEnd(data: { feature: Feature; duration: number; status: string }): void {
     const progress = this.features.get(data.feature.name);
     if (progress) {
@@ -305,9 +258,6 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle scenario start
-   */
   private handleScenarioStart(scenario: Scenario): void {
     const logger = ActionLogger.getInstance();
     logger.info(`ExecutionMonitor - Scenario: ${scenario.name}`);
@@ -326,7 +276,6 @@ export class ExecutionMonitor extends EventEmitter {
       failedSteps: 0
     });
 
-    // Update feature progress
     const featureProgress = this.features.get(this.currentFeature?.name || '');
     if (featureProgress) {
       featureProgress.scenarios.set(scenarioId, 'running');
@@ -342,9 +291,6 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle scenario end
-   */
   private handleScenarioEnd(data: { scenario: Scenario; duration: number; status: string }): void {
     const scenarioId = this.getScenarioId(data.scenario);
     const progress = this.scenarios.get(scenarioId);
@@ -355,7 +301,6 @@ export class ExecutionMonitor extends EventEmitter {
       progress.endTime = Date.now();
     }
 
-    // Update feature progress
     const featureProgress = this.features.get(this.currentFeature?.name || '');
     if (featureProgress) {
       featureProgress.completedScenarios++;
@@ -377,9 +322,6 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle step start
-   */
   private handleStepStart(step: Step): void {
     const logger = ActionLogger.getInstance();
     logger.info(`ExecutionMonitor - Step: ${step.keyword} ${step.text}`);
@@ -393,7 +335,6 @@ export class ExecutionMonitor extends EventEmitter {
       startTime: Date.now()
     });
 
-    // Update scenario progress
     const scenarioId = this.getScenarioId(this.currentScenario!);
     const scenarioProgress = this.scenarios.get(scenarioId);
     if (scenarioProgress) {
@@ -410,9 +351,6 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle step end
-   */
   private handleStepEnd(data: { step: Step; duration: number; status: string; error?: Error }): void {
     const stepId = this.getStepId(data.step);
     const progress = this.steps.get(stepId);
@@ -426,7 +364,6 @@ export class ExecutionMonitor extends EventEmitter {
       }
     }
 
-    // Update scenario progress
     const scenarioId = this.getScenarioId(this.currentScenario!);
     const scenarioProgress = this.scenarios.get(scenarioId);
     if (scenarioProgress) {
@@ -449,30 +386,21 @@ export class ExecutionMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Update progress
-   */
   private updateProgress(): void {
     const progress = this.calculateProgress();
     
-    // Update CLI reporter
     if (this.cliReporter) {
       this.cliReporter.updateProgress(progress);
     }
 
-    // Broadcast to dashboard
     this.broadcastUpdate({
       type: 'progress',
       data: progress
     });
 
-    // Emit progress event
     this.emit('progress', progress);
   }
 
-  /**
-   * Calculate execution progress
-   */
   private calculateProgress(): ExecutionProgress {
     let totalFeatures = 0;
     let completedFeatures = 0;
@@ -485,7 +413,6 @@ export class ExecutionMonitor extends EventEmitter {
     let passedSteps = 0;
     let failedSteps = 0;
 
-    // Aggregate feature progress
     for (const feature of Array.from(this.features.values())) {
       totalFeatures++;
       if (feature.status !== 'running') {
@@ -497,7 +424,6 @@ export class ExecutionMonitor extends EventEmitter {
       failedScenarios += feature.failedScenarios;
     }
 
-    // Aggregate scenario progress
     for (const scenario of Array.from(this.scenarios.values())) {
       totalSteps += scenario.totalSteps;
       completedSteps += scenario.completedSteps;
@@ -538,9 +464,6 @@ export class ExecutionMonitor extends EventEmitter {
     return progress;
   }
 
-  /**
-   * Estimate time remaining
-   */
   private estimateTimeRemaining(percentage: number, duration: number): number {
     if (percentage === 0 || percentage === 100) {
       return 0;
@@ -550,16 +473,13 @@ export class ExecutionMonitor extends EventEmitter {
     return Math.round(estimatedTotal - duration);
   }
 
-  /**
-   * Collect system metrics
-   */
   private collectSystemMetrics(): void {
     const cpuUsage = process.cpuUsage();
     const memoryUsage = process.memoryUsage();
     
     this.systemMetrics = {
-      cpuUsage: (cpuUsage.user + cpuUsage.system) / 1000000, // Convert to seconds
-      memoryUsage: memoryUsage.heapUsed / 1024 / 1024, // Convert to MB
+      cpuUsage: (cpuUsage.user + cpuUsage.system) / 1000000,
+      memoryUsage: memoryUsage.heapUsed / 1024 / 1024,
       totalMemory: os.totalmem() / 1024 / 1024,
       freeMemory: os.freemem() / 1024 / 1024,
       loadAverage: os.loadavg(),
@@ -568,13 +488,9 @@ export class ExecutionMonitor extends EventEmitter {
       processUptime: process.uptime()
     };
 
-    // Collect performance metrics
     this.performanceCollector.collectSystemMetrics(this.systemMetrics);
   }
 
-  /**
-   * Get execution snapshot
-   */
   getExecutionSnapshot(): ExecutionSnapshot {
     const progress = this.calculateProgress();
     
@@ -592,9 +508,6 @@ export class ExecutionMonitor extends EventEmitter {
     };
   }
 
-  /**
-   * Handle dashboard message
-   */
   private handleDashboardMessage(ws: any, message: string): void {
     try {
       const msg = JSON.parse(message);
@@ -640,24 +553,18 @@ export class ExecutionMonitor extends EventEmitter {
     }
   }
 
-  /**
-   * Broadcast update to all dashboard clients
-   */
   private broadcastUpdate(update: any): void {
     if (!this.wsServer) return;
     
     const message = JSON.stringify(update);
     
     this.wsServer.clients.forEach((client: any) => {
-      if (client.readyState === 1) { // WebSocket.OPEN
+      if (client.readyState === 1) {
         client.send(message);
       }
     });
   }
 
-  /**
-   * Generate final execution report
-   */
   private generateFinalReport(): void {
     const snapshot = this.getExecutionSnapshot();
     
@@ -675,23 +582,14 @@ export class ExecutionMonitor extends EventEmitter {
     logger.info('ExecutionMonitor - ========================');
   }
 
-  /**
-   * Get scenario ID
-   */
   private getScenarioId(scenario?: Scenario): string {
     return `${this.currentFeature?.name || 'unknown'}::${scenario?.name || 'unknown'}`;
   }
 
-  /**
-   * Get step ID
-   */
   private getStepId(step: Step): string {
     return `${this.getScenarioId(this.currentScenario)}::${step.line || 'unknown'}`;
   }
 
-  /**
-   * Export monitor state
-   */
   exportState(): any {
     return {
       executionSnapshot: this.getExecutionSnapshot(),
@@ -705,7 +603,6 @@ export class ExecutionMonitor extends EventEmitter {
   }
 }
 
-// Interfaces
 interface FeatureProgress {
   feature: Feature;
   status: 'running' | 'passed' | 'failed' | 'skipped';

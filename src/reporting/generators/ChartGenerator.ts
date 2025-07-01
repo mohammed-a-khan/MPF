@@ -24,46 +24,23 @@ import {
 } from '../types/reporting.types';
 import { Logger } from '../../core/utils/Logger';
 
-/**
- * Chart Generator - Creates Custom Charts Without External Dependencies
- * 
- * Implements 14 different chart types from scratch:
- * - Doughnut, Bar, Line, Area, Pie
- * - Radar, Scatter, Bubble, Heatmap
- * - Treemap, Sankey, Gauge, Waterfall, Funnel
- * 
- * Features:
- * - SVG-based rendering for quality
- * - Animations and transitions
- * - Interactive tooltips
- * - Responsive design
- * - Custom color schemes
- * - Data labels and legends
- * - Grid lines and axes
- * - Zoom and pan capabilities
- * 
- * Zero external dependencies - pure TypeScript/JavaScript implementation.
- */
 export class ChartGenerator {
   private readonly logger = Logger.getInstance();
   private readonly defaultColors: string[] = [
-    '#93186C', // Primary brand color
-    '#10B981', // Success green
-    '#EF4444', // Error red
+    '#93186C',
+    '#10B981',
+    '#EF4444',
     '#F59E0B', // Warning yellow
-    '#3B82F6', // Info blue
-    '#8B5CF6', // Purple
-    '#EC4899', // Pink
-    '#14B8A6', // Teal
-    '#F97316', // Orange
-    '#6366F1', // Indigo
-    '#84CC16', // Lime
-    '#06B6D4'  // Cyan
+    '#3B82F6',
+    '#8B5CF6',
+    '#EC4899',
+    '#14B8A6',
+    '#F97316',
+    '#6366F1',
+    '#84CC16',
+    '#06B6D4'
   ];
 
-  /**
-   * Generate chart based on type
-   */
   async generateChart(
     type: ChartType,
     data: ChartData,
@@ -111,9 +88,6 @@ export class ChartGenerator {
     }
   }
 
-  /**
-   * Generate Doughnut Chart
-   */
   private generateDoughnutChart(
     id: string,
     data: DoughnutChart,
@@ -122,7 +96,6 @@ export class ChartGenerator {
   ): string {
     const width = options.width || 400;
     const height = options.height || 400;
-    // Adjust for right-side legend
     const legendWidth = 160;
     const chartWidth = width - legendWidth;
     const centerX = chartWidth / 2;
@@ -130,7 +103,6 @@ export class ChartGenerator {
     const outerRadius = Math.min(chartWidth, height) / 2 - 30;
     const innerRadius = outerRadius * 0.4;
     
-    // Defensive check for data.values
     if (!data.values || !Array.isArray(data.values)) {
       console.error('DoughnutChart: data.values is undefined or not an array');
       return `<div style="display: flex; align-items: center; justify-content: center; width: ${width}px; height: ${height}px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
@@ -141,10 +113,8 @@ export class ChartGenerator {
               </div>`;
     }
     
-    // Calculate total and filter out zero values
     const total = data.values.reduce((sum: number, val: number) => sum + val, 0);
     
-    // If total is 0, show empty state
     if (total === 0) {
       return `<div style="display: flex; align-items: center; justify-content: center; width: ${width}px; height: ${height}px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
                 <div style="text-align: center; color: #6c757d;">
@@ -155,9 +125,8 @@ export class ChartGenerator {
               </div>`;
     }
     
-    let currentAngle = -Math.PI / 2; // Start at top
+    let currentAngle = -Math.PI / 2;
     
-    // Filter out zero values and create segments
     const validSegments = data.values
       .map((value: number, index: number) => ({
         value,
@@ -167,7 +136,6 @@ export class ChartGenerator {
       }))
       .filter(segment => segment.value > 0);
     
-    // If no valid segments, show empty state
     if (validSegments.length === 0) {
       return `<div style="display: flex; align-items: center; justify-content: center; width: ${width}px; height: ${height}px; background: #f8f9fa; border-radius: 8px; border: 2px dashed #dee2e6;">
                 <div style="text-align: center; color: #6c757d;">
@@ -177,16 +145,14 @@ export class ChartGenerator {
               </div>`;
     }
     
-    // SPECIAL HANDLING: For single segment (100% scenarios), create a visible doughnut
     const segments = validSegments.map((segment: any) => {
       let percentage = segment.value / total;
       let angle = percentage * 2 * Math.PI;
       let startAngle = currentAngle;
       let endAngle = currentAngle + angle;
       
-      // For single segment (100%), leave a small gap to make it visible as a doughnut
       if (validSegments.length === 1) {
-        angle = 2 * Math.PI - 0.1; // Leave small gap (0.1 radians ≈ 6 degrees)
+        angle = 2 * Math.PI - 0.1;
         endAngle = startAngle + angle;
       }
       
@@ -240,7 +206,6 @@ export class ChartGenerator {
         const labelY = Math.sin(labelAngle) * labelRadius;
         const percentage = Math.round(segment.percentage * 100);
         
-        // Use gradient fill for single segment to make it more visible
         const fillColor = validSegments.length === 1 ? `url(#singleSegmentGradient_${id})` : segment.color;
         
         return `
@@ -323,9 +288,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateDoughnutScript(id, segments, total)}`;
   }
 
-  /**
-   * Generate Bar Chart
-   */
   private generateBarChart(
     id: string,
     data: BarChart,
@@ -338,10 +300,9 @@ ${this.generateDoughnutScript(id, segments, total)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Calculate scales
     const barWidth = chartWidth / data.labels.length;
     const maxValue = Math.max(...data.datasets.flatMap(ds => ds.data));
-    const yScale = chartHeight / (maxValue * 1.1); // Add 10% padding
+    const yScale = chartHeight / (maxValue * 1.1);
     
     return `
 <div class="chart-container" id="${id}-container">
@@ -503,9 +464,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateBarChartScript(id, data)}`;
   }
 
-  /**
-   * Generate Line Chart
-   */
   private generateLineChart(
     id: string,
     data: LineChart,
@@ -518,7 +476,6 @@ ${this.generateBarChartScript(id, data)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Calculate scales
     const xScale = chartWidth / (data.labels.length - 1);
     const allValues = data.datasets.flatMap(ds => ds.data);
     const minValue = Math.min(...allValues);
@@ -712,16 +669,12 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateLineChartScript(id, data)}`;
   }
 
-  /**
-   * Generate Area Chart
-   */
   private generateAreaChart(
     id: string,
     data: AreaChart,
     options: ChartOptions,
     colors: ChartColors
   ): string {
-    // Area chart is similar to line chart with filled areas
     const lineChartData: LineChart = {
       type: ChartType.AREA,
       title: data.title || '',
@@ -737,9 +690,6 @@ ${this.generateLineChartScript(id, data)}`;
     return this.generateLineChart(id, lineChartData, options, colors);
   }
 
-  /**
-   * Generate Pie Chart
-   */
   private generatePieChart(
     id: string,
     data: PieChart,
@@ -752,7 +702,6 @@ ${this.generateLineChartScript(id, data)}`;
     const centerY = height / 2;
     const radius = Math.min(width, height) / 2 - 40;
     
-    // Defensive check for data.values
     if (!data.values || !Array.isArray(data.values)) {
       console.error('PieChart: data.values is undefined or not an array');
       return '<svg width="' + width + '" height="' + height + '"><text x="' + (width/2) + '" y="' + (height/2) + '" text-anchor="middle">No data available</text></svg>';
@@ -869,9 +818,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generatePieChartScript(id, segments, total)}`;
   }
 
-  /**
-   * Generate Radar Chart
-   */
   private generateRadarChart(
     id: string,
     data: RadarChart,
@@ -888,7 +834,6 @@ ${this.generatePieChartScript(id, segments, total)}`;
     const angleStep = (2 * Math.PI) / axes;
     const levels = 5;
     
-    // Calculate max value for scaling
     const maxValue = Math.max(...data.datasets.flatMap(ds => ds.data));
     
     return `
@@ -1072,9 +1017,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateRadarChartScript(id, data)}`;
   }
 
-  /**
-   * Generate Scatter Chart
-   */
   private generateScatterChart(
     id: string,
     data: ScatterChart,
@@ -1087,7 +1029,6 @@ ${this.generateRadarChartScript(id, data)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Calculate scales
     const allPoints = data.datasets.flatMap(ds => ds.data);
     const xMin = Math.min(...allPoints.map(p => p.x));
     const xMax = Math.max(...allPoints.map(p => p.x));
@@ -1244,9 +1185,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateScatterChartScript(id, data)}`;
   }
 
-  /**
-   * Generate Bubble Chart
-   */
   private generateBubbleChart(
     id: string,
     data: BubbleChart,
@@ -1259,7 +1197,6 @@ ${this.generateScatterChartScript(id, data)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Calculate scales
     const allPoints = data.datasets.flatMap(ds => ds.data);
     const xMin = Math.min(...allPoints.map(p => p.x));
     const xMax = Math.max(...allPoints.map(p => p.x));
@@ -1335,7 +1272,6 @@ ${this.generateScatterChartScript(id, data)}`;
       
       <!-- Bubbles -->
       ${data.datasets.map((dataset, datasetIndex) => {
-        // Sort bubbles by size (largest first) to prevent overlap issues
         const sortedData = [...dataset.data].sort((a, b) => (b.r || 0) - (a.r || 0));
         
         return `
@@ -1429,9 +1365,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateBubbleChartScript(id, data)}`;
   }
 
-  /**
-   * Generate Heatmap Chart
-   */
   private generateHeatmapChart(
     id: string,
     data: HeatmapChart,
@@ -1447,7 +1380,6 @@ ${this.generateBubbleChartScript(id, data)}`;
     const cellWidth = chartWidth / data.xLabels.length;
     const cellHeight = chartHeight / data.yLabels.length;
     
-    // Find min and max values for color scaling
     const flatData = data.data.flat();
     const minValue = Math.min(...flatData);
     const maxValue = Math.max(...flatData);
@@ -1618,9 +1550,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateHeatmapChartScript(id, data)}`;
   }
 
-  /**
-   * Generate Treemap Chart
-   */
   private generateTreemapChart(
     id: string,
     data: TreemapChart,
@@ -1633,13 +1562,11 @@ ${this.generateHeatmapChartScript(id, data)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Defensive check for data.data
     if (!data.data || !Array.isArray(data.data)) {
       console.error('TreemapChart: data.data is undefined or not an array');
       return '<svg width="' + width + '" height="' + height + '"><text x="' + (width/2) + '" y="' + (height/2) + '" text-anchor="middle">No data available</text></svg>';
     }
     
-    // Calculate treemap layout
     const totalValue = data.data.reduce((sum: number, item: any) => sum + item.value, 0);
     const normalizedData = data.data.map(item => ({
       label: item.label || item.name,
@@ -1731,9 +1658,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateTreemapChartScript(id, data, totalValue)}`;
   }
 
-  /**
-   * Generate Sankey Chart
-   */
   private generateSankeyChart(
     id: string,
     data: SankeyChart,
@@ -1746,7 +1670,6 @@ ${this.generateTreemapChartScript(id, data, totalValue)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Calculate node positions
     const nodes = this.calculateSankeyNodes(data.nodes, data.links, chartWidth, chartHeight);
     const links = this.calculateSankeyLinks(nodes, data.links);
     
@@ -1866,9 +1789,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateSankeyChartScript(id, nodes, links)}`;
   }
 
-  /**
-   * Generate Gauge Chart
-   */
   private generateGaugeChart(
     id: string,
     data: GaugeChart,
@@ -1881,14 +1801,12 @@ ${this.generateSankeyChartScript(id, nodes, links)}`;
     const centerY = height * 0.75;
     const radius = Math.min(width / 2, height * 0.75) - 40;
     
-    // Calculate angles
     const startAngle = -Math.PI * 0.75;
     const endAngle = Math.PI * 0.75;
     const angleRange = endAngle - startAngle;
     const valueRatio = (data.value - data.min) / (data.max - data.min);
     const valueAngle = startAngle + angleRange * valueRatio;
     
-    // Calculate color zones
     const zones = data.zones || [
       { min: data.min, max: data.max * 0.3, color: colors.dataColors[2] || '#ef4444' },
       { min: data.max * 0.3, max: data.max * 0.7, color: colors.dataColors[1] || '#f59e0b' },
@@ -2114,9 +2032,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateGaugeChartScript(id, data)}`;
   }
 
-  /**
-   * Generate Waterfall Chart
-   */
   private generateWaterfallChart(
     id: string,
     data: WaterfallChart,
@@ -2129,12 +2044,10 @@ ${this.generateGaugeChartScript(id, data)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Calculate cumulative values
     const cumulativeData = this.calculateWaterfallData(data.data);
     const barWidth = chartWidth / cumulativeData.length * 0.7;
     const barSpacing = chartWidth / cumulativeData.length * 0.3;
     
-    // Find min and max for scaling
     const allValues = cumulativeData.flatMap(d => [d.start, d.end]);
     const minValue = Math.min(0, ...allValues);
     const maxValue = Math.max(...allValues);
@@ -2211,7 +2124,6 @@ ${this.generateGaugeChartScript(id, data)}`;
           ? chartHeight - ((item.end - minValue) * yScale)
           : chartHeight - ((item.start - minValue) * yScale);
         
-        // Determine bar color
         let barColor;
         if (item.type === 'total') {
           barColor = colors.dataColors[3] || '#6366f1';
@@ -2361,9 +2273,6 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateWaterfallChartScript(id, cumulativeData)}`;
   }
 
-  /**
-   * Generate Funnel Chart
-   */
   private generateFunnelChart(
     id: string,
     data: FunnelChart,
@@ -2376,7 +2285,6 @@ ${this.generateWaterfallChartScript(id, cumulativeData)}`;
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
-    // Calculate funnel dimensions
     const maxValue = Math.max(...data.values);
     const segmentHeight = chartHeight / data.values.length;
     const topWidth = chartWidth * 0.9;
@@ -2576,11 +2484,7 @@ ${this.generateChartStyles(id, colors)}
 ${this.generateFunnelChartScript(id, segments)}`;
   }
 
-  // ========== Helper Methods ==========
 
-  /**
-   * Generate color palette
-   */
   private generateColorPalette(_data: ChartData, theme: ReportTheme): ChartColors {
     return {
       primaryColor: theme.primaryColor,
@@ -2593,9 +2497,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     };
   }
 
-  /**
-   * Create arc path
-   */
   private createArcPath(
     cx: number,
     cy: number,
@@ -2634,9 +2535,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     }
   }
 
-  /**
-   * Create segment label
-   */
   private createSegmentLabel(segment: any, innerRadius: number, outerRadius: number): string {
     const midAngle = (segment.startAngle + segment.endAngle) / 2;
     const labelRadius = (innerRadius + outerRadius) / 2;
@@ -2657,9 +2555,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     </text>`;
   }
 
-  /**
-   * Create line path
-   */
   private createLinePath(points: Point[], smooth: boolean = true): string {
     if (points.length === 0) return '';
     if (points.length === 1) {
@@ -2673,7 +2568,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
       ).join(' ');
     }
     
-    // Create smooth curve using cubic bezier
     const firstPoint = points[0];
     if (!firstPoint) return '';
     
@@ -2694,7 +2588,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
       path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
     }
     
-    // Last point
     const lastPoint = points[points.length - 1];
     if (lastPoint) {
       path += ` L ${lastPoint.x} ${lastPoint.y}`;
@@ -2703,18 +2596,11 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return path;
   }
 
-  /**
-   * Get path length (approximation for animation)
-   */
   private getPathLength(path: string): number {
-    // Rough approximation based on path commands
     const commands = path.match(/[A-Z][^A-Z]*/g) || [];
     return commands.length * 100;
   }
 
-  /**
-   * Generate grid lines
-   */
   private generateGridLines(
     width: number,
     height: number,
@@ -2740,9 +2626,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return lines;
   }
 
-  /**
-   * Generate Y axis labels
-   */
   private generateYAxisLabels(min: number, max: number, count: number): number[] {
     const range = max - min;
     const step = range / count;
@@ -2755,9 +2638,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return labels;
   }
 
-  /**
-   * Generate axis values
-   */
   private generateAxisValues(min: number, max: number, count: number): number[] {
     const range = max - min;
     const step = this.getNiceStep(range / count);
@@ -2771,9 +2651,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return values;
   }
 
-  /**
-   * Get nice step value
-   */
   private getNiceStep(roughStep: number): number {
     const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
     const normalized = roughStep / magnitude;
@@ -2787,9 +2664,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return niceStep * magnitude;
   }
 
-  /**
-   * Format axis value
-   */
   private formatAxisValue(value: number): string {
     if (Math.abs(value) >= 1000000) {
       return `${(value / 1000000).toFixed(1)}M`;
@@ -2802,16 +2676,10 @@ ${this.generateFunnelChartScript(id, segments)}`;
     }
   }
 
-  /**
-   * Format value
-   */
   private formatValue(value: number): string {
     return value.toLocaleString();
   }
 
-  /**
-   * Format cell value
-   */
   private formatCellValue(value: number): string {
     if (Math.abs(value) >= 1000) {
       return `${(value / 1000).toFixed(1)}k`;
@@ -2819,17 +2687,11 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return value.toFixed(0);
   }
 
-  /**
-   * Truncate label
-   */
   private truncateLabel(label: string, maxLength: number): string {
     if (label.length <= maxLength) return label;
     return label.substring(0, maxLength - 3) + '...';
   }
 
-  /**
-   * Generate legend
-   */
   private generateLegend(
     items: Array<{ label: string; color: string }>,
     width: number,
@@ -2887,9 +2749,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     }
   }
 
-  /**
-   * Darken color
-   */
   private darkenColor(color: string, percent: number): string {
     const num = parseInt(color.replace('#', ''), 16);
     const amt = Math.round(2.55 * percent);
@@ -2903,9 +2762,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
       .toString(16).slice(1);
   }
 
-  /**
-   * Get heatmap color
-   */
   private getHeatmapColor(value: number, colors: string[]): string {
     if (value <= 0) return colors[0] || '#93186C';
     if (value >= 1) return colors[colors.length - 1] || '#93186C';
@@ -2919,9 +2775,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return this.interpolateColor(color1, color2, remainder);
   }
 
-  /**
-   * Interpolate between two colors
-   */
   private interpolateColor(color1: string, color2: string, factor: number): string {
     const c1 = parseInt(color1.replace('#', ''), 16);
     const c2 = parseInt(color2.replace('#', ''), 16);
@@ -2941,15 +2794,11 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
   }
 
-  /**
-   * Calculate treemap layout
-   */
   private calculateTreemapLayout(
     data: Array<{ label: string; value: number }>,
     width: number,
     height: number
   ): Array<{ label: string; value: number; x: number; y: number; width: number; height: number }> {
-    // Defensive check for data
     if (!data || !Array.isArray(data) || data.length === 0) {
       return [];
     }
@@ -2964,12 +2813,10 @@ ${this.generateFunnelChartScript(id, segments)}`;
     let remainingHeight = height;
     let remainingValue = total;
     
-    // Simple slice and dice algorithm
     sorted.forEach((item: any) => {
       const ratio = item.value / remainingValue;
       
       if (remainingWidth > remainingHeight) {
-        // Vertical slice
         const rectWidth = remainingWidth * ratio;
         rectangles.push({
           ...item,
@@ -2981,7 +2828,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
         x += rectWidth;
         remainingWidth -= rectWidth;
       } else {
-        // Horizontal slice
         const rectHeight = remainingHeight * ratio;
         rectangles.push({
           ...item,
@@ -3000,19 +2846,14 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return rectangles;
   }
 
-  /**
-   * Calculate sankey nodes
-   */
   private calculateSankeyNodes(
     nodes: Array<{ id: string; label: string }>,
     links: Array<{ source: string; target: string; value: number }>,
     width: number,
     height: number
   ): any[] {
-    // Group nodes by level (simple left-to-right layout)
     const nodeMap = new Map(nodes.map(n => [n.id, { ...n, level: 0, value: 0 }]));
     
-    // Calculate node values
     links.forEach(link => {
       const source = nodeMap.get(link.source);
       const target = nodeMap.get(link.target);
@@ -3020,7 +2861,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
       if (target) target.value += link.value;
     });
     
-    // Assign levels (simple approach)
     const visited = new Set<string>();
     const assignLevel = (nodeId: string, level: number) => {
       if (visited.has(nodeId)) return;
@@ -3036,13 +2876,11 @@ ${this.generateFunnelChartScript(id, segments)}`;
       }
     };
     
-    // Find root nodes (no incoming links)
     const rootNodes = nodes.filter(n => 
       !links.some(l => l.target === n.id)
     );
     rootNodes.forEach(n => assignLevel(n.id, 0));
     
-    // Calculate positions
     const levelGroups = new Map<number, any[]>();
     nodeMap.forEach(node => {
       if (!levelGroups.has(node.level)) {
@@ -3059,7 +2897,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     const positionedNodes: any[] = [];
     
     levelGroups.forEach((levelNodes: any, level: number) => {
-      // Defensive check for levelNodes
       if (!levelNodes || !Array.isArray(levelNodes) || levelNodes.length === 0) {
         return;
       }
@@ -3087,9 +2924,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return positionedNodes;
   }
 
-  /**
-   * Calculate sankey links
-   */
   private calculateSankeyLinks(nodes: any[], links: any[]): any[] {
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
     
@@ -3105,9 +2939,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     });
   }
 
-  /**
-   * Create sankey link path
-   */
   private createSankeyLinkPath(link: any): string {
     const x0 = link.source.x + link.source.width;
     const x1 = link.target.x;
@@ -3122,9 +2953,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     `;
   }
 
-  /**
-   * Generate gauge ticks
-   */
   private generateGaugeTicks(
     min: number,
     max: number,
@@ -3144,9 +2972,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return ticks;
   }
 
-  /**
-   * Calculate waterfall data
-   */
   private calculateWaterfallData(data: any[]): any[] {
     const result: any[] = [];
     let cumulativeValue = 0;
@@ -3170,25 +2995,16 @@ ${this.generateFunnelChartScript(id, segments)}`;
     return result;
   }
 
-  /**
-   * Generate key times for animation
-   */
   private generateKeyTimes(steps: number): string {
     return Array.from({ length: steps }, (_, i) => (i / (steps - 1)).toFixed(2)).join(';');
   }
 
-  /**
-   * Generate animation values
-   */
   private generateAnimationValues(start: number, end: number, steps: number): string {
     return Array.from({ length: steps }, (_, i) => 
       Math.round(start + (end - start) * (i / (steps - 1)))
     ).join(';');
   }
 
-  /**
-   * Generate chart filters
-   */
   private generateChartFilters(): string {
     return `
     <filter id="drop-shadow">
@@ -3212,9 +3028,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     </filter>`;
   }
 
-  /**
-   * Generate chart gradients
-   */
   private generateChartGradients(colors: ChartColors): string {
     return colors.dataColors.map((color, index) => `
     <linearGradient id="gradient-${index}" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -3224,9 +3037,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     `).join('');
   }
 
-  /**
-   * Generate chart styles
-   */
   private generateChartStyles(id: string, colors: ChartColors): string {
     return `
 <style>
@@ -3344,7 +3154,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
   overflow: visible;
 }
 
-/* Hover effects */
 .segment-path:hover,
 .bar:hover,
 .line-point:hover,
@@ -3364,9 +3173,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </style>`;
   }
 
-  /**
-   * Generate doughnut chart script
-   */
   private generateDoughnutScript(id: string, segments: any[], total: number): string {
     return `
 <script>
@@ -3390,7 +3196,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     tooltip.style.left = event.pageX + 'px';
     tooltip.style.top = (event.pageY - tooltip.offsetHeight - 10) + 'px';
     
-    // Highlight segment
     event.target.style.transform = 'scale(1.05)';
     event.target.style.filter = 'brightness(1.1)';
   };
@@ -3406,17 +3211,12 @@ ${this.generateFunnelChartScript(id, segments)}`;
   window.chartClick_${id.replace(/-/g, '_')} = function(event, index) {
     const segment = segments[index];
     console.log('Clicked:', segment);
-    // Add custom click handler here
   };
 })();
 </script>`;
   }
 
-  /**
-   * Generate bar chart script
-   */
   private generateBarChartScript(id: string, data: BarChart): string {
-    // Ensure valid function names by replacing hyphens with underscores
     const funcId = id.replace(/-/g, '_');
     return `
 <script>
@@ -3454,9 +3254,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate line chart script
-   */
   private generateLineChartScript(id: string, data: LineChart): string {
     return `
 <script>
@@ -3494,9 +3291,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate pie chart script
-   */
   private generatePieChartScript(id: string, segments: any[], total: number): string {
     return `
 <script>
@@ -3533,9 +3327,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate radar chart script
-   */
   private generateRadarChartScript(id: string, data: RadarChart): string {
     return `
 <script>
@@ -3573,9 +3364,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate scatter chart script
-   */
   private generateScatterChartScript(id: string, data: ScatterChart): string {
     return `
 <script>
@@ -3616,9 +3404,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate bubble chart script
-   */
   private generateBubbleChartScript(id: string, data: BubbleChart): string {
     return `
 <script>
@@ -3659,9 +3444,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate heatmap chart script
-   */
   private generateHeatmapChartScript(id: string, data: HeatmapChart): string {
     return `
 <script>
@@ -3701,9 +3483,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate treemap chart script
-   */
   private generateTreemapChartScript(id: string, data: TreemapChart, total: number): string {
     return `
 <script>
@@ -3744,9 +3523,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate sankey chart script
-   */
   private generateSankeyChartScript(id: string, nodes: any[], links: any[]): string {
     return `
 <script>
@@ -3770,11 +3546,9 @@ ${this.generateFunnelChartScript(id, segments)}`;
     tooltip.style.left = event.pageX + 'px';
     tooltip.style.top = (event.pageY - tooltip.offsetHeight - 10) + 'px';
     
-    // Highlight node
     event.target.style.strokeWidth = '3';
     event.target.style.stroke = '#000';
     
-    // Highlight connected links
     const nodeId = node.id;
     const svgLinks = document.querySelectorAll('#' + chartId + ' .sankey-link');
     svgLinks.forEach(link => {
@@ -3795,7 +3569,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     event.target.style.strokeWidth = '1';
     event.target.style.stroke = '';
     
-    // Reset links
     const svgLinks = document.querySelectorAll('#' + chartId + ' .sankey-link');
     svgLinks.forEach(link => {
       link.style.opacity = '0.6';
@@ -3836,9 +3609,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate gauge chart script
-   */
   private generateGaugeChartScript(id: string, data: GaugeChart): string {
     return `
 <script>
@@ -3846,7 +3616,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
   const chartId = '${id}';
   const data = ${JSON.stringify(data)};
   
-  // Animate value counter
   const valueElement = document.querySelector('#' + chartId + ' .gauge-value-text tspan');
   if (valueElement) {
     let currentValue = 0;
@@ -3862,17 +3631,14 @@ ${this.generateFunnelChartScript(id, segments)}`;
     }, 20);
   }
   
-  // Add click handler to needle
   const needle = document.querySelector('#' + chartId + ' .gauge-needle');
   if (needle) {
     needle.style.cursor = 'pointer';
     needle.addEventListener('click', () => {
       console.log('Gauge value:', data.value);
-      // Add custom click handler here
     });
   }
   
-  // Add hover effect
   const gaugeZones = document.querySelectorAll('#' + chartId + ' .gauge-zone');
   gaugeZones.forEach((zone, index) => {
     zone.addEventListener('mouseenter', () => {
@@ -3886,9 +3652,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate waterfall chart script
-   */
   private generateWaterfallChartScript(id: string, cumulativeData: any[]): string {
     return `
 <script>
@@ -3928,14 +3691,12 @@ ${this.generateFunnelChartScript(id, segments)}`;
     event.target.style.strokeWidth = '1';
   };
   
-  // Animate connector lines
   const connectors = document.querySelectorAll('#' + chartId + ' .connector-line');
   connectors.forEach((connector, index) => {
     connector.style.strokeDasharray = '3,3';
     connector.style.animation = 'dash 20s linear infinite';
   });
   
-  // Add CSS animation
   const style = document.createElement('style');
   style.textContent = \`
     @keyframes dash {
@@ -3949,9 +3710,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
 </script>`;
   }
 
-  /**
-   * Generate funnel chart script
-   */
   private generateFunnelChartScript(id: string, segments: any[]): string {
     return `
 <script>
@@ -3988,7 +3746,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     event.target.style.strokeWidth = '2';
   };
   
-  // Animate funnel segments
   segments.forEach((segment, index) => {
     setTimeout(() => {
       const labels = document.querySelectorAll('#' + chartId + ' .segment-label, #' + chartId + ' .segment-value');
@@ -4001,7 +3758,6 @@ ${this.generateFunnelChartScript(id, segments)}`;
     }, index * 100 + 300);
   });
   
-  // Highlight conversion rates on hover
   const conversionRates = document.querySelectorAll('#' + chartId + ' .conversion-rate');
   conversionRates.forEach(rate => {
     rate.style.cursor = 'pointer';

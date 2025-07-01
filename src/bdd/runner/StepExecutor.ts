@@ -20,9 +20,6 @@ import { ExecutionContext } from '../context/ExecutionContext';
 import { ExecutionMonitor } from './ExecutionMonitor';
 import { BDDContext } from '../context/BDDContext';
 
-/**
- * Executes individual test steps by matching them to step definitions
- */
 export class StepExecutor {
     private debugManager: DebugManager;
     private screenshotManager: ScreenshotManager;
@@ -36,18 +33,11 @@ export class StepExecutor {
         this.executionMonitor = ExecutionMonitor.getInstance();
     }
     
-    /**
-     * Get browser management strategy - read fresh each time to ensure latest config
-     */
     private getBrowserManagementStrategy(): string {
         return ConfigurationManager.get('BROWSER_MANAGEMENT_STRATEGY', 'reuse-browser');
     }
 
-    /**
-     * Reset initialized classes for new scenario
-     */
     public resetInitializedClasses(): void {
-        // For new-per-scenario, also clear page instances from all initialized classes
         const browserStrategy = this.getBrowserManagementStrategy();
         if (browserStrategy === 'new-per-scenario') {
             for (const className of this.initializedClasses) {
@@ -64,16 +54,12 @@ export class StepExecutor {
         this.initializedClasses.clear();
     }
     
-    /**
-     * Call after() method for all initialized classes
-     */
     public async callAfterMethods(): Promise<void> {
         const browserStrategy = this.getBrowserManagementStrategy();
         
         for (const className of this.initializedClasses) {
             const classInstance = stepRegistry.getClassInstance(className);
             if (classInstance) {
-                // Clear page instances
                 if (typeof (classInstance as any).clearPageInstances === 'function') {
                     try {
                         (classInstance as any).clearPageInstances();
@@ -82,14 +68,12 @@ export class StepExecutor {
                     }
                 }
                 
-                // For new-per-scenario, also clear all element caches on page objects
                 if (browserStrategy === 'new-per-scenario') {
                     const pageProperties = Reflect.getMetadata('page:properties', classInstance) || 
                                           Reflect.getMetadata('page:properties', Object.getPrototypeOf(classInstance)) || [];
                     for (const propertyKey of pageProperties) {
                         const pageObject = (classInstance as any)[propertyKey];
                         if (pageObject) {
-                            // Clear element caches
                             if (typeof pageObject.clearAllElementCaches === 'function') {
                                 try {
                                     pageObject.clearAllElementCaches();
@@ -97,7 +81,6 @@ export class StepExecutor {
                                     ActionLogger.logWarn(`Error clearing element caches for ${propertyKey}`, error as Error);
                                 }
                             }
-                            // Also call cleanup if available
                             if (typeof pageObject.cleanup === 'function') {
                                 try {
                                     await pageObject.cleanup();
@@ -112,22 +95,17 @@ export class StepExecutor {
         }
     }
 
-    /**
-     * Execute a single step
-     */
     public async execute(step: Step, context: ExecutionContext): Promise<StepResult> {
         const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const startTime = Date.now();
         let screenshotPath: string | undefined;
         
-        // Record current timestamp to capture step actions (BEFORE try block)
         const stepStartTime = new Date();
         
         try {
             this.currentContext = context;
             this.executionMonitor.emit('stepStart', step);
             
-            // Take screenshot before step execution if configured
             if (this.shouldTakeScreenshot('before')) {
                 try {
                     const attachment = await this.takeScreenshot('before', step);
@@ -137,28 +115,23 @@ export class StepExecutor {
                 }
             }
             
-            // Execute the step
             await this.executeStepDefinitionWithoutResult(step, context);
             
-            // Capture action details from logs generated during step execution (passed step)
             const actionDetails = this.extractActionDetailsByTime(stepStartTime, StepStatus.PASSED);
             
-            // Action details captured successfully using timestamp-based approach
             
-            // Create successful result
             const result: StepResult = {
                 id: stepId,
                 keyword: step.keyword,
                 text: step.text,
                 line: step.line,
                 status: StepStatus.PASSED,
-                duration: 0, // Will be set below
+                duration: 0,
                 startTime: new Date(startTime),
                 endTime: new Date(Date.now()),
-                actionDetails // Add captured action details
+                actionDetails
             };
             
-            // Take screenshot after successful step execution
             if (this.shouldTakeScreenshot('passed')) {
                 try {
                     const attachment = await this.takeScreenshot('passed', step);
@@ -211,11 +184,9 @@ export class StepExecutor {
                 ActionLogger.logWarn('Failed to take failure screenshot', screenshotError as Error);
             }
             
-            // Capture action details from logs generated during step execution (failed step)
             // Note: stepStartTime was captured before the try block, so it includes all step execution logs
             const actionDetails = this.extractActionDetailsByTime(stepStartTime, StepStatus.FAILED, error);
             
-            // Create comprehensive failure result
             const failureResult: StepResult = {
                 id: stepId,
                 keyword: step.keyword,
@@ -228,7 +199,7 @@ export class StepExecutor {
                 error: this.formatError(error),
                 errorMessage: (error as Error).message,
                 stackTrace: (error as Error).stack || '',
-                actionDetails, // Add captured action details with error information
+                actionDetails,
                 attachments: screenshotPath ? [{
                     data: screenshotPath,
                     mimeType: 'image/png',
@@ -241,17 +212,11 @@ export class StepExecutor {
         }
     }
 
-    /**
-     * Find matching step definition
-     */
     private async findStepDefinition(step: Step): Promise<StepDefinition | null> {
-        // Step definitions are registered without keywords, so search with just the text
         const stepText = step.text.trim();
         
-        // Try to find matching step definition
         let definition = stepRegistry.findStepDefinition(stepText);
 
-        // Log if no definition found
         if (!definition) {
             const fullStepText = `${step.keyword} ${step.text}`.trim();
             ActionLogger.logWarn(`No step definition found for: ${fullStepText}`);
@@ -260,21 +225,15 @@ export class StepExecutor {
         return definition;
     }
 
-    /**
-     * Extract parameters from step text
-     */
     private extractParameters(step: Step, _definition: StepDefinition): any[] {
-        // Use just the step text without keyword for parameter extraction
         const stepText = step.text.trim();
         
-        // Use StepRegistry to extract parameters since it has the matching logic
         const parameters = stepRegistry.findStepWithParameters(stepText);
         
         if (!parameters) {
             throw new Error('Step text does not match pattern');
         }
 
-        // Transform parameters
         const transformedParams = parameters.parameters.map((param) => {
             return this.autoTransformParameter(param);
         });
@@ -282,9 +241,6 @@ export class StepExecutor {
         return transformedParams;
     }
 
-    /**
-     * Prepare arguments for step execution
-     */
     private async prepareArguments(
         parameters: any[], 
         stepArgument: DataTable | DocString | undefined,
@@ -292,7 +248,6 @@ export class StepExecutor {
     ): Promise<any[]> {
         const args = [...parameters];
 
-        // Add step argument if present
         if (stepArgument) {
             if ('rows' in stepArgument) {
                 args.push(this.transformDataTable(stepArgument as DataTable));
@@ -301,8 +256,6 @@ export class StepExecutor {
             }
         }
 
-        // Add context as last parameter if step expects it
-        // This is determined by the step definition's expectsContext flag
         if (this.stepExpectsContext(parameters.length, stepArgument)) {
             args.push(context);
         }
@@ -310,58 +263,42 @@ export class StepExecutor {
         return args;
     }
 
-    /**
-     * Execute step definition without returning result (for internal use)
-     */
     private async executeStepDefinitionWithoutResult(step: Step, context: ExecutionContext): Promise<void> {
-        // Log step start
         ActionLogger.logStepStart(step.keyword, step.text);
 
-        // Check for debug breakpoint
         await this.checkDebugBreakpoint(step);
 
-        // Find matching step definition
         const stepDefinition = await this.findStepDefinition(step);
         
         if (!stepDefinition) {
             throw new Error(`No step definition found for: ${step.keyword} ${step.text}`);
         }
 
-        // Extract parameters
         const parameters = this.extractParameters(step, stepDefinition);
 
-        // Prepare arguments
         const stepArgument = step.dataTable || step.docString || undefined;
         const args = await this.prepareArguments(parameters, stepArgument, context);
 
-        // Execute step definition
         await this.executeStepDefinition(stepDefinition, args, context);
     }
 
-    /**
-     * Execute step definition function
-     */
     private async executeStepDefinition(
         definition: StepDefinition,
         args: any[],
         context: ExecutionContext
     ): Promise<void> {
-        // Set timeout for step execution
         const timeout = definition.timeout || ConfigurationManager.getInt('STEP_TIMEOUT', 30000);
         
-        // Create timeout promise
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error(`Step timeout after ${timeout}ms`)), timeout);
         });
 
         try {
-            // Execute with timeout
             await Promise.race([
                 this.executeWithContext(definition, args, context),
                 timeoutPromise
             ]);
         } catch (error) {
-            // Enhance error with step information
             const err = error as Error;
             if (err.message && err.message.includes('Step timeout')) {
                 err.message = `${err.message}\nStep: ${definition.patternString}`;
@@ -370,15 +307,11 @@ export class StepExecutor {
         }
     }
 
-    /**
-     * Execute step with proper context binding
-     */
     private async executeWithContext(
         definition: StepDefinition,
         args: any[],
         _context: ExecutionContext
     ): Promise<void> {
-        // Get the class instance for proper 'this' binding
         const className = definition.metadata['className'];
         
         if (!className) {
@@ -401,10 +334,8 @@ export class StepExecutor {
             );
         }
         
-        // For new-per-scenario, force clear cached page instances before initialization
         const browserStrategy = this.getBrowserManagementStrategy();
         if (browserStrategy === 'new-per-scenario') {
-            // Clear page instances
             if (typeof (classInstance as any).clearPageInstances === 'function') {
                 try {
                     (classInstance as any).clearPageInstances();
@@ -413,7 +344,6 @@ export class StepExecutor {
                 }
             }
             
-            // Also clear element caches on all page objects
             const pageProperties = Reflect.getMetadata('page:properties', classInstance) || 
                                   Reflect.getMetadata('page:properties', Object.getPrototypeOf(classInstance)) || [];
             for (const propertyKey of pageProperties) {
@@ -428,8 +358,6 @@ export class StepExecutor {
             }
         }
         
-        // Always call initializePageObjects to ensure page objects are reinitialized if needed
-        // The method itself will check if reinitialization is necessary
         if (typeof (classInstance as any).initializePageObjects === 'function') {
             try {
                 ActionLogger.logDebug(`Initializing/checking page objects for ${className}`);
@@ -439,40 +367,27 @@ export class StepExecutor {
             }
         }
         
-        // Track that we've seen this class in this scenario
         this.initializedClasses.add(className);
         
-        // Bind the step function to the correct context (class instance)
         const boundFunction = definition.implementation.bind(classInstance);
         
-        // Execute the step
         await boundFunction(...args);
     }
 
-    /**
-     * Transform DataTable argument
-     */
     private transformDataTable(dataTable: DataTable): any {
-        // Return different representations based on step needs
         return {
             raw: () => dataTable.rows,
-            rows: () => dataTable.rows.slice(1), // Without header
+            rows: () => dataTable.rows.slice(1),
             hashes: () => this.dataTableToHashes(dataTable),
             rowsHash: () => this.dataTableToRowsHash(dataTable),
             transpose: () => this.transposeDataTable(dataTable)
         };
     }
 
-    /**
-     * Transform DocString argument
-     */
     private transformDocString(docString: DocString): string {
         return docString.content;
     }
 
-    /**
-     * Convert DataTable to array of objects
-     */
     private dataTableToHashes(dataTable: DataTable): any[] {
         if (dataTable.rows.length < 2) return [];
         
@@ -496,9 +411,6 @@ export class StepExecutor {
         return hashes;
     }
 
-    /**
-     * Convert DataTable to key-value pairs
-     */
     private dataTableToRowsHash(dataTable: DataTable): Record<string, string> {
         const hash: Record<string, string> = {};
         
@@ -511,9 +423,6 @@ export class StepExecutor {
         return hash;
     }
 
-    /**
-     * Transpose DataTable
-     */
     private transposeDataTable(dataTable: DataTable): string[][] {
         if (dataTable.rows.length === 0) return [];
         
@@ -533,11 +442,7 @@ export class StepExecutor {
         return transposed;
     }
 
-    /**
-     * Auto-transform parameter based on value
-     */
     private autoTransformParameter(value: string): any {
-        // Try to parse as number
         if (/^\d+$/.test(value)) {
             return parseInt(value, 10);
         }
@@ -546,24 +451,19 @@ export class StepExecutor {
             return parseFloat(value);
         }
         
-        // Try to parse as boolean
         if (value.toLowerCase() === 'true') return true;
         if (value.toLowerCase() === 'false') return false;
         
-        // Try to parse as null/undefined
         if (value.toLowerCase() === 'null') return null;
         if (value.toLowerCase() === 'undefined') return undefined;
         
-        // Try to parse as JSON
         if (value.startsWith('{') || value.startsWith('[')) {
             try {
                 return JSON.parse(value);
             } catch (e) {
-                // Not valid JSON, return as string
             }
         }
         
-        // Remove quotes if present
         if (value.startsWith('"') && value.endsWith('"')) {
             return value.slice(1, -1);
         }
@@ -575,19 +475,11 @@ export class StepExecutor {
         return value;
     }
 
-    /**
-     * Determine if step expects context parameter
-     */
     private stepExpectsContext(paramCount: number, stepArgument: DataTable | DocString | undefined): boolean {
-        // This is a heuristic - in real implementation, step definitions
-        // would declare if they expect context
         const expectedParams = paramCount + (stepArgument ? 1 : 0);
-        return expectedParams < 3; // Assume steps with few params might want context
+        return expectedParams < 3;
     }
 
-    /**
-     * Check for debug breakpoint
-     */
     private async checkDebugBreakpoint(step: Step): Promise<void> {
         if (!this.debugManager.isDebugMode()) return;
 
@@ -595,9 +487,6 @@ export class StepExecutor {
         await this.debugManager.checkStepBreakpoint(stepText, this.currentContext);
     }
 
-    /**
-     * Determine error status based on error type
-     */
     private determineErrorStatus(error: any): StepStatus {
         if (error.pending || error.constructor?.name === 'PendingError') {
             return StepStatus.PENDING;
@@ -608,9 +497,6 @@ export class StepExecutor {
         return StepStatus.FAILED;
     }
 
-    /**
-     * Format error for reporting
-     */
     private formatError(error: any): ExecutionError {
         const err = error as Error;
         return {
@@ -624,7 +510,6 @@ export class StepExecutor {
 
     private extractActionDetailsByTime(stepStartTime: Date, stepStatus?: StepStatus, error?: any): any {
         try {
-            // For skipped steps, return minimal action details with no actions
             if (stepStatus === StepStatus.SKIPPED) {
                 return {
                     actions: [],
@@ -657,17 +542,14 @@ export class StepExecutor {
 
             const actionLogger = ActionLogger.getInstance();
             
-            // Get all recent logs and filter by timestamp
             const allLogs = actionLogger.getAllBufferedLogs();
             const stepEndTime = new Date();
             
-            // Filter logs that occurred during step execution
             const logs = allLogs.filter(log => {
                 const logTime = new Date(log.timestamp);
                 return logTime >= stepStartTime && logTime <= stepEndTime;
             });
             
-            // Process the filtered logs using the same logic as the original method
             return this.processLogsForActionDetails(logs, stepStatus, error);
             
         } catch (error) {
@@ -685,7 +567,6 @@ export class StepExecutor {
     }
 
     private processLogsForActionDetails(logs: any[], stepStatus?: StepStatus, error?: any): any {
-        // Collect all action details from different log types
         const actionDetails: any = {
             actions: [],
             primaryAction: null,
@@ -713,7 +594,6 @@ export class StepExecutor {
             button: null
         };
 
-        // For failed steps, add detailed error information
         if (stepStatus === StepStatus.FAILED && error) {
             actionDetails.error = {
                 message: error.message || 'Step execution failed',
@@ -733,10 +613,8 @@ export class StepExecutor {
                 }
             };
             
-            // Set description to include error information
             actionDetails.description = `Step failed: ${error.message || 'Unknown error'}`;
             
-            // Add error action as primary action
             actionDetails.primaryAction = {
                 action: 'Error',
                 description: actionDetails.description,
@@ -744,7 +622,6 @@ export class StepExecutor {
                 error: actionDetails.error
             };
             
-            // Add error details to actions
             actionDetails.actions.push({
                 action: 'step_execution_failed',
                 details: {
@@ -760,14 +637,11 @@ export class StepExecutor {
             });
         }
         
-        // Process logs to extract detailed action information (for both passed and failed steps)
         for (const log of logs) {
-            // Handle action logs created by logAction() method
             if (log.type === 'action' && 'details' in log && (log as any).details) {
-                const actionLog = log as any; // Cast to access action and details properties
+                const actionLog = log as any;
                 const details = actionLog.details;
                 
-                // Extract all available details
                 if (details.description) actionDetails.description = details.description;
                 if (details.target) actionDetails.target = details.target;
                 if (details.value) actionDetails.value = details.value;
@@ -791,7 +665,6 @@ export class StepExecutor {
                 if (details.field) actionDetails.field = details.field;
                 if (details.button) actionDetails.button = details.button;
                 
-                // Set primary action if not already set (and not an error step)
                 if (!actionDetails.primaryAction && stepStatus !== StepStatus.FAILED) {
                     const inferredAction = this.inferActionFromLogAction(actionLog.action, details);
                     
@@ -803,7 +676,6 @@ export class StepExecutor {
                     actionDetails.action = actionDetails.primaryAction.action;
                 }
                 
-                // Store the action info
                 actionDetails.actions.push({
                     action: actionLog.action,
                     details: details,
@@ -812,7 +684,6 @@ export class StepExecutor {
                 });
             }
             
-            // Handle error logs for failed steps
             if (log.type === 'error' && stepStatus === StepStatus.FAILED) {
                 const errorLog = log as any;
                 actionDetails.actions.push({
@@ -830,10 +701,9 @@ export class StepExecutor {
                 });
             }
             
-            // Handle other log types for backward compatibility
             if (stepStatus !== undefined) {
                 if (log.type === 'element') {
-                    const elementLog = log as any; // Cast to access element-specific properties
+                    const elementLog = log as any;
                     const elementInfo = {
                         action: elementLog.action || 'Element Action',
                         target: elementLog.elementDescription || 'Unknown Element',
@@ -844,7 +714,6 @@ export class StepExecutor {
                     };
                     actionDetails.actions.push(elementInfo);
                     
-                    // Set as primary action if no primary action set
                     if (!actionDetails.primaryAction) {
                         actionDetails.primaryAction = {
                             action: this.formatActionName(elementLog.action || 'Element Action'),
@@ -857,7 +726,6 @@ export class StepExecutor {
             }
         }
 
-        // If no primary action was set from logs, try to infer from step text or provide fallback
         if (!actionDetails.primaryAction && stepStatus !== StepStatus.FAILED) {
             actionDetails.primaryAction = {
                 action: 'General',
@@ -869,13 +737,9 @@ export class StepExecutor {
         return actionDetails;
     }
 
-    /**
-     * Infer action type from log action name
-     */
     private inferActionFromLogAction(logAction: string, details: any): string {
         if (!logAction) return 'Unknown';
         
-        // Map specific log action names to user-friendly action types
         const actionMappings: { [key: string]: string } = {
             'navigate_to_login_page': 'Navigate',
             'page_navigation_completed': 'Navigate',
@@ -898,12 +762,10 @@ export class StepExecutor {
             'performance_metrics_validation_completed': 'Performance'
         };
         
-        // Check for exact match first
         if (actionMappings[logAction]) {
             return actionMappings[logAction];
         }
         
-        // Check for pattern matches
         if (logAction.includes('navigate') || logAction.includes('navigation')) return 'Navigate';
         if (logAction.includes('login')) return 'Login';
         if (logAction.includes('verify') || logAction.includes('validation')) return 'Verify';
@@ -913,17 +775,12 @@ export class StepExecutor {
         if (logAction.includes('performance') || logAction.includes('metrics')) return 'Performance';
         if (logAction.includes('initialize') || logAction.includes('setup')) return 'Initialize';
         
-        // Default to capitalize first letter
         return logAction.charAt(0).toUpperCase() + logAction.slice(1).replace(/_/g, ' ');
     }
     
-    /**
-     * Format action name for display
-     */
     private formatActionName(action: string): string {
         if (!action) return 'Unknown Action';
         
-        // Convert snake_case and camelCase to Title Case
         return action
             .replace(/[_-]/g, ' ')
             .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -932,11 +789,7 @@ export class StepExecutor {
             .join(' ');
     }
     
-    /**
-     * Extract target element/object from log message
-     */
     private extractTargetFromMessage(message: string): string | undefined {
-        // Look for common target patterns
         const targetPatterns = [
             /(?:clicked?|pressed|tapped)\s+(?:on\s+)?(?:the\s+)?([^.]+)/i,
             /(?:filled?|typed?|entered?)\s+(?:in\s+|into\s+)?(?:the\s+)?([^.]+)/i,
@@ -959,11 +812,7 @@ export class StepExecutor {
         return undefined;
     }
 
-    /**
-     * Extract value/data from log message
-     */
     private extractValueFromMessage(message: string): string | undefined {
-        // Look for common value patterns
         const valuePatterns = [
             /(?:with\s+text|with\s+value|using)\s+"([^"]+)"/i,
             /(?:with\s+text|with\s+value|using)\s+'([^']+)'/i,
@@ -984,11 +833,7 @@ export class StepExecutor {
         return undefined;
     }
 
-    /**
-     * Check if screenshot should be taken
-     */
     private shouldTakeScreenshot(status: string): boolean {
-        // Check if screenshot=always was specified
         const screenshotMode = ConfigurationManager.get('SCREENSHOT_MODE', 'failure');
         
         if (screenshotMode === 'always') {
@@ -1004,9 +849,6 @@ export class StepExecutor {
         return false;
     }
 
-    /**
-     * Get current step execution context information
-     */
     private getCurrentStepInfo(step: Step): { featureName: string; scenarioName: string; scenarioId: string; stepLabel: string } {
         try {
             const bddContext = BDDContext.getInstance();
@@ -1020,7 +862,6 @@ export class StepExecutor {
                 stepLabel: `${step.keyword} ${step.text}`
             };
         } catch (error) {
-            // Fallback if contexts are not available
             return {
                 featureName: 'Unknown Feature',
                 scenarioName: 'Unknown Scenario',
@@ -1030,9 +871,6 @@ export class StepExecutor {
         }
     }
 
-    /**
-     * Take screenshot
-     */
     private async takeScreenshot(status: string, step: Step): Promise<Attachment> {
         try {
             const page = this.currentContext.getPage();
@@ -1040,10 +878,8 @@ export class StepExecutor {
                 throw new Error('No page available for screenshot');
             }
             
-            // Get step context information
             const stepInfo = this.getCurrentStepInfo(step);
             
-            // Take screenshot as buffer
             const screenshotBuffer = await this.screenshotManager.takeScreenshot(
                 page,
                 {
@@ -1052,13 +888,10 @@ export class StepExecutor {
                 }
             );
 
-            // Generate filename with scenario ID and timestamp
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            // Format: scenarioId_stepId_type_timestamp.png (expected by ReportCollector)
             const fileName = `${stepInfo.scenarioId}_${stepId}_${status}_${timestamp}.png`;
             
-            // Save screenshot to screenshots subdirectory
             const screenshotPath = await this.screenshotManager.saveScreenshot(
                 screenshotBuffer,
                 fileName,
@@ -1077,7 +910,6 @@ export class StepExecutor {
                 mimeType: 'image/png',
                 name: `Screenshot - ${status}`,
                 path: screenshotPath,
-                // Include metadata for report organization
                 metadata: {
                     featureName: stepInfo.featureName,
                     scenarioName: stepInfo.scenarioName,
@@ -1092,4 +924,3 @@ export class StepExecutor {
         }
     }
 }
-

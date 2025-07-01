@@ -39,13 +39,10 @@ export class TokenAnalyzer {
   };
   
   tokenize(text: string): Token[] {
-    // Expand contractions first
     let processedText = this.expandContractions(text);
     
-    // Split into raw tokens
     const rawTokens = this.splitIntoTokens(processedText);
     
-    // Process each token
     const tokens: Token[] = [];
     
     for (let i = 0; i < rawTokens.length; i++) {
@@ -54,13 +51,11 @@ export class TokenAnalyzer {
       const token = this.createToken(value, i);
       
       if (token) {
-        // Add part-of-speech tagging
         token.pos = this.tagPartOfSpeech(token, tokens);
         tokens.push(token);
       }
     }
     
-    // Post-process for compound tokens
     const finalTokens = this.processCompoundTokens(tokens);
     
     ActionLogger.logAIOperation('tokenization_complete', {
@@ -114,10 +109,8 @@ export class TokenAnalyzer {
   }
   
   stemToken(token: string): string {
-    // Simple stemming rules
     const lowerToken = token.toLowerCase();
     
-    // Remove common suffixes
     const suffixes = [
       { suffix: 'ing', minLength: 4 },
       { suffix: 'ed', minLength: 3 },
@@ -140,7 +133,6 @@ export class TokenAnalyzer {
   }
   
   private splitIntoTokens(text: string): string[] {
-    // Split by whitespace and punctuation, but keep punctuation as separate tokens
     const tokens: string[] = [];
     let current = '';
     
@@ -187,7 +179,7 @@ export class TokenAnalyzer {
       normalized,
       stem: type === 'word' ? this.stemToken(value) : value,
       isStopWord: type === 'word' && this.isStopWord(value),
-      pos: 'UNKNOWN' // Will be set later
+      pos: 'UNKNOWN'
     };
   }
   
@@ -198,7 +190,6 @@ export class TokenAnalyzer {
       case 'modifier':
         return value.toLowerCase();
       case 'number':
-        // Normalize numbers to standard format
         const num = parseFloat(value);
         return isNaN(num) ? value : num.toString();
       default:
@@ -207,41 +198,33 @@ export class TokenAnalyzer {
   }
   
   private tagPartOfSpeech(token: Token, previousTokens: Token[]): PartOfSpeech {
-    // Simple rule-based POS tagging
     const value = token.value.toLowerCase();
     const prevToken = previousTokens[previousTokens.length - 1];
     
-    // Determiners
     if (['the', 'a', 'an', 'this', 'that', 'these', 'those'].includes(value)) {
       return 'DET';
     }
     
-    // Prepositions
     if (['in', 'on', 'at', 'by', 'for', 'with', 'to', 'from', 'of', 'above', 'below', 'near'].includes(value)) {
       return 'PREP';
     }
     
-    // Verbs
     if (this.isVerb(value, prevToken)) {
       return 'VERB';
     }
     
-    // Adjectives
     if (this.isAdjective(value, prevToken)) {
       return 'ADJ';
     }
     
-    // Adverbs
     if (value.endsWith('ly') || ['very', 'really', 'quite', 'extremely'].includes(value)) {
       return 'ADV';
     }
     
-    // Numbers
     if (token.type === 'number') {
       return 'NUM';
     }
     
-    // Default to noun for words
     if (token.type === 'word') {
       return 'NOUN';
     }
@@ -262,12 +245,10 @@ export class TokenAnalyzer {
       return true;
     }
     
-    // Check for verb patterns
     if (word.endsWith('ing') || word.endsWith('ed')) {
       return true;
     }
     
-    // If preceded by "to", likely a verb
     if (prevToken && prevToken.value.toLowerCase() === 'to') {
       return true;
     }
@@ -287,7 +268,6 @@ export class TokenAnalyzer {
       return true;
     }
     
-    // If preceded by "the" or "a", might be adjective
     if (prevToken && ['the', 'a', 'an'].includes(prevToken.value.toLowerCase())) {
       return word.endsWith('ed') || word.endsWith('ing');
     }
@@ -300,7 +280,6 @@ export class TokenAnalyzer {
     let i = 0;
     
     while (i < tokens.length) {
-      // Check for compound patterns
       if (i < tokens.length - 1) {
         const currentToken = tokens[i];
         const nextToken = tokens[i + 1];
@@ -325,7 +304,6 @@ export class TokenAnalyzer {
   }
   
   private checkCompound(token1: Token, token2: Token): Token | null {
-    // Check for common compounds
     const combined = `${token1.value} ${token2.value}`.toLowerCase();
     
     const compounds = [
@@ -381,18 +359,14 @@ export class TokenAnalyzer {
   private calculateComplexity(tokens: Token[]): number {
     let complexity = 0;
     
-    // Base complexity on token count
     complexity += Math.min(tokens.length / 10, 0.3);
     
-    // Add complexity for non-stop words
     const meaningfulTokens = tokens.filter(t => !t.isStopWord);
     complexity += Math.min(meaningfulTokens.length / 5, 0.3);
     
-    // Add complexity for compound tokens
     const compounds = tokens.filter(t => t.type === 'compound');
     complexity += compounds.length * 0.1;
     
-    // Add complexity for operators
     const operators = tokens.filter(t => t.type === 'operator');
     complexity += operators.length * 0.1;
     
@@ -413,14 +387,14 @@ export interface Token {
 export type TokenType = 'word' | 'number' | 'symbol' | 'operator' | 'modifier' | 'compound' | 'unknown';
 
 export type PartOfSpeech = 
-  | 'NOUN'    // Noun
-  | 'VERB'    // Verb
-  | 'ADJ'     // Adjective
-  | 'ADV'     // Adverb
-  | 'PREP'    // Preposition
-  | 'DET'     // Determiner
-  | 'NUM'     // Number
-  | 'OTHER'   // Other
+  | 'NOUN'
+  | 'VERB'
+  | 'ADJ'
+  | 'ADV'
+  | 'PREP'
+  | 'DET'
+  | 'NUM'
+  | 'OTHER'
   | 'UNKNOWN';
 
 interface TokenSequenceAnalysis {

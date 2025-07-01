@@ -41,20 +41,17 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   private collectionInterval?: NodeJS.Timeout;
   private performanceObserver?: PerformanceObserver;
   
-  // Metrics storage
   private systemMetrics: Map<string, SystemMetrics[]> = new Map();
   private browserMetrics: Map<string, BrowserMetrics[]> = new Map();
   private testMetrics: Map<string, TestMetrics[]> = new Map();
   private customMetrics: Map<string, CustomMetric[]> = new Map();
   private metricSnapshots: Map<string, MetricSnapshot[]> = new Map();
   
-  // Performance tracking
   private scenarioStartTimes: Map<string, number> = new Map();
   private stepStartTimes: Map<string, number> = new Map();
   private gcMetrics: any[] = [];
   private memoryLeaks: Map<string, number[]> = new Map();
   
-  // Alerting
   private alerts: Alert[] = [];
   private thresholds = {
     cpuUsage: 80,
@@ -64,7 +61,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     diskUsage: 90
   };
   
-  // Aggregation
   private aggregatedData: Map<string, AggregatedMetrics> = new Map();
 
   private constructor() {
@@ -94,7 +90,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
         ...options
       };
 
-      // Create metrics directory
       this.metricsPath = path.join(
         ConfigurationManager.get('EVIDENCE_PATH', './evidence'),
         'metrics',
@@ -102,12 +97,10 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       );
       await fs.promises.mkdir(this.metricsPath, { recursive: true });
 
-      // Start system metrics collection
       if (this.options.collectSystemMetrics) {
         this.startSystemMetricsCollection();
       }
 
-      // Enable GC metrics if requested
       if (this.options.includeGCMetrics && global.gc) {
         this.setupGCTracking();
       }
@@ -148,10 +141,8 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   private startSystemMetricsCollection(): void {
-    // Collect immediately
     this.collectSystemMetrics(this.executionId);
 
-    // Then collect at intervals
     this.collectionInterval = setInterval(() => {
       this.collectSystemMetrics(this.executionId);
     }, this.options.metricsInterval || 5000);
@@ -176,28 +167,23 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
         disk: diskData
       };
 
-      // Store metrics
       if (!this.systemMetrics.has(contextId)) {
         this.systemMetrics.set(contextId, []);
       }
       this.systemMetrics.get(contextId)!.push(metrics);
 
-      // Check thresholds and generate alerts
       if (this.options.enableAlerting) {
         this.checkThresholds(metrics);
       }
 
-      // Detect memory leaks
       if (this.options.detectMemoryLeaks && metrics.memory) {
         this.detectMemoryLeak(contextId, metrics.memory.used);
       }
 
-      // Aggregate if enabled
       if (this.options.aggregateMetrics) {
         this.aggregateMetric(contextId, metrics);
       }
 
-      // Emit metric event
       this.emit('metric', { type: 'system', contextId, metrics });
 
     } catch (error) {
@@ -209,16 +195,14 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     const cpus = os.cpus();
     const loadAvg = os.loadavg();
     
-    // Calculate CPU usage percentage
     const startUsage = process.cpuUsage();
     const startTime = Date.now();
     
-    // Wait 100ms to measure
     await new Promise(resolve => setTimeout(resolve, 100));
     
     const endUsage = process.cpuUsage(startUsage);
     const endTime = Date.now();
-    const elapsedTime = (endTime - startTime) * 1000; // Convert to microseconds
+    const elapsedTime = (endTime - startTime) * 1000;
     
     const userPercent = (endUsage.user / elapsedTime) * 100;
     const systemPercent = (endUsage.system / elapsedTime) * 100;
@@ -273,14 +257,13 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
 
   private async getDiskMetrics(): Promise<any> {
     try {
-      // Platform-specific disk usage command
       const platform = os.platform();
       let command: string;
       
       if (platform === 'win32') {
         command = 'wmic logicaldisk get size,freespace,caption';
       } else {
-        command = 'df -B1'; // Unix-like systems
+        command = 'df -B1';
       }
 
       const { stdout } = await execAsync(command);
@@ -297,7 +280,7 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     let totalUsed = 0;
 
     if (platform === 'win32') {
-      const lines = output.trim().split('\n').slice(1); // Skip header
+      const lines = output.trim().split('\n').slice(1);
       lines.forEach(line => {
         const parts = line.trim().split(/\s+/);
         if (parts.length >= 3) {
@@ -321,7 +304,7 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
         }
       });
     } else {
-      const lines = output.trim().split('\n').slice(1); // Skip header
+      const lines = output.trim().split('\n').slice(1);
       lines.forEach(line => {
         const parts = line.trim().split(/\s+/);
         if (parts.length >= 6 && parts[0] && !parts[0].startsWith('tmpfs')) {
@@ -358,72 +341,7 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     };
   }
 
-  // Currently unused but kept for future network metrics implementation
-  /*
-  private async _getNetworkMetrics(): Promise<any> {
-    const interfaces = os.networkInterfaces();
-    const activeInterfaces: any[] = [];
 
-    for (const [name, ifaces] of Object.entries(interfaces)) {
-      if (ifaces) {
-        for (const iface of ifaces) {
-          if (!iface.internal) {
-            activeInterfaces.push({
-              name,
-              address: iface.address,
-              family: iface.family,
-              mac: iface.mac,
-              cidr: iface.cidr
-            });
-          }
-        }
-      }
-    }
-
-    // Get network statistics if available
-    let stats = {};
-    try {
-      if (os.platform() !== 'win32') {
-        const { stdout } = await execAsync('netstat -i');
-        stats = this.parseNetworkStats(stdout);
-      }
-    } catch (error) {
-      // Network stats not available
-    }
-
-    return {
-      interfaces: activeInterfaces,
-      stats
-    };
-  }
-  */
-
-  // Currently unused - will be used when network metrics are re-enabled
-  /*
-  private parseNetworkStats(output: string): any {
-    // Parse netstat output for network statistics
-    const stats: any = {};
-    const lines = output.trim().split('\n').slice(2); // Skip headers
-    
-    lines.forEach(line => {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length >= 8) {
-        const interfaceName = parts[0];
-        if (interfaceName) {
-          stats[interfaceName] = {
-            mtu: parseInt(parts[1] || '0') || 0,
-            rxPackets: parseInt(parts[2] || '0') || 0,
-            rxErrors: parseInt(parts[3] || '0') || 0,
-            txPackets: parseInt(parts[4] || '0') || 0,
-            txErrors: parseInt(parts[5] || '0') || 0
-          };
-        }
-      }
-    });
-    
-    return stats;
-  }
-  */
 
   private getProcessMetrics(): any {
     const uptime = process.uptime();
@@ -449,7 +367,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       return;
     }
 
-    // Track garbage collection events
     const obs = new PerformanceObserver((list) => {
       const entries = list.getEntries();
       entries.forEach((entry: any) => {
@@ -475,12 +392,10 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     const history = this.memoryLeaks.get(contextId)!;
     history.push(heapUsed);
 
-    // Keep last 10 measurements
     if (history.length > 10) {
       history.shift();
     }
 
-    // Check for consistent memory growth
     if (history.length >= 5) {
       let increasing = true;
       for (let i = 1; i < history.length; i++) {
@@ -492,7 +407,7 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
 
       if (increasing) {
         const growthRate = ((history[history.length - 1]! - history[0]!) / history[0]!) * 100;
-        if (growthRate > 50) { // 50% growth over 5 measurements
+        if (growthRate > 50) {
           this.generateAlert({
             severity: AlertSeverity.ERROR,
             metric: 'memory.heapUsed',
@@ -507,7 +422,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   private checkThresholds(metrics: SystemMetrics): void {
-    // CPU threshold
     if (metrics.cpu && metrics.cpu.usage > this.thresholds.cpuUsage) {
       this.generateAlert({
         severity: AlertSeverity.ERROR,
@@ -519,7 +433,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       });
     }
 
-    // Memory threshold
     if (metrics.memory && metrics.memory.percent > this.thresholds.memoryUsage) {
       this.generateAlert({
         severity: AlertSeverity.ERROR,
@@ -531,7 +444,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       });
     }
 
-    // Disk threshold
     if (metrics.disk && metrics.disk.usage > this.thresholds.diskUsage) {
       this.generateAlert({
         severity: AlertSeverity.WARNING,
@@ -580,7 +492,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     agg.samples++;
     agg.endTime = Date.now();
 
-    // Update CPU aggregates
     if (metrics.cpu && metrics.cpu.usage) {
       const cpuUsage = metrics.cpu.usage;
       agg.cpu.min = Math.min(agg.cpu.min, cpuUsage);
@@ -589,7 +500,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       agg.cpu.avg = agg.cpu.sum / agg.samples;
     }
 
-    // Update Memory aggregates
     if (metrics.memory && metrics.memory.percent !== undefined) {
       const memUsage = metrics.memory.percent;
       agg.memory.min = Math.min(agg.memory.min, memUsage);
@@ -598,7 +508,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       agg.memory.avg = agg.memory.sum / agg.samples;
     }
 
-    // Update Disk aggregates
     if (metrics.disk && metrics.disk.usage !== undefined) {
       const diskUsage = metrics.disk.usage;
       agg.disk.min = Math.min(agg.disk.min, diskUsage);
@@ -612,20 +521,16 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     const evidence: Evidence[] = [];
     
     try {
-      // Mark scenario start
       this.scenarioStartTimes.set(scenarioId, Date.now());
       performance.mark(`scenario-start-${scenarioId}`);
       
-      // Create scenario-specific metrics context
       if (this.options.collectSystemMetrics) {
         this.collectSystemMetrics(scenarioId);
       }
 
-      // Initialize browser metrics collection for scenario
       this.browserMetrics.set(scenarioId, []);
       this.testMetrics.set(scenarioId, []);
 
-      // Take initial snapshot
       const snapshot = await this.captureMetricSnapshot(scenarioId, 'scenario-start');
       evidence.push(snapshot);
 
@@ -649,12 +554,10 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     try {
       const stepKey = `${scenarioId}-${stepId}`;
       
-      // Mark step timing
       if (!this.stepStartTimes.has(stepKey)) {
         this.stepStartTimes.set(stepKey, Date.now());
         performance.mark(`step-start-${stepKey}`);
       } else {
-        // Step completed
         const startTime = this.stepStartTimes.get(stepKey)!;
         const duration = Date.now() - startTime;
         
@@ -665,7 +568,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
           `step-end-${stepKey}`
         );
 
-        // Record step metrics
         const stepMetric: TestMetrics = {
           timestamp: new Date(),
           scenarioId,
@@ -682,10 +584,8 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
         }
         this.testMetrics.get(scenarioId)!.push(stepMetric);
 
-        // Clean up
         this.stepStartTimes.delete(stepKey);
 
-        // Capture metrics if step failed
         if (status === 'failed') {
           const snapshot = await this.captureMetricSnapshot(scenarioId, `step-failed-${stepId}`);
           evidence.push(snapshot);
@@ -701,7 +601,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
 
   async collectBrowserMetrics(scenarioId: string, page: any): Promise<void> {
     try {
-      // Collect browser performance metrics
       const metrics = await page.evaluate(() => {
         const navigation = (performance as any).getEntriesByType('navigation')[0] as any;
         const paint = (performance as any).getEntriesByType('paint');
@@ -761,7 +660,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     }
     this.customMetrics.get(contextId)!.push(metric);
     
-    // Check if this metric should trigger an alert
     if (metric.alert && metric.value > metric.alert.threshold) {
       this.generateAlert({
         severity: metric.alert.severity || AlertSeverity.ERROR,
@@ -784,15 +682,13 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       custom: this.customMetrics.get(contextId) || [],
       aggregated: this.aggregatedData.get(contextId) || null,
       alerts: this.alerts.filter(a => (a as any).contextId === contextId),
-      gcMetrics: this.gcMetrics.slice(-10) // Last 10 GC events
+      gcMetrics: this.gcMetrics.slice(-10)
     };
 
-    // Save snapshot
     const filename = `snapshot-${reason}-${Date.now()}.json`;
     const filepath = path.join(this.metricsPath, filename);
     await fs.promises.writeFile(filepath, JSON.stringify(snapshot, null, 2));
 
-    // Store in memory
     if (!this.metricSnapshots.has(contextId)) {
       this.metricSnapshots.set(contextId, []);
     }
@@ -817,25 +713,20 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   async finalize(): Promise<void> {
-    // Implementation moved to collect method for finalization
     this.cleanup();
   }
   
   async collect(...args: any[]): Promise<Evidence[]> {
-    // This is the main collection and finalization method
     const executionId = args[0] || this.executionId;
     const evidence: Evidence[] = [];
     
     try {
-      // Stop collection interval
       if (this.collectionInterval) {
         clearInterval(this.collectionInterval);
       }
 
-      // Calculate final metrics
       const allMetrics = await this.generateFinalReport(executionId);
       
-      // Save complete metrics report
       const reportPath = path.join(this.metricsPath, 'metrics-report.json');
       await fs.promises.writeFile(reportPath, JSON.stringify(allMetrics, null, 2));
       
@@ -854,7 +745,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
         tags: ['report', 'final']
       });
 
-      // Export in requested format
       if (this.options.exportFormat === 'grafana') {
         const grafanaPath = await this.exportToGrafana(executionId, allMetrics);
         evidence.push({
@@ -881,7 +771,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
         });
       }
 
-      // Generate trend analysis
       const trendsPath = await this.generateTrendAnalysis(executionId);
       evidence.push({
         id: `metrics-trends-${executionId}`,
@@ -894,7 +783,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
         tags: ['analysis', 'trends']
       });
 
-      // Clean up
       this.cleanup();
 
       this.logger.info('MetricsCollector finalized', { 
@@ -911,7 +799,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   private async generateFinalReport(executionId: string): Promise<MetricsData> {
-    // Calculate percentiles for response times
     const allResponseTimes: number[] = [];
     this.testMetrics.forEach(metrics => {
       metrics.forEach(m => {
@@ -927,7 +814,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       return allResponseTimes[index] || 0;
     };
 
-    // Calculate error rate
     let totalSteps = 0;
     let failedSteps = 0;
     this.testMetrics.forEach(metrics => {
@@ -1141,7 +1027,7 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   private calculateThroughput(): any {
-    const timeWindow = 60000; // 1 minute windows
+    const timeWindow = 60000;
     const throughputByWindow: any = {};
     
     this.testMetrics.forEach(metrics => {
@@ -1165,7 +1051,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   private calculateTrends(): MetricTrend[] {
     const trends: MetricTrend[] = [];
     
-    // CPU trend
     const cpuValues = this.extractTimeSeriesValues('cpu');
     if (cpuValues.length > 2) {
       trends.push({
@@ -1176,7 +1061,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       });
     }
     
-    // Memory trend
     const memoryValues = this.extractTimeSeriesValues('memory');
     if (memoryValues.length > 2) {
       trends.push({
@@ -1230,7 +1114,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   private simpleForecast(values: Array<{time: number, value: number}>): number {
-    // Simple linear regression forecast
     if (values.length < 2) return values[0]?.value || 0;
     
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
@@ -1246,31 +1129,26 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
     const intercept = (sumY - slope * sumX) / n;
     
-    // Forecast next point
     return slope * n + intercept;
   }
 
   private generateRecommendations(): string[] {
     const recommendations: string[] = [];
     
-    // CPU recommendations
     const avgCPU = this.calculateAverage('cpu');
     if (avgCPU > 70) {
       recommendations.push('High CPU usage detected. Consider optimizing compute-intensive operations or scaling resources.');
     }
     
-    // Memory recommendations
     const avgMemory = this.calculateAverage('memory');
     if (avgMemory > 80) {
       recommendations.push('High memory usage detected. Review for memory leaks and optimize memory allocation.');
     }
     
-    // Memory leak detection
     if (this.alerts.some(a => a.message.includes('memory leak'))) {
       recommendations.push('Potential memory leak detected. Profile application memory usage and fix leaks.');
     }
     
-    // Error rate recommendations
     let totalSteps = 0, failedSteps = 0;
     this.testMetrics.forEach(metrics => {
       metrics.forEach(m => {
@@ -1284,7 +1162,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       recommendations.push(`High error rate (${errorRate.toFixed(2)}%). Investigate failing tests and improve stability.`);
     }
     
-    // Performance recommendations
     const allResponseTimes: number[] = [];
     this.testMetrics.forEach(metrics => {
       metrics.forEach(m => {
@@ -1305,10 +1182,8 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   private async exportToGrafana(executionId: string, metrics: MetricsData): Promise<string> {
     const grafanaData: GrafanaMetric[] = [];
     
-    // Log metrics export for debugging
     this.logger.debug(`Exporting ${Object.keys(metrics).length} metric types to Grafana format`);
     
-    // Convert system metrics
     this.systemMetrics.forEach((metrics, contextId) => {
       metrics.forEach(m => {
         grafanaData.push({
@@ -1334,7 +1209,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       });
     });
     
-    // Convert test metrics
     this.testMetrics.forEach((metrics, scenarioId) => {
       metrics.forEach(m => {
         grafanaData.push({
@@ -1355,10 +1229,8 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   private async exportToPrometheus(executionId: string, metrics: MetricsData): Promise<string> {
     const lines: string[] = [];
     
-    // Log metrics export
     this.logger.debug(`Exporting metrics to Prometheus format for execution: ${executionId}`);
     
-    // Prometheus format
     lines.push(`# HELP cpu_usage CPU usage percentage`);
     lines.push(`# TYPE cpu_usage gauge`);
     lines.push(`# Metrics export for ${metrics.executionId || executionId}`);
@@ -1378,7 +1250,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
       }
     });
     
-    // Test metrics
     lines.push(`# HELP test_duration Test step duration in milliseconds`);
     lines.push(`# TYPE test_duration histogram`);
     
@@ -1440,7 +1311,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   private detectAnomalies(): any[] {
     const anomalies: any[] = [];
     
-    // Detect CPU spikes
     this.systemMetrics.forEach((metrics, contextId) => {
       metrics.forEach((m, i) => {
         if (i > 0) {
@@ -1449,7 +1319,7 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
           const currentCpu = m.cpu ? m.cpu.usage : m.cpuUsage;
           const prevCpu = prev.cpu ? prev.cpu.usage : prev.cpuUsage;
           const cpuDiff = currentCpu - prevCpu;
-          if (cpuDiff > 30) { // 30% spike
+          if (cpuDiff > 30) {
             anomalies.push({
               type: 'cpu_spike',
               contextId,
@@ -1467,7 +1337,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   private calculateCorrelations(): any {
-    // Simple correlation between CPU and memory usage
     const cpuValues: number[] = [];
     const memoryValues: number[] = [];
     
@@ -1501,9 +1370,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     return denominator === 0 ? 0 : numerator / denominator;
   }
 
-  /**
-   * Get all collected metrics
-   */
   getMetrics(): MetricsData {
     const metrics: MetricsData = {
       systemMetrics: Array.from(this.systemMetrics.entries()),
@@ -1521,17 +1387,14 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
   }
 
   private cleanup(): void {
-    // Clear intervals
     if (this.collectionInterval) {
       clearInterval(this.collectionInterval);
     }
     
-    // Disconnect performance observer
     if (this.performanceObserver) {
       this.performanceObserver.disconnect();
     }
     
-    // Clear large data structures
     this.systemMetrics.clear();
     this.browserMetrics.clear();
     this.testMetrics.clear();
@@ -1545,13 +1408,9 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     this.alerts = [];
   }
   
-  /**
-   * Get collected evidence
-   */
   getEvidence(): Evidence[] {
     const evidence: Evidence[] = [];
     
-    // Add system metrics as evidence
     this.systemMetrics.forEach((metrics, contextId) => {
       if (metrics.length > 0) {
         evidence.push({
@@ -1569,9 +1428,6 @@ export class MetricsCollector extends EventEmitter implements CollectorInterface
     return evidence;
   }
   
-  /**
-   * Clear all collected data
-   */
   clear(): void {
     this.cleanup();
   }

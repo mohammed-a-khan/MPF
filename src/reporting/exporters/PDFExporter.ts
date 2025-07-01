@@ -16,9 +16,6 @@ export class PDFExporter {
     this.tempDir = path.join(process.cwd(), '.temp', 'pdf-export');
   }
 
-  /**
-   * Export report data to PDF using Playwright's built-in PDF generation
-   */
   async export(
     reportData: ReportData,
     htmlContent: string,
@@ -35,19 +32,14 @@ export class PDFExporter {
         options
       });
 
-      // Prepare export environment
       await this.prepareExport();
 
-      // Create temporary HTML file
       const tempHtmlPath = await this.createTempHtml(htmlContent, exportId);
 
-      // Launch browser for PDF generation
       await this.launchBrowser();
 
-      // Generate PDF using Playwright's built-in functionality
       const outputPath = await this.generatePDFWithPlaywright(tempHtmlPath, reportData, options);
 
-      // Calculate final metrics
       const stats = await fs.stat(outputPath);
 
       const result: ExportResult = {
@@ -60,7 +52,7 @@ export class PDFExporter {
           title: reportData.summary?.projectName || 'Test Report',
           author: 'CS Test Automation Framework',
           created: new Date().toISOString(),
-          pages: 0, // Playwright doesn't provide page count directly
+          pages: 0,
           encrypted: false,
           optimized: true,
           hasTableOfContents: false,
@@ -85,9 +77,6 @@ export class PDFExporter {
     }
   }
 
-  /**
-   * Generate PDF using Playwright's built-in PDF functionality
-   */
   private async generatePDFWithPlaywright(
     htmlPath: string,
     reportData: ReportData,
@@ -100,19 +89,15 @@ export class PDFExporter {
     const page = await this.context.newPage();
 
     try {
-      // Navigate to the HTML file
       await page.goto(`file://${htmlPath}`, { waitUntil: 'networkidle' });
 
-      // Wait for content to be ready
       await this.waitForContentReady(page);
 
-      // Prepare output path
       const outputPath = path.join(
         options.outputDir || this.tempDir,
         options.filename || `test-report-${Date.now()}.pdf`
       );
 
-      // Fix PDF options to handle optional properties correctly
       const pdfOptions: any = {
         path: outputPath,
         format: options.pageFormat || 'A4',
@@ -128,7 +113,6 @@ export class PDFExporter {
         scale: options.scale || 1.0
       };
 
-      // Only add header/footer templates if displayHeaderFooter is true
       if (options.displayHeaderFooter !== false) {
         pdfOptions.headerTemplate = options.headerTemplate || this.getDefaultHeader(reportData);
         pdfOptions.footerTemplate = options.footerTemplate || this.getDefaultFooter();
@@ -144,28 +128,21 @@ export class PDFExporter {
     }
   }
 
-  /**
-   * Wait for content to be ready for PDF generation
-   */
   private async waitForContentReady(page: Page): Promise<void> {
     try {
-      // Wait for any charts or dynamic content to load
       await page.waitForTimeout(2000);
 
-      // Wait for any images to load
       await page.waitForFunction(() => {
         const images = Array.from(document.querySelectorAll('img'));
         return images.every(img => img.complete);
       }, { timeout: 10000 });
 
-      // Fix font loading wait
       await page.waitForFunction(() => {
         if (document.fonts) {
           return document.fonts.ready.then(() => true);
         }
         return true;
       }).catch(() => {
-        // Ignore font loading timeout
       });
 
     } catch (error) {
@@ -173,9 +150,6 @@ export class PDFExporter {
     }
   }
 
-  /**
-   * Get default header template
-   */
   private getDefaultHeader(reportData: ReportData): string {
     const title = reportData.summary?.projectName || 'Test Report';
     const date = new Date().toLocaleDateString();
@@ -188,9 +162,6 @@ export class PDFExporter {
     `;
   }
 
-  /**
-   * Get default footer template
-   */
   private getDefaultFooter(): string {
     return `
       <div style="font-size: 10px; padding: 5px 15px; width: 100%; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ccc;">
@@ -200,9 +171,6 @@ export class PDFExporter {
     `;
   }
 
-  /**
-   * Prepare export environment
-   */
   private async prepareExport(): Promise<void> {
     try {
       if (!existsSync(this.tempDir)) {
@@ -214,24 +182,16 @@ export class PDFExporter {
     }
   }
 
-  /**
-   * Create temporary HTML file
-   */
   private async createTempHtml(content: string, exportId: string): Promise<string> {
     const tempPath = path.join(this.tempDir, `report-${exportId}.html`);
     
-    // Enhance HTML for better PDF rendering
     const enhancedHtml = await this.enhanceHtmlForPdf(content);
     
     await fs.writeFile(tempPath, enhancedHtml, 'utf8');
     return tempPath;
   }
 
-  /**
-   * Enhance HTML for better PDF rendering
-   */
   private async enhanceHtmlForPdf(html: string): Promise<string> {
-    // Add PDF-specific styles
     const pdfStyles = `
       <style>
         @media print {
@@ -281,13 +241,9 @@ export class PDFExporter {
       </style>
     `;
 
-    // Insert PDF styles before closing head tag
     return html.replace('</head>', `${pdfStyles}</head>`);
   }
 
-  /**
-   * Use existing browser for PDF generation - NO NEW BROWSER LAUNCH
-   */
   private async launchBrowser(): Promise<void> {
     try {
       // CRITICAL FIX: Use existing browser instead of launching new one
@@ -310,9 +266,6 @@ export class PDFExporter {
     }
   }
 
-  /**
-   * Cleanup resources
-   */
   private async cleanup(): Promise<void> {
     try {
       if (this.context) {
@@ -321,12 +274,10 @@ export class PDFExporter {
       }
 
       // CRITICAL FIX: Don't close the shared browser instance!
-      // The browser is managed by BrowserManager singleton
       if (this.browser) {
-        this.browser = null; // Just clear the reference, don't close
+        this.browser = null;
       }
 
-      // Clean up temporary files
       try {
         const tempFiles = await fs.readdir(this.tempDir);
         for (const file of tempFiles) {
@@ -335,7 +286,6 @@ export class PDFExporter {
           }
         }
       } catch (error) {
-        // Ignore cleanup errors
       }
 
       this.logger.info('PDF export cleanup completed');
@@ -344,9 +294,6 @@ export class PDFExporter {
     }
   }
 
-  /**
-   * Export multiple reports as a batch
-   */
   async exportBatch(
     reports: Array<{ data: ReportData; html: string; name?: string }>,
     options: PDFOptions = { format: ExportFormat.PDF }
@@ -354,8 +301,6 @@ export class PDFExporter {
     const startTime = Date.now();
     
     try {
-      // For batch export, we'll create separate PDFs for each report
-      // In a production environment, you might want to merge them
       const results: ExportResult[] = [];
       
       for (let i = 0; i < reports.length; i++) {
@@ -371,7 +316,6 @@ export class PDFExporter {
         results.push(result);
       }
 
-      // Return summary result
       const totalSize = results.reduce((sum, r) => sum + (r?.size || 0), 0);
       
       return {

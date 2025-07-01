@@ -4,9 +4,6 @@ import { ValidationResult } from '../types/database.types';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
 export class DataTypeValidator {
-    /**
-     * Validate value against expected data type
-     */
     validateType(value: any, expectedType: string): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -21,7 +18,6 @@ export class DataTypeValidator {
         };
 
         switch (expectedType.toLowerCase()) {
-            // String types
             case 'string':
             case 'varchar':
             case 'char':
@@ -32,7 +28,6 @@ export class DataTypeValidator {
                 passed = typeof value === 'string';
                 break;
 
-            // Integer types
             case 'int':
             case 'integer':
             case 'bigint':
@@ -43,7 +38,6 @@ export class DataTypeValidator {
                 details.parsedValue = Number(value);
                 break;
 
-            // Decimal types
             case 'decimal':
             case 'numeric':
             case 'float':
@@ -56,7 +50,6 @@ export class DataTypeValidator {
                 details.parsedValue = Number(value);
                 break;
 
-            // Boolean types
             case 'boolean':
             case 'bool':
             case 'bit':
@@ -68,7 +61,6 @@ export class DataTypeValidator {
                 details.booleanValue = this.parseBoolean(value);
                 break;
 
-            // Date/Time types
             case 'date':
                 passed = this.isValidDate(value);
                 details.parsedDate = this.parseDate(value);
@@ -94,7 +86,6 @@ export class DataTypeValidator {
                 details.hasTimezone = true;
                 break;
 
-            // Binary types
             case 'binary':
             case 'varbinary':
             case 'image':
@@ -107,7 +98,6 @@ export class DataTypeValidator {
                 details.length = this.getBinaryLength(value);
                 break;
 
-            // JSON types
             case 'json':
             case 'jsonb':
                 passed = this.isValidJSON(value);
@@ -116,20 +106,16 @@ export class DataTypeValidator {
                     try {
                         details.parsedJSON = JSON.parse(value);
                     } catch (error) {
-                        // JSON parsing failed, but validation already passed
-                        // This can happen if isValidJSON uses a different method
                         details.parseError = error instanceof Error ? error.message : 'JSON parse error';
                     }
                 }
                 break;
 
-            // XML type
             case 'xml':
                 passed = this.isValidXML(value);
                 details.isXML = passed;
                 break;
 
-            // UUID/GUID types
             case 'uuid':
             case 'guid':
             case 'uniqueidentifier':
@@ -137,19 +123,16 @@ export class DataTypeValidator {
                 details.isUUID = passed;
                 break;
 
-            // Array types
             case 'array':
                 passed = Array.isArray(value);
                 details.isArray = passed;
                 details.length = passed ? value.length : 0;
                 break;
 
-            // Null type
             case 'null':
                 passed = value === null || value === undefined;
                 break;
 
-            // Custom validation for specific database types
             case 'geography':
             case 'geometry':
                 passed = this.isValidSpatialData(value);
@@ -173,15 +156,12 @@ export class DataTypeValidator {
                 break;
 
             default:
-                // For unknown types, check if it's a custom type with validation
                 if (expectedType.includes('(')) {
-                    // Handle types with precision/scale like decimal(10,2)
                     const baseType = expectedType.substring(0, expectedType.indexOf('('));
                     const params = expectedType.match(/\(([^)]+)\)/)?.[1];
                     return this.validateTypeWithParams(value, baseType, params);
                 }
                 
-                // Default: type name match
                 passed = actualType.toLowerCase() === expectedType.toLowerCase();
         }
 
@@ -205,9 +185,6 @@ export class DataTypeValidator {
         return validationResult;
     }
 
-    /**
-     * Validate value can be converted to target type
-     */
     validateConversion(value: any, targetType: string): ValidationResult {
         const startTime = Date.now();
         const actionLogger = ActionLogger.getInstance();
@@ -253,9 +230,6 @@ export class DataTypeValidator {
         return validationResult;
     }
 
-    /**
-     * Validate type with parameters (e.g., varchar(50), decimal(10,2))
-     */
     private validateTypeWithParams(value: any, baseType: string, params?: string): ValidationResult {
         const startTime = Date.now();
         
@@ -325,7 +299,6 @@ export class DataTypeValidator {
                 break;
 
             default:
-                // Fallback to base type validation
                 return this.validateType(value, baseType);
         }
 
@@ -338,9 +311,6 @@ export class DataTypeValidator {
         };
     }
 
-    /**
-     * Convert value to specified type
-     */
     convertToType(value: any, targetType: string): any {
         if (value === null || value === undefined) {
             return null;
@@ -412,8 +382,6 @@ export class DataTypeValidator {
                             return parsed;
                         }
                     } catch (error) {
-                        // JSON parsing failed, continue to throw error below
-                        // The error message will indicate the value cannot be converted
                     }
                 }
                 throw new Error(`Cannot convert ${value} to array`);
@@ -423,7 +391,6 @@ export class DataTypeValidator {
         }
     }
 
-    // Helper methods for type detection and validation
 
     private getActualType(value: any): string {
         if (value === null) return 'null';
@@ -435,7 +402,6 @@ export class DataTypeValidator {
         
         const type = typeof value;
         if (type === 'object') {
-            // Check for specific object types
             if (value.constructor && value.constructor.name) {
                 return value.constructor.name.toLowerCase();
             }
@@ -450,11 +416,10 @@ export class DataTypeValidator {
         }
         
         if (typeof value === 'string') {
-            // Check common date formats
             const datePatterns = [
-                /^\d{4}-\d{2}-\d{2}$/,  // YYYY-MM-DD
-                /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY
-                /^\d{2}-\d{2}-\d{4}$/     // DD-MM-YYYY
+                /^\d{4}-\d{2}-\d{2}$/,
+                /^\d{2}\/\d{2}\/\d{4}$/,
+                /^\d{2}-\d{2}-\d{4}$/
             ];
             
             if (datePatterns.some(pattern => pattern.test(value))) {
@@ -468,11 +433,10 @@ export class DataTypeValidator {
 
     private isValidTime(value: any): boolean {
         if (typeof value === 'string') {
-            // Check common time formats
             const timePatterns = [
-                /^\d{2}:\d{2}:\d{2}$/,        // HH:MM:SS
-                /^\d{2}:\d{2}:\d{2}\.\d+$/,   // HH:MM:SS.mmm
-                /^\d{2}:\d{2}$/                // HH:MM
+                /^\d{2}:\d{2}:\d{2}$/,
+                /^\d{2}:\d{2}:\d{2}\.\d+$/,
+                /^\d{2}:\d{2}$/
             ];
             
             return timePatterns.some(pattern => pattern.test(value));
@@ -496,12 +460,11 @@ export class DataTypeValidator {
 
     private isValidDateTimeOffset(value: any): boolean {
         if (typeof value === 'string') {
-            // Check for timezone information
             const offsetPatterns = [
-                /\+\d{2}:\d{2}$/,  // +00:00
-                /-\d{2}:\d{2}$/,   // -00:00
-                /Z$/,               // UTC
-                /[+-]\d{4}$/        // +0000
+                /\+\d{2}:\d{2}$/,
+                /-\d{2}:\d{2}$/,
+                /Z$/,
+                /[+-]\d{4}$/
             ];
             
             return offsetPatterns.some(pattern => pattern.test(value)) && 
@@ -541,7 +504,6 @@ export class DataTypeValidator {
             return false;
         }
         
-        // Basic XML validation
         const xmlPattern = /^<([^>]+)>[\s\S]*<\/\1>$/;
         return xmlPattern.test(value.trim());
     }
@@ -557,7 +519,6 @@ export class DataTypeValidator {
 
     private isValidSpatialData(value: any): boolean {
         if (typeof value === 'string') {
-            // WKT (Well-Known Text) format validation
             const wktPatterns = [
                 /^POINT\s*\([^)]+\)$/i,
                 /^LINESTRING\s*\([^)]+\)$/i,
@@ -572,7 +533,6 @@ export class DataTypeValidator {
                 return true;
             }
             
-            // GeoJSON format validation
             try {
                 const parsed = JSON.parse(value);
                 return parsed.type && ['Point', 'LineString', 'Polygon', 'MultiPoint', 
@@ -583,7 +543,6 @@ export class DataTypeValidator {
         }
         
         if (typeof value === 'object' && value !== null) {
-            // Check for GeoJSON object
             return value.type && value.coordinates;
         }
         
@@ -595,12 +554,11 @@ export class DataTypeValidator {
             return false;
         }
         
-        // PostgreSQL interval format
         const intervalPatterns = [
             /^\d+\s+(year|month|day|hour|minute|second)s?$/i,
-            /^P(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$/,  // ISO 8601
-            /^\d+:\d+:\d+$/,  // HH:MM:SS
-            /^-?\d+\s+days?\s+\d+:\d+:\d+$/  // PostgreSQL format
+            /^P(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$/,
+            /^\d+:\d+:\d+$/,
+            /^-?\d+\s+days?\s+\d+:\d+:\d+$/
         ];
         
         return intervalPatterns.some(pattern => pattern.test(value));
@@ -611,19 +569,16 @@ export class DataTypeValidator {
             return false;
         }
         
-        // IPv4 validation
         const ipv4Pattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
         if (ipv4Pattern.test(value)) {
             return true;
         }
         
-        // IPv6 validation
         const ipv6Pattern = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
         if (ipv6Pattern.test(value)) {
             return true;
         }
         
-        // CIDR notation
         const cidrPattern = /^([0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}$/;
         return cidrPattern.test(value);
     }
@@ -634,8 +589,8 @@ export class DataTypeValidator {
         }
         
         const macPatterns = [
-            /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/,  // XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
-            /^([0-9A-Fa-f]{4}\.){2}([0-9A-Fa-f]{4})$/      // XXXX.XXXX.XXXX
+            /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/,
+            /^([0-9A-Fa-f]{4}\.){2}([0-9A-Fa-f]{4})$/
         ];
         
         return macPatterns.some(pattern => pattern.test(value));
@@ -666,7 +621,6 @@ export class DataTypeValidator {
         if (typeof value === 'string') {
             const parsed = new Date(value);
             if (!isNaN(parsed.getTime())) {
-                // Set time to 00:00:00 for date-only
                 parsed.setHours(0, 0, 0, 0);
                 return parsed;
             }
@@ -706,7 +660,6 @@ export class DataTypeValidator {
     }
 
     private parseDateTimeOffset(value: any): Date | null {
-        // Similar to parseDateTime but preserves timezone information
         return this.parseDateTime(value);
     }
 
@@ -720,7 +673,6 @@ export class DataTypeValidator {
         }
         
         if (typeof value === 'string') {
-            // Assume base64
             return Buffer.from(value, 'base64').length;
         }
         
@@ -736,11 +688,9 @@ export class DataTypeValidator {
         const strValue = numValue.toString();
         const parts = strValue.split('.');
         
-        // Check integer part
         const integerDigits = parts[0] ? parts[0].replace('-', '').length : 0;
         const decimalDigits = parts.length > 1 && parts[1] ? parts[1].length : 0;
         
-        // Total digits (excluding decimal point and sign)
         const totalDigits = integerDigits + decimalDigits;
         
         return totalDigits <= precision && decimalDigits <= scale;
@@ -752,7 +702,6 @@ export class DataTypeValidator {
             return false;
         }
         
-        // For float precision, check significant digits
         const significantDigits = numValue.toPrecision(precision);
         return Number(significantDigits) === numValue;
     }

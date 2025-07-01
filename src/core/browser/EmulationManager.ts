@@ -9,7 +9,6 @@ export class EmulationManager {
   private readonly customDevices: Map<string, any> = new Map();
 
   private constructor() {
-    // Initialize with Playwright's device registry
     this.deviceRegistry = new Map(Object.entries(devices));
     this.registerCustomDevices();
   }
@@ -22,7 +21,6 @@ export class EmulationManager {
   }
 
   private registerCustomDevices(): void {
-    // Add custom device configurations
     this.customDevices.set('Custom Desktop', {
       name: 'Custom Desktop',
       viewport: { width: 1920, height: 1080 },
@@ -47,7 +45,6 @@ export class EmulationManager {
     deviceName: string
   ): Promise<void> {
     try {
-      // Validate context is connected
       if (!context.browser()?.isConnected()) {
         throw new Error('Browser context is not connected');
       }
@@ -59,8 +56,6 @@ export class EmulationManager {
         throw new Error(`Device '${deviceName}' not found`);
       }
 
-      // Device properties are set during context creation
-      // Log the emulation with context info
       ActionLogger.logEmulation('device', deviceName, {
         ...device,
         contextPages: context.pages().length
@@ -95,13 +90,10 @@ export class EmulationManager {
     userAgent: string
   ): Promise<void> {
     try {
-      // Validate context is connected
       if (!context.browser()?.isConnected()) {
         throw new Error('Browser context is not connected');
       }
       
-      // User agent is set during context creation
-      // We can verify it was set correctly
       const pages = context.pages();
       ActionLogger.logEmulation('userAgent', userAgent.substring(0, 50) + '...', {
         fullUserAgent: userAgent,
@@ -118,13 +110,10 @@ export class EmulationManager {
     locale: string
   ): Promise<void> {
     try {
-      // Validate context is connected
       if (!context.browser()?.isConnected()) {
         throw new Error('Browser context is not connected');
       }
       
-      // Locale is set during context creation
-      // Store for reference and validation
       ActionLogger.logEmulation('locale', locale, { 
         locale,
         contextId: (context as any)._guid || 'unknown'
@@ -140,13 +129,10 @@ export class EmulationManager {
     timezone: string
   ): Promise<void> {
     try {
-      // Validate context is connected
       if (!context.browser()?.isConnected()) {
         throw new Error('Browser context is not connected');
       }
       
-      // Timezone is set during context creation
-      // Validate the timezone format
       if (!timezone.includes('/')) {
         throw new Error(`Invalid timezone format: ${timezone}. Expected format like 'America/New_York'`);
       }
@@ -231,7 +217,6 @@ export class EmulationManager {
     rate: number
   ): Promise<void> {
     try {
-      // CPU throttling via CDP
       const client = await page.context().newCDPSession(page);
       await client.send('Emulation.setCPUThrottlingRate', { rate });
       ActionLogger.logEmulation('cpuThrottling', `${rate}x`, { rate });
@@ -272,28 +257,28 @@ export class EmulationManager {
   ): Promise<void> {
     const presets = {
       'GPRS': {
-        downloadThroughput: 50 * 1024 / 8, // 50kb/s
-        uploadThroughput: 20 * 1024 / 8,   // 20kb/s
+        downloadThroughput: 50 * 1024 / 8,
+        uploadThroughput: 20 * 1024 / 8,
         latency: 500
       },
       '3G': {
-        downloadThroughput: 1.5 * 1024 * 1024 / 8, // 1.5Mb/s
-        uploadThroughput: 750 * 1024 / 8,         // 750kb/s
+        downloadThroughput: 1.5 * 1024 * 1024 / 8,
+        uploadThroughput: 750 * 1024 / 8,
         latency: 100
       },
       '4G': {
-        downloadThroughput: 4 * 1024 * 1024 / 8, // 4Mb/s
-        uploadThroughput: 3 * 1024 * 1024 / 8,   // 3Mb/s
+        downloadThroughput: 4 * 1024 * 1024 / 8,
+        uploadThroughput: 3 * 1024 * 1024 / 8,
         latency: 20
       },
       'DSL': {
-        downloadThroughput: 2 * 1024 * 1024 / 8, // 2Mb/s
-        uploadThroughput: 1 * 1024 * 1024 / 8,   // 1Mb/s
+        downloadThroughput: 2 * 1024 * 1024 / 8,
+        uploadThroughput: 1 * 1024 * 1024 / 8,
         latency: 5
       },
       'WiFi': {
-        downloadThroughput: 30 * 1024 * 1024 / 8, // 30Mb/s
-        uploadThroughput: 15 * 1024 * 1024 / 8,   // 15Mb/s
+        downloadThroughput: 30 * 1024 * 1024 / 8,
+        uploadThroughput: 15 * 1024 * 1024 / 8,
         latency: 2
       }
     };
@@ -339,13 +324,10 @@ export class EmulationManager {
     enabled: boolean
   ): Promise<void> {
     try {
-      // Validate context is connected
       if (!context.browser()?.isConnected()) {
         throw new Error('Browser context is not connected');
       }
       
-      // JavaScript enabled/disabled is set during context creation
-      // Log the setting with context validation
       const pages = context.pages();
       ActionLogger.logEmulation('javaScript', enabled ? 'enabled' : 'disabled', { 
         enabled,
@@ -377,13 +359,10 @@ export class EmulationManager {
     enabled: boolean
   ): Promise<void> {
     try {
-      // Validate context is connected
       if (!context.browser()?.isConnected()) {
         throw new Error('Browser context is not connected');
       }
       
-      // Touch is enabled during context creation with hasTouch property
-      // Verify current pages and log the setting
       const pages = context.pages();
       const touchSupport = pages.length > 0 ? 'Only affects new pages' : 'Will be applied to new pages';
       

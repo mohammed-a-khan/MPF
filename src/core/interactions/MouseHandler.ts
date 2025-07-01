@@ -129,14 +129,12 @@ export class MouseHandler {
     
     if (path.length === 0) return;
     
-    // Move to start position
     const firstPoint = path[0];
     if (!firstPoint) return;
     
     await page.mouse.move(firstPoint.x, firstPoint.y);
     await page.mouse.down();
     
-    // Draw the path
     for (let i = 1; i < path.length; i++) {
       const point = path[i];
       if (!point) continue;
@@ -150,11 +148,9 @@ export class MouseHandler {
     const actionLogger = ActionLogger.getInstance();
     await actionLogger.logAction('mouse_human_movement', { start, end });
     
-    // Create a curved path with some randomness
     const steps = 30;
     const path: Point[] = [];
     
-    // Add control points for bezier curve
     const controlPoint1 = {
       x: start.x + (end.x - start.x) * 0.25 + (Math.random() - 0.5) * 50,
       y: start.y + (end.y - start.y) * 0.25 + (Math.random() - 0.5) * 50
@@ -165,7 +161,6 @@ export class MouseHandler {
       y: start.y + (end.y - start.y) * 0.75 + (Math.random() - 0.5) * 50
     };
     
-    // Generate bezier curve points
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const t2 = t * t;
@@ -180,14 +175,12 @@ export class MouseHandler {
       path.push({ x, y });
     }
     
-    // Move along the path with varying speeds
     for (let i = 1; i < path.length; i++) {
-      const speed = Math.random() * 0.5 + 0.5; // Random speed multiplier
+      const speed = Math.random() * 0.5 + 0.5;
       const point = path[i];
       if (!point) continue;
       await page.mouse.move(point.x, point.y, { steps: Math.ceil(3 * speed) });
       
-      // Occasional micro-pauses
       if (Math.random() < 0.1) {
         await page.waitForTimeout(Math.random() * 50 + 10);
       }

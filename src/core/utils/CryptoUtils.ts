@@ -1,9 +1,3 @@
-/**
- * CS Test Automation Framework - Cryptography Utilities
- * 
- * Comprehensive cryptographic operations including encryption, decryption,
- * hashing, signing, and key management using Node.js crypto module
- */
 
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -76,7 +70,6 @@ export class CryptoUtils {
   private static readonly DEFAULT_ITERATIONS = 100000;
   private static readonly DEFAULT_DIGEST = 'sha256';
 
-  // Symmetric Encryption
   public static async encrypt(
     data: string | Buffer,
     password: string,
@@ -92,23 +85,18 @@ export class CryptoUtils {
       encoding = 'base64'
     } = options;
 
-    // Generate salt and IV
     const salt = crypto.randomBytes(saltLength);
     const iv = crypto.randomBytes(ivLength);
 
-    // Derive key from password
     const key = crypto.pbkdf2Sync(password, salt, iterations, keyLength, digest);
 
-    // Create cipher
     const cipher = crypto.createCipheriv(algorithm, key, iv);
     
-    // Encrypt data
     const encrypted = Buffer.concat([
       cipher.update(typeof data === 'string' ? Buffer.from(data, 'utf8') : data),
       cipher.final()
     ]);
 
-    // Get authentication tag for GCM mode
     let tag = Buffer.alloc(0);
     if (algorithm.includes('gcm')) {
       tag = (cipher as any).getAuthTag();
@@ -138,24 +126,19 @@ export class CryptoUtils {
       encoding = 'base64'
     } = options;
 
-    // Convert from encoding
     const encryptedBuffer = Buffer.from(encryptedData, encoding as BufferEncoding);
     const saltBuffer = Buffer.from(salt, encoding as BufferEncoding);
     const ivBuffer = Buffer.from(iv, encoding as BufferEncoding);
     const tagBuffer = tag ? Buffer.from(tag, encoding as BufferEncoding) : Buffer.alloc(0);
 
-    // Derive key from password
     const key = crypto.pbkdf2Sync(password, saltBuffer, iterations, keyLength, digest);
 
-    // Create decipher
     const decipher = crypto.createDecipheriv(algorithm, key, ivBuffer);
 
-    // Set authentication tag for GCM mode
     if (algorithm.includes('gcm') && tagBuffer.length > 0) {
       (decipher as any).setAuthTag(tagBuffer);
     }
 
-    // Decrypt data
     const decrypted = Buffer.concat([
       decipher.update(encryptedBuffer),
       decipher.final()
@@ -164,7 +147,6 @@ export class CryptoUtils {
     return decrypted.toString('utf8');
   }
 
-  // Asymmetric Encryption
   public static async encryptWithPublicKey(
     data: string | Buffer,
     publicKey: string | Buffer | crypto.KeyObject,
@@ -211,7 +193,6 @@ export class CryptoUtils {
     return decrypted.toString('utf8');
   }
 
-  // Hashing
   public static hash(data: string | Buffer, options: HashOptions = {}): string {
     const {
       algorithm = this.DEFAULT_HASH_ALGORITHM,
@@ -222,11 +203,9 @@ export class CryptoUtils {
       .createHash(algorithm)
       .update(typeof data === 'string' ? data : data.toString());
 
-    // Handle different encoding types
     if (encoding === 'hex' || encoding === 'base64' || encoding === 'base64url') {
       return hash.digest(encoding);
     } else {
-      // For other encodings, use hex as default
       return hash.digest('hex');
     }
   }
@@ -293,16 +272,13 @@ export class CryptoUtils {
       .createHmac(algorithm, key)
       .update(data);
 
-    // Handle different encoding types
     if (encoding === 'hex' || encoding === 'base64' || encoding === 'base64url') {
       return hmac.digest(encoding);
     } else {
-      // For other encodings, use hex as default
       return hmac.digest('hex');
     }
   }
 
-  // Digital Signatures
   public static sign(
     data: string | Buffer,
     privateKey: string | Buffer | crypto.KeyObject,
@@ -317,7 +293,6 @@ export class CryptoUtils {
     const sign = crypto.createSign(algorithm);
     sign.update(data);
     
-    // Ensure encoding is valid for sign
     const validEncoding = ['hex', 'base64', 'base64url'].includes(encoding) 
       ? encoding as 'hex' | 'base64' | 'base64url'
       : 'base64';
@@ -339,7 +314,6 @@ export class CryptoUtils {
     const verify = crypto.createVerify(algorithm);
     verify.update(data);
     
-    // Ensure encoding is valid for verify
     const validEncoding = ['hex', 'base64', 'base64url'].includes(encoding) 
       ? encoding as 'hex' | 'base64' | 'base64url'
       : 'base64';
@@ -380,7 +354,6 @@ export class CryptoUtils {
         }
       };
 
-      // Type assertion to handle overload issues
       const generateKeyPairAny = crypto.generateKeyPair as any;
 
       switch (type) {
@@ -412,7 +385,6 @@ export class CryptoUtils {
     return crypto.randomBytes(length).toString('base64');
   }
 
-  // Random Generation
   public static randomBytes(size: number, encoding?: BufferEncoding): string | Buffer {
     const bytes = crypto.randomBytes(size);
     return encoding ? bytes.toString(encoding) : bytes;
@@ -430,17 +402,14 @@ export class CryptoUtils {
     return crypto.randomBytes(length).toString('base64url');
   }
 
-  // Certificate Operations
   public static async generateSelfSignedCertificate(
     options: CertificateOptions
   ): Promise<{ cert: string; key: string }> {
-    // Generate key pair
     const { publicKey, privateKey } = await this.generateKeyPair({
       type: 'rsa',
       modulusLength: 2048
     });
 
-    // Create certificate (simplified - in production use proper X.509 library)
     const cert = this.createX509Certificate(publicKey, privateKey, options);
 
     return {
@@ -459,11 +428,9 @@ export class CryptoUtils {
       validDays = 365
     } = options;
 
-    // Build X.509 certificate structure
     const notBefore = new Date();
     const notAfter = new Date(notBefore.getTime() + validDays * 24 * 60 * 60 * 1000);
 
-    // Simplified certificate template
     const certTemplate = `-----BEGIN CERTIFICATE-----
 MIIDXTCCAkWgAwIBAgIJAKl3mhV5R5tMMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
 BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
@@ -489,7 +456,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     validTo: Date;
     serialNumber: string;
   } {
-    // Simplified parsing - in production use proper X.509 parser
     const now = new Date();
 
     return {
@@ -509,7 +475,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     };
   }
 
-  // JWT Operations (simplified implementation)
   public static createJWT(
     payload: Record<string, any>,
     secret: string | Buffer | crypto.KeyObject,
@@ -527,14 +492,12 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
       header = {}
     } = options;
 
-    // Create header
     const jwtHeader = {
       alg: algorithm,
       typ: 'JWT',
       ...header
     };
 
-    // Create payload with standard claims
     const now = Math.floor(Date.now() / 1000);
     const jwtPayload = {
       ...payload,
@@ -547,21 +510,17 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
       ...(!noTimestamp && { iat: now })
     };
 
-    // Encode header and payload
     const encodedHeader = this.base64UrlEncode(JSON.stringify(jwtHeader));
     const encodedPayload = this.base64UrlEncode(JSON.stringify(jwtPayload));
     const message = `${encodedHeader}.${encodedPayload}`;
 
-    // Create signature
     let signature: string;
     if (algorithm.startsWith('HS')) {
-      // HMAC signature
       const hmacAlg = `sha${algorithm.substring(2)}`;
       signature = this.base64UrlEncode(
         crypto.createHmac(hmacAlg, secret).update(message).digest()
       );
     } else if (algorithm.startsWith('RS')) {
-      // RSA signature
       const rsaAlg = `RSA-SHA${algorithm.substring(2)}`;
       const sign = crypto.createSign(rsaAlg);
       sign.update(message);
@@ -585,12 +544,10 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
 
     const [encodedHeader, encodedPayload, signature] = parts;
 
-    // Check that all parts are defined
     if (!encodedHeader || !encodedPayload || !signature) {
       return { header: null, payload: null, valid: false };
     }
 
-    // Decode header and payload
     let header: any;
     let payload: any;
 
@@ -601,42 +558,38 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
       return { header: null, payload: null, valid: false };
     }
 
-    // Verify signature
     const message = `${encodedHeader}.${encodedPayload}`;
     let valid = false;
 
     if (header.alg && header.alg.startsWith('HS')) {
-      // HMAC verification
       const hmacAlg = `sha${header.alg.substring(2)}`;
       const expectedSignature = this.base64UrlEncode(
         crypto.createHmac(hmacAlg, secret).update(message).digest()
       );
       valid = signature === expectedSignature;
     } else if (header.alg && header.alg.startsWith('RS')) {
-      // RSA verification
       const rsaAlg = `RSA-SHA${header.alg.substring(2)}`;
       const verify = crypto.createVerify(rsaAlg);
       verify.update(message);
       valid = verify.verify(secret as crypto.KeyLike, Buffer.from(this.base64UrlDecode(signature)));
     }
 
-    // Verify claims
     const now = Math.floor(Date.now() / 1000);
     
     if (valid && payload.exp && payload.exp < now) {
-      valid = false; // Token expired
+      valid = false;
     }
 
     if (valid && payload.nbf && payload.nbf > now) {
-      valid = false; // Token not yet valid
+      valid = false;
     }
 
     if (valid && options.audience && payload.aud !== options.audience) {
-      valid = false; // Audience mismatch
+      valid = false;
     }
 
     if (valid && options.issuer && payload.iss !== options.issuer) {
-      valid = false; // Issuer mismatch
+      valid = false;
     }
 
     return { header, payload, valid };
@@ -679,7 +632,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     return Buffer.from(base64, 'base64').toString();
   }
 
-  // File Encryption
   public static async encryptFile(
     inputPath: string,
     outputPath: string,
@@ -695,14 +647,11 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
       digest = this.DEFAULT_DIGEST
     } = options;
 
-    // Generate salt and IV
     const salt = crypto.randomBytes(saltLength);
     const iv = crypto.randomBytes(ivLength);
 
-    // Derive key
     const key = crypto.pbkdf2Sync(password, salt, iterations, keyLength, digest);
 
-    // Create streams
     const input = fs.createReadStream(inputPath);
     const output = fs.createWriteStream(outputPath);
     const cipher = crypto.createCipheriv(algorithm, key, iv);
@@ -743,20 +692,16 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
       digest = this.DEFAULT_DIGEST
     } = options;
 
-    // Convert from base64
     const saltBuffer = Buffer.from(salt, 'base64');
     const ivBuffer = Buffer.from(iv, 'base64');
     const tagBuffer = tag ? Buffer.from(tag, 'base64') : Buffer.alloc(0);
 
-    // Derive key
     const key = crypto.pbkdf2Sync(password, saltBuffer, iterations, keyLength, digest);
 
-    // Create streams
     const input = fs.createReadStream(inputPath);
     const output = fs.createWriteStream(outputPath);
     const decipher = crypto.createDecipheriv(algorithm, key, ivBuffer);
 
-    // Set auth tag for GCM
     if (algorithm.includes('gcm') && tagBuffer.length > 0) {
       (decipher as any).setAuthTag(tagBuffer);
     }
@@ -770,7 +715,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     });
   }
 
-  // Checksum Operations
   public static async fileChecksum(
     filePath: string,
     algorithm: string = 'sha256',
@@ -783,11 +727,9 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
       stream.on('error', reject);
       stream.on('data', chunk => hash.update(chunk));
       stream.on('end', () => {
-        // Handle different encoding types
         if (encoding === 'hex' || encoding === 'base64' || encoding === 'base64url') {
           resolve(hash.digest(encoding));
         } else {
-          // For other encodings, use hex as default
           resolve(hash.digest('hex'));
         }
       });
@@ -804,7 +746,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     return actualChecksum === expectedChecksum;
   }
 
-  // Constant-Time Comparison
   public static timingSafeEqual(a: string | Buffer, b: string | Buffer): boolean {
     const bufferA = typeof a === 'string' ? Buffer.from(a) : a;
     const bufferB = typeof b === 'string' ? Buffer.from(b) : b;
@@ -816,7 +757,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     return crypto.timingSafeEqual(bufferA, bufferB);
   }
 
-  // Key Derivation
   public static deriveKey(
     password: string,
     salt: string | Buffer,
@@ -847,7 +787,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     });
   }
 
-  // Diffie-Hellman Key Exchange
   public static createDiffieHellman(primeLength: number = 2048): {
     publicKey: string;
     privateKey: string;
@@ -869,7 +808,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     };
   }
 
-  // Password Strength
   public static checkPasswordStrength(password: string): {
     score: number;
     strength: 'weak' | 'fair' | 'good' | 'strong';
@@ -878,13 +816,11 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     let score = 0;
     const suggestions: string[] = [];
 
-    // Length check
     if (password.length >= 8) score++;
     if (password.length >= 12) score++;
     if (password.length >= 16) score++;
     else suggestions.push('Use at least 12 characters');
 
-    // Character variety
     if (/[a-z]/.test(password)) score++;
     else suggestions.push('Include lowercase letters');
 
@@ -897,14 +833,12 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     if (/[^a-zA-Z0-9]/.test(password)) score++;
     else suggestions.push('Include special characters');
 
-    // Pattern checks
-    if (!/(.)\1{2,}/.test(password)) score++; // No repeated characters
+    if (!/(.)\1{2,}/.test(password)) score++;
     else suggestions.push('Avoid repeated characters');
 
-    if (!/^(123|abc|password|qwerty)/i.test(password)) score++; // No common patterns
+    if (!/^(123|abc|password|qwerty)/i.test(password)) score++;
     else suggestions.push('Avoid common patterns');
 
-    // Determine strength
     let strength: 'weak' | 'fair' | 'good' | 'strong';
     if (score < 4) strength = 'weak';
     else if (score < 6) strength = 'fair';
@@ -914,7 +848,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     return { score, strength, suggestions };
   }
 
-  // Secure Random String
   public static generateSecureString(
     length: number,
     options: {
@@ -939,7 +872,6 @@ ${this.hash(notAfter.toISOString()).substring(0, 128)}
     if (numbers) charset += '0123456789';
     if (symbols) charset += '!@#$%^&*()_+-=[]{}|;:,.<>?';
 
-    // Remove excluded characters
     if (exclude) {
       charset = charset.split('').filter(char => !exclude.includes(char)).join('');
     }

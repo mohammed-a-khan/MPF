@@ -1,11 +1,3 @@
-/**
- * CS Test Automation Framework - Proxy Types
- * 
- * Complete type definitions for the proxy management system.
- * 
- * @author CS Test Automation Team
- * @version 4.0.0
- */
 
 import { Socket } from 'net';
 import { TLSSocket } from 'tls';

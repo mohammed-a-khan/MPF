@@ -10,22 +10,10 @@ export interface SecureConfigOptions extends Partial<ConfigurationOptions> {
   internalKey?: string;
 }
 
-/**
- * Secure Configuration Loader with automatic encryption detection and setup
- * 
- * This class provides a simple way to:
- * 1. Load configuration with automatic encryption support
- * 2. Validate existing encrypted values
- * 3. Migrate from plain to encrypted configuration
- * 4. Provide secure access patterns
- */
 export class SecureConfigurationLoader {
   private static logger = Logger.getInstance();
   private static isInitialized = false;
 
-  /**
-   * Initialize secure configuration with encryption support
-   */
   static async initialize(options: SecureConfigOptions = {}): Promise<void> {
     const {
       enableEncryption = true,
@@ -36,20 +24,17 @@ export class SecureConfigurationLoader {
     } = options;
 
     try {
-      // Load base configuration first
       if (configOptions.environment) {
         await ConfigurationManager.loadConfiguration(configOptions.environment, configOptions);
       }
 
       if (enableEncryption) {
-        // Initialize encryption configuration
         EncryptionConfigurationManager.initializeEncryption({
           enabled: true,
           internalKey: internalKey || ''
         });
 
         if (validateEncryption) {
-          // Validate encryption setup
           const validation = await EncryptionConfigurationManager.validateEncryptionConfig();
           
           if (!validation.valid) {
@@ -77,65 +62,41 @@ export class SecureConfigurationLoader {
     }
   }
 
-  /**
-   * Get configuration value with automatic decryption
-   */
   static get(key: string, defaultValue?: string): string {
     this.ensureInitialized();
     return EncryptionConfigurationManager.get(key, defaultValue || '');
   }
 
-  /**
-   * Get secure configuration value (throws if decryption fails)
-   */
   static getSecure(key: string, defaultValue?: string): string {
     this.ensureInitialized();
     return EncryptionConfigurationManager.getDecrypted(key, defaultValue);
   }
 
-  /**
-   * Get boolean configuration value
-   */
   static getBoolean(key: string, defaultValue?: boolean): boolean {
     this.ensureInitialized();
     return EncryptionConfigurationManager.getBoolean(key, defaultValue || false);
   }
 
-  /**
-   * Get number configuration value
-   */
   static getNumber(key: string, defaultValue?: number): number | undefined {
     this.ensureInitialized();
     return EncryptionConfigurationManager.getNumber(key, defaultValue);
   }
 
-  /**
-   * Get array configuration value
-   */
   static getArray(key: string, delimiter?: string): string[] {
     this.ensureInitialized();
     return EncryptionConfigurationManager.getArray(key, delimiter);
   }
 
-  /**
-   * Get JSON configuration value
-   */
   static getJSON<T = any>(key: string, defaultValue?: T): T {
     this.ensureInitialized();
     return EncryptionConfigurationManager.getJSON(key, defaultValue);
   }
 
-  /**
-   * Encrypt a value for configuration storage
-   */
   static async encryptValue(value: string): Promise<string> {
     this.ensureInitialized();
     return await EncryptionConfigurationManager.encryptValue(value);
   }
 
-  /**
-   * Test encryption/decryption of a value
-   */
   static async testEncryption(value: string): Promise<{ encrypted: string; decrypted: string; success: boolean }> {
     this.ensureInitialized();
     
@@ -158,9 +119,6 @@ export class SecureConfigurationLoader {
     }
   }
 
-  /**
-   * Get all configuration with sensitive values masked
-   */
   static getAllMasked(): Record<string, string> {
     this.ensureInitialized();
     const allConfig = ConfigurationManager.getAll();
@@ -177,9 +135,6 @@ export class SecureConfigurationLoader {
     return masked;
   }
 
-  /**
-   * Get encryption statistics
-   */
   static getEncryptionStats(): {
     enabled: boolean;
     encryptedKeys: string[];
@@ -203,25 +158,16 @@ export class SecureConfigurationLoader {
     };
   }
 
-  /**
-   * Clear sensitive data from memory
-   */
   static clearSensitiveData(): void {
     this.ensureInitialized();
     EncryptionConfigurationManager.clearDecryptionCache();
     this.logger.info('Sensitive data cleared from memory');
   }
 
-  /**
-   * Check if configuration is properly initialized
-   */
   static isSecurelyInitialized(): boolean {
     return this.isInitialized;
   }
 
-  /**
-   * Generate migration commands for existing configuration
-   */
   static generateMigrationCommands(keys?: string[]): string[] {
     this.ensureInitialized();
     
@@ -246,18 +192,12 @@ export class SecureConfigurationLoader {
     return commands;
   }
 
-  /**
-   * Ensure configuration is initialized
-   */
   private static ensureInitialized(): void {
     if (!this.isInitialized) {
       throw new Error('SecureConfigurationLoader not initialized. Call initialize() first.');
     }
   }
 
-  /**
-   * Check if a key contains sensitive data
-   */
   private static isSensitiveKey(key: string): boolean {
     const sensitivePatterns = [
       /password/i,
@@ -274,16 +214,10 @@ export class SecureConfigurationLoader {
     return sensitivePatterns.some(pattern => pattern.test(key));
   }
 
-  /**
-   * Get all keys that might contain sensitive data
-   */
   private static getSensitiveKeys(allKeys: string[]): string[] {
     return allKeys.filter(key => this.isSensitiveKey(key));
   }
 
-  /**
-   * Mask a configuration value for display
-   */
   private static maskValue(value: string): string {
     if (!value) return value;
     
@@ -299,16 +233,9 @@ export class SecureConfigurationLoader {
   }
 }
 
-/**
- * Backward compatibility - replace ConfigurationManager usage
- */
 export class SecureConfig extends SecureConfigurationLoader {
-  // Alias for easier migration
 }
 
-/**
- * Quick setup function for common scenarios
- */
 export async function initializeSecureConfig(environment?: string, internalKey?: string): Promise<void> {
   await SecureConfigurationLoader.initialize({
     environment: environment || 'default',

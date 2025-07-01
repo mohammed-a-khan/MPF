@@ -13,27 +13,14 @@ import {
   DatabaseErrorCode
 } from '../types/database.types';
 
-/**
- * Abstract base class for database adapters
- * Each database type must implement this interface
- */
 export abstract class DatabaseAdapter {
   protected config?: DatabaseConfig;
   protected eventHandlers: Map<string, Set<Function>> = new Map();
 
-  /**
-   * Connect to database
-   */
   abstract connect(config: DatabaseConfig): Promise<DatabaseConnection>;
 
-  /**
-   * Disconnect from database
-   */
   abstract disconnect(connection: DatabaseConnection): Promise<void>;
 
-  /**
-   * Execute query
-   */
   abstract query(
     connection: DatabaseConnection, 
     sql: string, 
@@ -41,9 +28,6 @@ export abstract class DatabaseAdapter {
     options?: QueryOptions
   ): Promise<QueryResult>;
 
-  /**
-   * Execute stored procedure
-   */
   abstract executeStoredProcedure(
     connection: DatabaseConnection,
     procedureName: string,
@@ -51,9 +35,6 @@ export abstract class DatabaseAdapter {
     options?: QueryOptions
   ): Promise<QueryResult>;
 
-  /**
-   * Execute function
-   */
   abstract executeFunction(
     connection: DatabaseConnection,
     functionName: string,
@@ -61,81 +42,41 @@ export abstract class DatabaseAdapter {
     options?: QueryOptions
   ): Promise<any>;
 
-  /**
-   * Begin transaction
-   */
   abstract beginTransaction(
     connection: DatabaseConnection,
     options?: TransactionOptions
   ): Promise<void>;
 
-  /**
-   * Commit transaction
-   */
   abstract commitTransaction(connection: DatabaseConnection): Promise<void>;
 
-  /**
-   * Rollback transaction
-   */
   abstract rollbackTransaction(connection: DatabaseConnection): Promise<void>;
 
-  /**
-   * Create savepoint
-   */
   abstract createSavepoint(connection: DatabaseConnection, name: string): Promise<void>;
 
-  /**
-   * Release savepoint
-   */
   abstract releaseSavepoint(connection: DatabaseConnection, name: string): Promise<void>;
 
-  /**
-   * Rollback to savepoint
-   */
   abstract rollbackToSavepoint(connection: DatabaseConnection, name: string): Promise<void>;
 
-  /**
-   * Prepare statement
-   */
   abstract prepare(connection: DatabaseConnection, sql: string): Promise<PreparedStatement>;
 
-  /**
-   * Execute prepared statement
-   */
   abstract executePrepared(
     statement: PreparedStatement,
     params?: any[]
   ): Promise<QueryResult>;
 
-  /**
-   * Ping connection
-   */
   abstract ping(connection: DatabaseConnection): Promise<void>;
 
-  /**
-   * Get database metadata
-   */
   abstract getMetadata(connection: DatabaseConnection): Promise<DatabaseMetadata>;
 
-  /**
-   * Get table information
-   */
   abstract getTableInfo(connection: DatabaseConnection, tableName: string): Promise<TableInfo>;
 
-  /**
-   * Bulk insert
-   */
   abstract bulkInsert(
     connection: DatabaseConnection,
     table: string,
     data: any[]
   ): Promise<number>;
 
-  /**
-   * Build stored procedure call
-   */
   buildStoredProcedureCall(procedureName: string, params?: any[]): string {
-    // Default implementation - can be overridden
     if (!params || params.length === 0) {
       return `CALL ${procedureName}()`;
     }
@@ -144,20 +85,15 @@ export abstract class DatabaseAdapter {
     return `CALL ${procedureName}(${placeholders})`;
   }
 
-  /**
-   * Set session parameter
-   */
   async setSessionParameter(
     connection: DatabaseConnection,
     parameter: string,
     value: any
   ): Promise<void> {
-    // Store session parameter in connection object
     if (!connection.sessionOptions) {
       connection.sessionOptions = {};
     }
     
-    // Map common session parameters
     switch (parameter.toLowerCase()) {
       case 'autocommit':
         connection.sessionOptions.autoCommit = Boolean(value);
@@ -175,20 +111,12 @@ export abstract class DatabaseAdapter {
         connection.sessionOptions.timezone = String(value);
         break;
       default:
-        // For database-specific parameters, override this method
         throw new Error(`Session parameter '${parameter}' not supported by this database type`);
     }
   }
 
-  /**
-   * Cancel running query
-   */
   async cancelQuery?(connection: DatabaseConnection): Promise<void>;
 
-  /**
-   * Stream query results
-   * Implementation for async generator without overload issues
-   */
   stream?(
     connection: DatabaseConnection,
     sql: string,
@@ -196,17 +124,10 @@ export abstract class DatabaseAdapter {
     options?: QueryOptions
   ): AsyncGenerator<any, void, unknown>;
 
-  /**
-   * Escape identifier (table/column name)
-   */
   escapeIdentifier(identifier: string): string {
-    // Default implementation - override as needed
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
-  /**
-   * Escape value
-   */
   escapeValue(value: any): string {
     if (value === null || value === undefined) return 'NULL';
     if (typeof value === 'number') return String(value);
@@ -215,20 +136,13 @@ export abstract class DatabaseAdapter {
       return `'${value.toISOString()}'`;
     }
     
-    // String values
     return `'${String(value).replace(/'/g, "''")}'`;
   }
 
-  /**
-   * Format date for database
-   */
   formatDate(date: Date): string {
     return date.toISOString().slice(0, 19).replace('T', ' ');
   }
 
-  /**
-   * Get isolation level SQL
-   */
   getIsolationLevelSQL(level?: string): string {
     switch (level?.toUpperCase()) {
       case 'READ_UNCOMMITTED':
@@ -244,20 +158,15 @@ export abstract class DatabaseAdapter {
     }
   }
 
-  /**
-   * Parse connection error
-   */
   parseConnectionError(error: any): DatabaseError {
     const message = error.message || 'Unknown database error';
     const enhancedError = new Error(message) as DatabaseError;
     
-    // Determine error code based on error properties
     let errorCode = DatabaseErrorCode.UNKNOWN_ERROR;
     
     if (error.code) {
       const code = String(error.code).toUpperCase();
       
-      // Common error code mappings
       if (code.includes('CONN') || code.includes('NETWORK') || code === 'ECONNREFUSED') {
         errorCode = DatabaseErrorCode.CONNECTION_ERROR;
       } else if (code.includes('AUTH') || code === 'EAUTH' || code === '28P01') {
@@ -277,7 +186,6 @@ export abstract class DatabaseAdapter {
       }
     }
     
-    // Preserve original error properties
     Object.assign(enhancedError, {
       code: errorCode,
       originalError: error,
@@ -294,7 +202,6 @@ export abstract class DatabaseAdapter {
       }
     });
 
-    // Add solution suggestions based on error type
     switch (errorCode) {
       case DatabaseErrorCode.CONNECTION_ERROR:
         enhancedError.solution = 'Check database host, port, and network connectivity';
@@ -322,11 +229,7 @@ export abstract class DatabaseAdapter {
     return enhancedError;
   }
 
-  /**
-   * Get server info
-   */
   async getServerInfo(connection: DatabaseConnection): Promise<any> {
-    // Default implementation
     const metadata = await this.getMetadata(connection);
     
     return {
@@ -345,9 +248,6 @@ export abstract class DatabaseAdapter {
     };
   }
 
-  /**
-   * Emit event
-   */
   protected emit(event: string, data?: any): void {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
@@ -361,9 +261,6 @@ export abstract class DatabaseAdapter {
     }
   }
 
-  /**
-   * Add event listener
-   */
   on(event: string, handler: Function): void {
     if (!this.eventHandlers.has(event)) {
       this.eventHandlers.set(event, new Set());
@@ -371,9 +268,6 @@ export abstract class DatabaseAdapter {
     this.eventHandlers.get(event)!.add(handler);
   }
 
-  /**
-   * Remove event listener
-   */
   off(event: string, handler: Function): void {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
@@ -381,18 +275,12 @@ export abstract class DatabaseAdapter {
     }
   }
 
-  /**
-   * Validate connection
-   */
   protected validateConnection(connection: DatabaseConnection): void {
     if (!connection || !connection.connected) {
       throw this.parseConnectionError(new Error('Connection is not established'));
     }
   }
 
-  /**
-   * Measure query duration
-   */
   protected async measureDuration<T>(
     operation: () => Promise<T>
   ): Promise<{ result: T; duration: number }> {
@@ -402,9 +290,6 @@ export abstract class DatabaseAdapter {
     return { result, duration };
   }
 
-  /**
-   * Handle transaction state
-   */
   protected updateTransactionState(
     connection: DatabaseConnection,
     inTransaction: boolean,
@@ -417,9 +302,6 @@ export abstract class DatabaseAdapter {
     }
   }
 
-  /**
-   * Format query for logging
-   */
   protected formatQueryForLog(sql: string, params?: any[]): string {
     let formattedQuery = sql.trim();
     
@@ -430,30 +312,20 @@ export abstract class DatabaseAdapter {
     return formattedQuery;
   }
 
-  /**
-   * Validate table name
-   */
   protected validateTableName(tableName: string): void {
     if (!tableName || typeof tableName !== 'string') {
       throw new Error('Invalid table name');
     }
     
-    // Basic SQL injection prevention
     if (/[';\\]/.test(tableName)) {
       throw new Error('Invalid characters in table name');
     }
   }
 
-  /**
-   * Build column list
-   */
   protected buildColumnList(columns: string[]): string {
     return columns.map(col => this.escapeIdentifier(col)).join(', ');
   }
 
-  /**
-   * Build value placeholders
-   */
   protected buildValuePlaceholders(count: number, startIndex: number = 1): string {
     const placeholders: string[] = [];
     for (let i = 0; i < count; i++) {

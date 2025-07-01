@@ -1,12 +1,3 @@
-/**
- * CS Test Automation Framework - Console Capture
- * 
- * Captures all console output including framework initialization messages
- * and makes them available for reports.
- * 
- * @author CS Test Automation Team
- * @version 1.0.0
- */
 
 export interface ConsoleMessage {
   timestamp: Date;
@@ -30,7 +21,6 @@ export class ConsoleCapture {
   private maxMessages: number = 10000;
 
   private constructor() {
-    // Store original console methods
     this.originalMethods = {
       log: console.log.bind(console),
       info: console.info.bind(console),
@@ -47,9 +37,6 @@ export class ConsoleCapture {
     return ConsoleCapture.instance;
   }
 
-  /**
-   * Start capturing console output
-   */
   startCapture(): void {
     if (this.isCapturing) {
       return;
@@ -57,7 +44,6 @@ export class ConsoleCapture {
 
     this.isCapturing = true;
 
-    // Override console methods
     console.log = this.createInterceptor('log');
     console.info = this.createInterceptor('info');
     console.warn = this.createInterceptor('warn');
@@ -65,9 +51,6 @@ export class ConsoleCapture {
     console.debug = this.createInterceptor('debug');
   }
 
-  /**
-   * Stop capturing console output
-   */
   stopCapture(): void {
     if (!this.isCapturing) {
       return;
@@ -75,7 +58,6 @@ export class ConsoleCapture {
 
     this.isCapturing = false;
 
-    // Restore original console methods
     console.log = this.originalMethods.log;
     console.info = this.originalMethods.info;
     console.warn = this.originalMethods.warn;
@@ -83,12 +65,8 @@ export class ConsoleCapture {
     console.debug = this.originalMethods.debug;
   }
 
-  /**
-   * Create an interceptor for a console method
-   */
   private createInterceptor(level: keyof typeof this.originalMethods): (...args: any[]) => void {
     return (...args: any[]) => {
-      // Capture the message
       const message = args.map(arg => this.formatArg(arg)).join(' ');
       const consoleMessage: ConsoleMessage = {
         timestamp: new Date(),
@@ -97,22 +75,16 @@ export class ConsoleCapture {
         args: args.map(arg => this.serializeArg(arg))
       };
 
-      // Add stack trace for errors
       if (level === 'error' && args[0] instanceof Error && args[0].stack) {
         consoleMessage.stack = args[0].stack;
       }
 
-      // Store the message
       this.addMessage(consoleMessage);
 
-      // Call the original method
       this.originalMethods[level](...args);
     };
   }
 
-  /**
-   * Format an argument for display
-   */
   private formatArg(arg: any): string {
     if (arg === null) return 'null';
     if (arg === undefined) return 'undefined';
@@ -129,9 +101,6 @@ export class ConsoleCapture {
     return String(arg);
   }
 
-  /**
-   * Serialize an argument for storage
-   */
   private serializeArg(arg: any): any {
     if (arg === null || arg === undefined) return arg;
     if (typeof arg === 'string' || typeof arg === 'number' || typeof arg === 'boolean') return arg;
@@ -144,7 +113,6 @@ export class ConsoleCapture {
     }
     if (typeof arg === 'object') {
       try {
-        // Create a shallow copy to avoid circular references
         return JSON.parse(JSON.stringify(arg));
       } catch {
         return String(arg);
@@ -153,44 +121,28 @@ export class ConsoleCapture {
     return String(arg);
   }
 
-  /**
-   * Add a message to the buffer
-   */
   private addMessage(message: ConsoleMessage): void {
     this.messages.push(message);
 
-    // Limit the number of messages
     if (this.messages.length > this.maxMessages) {
       this.messages.shift();
     }
   }
 
-  /**
-   * Get all captured messages
-   */
   getMessages(): ConsoleMessage[] {
     return [...this.messages];
   }
 
-  /**
-   * Get messages filtered by level
-   */
   getMessagesByLevel(level: ConsoleMessage['level']): ConsoleMessage[] {
     return this.messages.filter(m => m.level === level);
   }
 
-  /**
-   * Get messages within a time range
-   */
   getMessagesInRange(startTime: Date, endTime: Date): ConsoleMessage[] {
     return this.messages.filter(m => 
       m.timestamp >= startTime && m.timestamp <= endTime
     );
   }
 
-  /**
-   * Search messages by content
-   */
   searchMessages(searchTerm: string): ConsoleMessage[] {
     const lowerSearch = searchTerm.toLowerCase();
     return this.messages.filter(m => 
@@ -198,16 +150,10 @@ export class ConsoleCapture {
     );
   }
 
-  /**
-   * Clear all captured messages
-   */
   clear(): void {
     this.messages = [];
   }
 
-  /**
-   * Export messages as text
-   */
   exportAsText(): string {
     return this.messages.map(m => {
       const timestamp = m.timestamp.toISOString();
@@ -216,16 +162,10 @@ export class ConsoleCapture {
     }).join('\n');
   }
 
-  /**
-   * Export messages as JSON
-   */
   exportAsJson(): string {
     return JSON.stringify(this.messages, null, 2);
   }
 
-  /**
-   * Export messages as HTML
-   */
   exportAsHtml(): string {
     const levelColors = {
       log: '#333',
@@ -340,16 +280,12 @@ export class ConsoleCapture {
     return html;
   }
 
-  /**
-   * Escape HTML special characters
-   */
   private escapeHtml(text: string): string {
     const div = document?.createElement?.('div');
     if (div) {
       div.textContent = text;
       return div.innerHTML;
     }
-    // Fallback for non-browser environments
     return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -358,9 +294,6 @@ export class ConsoleCapture {
       .replace(/'/g, '&#039;');
   }
 
-  /**
-   * Get framework initialization logs
-   */
   getInitializationLogs(): ConsoleMessage[] {
     return this.messages.filter(m => 
       m.message.includes('🚀') ||
@@ -372,9 +305,6 @@ export class ConsoleCapture {
     );
   }
 
-  /**
-   * Get a summary of captured logs
-   */
   getSummary(): {
     total: number;
     byLevel: Record<ConsoleMessage['level'], number>;
@@ -404,5 +334,4 @@ export class ConsoleCapture {
   }
 }
 
-// Export singleton instance
 export const consoleCapture = ConsoleCapture.getInstance();

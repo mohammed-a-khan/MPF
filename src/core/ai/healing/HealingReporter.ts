@@ -25,25 +25,17 @@ interface VisualizationData {
     healingDurationChart: ChartData;
 }
 
-/**
- * Extended healing report with additional analysis
- */
 interface EnhancedHealingReport extends HealingReport {
     analysis?: any;
     visualizations?: VisualizationData;
     recommendations?: HealingRecommendation[];
 }
 
-/**
- * Generates comprehensive healing reports with visualizations
- * Integrates with main reporting system
- */
 class HealingReporter {
     private static instance: HealingReporter;
     private readonly healingHistory: HealingHistory;
     private readonly reportPath: string;
     
-    // Brand theme colors
     private readonly theme = {
         primary: '#93186C',
         primaryLight: '#B91C84',
@@ -73,23 +65,17 @@ class HealingReporter {
         return HealingReporter.instance;
     }
     
-    /**
-     * Generate comprehensive healing report
-     */
     async generateHealingReport(): Promise<EnhancedHealingReport> {
         try {
             logger.info('Generating healing report...');
             
-            // Get all data from healing history
             const report = await this.healingHistory.exportHistory('json');
             const healingData: EnhancedHealingReport = JSON.parse(report);
             
-            // Enhance report with additional analysis
             healingData.analysis = this.performDetailedAnalysis(healingData);
             healingData.visualizations = this.generateVisualizationData(healingData);
             healingData.recommendations = this.healingHistory.getRecommendations();
             
-            // Save report files
             await this.saveReportFiles(healingData);
             
             logger.info('Healing report generated successfully');
@@ -102,16 +88,10 @@ class HealingReporter {
         }
     }
     
-    /**
-     * Identify fragile elements that need attention
-     */
     identifyFragileElements(): FragileElement[] {
         return this.healingHistory.getFragileElements(0.5);
     }
     
-    /**
-     * Suggest locator improvements
-     */
     suggestLocatorImprovements(): LocatorSuggestion[] {
         const suggestions: LocatorSuggestion[] = [];
         const fragileElements = this.identifyFragileElements();
@@ -120,7 +100,6 @@ class HealingReporter {
             const history = this.healingHistory.getElementHistory(element.elementId);
             const recentFailures = history.filter(h => !h.success).slice(-10);
             
-            // Analyze failure patterns
             const locatorTypes = new Map<string, number>();
             
             for (const failure of recentFailures) {
@@ -130,7 +109,6 @@ class HealingReporter {
                 }
             }
             
-            // Generate suggestions based on failure patterns
             for (const [type, count] of locatorTypes) {
                 if (count > 3) {
                     suggestions.push(this.generateLocatorSuggestion(element, type, count));
@@ -141,9 +119,6 @@ class HealingReporter {
         return suggestions.sort((a, b) => b.priority - a.priority);
     }
     
-    /**
-     * Export report to HTML format
-     */
     async exportToHTML(): Promise<string> {
         const healingData = await this.generateHealingReport();
         const html = this.generateHTMLReport(healingData);
@@ -152,14 +127,10 @@ class HealingReporter {
         return filePath;
     }
     
-    /**
-     * Export report to PDF format
-     */
     async exportToPDF(): Promise<string> {
         const html = await this.exportToHTML();
         const pdfPath = html.replace('.html', '.pdf');
         
-        // Use existing browser instead of launching new one
         const browserManager = BrowserManager.getInstance();
         const browser = await browserManager.getBrowser();
         const context = await browser.newContext();
@@ -185,14 +156,10 @@ class HealingReporter {
         }
     }
     
-    /**
-     * Get healing effectiveness metrics
-     */
     getHealingEffectiveness(): HealingEffectiveness {
         const stats = this.healingHistory.getStrategyStatistics();
         const trends = this.healingHistory.getHealingTrends(30);
         
-        // Calculate overall effectiveness
         let totalAttempts = 0;
         let totalSuccess = 0;
         let totalDuration = 0;
@@ -206,11 +173,9 @@ class HealingReporter {
         const overallSuccessRate = totalAttempts > 0 ? totalSuccess / totalAttempts : 0;
         const averageDuration = totalAttempts > 0 ? totalDuration / totalAttempts : 0;
         
-        // Calculate trend
         const recentTrends = trends.slice(-7);
         const trendDirection = this.calculateTrendDirection(recentTrends);
         
-        // Identify best and worst strategies
         const strategies = Array.from(stats.entries())
             .map(([name, stat]) => ({
                 name,
@@ -234,35 +199,27 @@ class HealingReporter {
         };
     }
     
-    // Private helper methods
     
     private async saveReportFiles(data: EnhancedHealingReport): Promise<void> {
         const timestamp = DateUtils.toTimestamp(new Date());
         
-        // Save JSON report
         const jsonPath = path.join(this.reportPath, `healing-report-${timestamp}.json`);
         await FileUtils.writeJSON(jsonPath, data);
         
-        // Save HTML report
         const htmlPath = path.join(this.reportPath, `healing-report-${timestamp}.html`);
         await FileUtils.writeFile(htmlPath, this.generateHTMLReport(data));
         
-        // Save visualization data
         const vizPath = path.join(this.reportPath, `healing-viz-${timestamp}.json`);
         await FileUtils.writeJSON(vizPath, data.visualizations);
     }
     
     private performDetailedAnalysis(data: EnhancedHealingReport): DetailedAnalysis {
-        // Time-based analysis
         const timeAnalysis = this.analyzeTimePatterns(data.trends || []);
         
-        // Strategy effectiveness analysis
         const strategyAnalysis = this.analyzeStrategyEffectiveness(data.strategyStatistics || []);
         
-        // Element stability analysis
         const stabilityAnalysis = this.analyzeElementStability(data.elementStatistics || []);
         
-        // Failure root cause analysis
         const failureAnalysis = this.analyzeFailureRootCauses(data.recentFailures || []);
         
         return {
@@ -278,13 +235,11 @@ class HealingReporter {
         const dayOfWeekStats = new Map<string, { attempts: number; success: number }>();
         const hourOfDayStats = new Map<number, { attempts: number; success: number }>();
         
-        // Aggregate by day of week and hour
         for (const trend of trends) {
             const date = new Date(trend.date);
             const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
             const hour = date.getHours();
             
-            // Day of week
             if (!dayOfWeekStats.has(dayOfWeek)) {
                 dayOfWeekStats.set(dayOfWeek, { attempts: 0, success: 0 });
             }
@@ -292,7 +247,6 @@ class HealingReporter {
             dowStats.attempts += trend.totalAttempts || 0;
             dowStats.success += trend.successfulAttempts || 0;
             
-            // Hour of day
             if (!hourOfDayStats.has(hour)) {
                 hourOfDayStats.set(hour, { attempts: 0, success: 0 });
             }
@@ -301,7 +255,6 @@ class HealingReporter {
             hodStats.success += trend.successfulAttempts || 0;
         }
         
-        // Find peak healing times
         const peakDay = Array.from(dayOfWeekStats.entries())
             .sort((a, b) => b[1].attempts - a[1].attempts)[0];
         
@@ -329,7 +282,6 @@ class HealingReporter {
         
         if (strategies.length === 0) return analysis;
         
-        // Sort by success rate
         const sorted = strategies.sort((a, b) => 
             (b.successRate || 0) - (a.successRate || 0)
         );
@@ -337,11 +289,9 @@ class HealingReporter {
         analysis.mostEffective = sorted[0].strategy;
         analysis.leastEffective = sorted[sorted.length - 1].strategy;
         
-        // Calculate average
         const totalRate = strategies.reduce((sum, s) => sum + (s.successRate || 0), 0);
         analysis.averageSuccessRate = totalRate / strategies.length;
         
-        // Categorize strategies
         for (const strategy of strategies) {
             const successRate = strategy.successRate || 0;
             const totalAttempts = strategy.totalAttempts || 0;
@@ -368,14 +318,12 @@ class HealingReporter {
         const unstableElements = elements.filter(e => (e.stability || 0) < 0.3).length;
         const moderateElements = elements.length - stableElements - unstableElements;
         
-        // Group by stability categories
         const stabilityGroups = {
             high: elements.filter(e => (e.stability || 0) > 0.7),
             medium: elements.filter(e => (e.stability || 0) >= 0.3 && (e.stability || 0) <= 0.7),
             low: elements.filter(e => (e.stability || 0) < 0.3)
         };
         
-        // Calculate average healing frequency
         const avgHealingFrequency = elements.reduce((sum, e) => 
             sum + ((e.totalHealingAttempts || 0) / Math.max(1, e.daysTracked || 1)), 0
         ) / Math.max(1, elements.length);
@@ -397,18 +345,15 @@ class HealingReporter {
         const errorPatterns = new Map<string, number>();
         
         for (const failure of failures) {
-            // Categorize by error message
             if (failure.errorMessage) {
                 const rootCause = this.categorizeError(failure.errorMessage);
                 rootCauses.set(rootCause, (rootCauses.get(rootCause) || 0) + 1);
                 
-                // Extract error patterns
                 const pattern = this.extractErrorPattern(failure.errorMessage);
                 errorPatterns.set(pattern, (errorPatterns.get(pattern) || 0) + 1);
             }
         }
         
-        // Sort by frequency
         const topCauses = Array.from(rootCauses.entries())
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
@@ -423,7 +368,6 @@ class HealingReporter {
             .slice(0, 5)
             .map(([pattern, count]) => ({ pattern, count }));
         
-        // Calculate average time to failure
         let totalTimeToFailure = 0;
         let failureCount = 0;
         
@@ -441,7 +385,7 @@ class HealingReporter {
         return {
             topRootCauses: topCauses,
             commonErrorPatterns: commonPatterns,
-            failureRate: failures.length > 0 ? failures.length / (failures.length + 100) : 0, // Assume 100 successful for rate
+            failureRate: failures.length > 0 ? failures.length / (failures.length + 100) : 0,
             averageTimeToFailure
         };
     }
@@ -1189,14 +1133,11 @@ class HealingReporter {
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <script>
-        // Chart.js configuration
         Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         Chart.defaults.color = '${this.theme.text}';
         
-        // Render charts
         const vizData = ${JSON.stringify(data.visualizations || {})};
         
-        // Success Rate Chart
         if (vizData.successRateChart && document.getElementById('successRateChart')) {
             new Chart(document.getElementById('successRateChart'), {
                 type: vizData.successRateChart.type,
@@ -1205,7 +1146,6 @@ class HealingReporter {
             });
         }
         
-        // Healing Trend Chart
         if (vizData.healingTrendChart && document.getElementById('healingTrendChart')) {
             new Chart(document.getElementById('healingTrendChart'), {
                 type: vizData.healingTrendChart.type,
@@ -1214,7 +1154,6 @@ class HealingReporter {
             });
         }
         
-        // Strategy Performance Chart
         if (vizData.strategyPerformanceChart && document.getElementById('strategyPerformanceChart')) {
             new Chart(document.getElementById('strategyPerformanceChart'), {
                 type: vizData.strategyPerformanceChart.type,
@@ -1223,7 +1162,6 @@ class HealingReporter {
             });
         }
         
-        // Element Stability Chart
         if (vizData.elementStabilityChart && document.getElementById('elementStabilityChart')) {
             new Chart(document.getElementById('elementStabilityChart'), {
                 type: vizData.elementStabilityChart.type,
@@ -1232,7 +1170,6 @@ class HealingReporter {
             });
         }
         
-        // Time Distribution Chart
         if (vizData.timeDistributionChart && document.getElementById('timeDistributionChart')) {
             new Chart(document.getElementById('timeDistributionChart'), {
                 type: vizData.timeDistributionChart.type,
@@ -1245,7 +1182,6 @@ class HealingReporter {
 </html>`;
     }
     
-    // Helper methods
     
     private identifyLocatorType(locator: string): string {
         if (locator.startsWith('#')) return 'id';
@@ -1330,7 +1266,6 @@ class HealingReporter {
     }
     
     private extractErrorPattern(errorMessage: string): string {
-        // Extract the core error pattern
         const patterns = [
             /timeout.*waiting for .*(selector|locator)/i,
             /element.*not found/i,
@@ -1347,14 +1282,12 @@ class HealingReporter {
             }
         }
         
-        // Return first 50 chars as pattern if no match
         return errorMessage.substring(0, 50) + '...';
     }
     
     private calculateTrendDirection(trends: any[]): 'improving' | 'degrading' | 'stable' {
         if (trends.length < 2) return 'stable';
         
-        // Calculate linear regression
         const n = trends.length;
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
         
@@ -1419,23 +1352,17 @@ class HealingReporter {
         const effectiveness = this.getHealingEffectiveness();
         const fragileElements = this.identifyFragileElements();
         
-        // Calculate health score (0-100)
         let score = 100;
         
-        // Deduct for low success rate
         score -= (1 - effectiveness.overallSuccessRate) * 30;
         
-        // Deduct for fragile elements
         score -= Math.min(fragileElements.length * 2, 20);
         
-        // Deduct for high healing load
         if (effectiveness.healingLoad > 50) score -= 10;
         if (effectiveness.healingLoad > 100) score -= 10;
         
-        // Deduct for degrading trend
         if (effectiveness.trendDirection === 'degrading') score -= 15;
         
-        // Ensure score is within bounds
         score = Math.max(0, Math.min(100, score));
         
         return {
@@ -1529,7 +1456,6 @@ class HealingReporter {
     }
 }
 
-// Type definitions
 interface LocatorSuggestion {
     elementId: string;
     currentLocator: string;

@@ -19,9 +19,6 @@ export class SummaryGenerator {
     this.theme = theme;
   }
 
-  /**
-   * Generate executive summary
-   */
   async generateSummary(data: ExecutionSummary): Promise<string> {
     SummaryGenerator.logger.info('Generating executive summary');
 
@@ -43,9 +40,6 @@ export class SummaryGenerator {
     `;
   }
 
-  /**
-   * Calculate summary statistics
-   */
   private calculateSummaryStats(data: ExecutionSummary): SummaryStats {
     const totalScenarios = data.scenarios.length;
     const passedScenarios = data.scenarios.filter((s: ScenarioSummary) => s.status === 'passed').length;
@@ -63,13 +57,11 @@ export class SummaryGenerator {
     const passRate = (passedScenarios / totalScenarios) * 100;
     const avgDuration = data.scenarios.reduce((sum: number, s: ScenarioSummary) => sum + s.duration, 0) / totalScenarios;
 
-    // Calculate improvement metrics
     const previousPassRate = data.previousRun?.passRate || passRate - 5;
     const previousAvgDuration = data.previousRun?.avgDuration || avgDuration * 1.1;
     const passRateImprovement = passRate - previousPassRate;
     const durationImprovement = ((previousAvgDuration - avgDuration) / previousAvgDuration) * 100;
 
-    // Risk assessment
     const criticalFailures = data.scenarios.filter((s: ScenarioSummary) => 
       s.status === 'failed' && s.tags?.includes('@critical')
     ).length;
@@ -101,13 +93,9 @@ export class SummaryGenerator {
     };
   }
 
-  /**
-   * Identify key highlights
-   */
   private identifyHighlights(data: ExecutionSummary): HighlightItem[] {
     const highlights: HighlightItem[] = [];
 
-    // Pass rate achievement
     const passRate = (data.scenarios.filter((s: ScenarioSummary) => s.status === 'passed').length / data.scenarios.length) * 100;
     if (passRate >= 95) {
       highlights.push({
@@ -118,7 +106,6 @@ export class SummaryGenerator {
       });
     }
 
-    // Performance improvement
     if (data.previousRun) {
       const currentAvg = data.scenarios.reduce((sum: number, s: ScenarioSummary) => sum + s.duration, 0) / data.scenarios.length;
       const previousAvg = data.previousRun.avgDuration;
@@ -147,7 +134,6 @@ export class SummaryGenerator {
       });
     }
 
-    // New failures
     const newFailures = this.identifyNewFailures(data);
     if (newFailures.length > 0) {
       highlights.push({
@@ -158,7 +144,6 @@ export class SummaryGenerator {
       });
     }
 
-    // Flaky tests
     const flakyTests = this.identifyFlakyTests(data);
     if (flakyTests.length > 5) {
       highlights.push({
@@ -169,7 +154,6 @@ export class SummaryGenerator {
       });
     }
 
-    // Parallel execution efficiency
     if (data.parallelWorkers > 1) {
       const efficiency = this.calculateParallelEfficiency(data);
       if (efficiency > 80) {
@@ -185,13 +169,9 @@ export class SummaryGenerator {
     return highlights;
   }
 
-  /**
-   * Generate recommendations
-   */
   private generateRecommendations(data: ExecutionSummary): RecommendationItem[] {
     const recommendations: RecommendationItem[] = [];
 
-    // Failed test recommendations
     const failedScenarios = data.scenarios.filter((s: ScenarioSummary) => s.status === 'failed');
     if (failedScenarios.length > 0) {
       const errorTypes = this.analyzeErrorTypes(failedScenarios);
@@ -221,8 +201,7 @@ export class SummaryGenerator {
       }
     }
 
-    // Performance recommendations
-    const slowScenarios = data.scenarios.filter((s: ScenarioSummary) => s.duration > 30000); // > 30 seconds
+    const slowScenarios = data.scenarios.filter((s: ScenarioSummary) => s.duration > 30000);
     if (slowScenarios.length > 10) {
       recommendations.push({
         priority: 'medium',
@@ -235,7 +214,6 @@ export class SummaryGenerator {
       });
     }
 
-    // Retry recommendations
     const retriedScenarios = data.scenarios.filter((s: ScenarioSummary) => (s.retryCount || 0) > 0);
     if (retriedScenarios.length > data.scenarios.length * 0.1) {
       recommendations.push({
@@ -249,7 +227,6 @@ export class SummaryGenerator {
       });
     }
 
-    // Parallel execution recommendations
     if (data.parallelWorkers === 1 && data.scenarios.length > 50) {
       recommendations.push({
         priority: 'low',
@@ -262,7 +239,6 @@ export class SummaryGenerator {
       });
     }
 
-    // Coverage recommendations
     const tagCoverage = this.analyzeTagCoverage(data);
     if ((tagCoverage['smoke'] || 0) < 10) {
       recommendations.push({
@@ -276,7 +252,6 @@ export class SummaryGenerator {
       });
     }
 
-    // Test organization recommendations
     const averageScenariosPerFeature = data.scenarios.length / data.features.length;
     if (averageScenariosPerFeature > 20) {
       recommendations.push({
@@ -296,9 +271,6 @@ export class SummaryGenerator {
     });
   }
 
-  /**
-   * Generate executive summary text
-   */
   private generateExecutiveSummary(data: ExecutionSummary, stats: SummaryStats): string {
     const passRateStatus = stats.passRate >= 95 ? 'excellent' : stats.passRate >= 80 ? 'good' : 'needs improvement';
     const trend = stats.passRateImprovement > 0 ? 'improving' : stats.passRateImprovement < 0 ? 'declining' : 'stable';
@@ -328,9 +300,6 @@ export class SummaryGenerator {
     return summary;
   }
 
-  /**
-   * Generate summary HTML
-   */
   private generateSummaryHTML(
     executiveSummary: string,
     stats: SummaryStats,
@@ -541,9 +510,6 @@ export class SummaryGenerator {
     `;
   }
 
-  /**
-   * Generate summary CSS
-   */
   private generateSummaryCSS(): string {
     const colors = this.theme.colors || {} as any;
     const primary = colors.primary || '#93186C';
@@ -565,7 +531,6 @@ export class SummaryGenerator {
         overflow: hidden;
       }
 
-      /* Header */
       .summary-header {
         background: linear-gradient(135deg, ${primary} 0%, ${primary}DD 100%);
         color: white;
@@ -632,7 +597,6 @@ export class SummaryGenerator {
         background: ${error}40;
       }
 
-      /* Executive Summary */
       .executive-summary {
         padding: 24px 32px;
         background: ${background.secondary};
@@ -646,7 +610,6 @@ export class SummaryGenerator {
         margin: 0;
       }
 
-      /* Key Metrics */
       .key-metrics {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -738,7 +701,6 @@ export class SummaryGenerator {
         margin-top: 4px;
       }
 
-      /* Distribution Chart */
       .distribution-section {
         padding: 0 32px 32px;
       }
@@ -843,7 +805,6 @@ export class SummaryGenerator {
         margin-left: 8px;
       }
 
-      /* Highlights */
       .highlights-section {
         padding: 0 32px 32px;
       }
@@ -949,7 +910,6 @@ export class SummaryGenerator {
         line-height: 1.5;
       }
 
-      /* Recommendations */
       .recommendations-section {
         background: ${background.secondary};
         padding: 32px;
@@ -1078,7 +1038,6 @@ export class SummaryGenerator {
         color: ${primary};
       }
 
-      /* Quick Stats */
       .quick-stats {
         padding: 32px;
         border-top: 1px solid ${border};
@@ -1122,7 +1081,6 @@ export class SummaryGenerator {
         color: ${error};
       }
 
-      /* Responsive */
       @media (max-width: 768px) {
         .summary-header {
           flex-direction: column;
@@ -1157,9 +1115,6 @@ export class SummaryGenerator {
     `;
   }
 
-  /**
-   * Generate summary JavaScript
-   */
   private generateSummaryJS(): string {
     const colors = this.theme.colors || {} as any;
     const success = colors.success || '#28A745';
@@ -1171,7 +1126,6 @@ export class SummaryGenerator {
         const summaryData = window.summaryData;
         const stats = summaryData.stats;
         
-        // Draw distribution chart
         function drawDistributionChart() {
           const canvas = document.getElementById('distributionCanvas');
           if (!canvas) return;
@@ -1195,13 +1149,11 @@ export class SummaryGenerator {
           const total = data.reduce((sum, item) => sum + item.value, 0);
           let currentAngle = -Math.PI / 2;
           
-          // Draw segments
           data.forEach((segment, index) => {
             if (segment.value === 0) return;
             
             const angle = (segment.value / total) * 2 * Math.PI;
             
-            // Draw segment
             ctx.beginPath();
             ctx.arc(centerX, centerY, outerRadius, currentAngle, currentAngle + angle);
             ctx.arc(centerX, centerY, innerRadius, currentAngle + angle, currentAngle, true);
@@ -1210,7 +1162,6 @@ export class SummaryGenerator {
             ctx.fillStyle = segment.color;
             ctx.fill();
             
-            // Add separator
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 2;
             ctx.stroke();
@@ -1218,7 +1169,6 @@ export class SummaryGenerator {
             currentAngle += angle;
           });
           
-          // Clear center
           ctx.globalCompositeOperation = 'destination-out';
           ctx.beginPath();
           ctx.arc(centerX, centerY, innerRadius - 2, 0, 2 * Math.PI);
@@ -1226,14 +1176,12 @@ export class SummaryGenerator {
           ctx.globalCompositeOperation = 'source-over';
         }
         
-        // Animate metrics on scroll
         function animateMetrics() {
           const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
               if (entry.isIntersecting) {
                 entry.target.classList.add('animated');
                 
-                // Animate numbers
                 const valueElement = entry.target.querySelector('.metric-value');
                 if (valueElement) {
                   const finalValue = valueElement.textContent;
@@ -1255,7 +1203,6 @@ export class SummaryGenerator {
           });
         }
         
-        // Animate number
         function animateNumber(element, start, end, duration, isPercentage) {
           const startTime = performance.now();
           
@@ -1274,37 +1221,30 @@ export class SummaryGenerator {
           requestAnimationFrame(update);
         }
         
-        // Easing function
         function easeOutCubic(t) {
           return 1 - Math.pow(1 - t, 3);
         }
         
-        // Highlight cards interaction
         function setupHighlightInteractions() {
           document.querySelectorAll('.highlight-card').forEach(card => {
             card.addEventListener('click', () => {
-              // Could expand to show more details
               card.classList.toggle('expanded');
             });
           });
         }
         
-        // Recommendation interactions
         function setupRecommendationInteractions() {
           document.querySelectorAll('.recommendation-item').forEach((item, index) => {
             item.addEventListener('click', () => {
-              // Track recommendation clicks
               console.log('Recommendation clicked:', summaryData.recommendations[index]);
             });
           });
         }
         
-        // Print functionality
         window.printSummary = function() {
           window.print();
         };
         
-        // Export summary data
         window.exportSummaryData = function() {
           const dataStr = JSON.stringify(summaryData, null, 2);
           const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -1316,13 +1256,11 @@ export class SummaryGenerator {
           URL.revokeObjectURL(url);
         };
         
-        // Initialize
         drawDistributionChart();
         animateMetrics();
         setupHighlightInteractions();
         setupRecommendationInteractions();
         
-        // Redraw on resize
         let resizeTimeout;
         window.addEventListener('resize', () => {
           clearTimeout(resizeTimeout);
@@ -1334,9 +1272,6 @@ export class SummaryGenerator {
     `;
   }
 
-  /**
-   * Helper methods
-   */
   private calculateRiskLevel(failed: number, critical: number, total: number): string {
     if (critical > 0) return 'high';
     if (failed / total > 0.2) return 'high';
@@ -1356,7 +1291,6 @@ export class SummaryGenerator {
   }
 
   private identifyNewFailures(data: ExecutionSummary): any[] {
-    // In a real implementation, this would compare with previous run data
     if (!data.previousRun) return [];
     
     return data.scenarios.filter((s: ScenarioSummary) => 
@@ -1366,7 +1300,6 @@ export class SummaryGenerator {
   }
 
   private identifyFlakyTests(data: ExecutionSummary): any[] {
-    // Identify tests that have inconsistent results
     const testResults = new Map<string, number>();
     
     data.scenarios.forEach((scenario: ScenarioSummary) => {

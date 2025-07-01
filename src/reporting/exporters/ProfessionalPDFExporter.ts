@@ -27,7 +27,6 @@ export class ProfessionalPDFExporter {
         
         try {
 
-            // Ensure output directory exists
             if (!options.outputPath) {
                 throw new Error('Output path is required for PDF export');
             }
@@ -41,15 +40,12 @@ export class ProfessionalPDFExporter {
             const { BrowserManager } = await import('../../core/browser/BrowserManager');
             const browserManager = BrowserManager.getInstance();
             
-            // Variables already declared above
             
             try {
-                // BROWSER FLASHING FIX: Always try to use existing browser first
                 this.browser = await browserManager.getBrowser();
                 this.logger.debug('Using existing browser for PDF generation - no new browser launch');
             } catch (error) {
                 this.logger.warn('No existing browser available for PDF generation, will skip PDF export to prevent browser flashing');
-                // BROWSER FLASHING FIX: Don't launch new browser, just skip PDF generation
                 return {
                     success: false,
                     error: 'PDF generation skipped - no existing browser available (prevents browser flashing)',
@@ -60,7 +56,6 @@ export class ProfessionalPDFExporter {
                 };
             }
 
-            // BROWSER FLASHING FIX: Only proceed if we have a valid existing browser
             if (!this.browser || !this.browser.isConnected()) {
                 this.logger.warn('Existing browser is not connected, skipping PDF generation to prevent browser flashing');
                 return {
@@ -73,28 +68,22 @@ export class ProfessionalPDFExporter {
                 };
             }
 
-            // Create a new context and page
             localContext = await this.browser.newContext({
                 viewport: { width: 1200, height: 800 }
             });
             localPage = await localContext.newPage();
 
-            // Set viewport for consistent rendering
             await localPage.setViewportSize({ width: 1200, height: 800 });
 
-            // Add PDF-specific CSS
             const pdfOptimizedHtml = this.addPDFStyles(htmlContent);
 
-            // Load the HTML content
             await localPage.setContent(pdfOptimizedHtml, { 
                 waitUntil: 'networkidle',
                 timeout: 30000 
             });
 
-            // Wait for charts to render
             await localPage.waitForTimeout(2000);
 
-            // Generate PDF
             await localPage.pdf({
                 path: options.outputPath,
                 format: 'A4',
@@ -112,7 +101,6 @@ export class ProfessionalPDFExporter {
             });
 
             // CRITICAL FIX: Don't close the shared browser instance!
-            // Clean up resources
             try {
                 if (localPage) {
                     await localPage.close();
@@ -121,7 +109,6 @@ export class ProfessionalPDFExporter {
                     await localContext.close();
                 }
                 if (needsCleanup && this.browser) {
-                    // Only close the browser if we launched it specifically for PDF generation
                     await this.browser.close();
                     this.logger.debug('Closed PDF generation browser');
                 }
@@ -151,7 +138,6 @@ export class ProfessionalPDFExporter {
         } catch (error) {
             this.logger.error('Professional PDF export failed', error as Error);
             
-            // Clean up resources before returning error
             try {
                 if (localPage) {
                     await localPage.close();
@@ -160,7 +146,6 @@ export class ProfessionalPDFExporter {
                     await localContext.close();
                 }
                 if (needsCleanup && this.browser) {
-                    // Only close the browser if we launched it specifically for PDF generation
                     await this.browser.close();
                     this.logger.debug('Closed PDF generation browser after error');
                 }
@@ -182,7 +167,6 @@ export class ProfessionalPDFExporter {
     private addPDFStyles(htmlContent: string): string {
         const pdfStyles = `
         <style media="print">
-            /* PDF-specific styles */
             @page {
                 size: A4;
                 margin: 20mm 15mm;
@@ -258,14 +242,12 @@ export class ProfessionalPDFExporter {
                 page-break-before: always;
             }
             
-            /* Hide interactive elements */
             .nav-tab,
             button,
             .btn {
                 display: none !important;
             }
             
-            /* Ensure text is readable */
             * {
                 color: #000 !important;
                 background: transparent !important;
@@ -310,7 +292,6 @@ export class ProfessionalPDFExporter {
             }
         </style>`;
 
-        // Insert PDF styles before closing head tag
         return htmlContent.replace('</head>', `${pdfStyles}\n</head>`);
     }
 
@@ -331,9 +312,8 @@ export class ProfessionalPDFExporter {
 
     private async getPDFPageCount(pdfPath: string): Promise<number> {
         try {
-            // Simple estimation based on file size (not accurate but gives an idea)
             const stats = fs.statSync(pdfPath);
-            const estimatedPages = Math.ceil(stats.size / 50000); // Rough estimate
+            const estimatedPages = Math.ceil(stats.size / 50000);
             return Math.max(1, estimatedPages);
         } catch {
             return 1;

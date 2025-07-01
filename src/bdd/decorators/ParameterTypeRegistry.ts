@@ -7,10 +7,6 @@ import {
 import { Logger } from '../../core/utils/Logger';
 import { ActionLogger } from '../../core/logging/ActionLogger';
 
-/**
- * Registry for custom parameter types used in step definitions
- * Provides type transformation and validation for step parameters
- */
 export class ParameterTypeRegistry {
   private static instance: ParameterTypeRegistry;
   private readonly parameterTypes: Map<string, ParameterTypeDefinition>;
@@ -26,9 +22,6 @@ export class ParameterTypeRegistry {
     this.registerBuiltInTypes();
   }
 
-  /**
-   * Get singleton instance
-   */
   public static getInstance(): ParameterTypeRegistry {
     if (!ParameterTypeRegistry.instance) {
       ParameterTypeRegistry.instance = new ParameterTypeRegistry();
@@ -36,11 +29,7 @@ export class ParameterTypeRegistry {
     return ParameterTypeRegistry.instance;
   }
 
-  /**
-   * Register built-in parameter types
-   */
   private registerBuiltInTypes(): void {
-    // String type
     this.registerBuiltIn('string', {
       name: 'string',
       regexp: /"([^"]*)"|'([^']*)'/,
@@ -49,7 +38,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: true
     });
 
-    // Integer type
     this.registerBuiltIn('int', {
       name: 'int',
       regexp: /(-?\d+)/,
@@ -64,7 +52,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: true
     });
 
-    // Float type
     this.registerBuiltIn('float', {
       name: 'float',
       regexp: /(-?\d*\.?\d+)/,
@@ -79,7 +66,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: true
     });
 
-    // Word type
     this.registerBuiltIn('word', {
       name: 'word',
       regexp: /(\w+)/,
@@ -88,7 +74,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: false
     });
 
-    // Any type
     this.registerBuiltIn('any', {
       name: 'any',
       regexp: /(.*)/,
@@ -97,7 +82,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: false
     });
 
-    // Boolean type
     this.registerBuiltIn('boolean', {
       name: 'boolean',
       regexp: /(true|false|yes|no|on|off)/i,
@@ -108,7 +92,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: true
     });
 
-    // Date type
     this.registerBuiltIn('date', {
       name: 'date',
       regexp: /(\d{4}-\d{2}-\d{2})/,
@@ -123,19 +106,16 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: true
     });
 
-    // Time type
     this.registerBuiltIn('time', {
       name: 'time',
       regexp: /(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)/i,
       transformer: (s: string) => {
-        // Simple time parsing - can be enhanced
         return s;
       },
       useForSnippets: true,
       preferForRegexpMatch: true
     });
 
-    // List type
     this.registerBuiltIn('list', {
       name: 'list',
       regexp: /([^,]+(?:,\s*[^,]+)*)/,
@@ -146,7 +126,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: false
     });
 
-    // JSON type
     this.registerBuiltIn('json', {
       name: 'json',
       regexp: /(\{.*\}|\[.*\])/,
@@ -162,17 +141,11 @@ export class ParameterTypeRegistry {
     });
   }
 
-  /**
-   * Register built-in type
-   */
   private registerBuiltIn(name: string, definition: ParameterTypeDefinition): void {
     this.builtInTypes.set(name, definition);
     this.parameterTypes.set(name, definition);
   }
 
-  /**
-   * Define a custom parameter type
-   */
   public defineParameterType(options: ParameterTypeOptions): void {
     if (!options.name) {
       throw new Error('Parameter type name is required');
@@ -190,7 +163,6 @@ export class ParameterTypeRegistry {
       preferForRegexpMatch: options.preferForRegexpMatch ?? true
     };
     
-    // Only add type property if it's defined
     if (options.type !== undefined) {
       definition.type = options.type;
     }
@@ -201,20 +173,13 @@ export class ParameterTypeRegistry {
     this.logger.debug(`Registered parameter type: ${options.name}`);
   }
 
-  /**
-   * Get parameter type definition
-   */
   public getParameterType(name: string): ParameterTypeDefinition | undefined {
     return this.parameterTypes.get(name);
   }
 
-  /**
-   * Transform value using parameter type
-   */
   public transform(value: string, typeName: string): any {
     const cacheKey = `${typeName}:${value}`;
     
-    // Check cache
     if (this.transformCache.has(cacheKey)) {
       return this.transformCache.get(cacheKey);
     }
@@ -227,7 +192,6 @@ export class ParameterTypeRegistry {
     try {
       const transformed = parameterType.transformer(value);
       
-      // Cache successful transformation
       this.transformCache.set(cacheKey, transformed);
       
       return transformed;
@@ -238,9 +202,6 @@ export class ParameterTypeRegistry {
     }
   }
 
-  /**
-   * Transform multiple values
-   */
   public transformAll(values: string[], types: string[]): any[] {
     if (values.length !== types.length) {
       throw new Error(
@@ -257,11 +218,7 @@ export class ParameterTypeRegistry {
     });
   }
 
-  /**
-   * Detect parameter type from value
-   */
   public detectType(value: string): string | null {
-    // Check each parameter type
     const entries = Array.from(this.parameterTypes.entries());
     for (const [name, definition] of entries) {
       if (definition.preferForRegexpMatch && definition.regexp.test(value)) {
@@ -269,27 +226,17 @@ export class ParameterTypeRegistry {
       }
     }
 
-    // Default to string if no match
     return 'string';
   }
 
-  /**
-   * Get all parameter types
-   */
   public getAllParameterTypes(): ParameterTypeDefinition[] {
     return Array.from(this.parameterTypes.values());
   }
 
-  /**
-   * Get parameter types for snippets
-   */
   public getSnippetParameterTypes(): ParameterTypeDefinition[] {
     return this.getAllParameterTypes().filter(pt => pt.useForSnippets);
   }
 
-  /**
-   * Generate type pattern for step definition
-   */
   public generateTypePattern(typeName: string): string {
     const parameterType = this.parameterTypes.get(typeName);
     if (!parameterType) {
@@ -299,9 +246,6 @@ export class ParameterTypeRegistry {
     return `{${typeName}}`;
   }
 
-  /**
-   * Create regexp for parameter type in context
-   */
   public createRegexpForType(typeName: string): RegExp {
     const parameterType = this.parameterTypes.get(typeName);
     if (!parameterType) {
@@ -311,22 +255,15 @@ export class ParameterTypeRegistry {
     return parameterType.regexp;
   }
 
-  /**
-   * Clear cache
-   */
   public clearCache(): void {
     this.transformCache.clear();
     this.logger.debug('Transform cache cleared');
   }
 
-  /**
-   * Reset to built-in types only
-   */
   public reset(): void {
     this.parameterTypes.clear();
     this.transformCache.clear();
     
-    // Re-register built-in types
     const builtInEntries = Array.from(this.builtInTypes.entries());
     for (const [name, definition] of builtInEntries) {
       this.parameterTypes.set(name, definition);
@@ -335,16 +272,12 @@ export class ParameterTypeRegistry {
     this.logger.info('ParameterTypeRegistry reset to built-in types');
   }
 
-  /**
-   * Normalize regexp
-   */
   private normalizeRegexp(regexp: RegExp | string | string[]): RegExp {
     if (regexp instanceof RegExp) {
       return regexp;
     }
 
     if (Array.isArray(regexp)) {
-      // Create alternation
       const pattern = regexp.map(r => `(?:${r})`).join('|');
       return new RegExp(pattern);
     }
@@ -352,9 +285,6 @@ export class ParameterTypeRegistry {
     return new RegExp(regexp);
   }
 
-  /**
-   * Export registry for debugging
-   */
   public export(): any {
     return {
       builtInTypes: Array.from(this.builtInTypes.keys()),
@@ -371,5 +301,4 @@ export class ParameterTypeRegistry {
   }
 }
 
-// Export singleton instance
 export const parameterTypeRegistry = ParameterTypeRegistry.getInstance();

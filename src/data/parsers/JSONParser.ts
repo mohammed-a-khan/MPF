@@ -6,10 +6,6 @@ import { ActionLogger } from '../../core/logging/ActionLogger';
 import { TypeConverter } from '../transformers/TypeConverter';
 const jsonpath = require('jsonpath');
 
-/**
- * Parser for JSON files
- * Supports JSONPath queries for data extraction
- */
 export class JSONParser {
     private typeConverter: TypeConverter;
     
@@ -17,9 +13,6 @@ export class JSONParser {
         this.typeConverter = new TypeConverter();
     }
 
-    /**
-     * Parse JSON content
-     */
     async parse(content: string, options: ParserOptions = {}): Promise<{
         data: any;
         metadata?: Record<string, any>;
@@ -27,7 +20,6 @@ export class JSONParser {
         const startTime = Date.now();
         
         try {
-            // Validate JSON
             let parsed: any;
             try {
                 parsed = JSON.parse(content);
@@ -35,7 +27,6 @@ export class JSONParser {
                 throw new Error(`Invalid JSON: ${error.message} at position ${this.findErrorPosition(content, error)}`);
             }
             
-            // Apply JSONPath if specified
             let data = parsed;
             if (options.jsonPath) {
                 try {
@@ -49,9 +40,7 @@ export class JSONParser {
                         console.log(`🔍 DEBUG JSONParser: First result:`, JSON.stringify(data[0], null, 2));
                     }
                     
-                    // JSONPath returns array, unwrap if single result expected
                     if (options.jsonPath.startsWith('$..')) {
-                        // Keep as array for recursive descent
                     } else if (data.length === 1 && !options.jsonPath.includes('[*]') && !options.jsonPath.includes('.*')) {
                         data = data[0];
                     }
@@ -60,7 +49,6 @@ export class JSONParser {
                 }
             }
             
-            // Apply type conversion if requested
             const parseOptions = options as any;
             if (parseOptions.parseNumbers || parseOptions.parseDates) {
                 data = await this.convertTypes(data, options);
@@ -92,9 +80,6 @@ export class JSONParser {
         }
     }
 
-    /**
-     * Parse streaming JSON (line-delimited JSON)
-     */
     async *parseStream(lines: AsyncIterable<string>, options: ParserOptions = {}): AsyncIterableIterator<any> {
         let lineNumber = 0;
         
@@ -106,18 +91,16 @@ export class JSONParser {
             try {
                 const parsed = JSON.parse(line);
                 
-                // Apply JSONPath if specified
                 let data = parsed;
                 if (options.jsonPath) {
                     const results = jsonpath.query(parsed, options.jsonPath);
                     if (results.length > 0) {
                         data = results[0];
                     } else {
-                        continue; // Skip if JSONPath doesn't match
+                        continue;
                     }
                 }
                 
-                // Apply type conversion
                 const convertOptions = options as any;
                 if (convertOptions.parseNumbers || convertOptions.parseDates) {
                     data = await this.convertTypes(data, options);
@@ -137,16 +120,12 @@ export class JSONParser {
         }
     }
 
-    /**
-     * Infer schema from JSON data
-     */
     async inferSchema(data: any, options: {
         sampleSize?: number;
         detectTypes?: boolean;
         detectRequired?: boolean;
         detectUnique?: boolean;
     } = {}): Promise<DataSchema> {
-        // Ensure we have an array of objects
         let records: any[];
         if (Array.isArray(data)) {
             records = data;
@@ -156,27 +135,19 @@ export class JSONParser {
             throw new Error('Data must be an object or array of objects');
         }
         
-        // Sample data
         const sample = records.slice(0, options.sampleSize || Math.min(100, records.length));
         
-        // Analyze structure
         const fieldAnalysis = this.analyzeStructure(sample, options);
         
-        // Convert to schema
         return this.buildSchema(fieldAnalysis);
     }
 
-    /**
-     * Validate JSON against schema
-     */
     async validateSchema(data: any, schema: any): Promise<{
         valid: boolean;
         errors: string[];
     }> {
         const errors: string[] = [];
         
-        // Simple validation implementation
-        // For production, consider using ajv or similar
         
         const validate = (obj: any, schemaObj: any, path: string = '') => {
             if (schemaObj.type) {
@@ -214,9 +185,6 @@ export class JSONParser {
         };
     }
 
-    /**
-     * Convert JSON to different formats
-     */
     toFormat(data: any, format: 'csv' | 'xml' | 'yaml'): string {
         switch (format) {
             case 'csv':
@@ -230,14 +198,10 @@ export class JSONParser {
         }
     }
 
-    /**
-     * Convert to CSV
-     */
     private toCSV(data: any): string {
         const records = Array.isArray(data) ? data : [data];
         if (records.length === 0) return '';
         
-        // Get all unique keys
         const keys = new Set<string>();
         records.forEach(record => {
             if (typeof record === 'object' && record !== null) {
@@ -248,10 +212,8 @@ export class JSONParser {
         const headers = Array.from(keys);
         const rows: string[] = [];
         
-        // Add headers
         rows.push(headers.map(h => this.escapeCSV(h)).join(','));
         
-        // Add data rows
         for (const record of records) {
             const values = headers.map(header => {
                 const value = record[header];
@@ -263,9 +225,6 @@ export class JSONParser {
         return rows.join('\n');
     }
 
-    /**
-     * Convert to XML
-     */
     private toXML(data: any, rootName: string = 'root', indent: string = ''): string {
         const nextIndent = indent + '  ';
         
@@ -289,9 +248,6 @@ export class JSONParser {
         }
     }
 
-    /**
-     * Convert to YAML
-     */
     private toYAML(data: any, indent: number = 0): string {
         const spaces = '  '.repeat(indent);
         
@@ -300,7 +256,6 @@ export class JSONParser {
         } else if (typeof data === 'boolean' || typeof data === 'number') {
             return String(data);
         } else if (typeof data === 'string') {
-            // Quote if contains special characters
             if (data.includes(':') || data.includes('#') || data.includes('\n')) {
                 return `"${data.replace(/"/g, '\\"')}"`;
             }
@@ -333,9 +288,6 @@ export class JSONParser {
         }
     }
 
-    /**
-     * Analyze structure for schema inference
-     */
     private analyzeStructure(records: any[], _options: any): Map<string, any> {
         const fieldAnalysis = new Map<string, any>();
         
@@ -365,12 +317,10 @@ export class JSONParser {
                 analysis.array = true;
                 analysis.types.add('array');
                 
-                // Analyze array items
                 value.forEach(item => {
                     if (item !== null && item !== undefined) {
                         analysis.arrayTypes.add(typeof item);
                         if (typeof item === 'object' && !Array.isArray(item)) {
-                            // Analyze nested structure
                             analyzeObject(item, [...path, '[]']);
                         }
                     }
@@ -379,7 +329,6 @@ export class JSONParser {
                 analysis.types.add('object');
                 analysis.nested = true;
                 
-                // Analyze nested object
                 analyzeObject(value, path);
             } else {
                 analysis.types.add(typeof value);
@@ -388,7 +337,6 @@ export class JSONParser {
                     analysis.values.add(value);
                 }
                 
-                // Detect formats
                 if (typeof value === 'string') {
                     const format = this.detectStringFormat(value);
                     if (format) {
@@ -404,7 +352,6 @@ export class JSONParser {
             }
         };
         
-        // Analyze all records
         for (const record of records) {
             if (typeof record === 'object' && record !== null && !Array.isArray(record)) {
                 analyzeObject(record, []);
@@ -416,19 +363,14 @@ export class JSONParser {
         return fieldAnalysis;
     }
 
-    /**
-     * Build schema from analysis
-     */
     private buildSchema(fieldAnalysis: Map<string, any>): DataSchema {
         const fields: any[] = [];
         const processedPaths = new Set<string>();
         
-        // Sort by path depth to process parents before children
         const sortedEntries = Array.from(fieldAnalysis.entries())
             .sort(([a], [b]) => a.split('.').length - b.split('.').length);
         
         for (const [key, analysis] of sortedEntries) {
-            // Skip if this is a child of an already processed object
             const pathParts = key.split('.');
             let isChild = false;
             for (let i = 1; i < pathParts.length; i++) {
@@ -451,7 +393,6 @@ export class JSONParser {
                 nullable: analysis.nullCount > 0
             };
             
-            // Handle arrays
             if (analysis.array) {
                 field.type = 'array';
                 if (analysis.arrayTypes.size === 1) {
@@ -465,12 +406,10 @@ export class JSONParser {
                 }
             }
             
-            // Handle nested objects
             if (analysis.nested) {
                 field.type = 'object';
                 field.properties = {};
                 
-                // Find child properties
                 for (const [childKey, childAnalysis] of fieldAnalysis.entries()) {
                     if (childKey.startsWith(key + '.') && !childKey.includes('[]')) {
                         const childName = childKey.substring(key.length + 1);
@@ -484,12 +423,10 @@ export class JSONParser {
                 }
             }
             
-            // Add format if consistent
             if (analysis.formats.size === 1) {
                 field.format = Array.from(analysis.formats)[0];
             }
             
-            // Add enum for limited values
             if (analysis.values.size <= 10 && analysis.values.size > 1) {
                 field.enum = Array.from(analysis.values);
             }
@@ -504,9 +441,6 @@ export class JSONParser {
         };
     }
 
-    /**
-     * Convert types recursively
-     */
     private async convertTypes(data: any, options: ParserOptions): Promise<any> {
         if (data === null || data === undefined) {
             return data;
@@ -529,31 +463,23 @@ export class JSONParser {
         }
     }
 
-    /**
-     * Detect string format
-     */
     private detectStringFormat(value: string): string | null {
-        // ISO Date
         if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/.test(value)) {
             return 'date-time';
         }
         
-        // Email
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
             return 'email';
         }
         
-        // URL
         if (/^https?:\/\/[^\s]+$/.test(value)) {
             return 'uri';
         }
         
-        // UUID
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
             return 'uuid';
         }
         
-        // IPv4
         if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(value)) {
             return 'ipv4';
         }
@@ -561,29 +487,20 @@ export class JSONParser {
         return null;
     }
 
-    /**
-     * Consolidate multiple types
-     */
     private consolidateTypes(types: string[]): string {
         if (types.length === 0) return 'any';
         if (types.length === 1) return types[0] || 'any';
         
-        // Remove null/undefined
         const definedTypes = types.filter(t => t !== 'null' && t !== 'undefined');
         if (definedTypes.length === 0) return 'any';
         if (definedTypes.length === 1) return definedTypes[0] || 'any';
         
-        // If includes object or array, use that
         if (definedTypes.includes('object')) return 'object';
         if (definedTypes.includes('array')) return 'array';
         
-        // Mixed primitive types
         return 'any';
     }
 
-    /**
-     * Escape CSV value
-     */
     private escapeCSV(value: any): string {
         if (value === null || value === undefined) return '';
         
@@ -595,9 +512,6 @@ export class JSONParser {
         return str;
     }
 
-    /**
-     * Escape XML value
-     */
     private escapeXML(value: string): string {
         return value
             .replace(/&/g, '&amp;')
@@ -607,15 +521,11 @@ export class JSONParser {
             .replace(/'/g, '&apos;');
     }
 
-    /**
-     * Find error position in JSON
-     */
     private findErrorPosition(_content: string, error: any): string {
         if (error.message && error.message.includes('position')) {
             return error.message;
         }
         
-        // Try to extract line and column from error
         const match = error.message.match(/line (\d+) column (\d+)/);
         if (match) {
             return `line ${match[1]}, column ${match[2]}`;
@@ -624,9 +534,6 @@ export class JSONParser {
         return 'unknown position';
     }
 
-    /**
-     * Enhance error with context
-     */
     private enhanceError(error: any, operation: string): Error {
         const message = error instanceof Error ? error.message : String(error);
         const enhancedError = new Error(

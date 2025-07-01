@@ -29,28 +29,18 @@ export class NetworkInterceptor {
     this.page = page;
   }
   
-  /**
-   * Get singleton instance
-   */
   static getInstance(): NetworkInterceptor {
     // Note: NetworkInterceptor is page-specific, so this pattern needs adjustment
-    // For now, we'll return a placeholder that can be overridden
     if (!NetworkInterceptor.instance) {
       throw new Error('NetworkInterceptor requires page context. Use new NetworkInterceptor(page) instead.');
     }
     return NetworkInterceptor.instance;
   }
   
-  /**
-   * Set singleton instance (for page-specific instance)
-   */
   static setInstance(instance: NetworkInterceptor): void {
     NetworkInterceptor.instance = instance;
   }
 
-  /**
-   * Intercept requests matching pattern
-   */
   async interceptRequest(
     pattern: URLPattern,
     handler: RequestHandler
@@ -66,13 +56,11 @@ export class NetworkInterceptor {
       const routeHandler = async (route: Route, request: Request) => {
         const url = request.url();
         
-        // Check if matches pattern
         if (!this.matchesPattern(url, request, pattern)) {
           await route.continue();
           return;
         }
 
-        // Log interception
         ActionLogger.logInfo('interceptRequest.matched', {
           url,
           method: request.method(),
@@ -80,10 +68,8 @@ export class NetworkInterceptor {
         });
 
         try {
-          // Execute handler
           await handler(route, request);
           
-          // Track request
           this.trackRequest(patternKey, request);
         } catch (error) {
           ActionLogger.logError('NetworkInterceptor.interceptRequest.handler', error as Error);
@@ -91,10 +77,8 @@ export class NetworkInterceptor {
         }
       };
 
-      // Register route
       await this.page.route('**/*', routeHandler);
       
-      // Store rule
       this.interceptRules.set(patternKey, {
         pattern,
         type: 'request',
@@ -115,9 +99,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Intercept responses matching pattern
-   */
   async interceptResponse(
     pattern: URLPattern,
     handler: ResponseHandler
@@ -145,13 +126,10 @@ export class NetworkInterceptor {
         });
 
         try {
-          // Fetch the actual response first
           const response = await route.fetch();
           
-          // Track response
           this.trackResponse(patternKey, response);
           
-          // Execute handler with response
           await handler(route, response);
         } catch (error) {
           ActionLogger.logError('NetworkInterceptor.interceptResponse.handler', error as Error);
@@ -180,9 +158,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Mock response for matching requests
-   */
   async mockResponse(
     pattern: URLPattern,
     response: MockResponse
@@ -198,12 +173,10 @@ export class NetworkInterceptor {
       await this.interceptRequest(pattern, async (route, request) => {
         const mockDelay = response.delay || 0;
         
-        // Apply delay if specified
         if (mockDelay > 0) {
           await new Promise(resolve => setTimeout(resolve, mockDelay));
         }
 
-        // Build response
         const fulfillOptions: any = {
           status: response.status || 200,
           headers: {
@@ -212,7 +185,6 @@ export class NetworkInterceptor {
           }
         };
 
-        // Set body based on type
         if (response.json !== undefined) {
           fulfillOptions.body = JSON.stringify(response.json);
         } else if (response.text !== undefined) {
@@ -221,7 +193,6 @@ export class NetworkInterceptor {
           fulfillOptions.body = response.body;
         }
 
-        // Add path if specified (file response)
         if (response.path) {
           fulfillOptions.path = response.path;
         }
@@ -244,9 +215,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Abort requests matching pattern
-   */
   async abortRequests(
     pattern: URLPattern,
     errorCode: string = 'failed'
@@ -280,9 +248,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Delay requests matching pattern
-   */
   async delayRequests(
     pattern: URLPattern,
     delay: number
@@ -315,9 +280,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Throttle network speed
-   */
   async throttleRequests(
     pattern: URLPattern,
     bandwidth: number
@@ -330,8 +292,7 @@ export class NetworkInterceptor {
         bandwidth
       });
 
-      // Calculate delays based on bandwidth
-      const bytesPerMs = bandwidth / 8000; // Convert from kbps to bytes/ms
+      const bytesPerMs = bandwidth / 8000;
 
       await this.interceptResponse(pattern, async (route, response) => {
         const body = await response.body();
@@ -345,7 +306,6 @@ export class NetworkInterceptor {
           bandwidth
         });
 
-        // Simulate download time
         await new Promise(resolve => setTimeout(resolve, delay));
 
         await route.fulfill({
@@ -371,9 +331,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Record requests matching pattern
-   */
   async recordRequests(pattern: URLPattern): Promise<void> {
     const patternKey = this.createPatternKey(pattern);
     
@@ -403,9 +360,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Modify request before sending
-   */
   async modifyRequest(
     pattern: URLPattern,
     modifications: RequestModification
@@ -421,19 +375,16 @@ export class NetworkInterceptor {
       await this.interceptRequest(pattern, async (route, request) => {
         const options: any = {};
 
-        // Apply URL modification
         if (modifications.url) {
           options.url = typeof modifications.url === 'function' 
             ? modifications.url(request.url()) 
             : modifications.url;
         }
 
-        // Apply method modification
         if (modifications.method) {
           options.method = modifications.method;
         }
 
-        // Apply header modifications
         if (modifications.headers) {
           const currentHeaders = request.headers();
           options.headers = typeof modifications.headers === 'function'
@@ -441,7 +392,6 @@ export class NetworkInterceptor {
             : { ...currentHeaders, ...modifications.headers };
         }
 
-        // Apply post data modification
         if (modifications.postData) {
           const currentData = request.postData();
           options.postData = typeof modifications.postData === 'function'
@@ -466,12 +416,8 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Get recorded requests
-   */
   getRecordedRequests(pattern?: string): Request[] {
     if (!pattern) {
-      // Return all recorded requests
       const allRequests: Request[] = [];
       this.recordedRequests.forEach(requests => {
         allRequests.push(...requests);
@@ -482,9 +428,6 @@ export class NetworkInterceptor {
     return this.recordedRequests.get(pattern) || [];
   }
 
-  /**
-   * Get recorded responses
-   */
   getRecordedResponses(pattern?: string): APIResponse[] {
     if (!pattern) {
       const allResponses: APIResponse[] = [];
@@ -497,26 +440,18 @@ export class NetworkInterceptor {
     return this.recordedResponses.get(pattern) || [];
   }
 
-  /**
-   * Get request count for pattern
-   */
   getRequestCount(pattern: string): number {
     return this.requestCounter.get(pattern) || 0;
   }
 
-  /**
-   * Clear all interceptors
-   */
   async clearInterceptors(): Promise<void> {
     try {
       ActionLogger.logInfo('clearInterceptors', {
         count: this.interceptRules.size
       });
 
-      // Unroute all patterns
       await this.page.unroute('**/*');
 
-      // Clear all data
       this.interceptRules.clear();
       this.recordedRequests.clear();
       this.recordedResponses.clear();
@@ -533,14 +468,10 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Enable offline mode
-   */
   async enableOfflineMode(): Promise<void> {
     try {
       ActionLogger.logInfo('enableOfflineMode');
 
-      // Set context to offline
       await this.page.context().setOffline(true);
       
       this.isOfflineMode = true;
@@ -552,9 +483,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Disable offline mode
-   */
   async disableOfflineMode(): Promise<void> {
     try {
       ActionLogger.logInfo('disableOfflineMode');
@@ -570,9 +498,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Simulate network error
-   */
   async simulateNetworkError(
     pattern: URLPattern,
     error: NetworkError
@@ -591,7 +516,6 @@ export class NetworkInterceptor {
           error: error.type
         });
 
-        // Map error types to Playwright error codes
         const errorCodeMap: Record<string, string> = {
           'abort': 'aborted',
           'timeout': 'timedout',
@@ -614,9 +538,6 @@ export class NetworkInterceptor {
     }
   }
 
-  /**
-   * Get network statistics
-   */
   getNetworkStats(): Record<string, any> {
     const totalRequests = Array.from(this.requestCounter.values())
       .reduce((sum, count) => sum + count, 0);
@@ -640,7 +561,6 @@ export class NetworkInterceptor {
     };
   }
 
-  // Private helper methods
 
   private createPatternKey(pattern: URLPattern): string {
     if (typeof pattern.url === 'string') {
@@ -657,7 +577,6 @@ export class NetworkInterceptor {
     request: Request,
     pattern: URLPattern
   ): boolean {
-    // Check URL match
     if (pattern.url) {
       if (typeof pattern.url === 'string') {
         if (!url.includes(pattern.url)) return false;
@@ -666,13 +585,11 @@ export class NetworkInterceptor {
       }
     }
 
-    // Check method match
     if (pattern.method) {
       const methods = Array.isArray(pattern.method) ? pattern.method : [pattern.method];
       if (!methods.includes(request.method())) return false;
     }
 
-    // Check resource type match
     if (pattern.resourceType) {
       const resourceType = request.resourceType() as ResourceType;
       if (!pattern.resourceType.includes(resourceType)) return false;
@@ -682,19 +599,16 @@ export class NetworkInterceptor {
   }
 
   private trackRequest(pattern: string, request: Request): void {
-    // Track in recorded requests
     if (!this.recordedRequests.has(pattern)) {
       this.recordedRequests.set(pattern, []);
     }
     this.recordedRequests.get(pattern)!.push(request);
 
-    // Update counter
     this.requestCounter.set(
       pattern,
       (this.requestCounter.get(pattern) || 0) + 1
     );
 
-    // Limit stored requests
     const requests = this.recordedRequests.get(pattern)!;
     if (requests.length > 100) {
       requests.shift();
@@ -707,21 +621,16 @@ export class NetworkInterceptor {
     }
     this.recordedResponses.get(pattern)!.push(response);
 
-    // Limit stored responses
     const responses = this.recordedResponses.get(pattern)!;
     if (responses.length > 100) {
       responses.shift();
     }
   }
   
-  /**
-   * REAL IMPLEMENTATION: Clear request history to limit memory usage
-   */
   clearRequestHistory(maxToKeep: number = 1000): void {
     let totalRequestsCleared = 0;
     let totalResponsesCleared = 0;
     
-    // Clear excess requests
     for (const [pattern, requests] of this.recordedRequests.entries()) {
       if (requests.length > maxToKeep) {
         const toRemove = requests.length - maxToKeep;
@@ -731,7 +640,6 @@ export class NetworkInterceptor {
       }
     }
     
-    // Clear excess responses
     for (const [pattern, responses] of this.recordedResponses.entries()) {
       if (responses.length > maxToKeep) {
         const toRemove = responses.length - maxToKeep;
@@ -749,9 +657,6 @@ export class NetworkInterceptor {
     });
   }
   
-  /**
-   * REAL IMPLEMENTATION: Complete cache cleanup for memory management
-   */
   clearCache(): void {
     const interceptCount = this.interceptRules.size;
     const requestCount = Array.from(this.recordedRequests.values()).reduce((sum, reqs) => sum + reqs.length, 0);

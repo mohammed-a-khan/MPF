@@ -18,7 +18,6 @@ export interface RequestOptions {
   keepAlive?: boolean;
   socketTimeout?: number;
   signal?: AbortSignal;
-  // Additional properties for compatibility
   query?: Record<string, any>;
   form?: Record<string, any>;
   json?: any;
@@ -327,7 +326,6 @@ export interface SSEOptions {
   withCredentials?: boolean;
 }
 
-// Missing type definitions for API Context
 export interface APIContextData {
   variables?: Record<string, any>;
   requests?: Record<string, Response>;
@@ -370,7 +368,6 @@ export interface APIResponse extends Response {
   validation?: ValidationResult;
 }
 
-// Missing type definitions for Chain Context
 export interface ChainStep {
   id?: string;
   name: string;
@@ -381,7 +378,6 @@ export interface ChainStep {
   retryOnFailure?: boolean;
   continueOnFailure?: boolean;
   dependencies?: string[];
-  // Additional properties for request steps
   request?: Partial<RequestOptions>;
   responseAlias?: string;
   extractors?: Array<{
@@ -393,16 +389,12 @@ export interface ChainStep {
     expected: any;
     message?: string;
   }> | undefined;
-  // Properties for transformation steps
   transformer?: ((data: any, variables: Map<string, any>) => any) | undefined;
   resultVariable?: string | undefined;
-  // Properties for delay steps
   delay?: number | undefined;
-  // Properties for conditional steps
   condition?: ((variables: Map<string, any>) => boolean) | undefined;
   thenSteps?: ChainStep[] | undefined;
   elseSteps?: ChainStep[] | undefined;
-  // Properties for loop steps
   items?: (any[] | ((variables: Map<string, any>) => any[])) | undefined;
   loopSteps?: ChainStep[] | undefined;
   itemVariable?: string | undefined;
@@ -419,7 +411,6 @@ export interface ChainResult {
   retryCount?: number;
 }
 
-// Missing type definitions for Template System
 export interface TemplateContext {
   [key: string]: any;
 }
@@ -453,7 +444,6 @@ export interface TemplateFunction {
   (args: any[], context: TemplateContext): Promise<any>;
 }
 
-// Missing type definitions for Cache
 export interface CacheEntry {
   key: string;
   value: string;
@@ -482,7 +472,6 @@ export interface CacheOptions {
   cleanupInterval?: number;
 }
 
-// Missing type definitions for XML Validation
 export interface XMLValidationOptions {
   namespaces?: Record<string, string>;
   expectMultiple?: boolean;
@@ -525,7 +514,6 @@ export interface JSONPathOptions {
   arrayExact?: boolean;
 }
 
-// Missing type definitions for Schema Validation
 export interface SchemaValidationError {
   path: string;
   message: string;

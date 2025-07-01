@@ -4,15 +4,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { ExecutionOptions, CLIArgument, CLIFlag, ParsedArguments, ValidationError } from './ExecutionOptions';
 
-/**
- * Production-ready command line parser with full argument validation,
- * help generation, config file support, and error handling
- */
 export class CommandLineParser {
   private static readonly VERSION = '1.0.0';
   private static readonly FRAMEWORK_NAME = 'CS Test Automation Framework';
   
-  // Argument definitions with full metadata
   private static readonly ARGUMENTS: Map<string, CLIArgument> = new Map([
     ['project', {
       name: 'project',
@@ -48,7 +43,6 @@ export class CommandLineParser {
       description: 'Tag expression to filter scenarios (supports AND, OR, NOT)',
       examples: ['@smoke', '@regression and not @flaky', '(@smoke or @sanity) and @critical'],
       validate: (value: string) => {
-        // Validate tag expression syntax
         const validTagRegex = /^[@\w\s\(\)]+(\s+(and|or|not)\s+[@\w\s\(\)]+)*$/i;
         if (!validTagRegex.test(value)) {
           throw new Error(`Invalid tag expression: ${value}`);
@@ -65,11 +59,9 @@ export class CommandLineParser {
       description: 'Feature file(s) or pattern to execute',
       examples: ['login.feature', 'features/*.feature', 'features/api/*.feature'],
       validate: (value: string) => {
-        // Check if it's a valid file pattern
         if (value.includes('*') || value.includes('?')) {
-          return true; // Glob pattern
+          return true;
         }
-        // Check if file exists
         const resolvedPath = path.resolve(process.cwd(), value);
         if (!fs.existsSync(resolvedPath) && !value.includes('*')) {
           throw new Error(`Feature file not found: ${value}`);
@@ -474,7 +466,6 @@ export class CommandLineParser {
     }]
   ]);
 
-  // Flag definitions
   private static readonly FLAGS: Map<string, CLIFlag> = new Map([
     ['help', {
       name: 'help',
@@ -508,7 +499,6 @@ export class CommandLineParser {
     }]
   ]);
 
-  // Execution profiles
   private static readonly PROFILES: Map<string, Partial<ExecutionOptions>> = new Map([
     ['smoke', {
       tags: '@smoke',
@@ -549,43 +539,31 @@ export class CommandLineParser {
   private static validationErrors: ValidationError[] = [];
   private static explicitlySetArgs: Set<string> = new Set();
 
-  /**
-   * Parse command line arguments into ExecutionOptions
-   */
   public static parse(argv: string[]): ExecutionOptions {
     try {
-      // Debug logging for PowerShell issues
       console.log('🔍 DEBUG CommandLineParser: Raw argv:', JSON.stringify(argv));
       
-      // Remove node and script path
       const args = argv.slice(2);
       console.log('🔍 DEBUG CommandLineParser: Args after slice:', JSON.stringify(args));
       
-      // Check for help or version flags first
       if (this.checkHelpOrVersion(args)) {
         process.exit(0);
       }
 
-      // Parse arguments
       this.parsedArgs = this.parseArguments(args);
 
-      // Load config file if specified
       if (this.parsedArgs['config']) {
         this.loadConfigFile(this.parsedArgs['config'] as string);
       }
 
-      // Apply profile if specified
       if (this.parsedArgs['profile']) {
         this.applyProfile(this.parsedArgs['profile'] as string);
       }
 
-      // Validate all arguments
       this.validateArguments();
 
-      // Handle special flags
       this.handleSpecialFlags();
 
-      // Build and return ExecutionOptions
       return this.buildExecutionOptions();
 
     } catch (error) {
@@ -594,9 +572,6 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Parse raw arguments into structured format
-   */
   private static parseArguments(args: string[]): ParsedArguments {
     const parsed: ParsedArguments = {};
     let i = 0;
@@ -610,22 +585,18 @@ export class CommandLineParser {
       }
 
       if (arg.startsWith('--')) {
-        // Handle special case of "--" separator (end of options)
         if (arg === '--') {
           i++;
           continue;
         }
         
-        // Long option: --option or --option=value
         const equalIndex = arg.indexOf('=');
         
         if (equalIndex > -1) {
-          // --option=value format
           const name = arg.substring(2, equalIndex);
           const value = arg.substring(equalIndex + 1);
           this.processArgument(name, value, parsed);
         } else {
-          // --option format
           const name = arg.substring(2);
           const argDef = this.findArgument(name);
           
@@ -644,7 +615,6 @@ export class CommandLineParser {
           }
         }
       } else if (arg.startsWith('-') && arg.length > 1) {
-        // Short option(s): -o or -abc
         const options = arg.substring(1);
         
         for (let j = 0; j < options.length; j++) {
@@ -660,7 +630,6 @@ export class CommandLineParser {
           if (argDef && argDef.type === 'boolean') {
             parsed[fullName] = true;
           } else if (j === options.length - 1 && i + 1 < args.length && args[i + 1] && !args[i + 1]!.startsWith('-')) {
-            // Last option in group can take value
             i++;
             const nextArg = args[i];
             if (nextArg) {
@@ -673,7 +642,6 @@ export class CommandLineParser {
           }
         }
       } else {
-        // Positional argument (treat as feature file)
         if (!parsed['feature']) {
           parsed['feature'] = [];
         }
@@ -683,15 +651,11 @@ export class CommandLineParser {
       i++;
     }
 
-    // Apply defaults
     this.applyDefaults(parsed);
 
     return parsed;
   }
 
-  /**
-   * Process and store argument value
-   */
   private static processArgument(name: string, value: string, parsed: ParsedArguments): void {
     const fullName = this.resolveAlias(name) || name;
     const argDef = this.ARGUMENTS.get(fullName);
@@ -700,13 +664,11 @@ export class CommandLineParser {
       throw new Error(`Unknown option: ${name}`);
     }
 
-    // Track that this argument was explicitly set
     this.explicitlySetArgs.add(fullName);
 
     if (argDef) {
       let processedValue: any = value;
 
-      // Type conversion
       switch (argDef.type) {
         case 'number':
           processedValue = this.parseNumber(value, fullName);
@@ -719,7 +681,6 @@ export class CommandLineParser {
           break;
       }
 
-      // Handle array values
       if (argDef.array) {
         if (!parsed[fullName]) {
           parsed[fullName] = [];
@@ -729,14 +690,10 @@ export class CommandLineParser {
         parsed[fullName] = processedValue;
       }
     } else {
-      // It's a flag
       parsed[fullName] = true;
     }
   }
 
-  /**
-   * Parse number value with validation
-   */
   private static parseNumber(value: string, name: string): number {
     const num = Number(value);
     if (isNaN(num)) {
@@ -745,9 +702,6 @@ export class CommandLineParser {
     return num;
   }
 
-  /**
-   * Parse boolean value
-   */
   private static parseBoolean(value: string, name: string): boolean {
     const lower = value.toLowerCase();
     if (['true', 'yes', '1', 'on'].includes(lower)) {
@@ -759,18 +713,13 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Resolve alias to full argument name
-   */
   private static resolveAlias(alias: string): string | null {
-    // Check arguments
     for (const [name, arg] of this.ARGUMENTS) {
       if (name === alias || arg.aliases?.includes(alias)) {
         return name;
       }
     }
 
-    // Check flags
     for (const [name, flag] of this.FLAGS) {
       if (name === alias || flag.aliases?.includes(alias)) {
         return name;
@@ -780,25 +729,16 @@ export class CommandLineParser {
     return null;
   }
 
-  /**
-   * Find argument definition by name or alias
-   */
   private static findArgument(name: string): CLIArgument | null {
     const fullName = this.resolveAlias(name) || name;
     return this.ARGUMENTS.get(fullName) || null;
   }
 
-  /**
-   * Check if name is a flag
-   */
   private static isFlag(name: string): boolean {
     const fullName = this.resolveAlias(name) || name;
     return this.FLAGS.has(fullName);
   }
 
-  /**
-   * Apply default values
-   */
   private static applyDefaults(parsed: ParsedArguments): void {
     for (const [name, arg] of this.ARGUMENTS) {
       if (!(name in parsed) && 'default' in arg) {
@@ -807,9 +747,6 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Load configuration from file
-   */
   private static loadConfigFile(configPath: string): void {
     const resolvedPath = path.resolve(process.cwd(), configPath);
     const ext = path.extname(resolvedPath).toLowerCase();
@@ -821,17 +758,14 @@ export class CommandLineParser {
         const content = fs.readFileSync(resolvedPath, 'utf-8');
         config = JSON.parse(content);
       } else if (ext === '.js' || ext === '.ts') {
-        // Clear require cache to allow config changes
         delete require.cache[resolvedPath];
         config = require(resolvedPath);
         
-        // Handle default exports
         if (config.default) {
           config = config.default;
         }
       }
 
-      // Merge config with parsed args (CLI args take precedence)
       for (const [key, value] of Object.entries(config)) {
         if (!(key in this.parsedArgs!)) {
           this.parsedArgs![key] = value;
@@ -843,9 +777,6 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Apply execution profile
-   */
   private static applyProfile(profileName: string): void {
     const profile = this.PROFILES.get(profileName);
     
@@ -853,7 +784,6 @@ export class CommandLineParser {
       throw new Error(`Unknown profile: ${profileName}. Available profiles: ${Array.from(this.PROFILES.keys()).join(', ')}`);
     }
 
-    // Merge profile with parsed args (CLI args take precedence)
     for (const [key, value] of Object.entries(profile)) {
       if (!(key in this.parsedArgs!)) {
         this.parsedArgs![key] = value;
@@ -861,9 +791,6 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Validate all arguments
-   */
   private static validateArguments(): void {
     this.validationErrors = [];
 
@@ -871,11 +798,10 @@ export class CommandLineParser {
       const argDef = this.ARGUMENTS.get(name);
       
       if (!argDef && !this.FLAGS.has(name)) {
-        continue; // Skip unknown args (might be from config)
+        continue;
       }
 
       if (argDef) {
-        // Check required
         if (argDef.required && !value) {
           this.validationErrors.push({
             argument: name,
@@ -883,7 +809,6 @@ export class CommandLineParser {
           });
         }
 
-        // Check choices
         if (argDef.choices && value) {
           const values = Array.isArray(value) ? value : [value];
           for (const v of values) {
@@ -897,7 +822,6 @@ export class CommandLineParser {
           }
         }
 
-        // Run custom validation
         if (argDef.validate && value) {
           try {
             const values = Array.isArray(value) ? value : [value];
@@ -912,7 +836,6 @@ export class CommandLineParser {
           }
         }
 
-        // Check dependencies - only if the argument was explicitly set (not default)
         if (argDef.dependsOn && value && !this.parsedArgs![argDef.dependsOn] && this.wasExplicitlySet(name)) {
           this.validationErrors.push({
             argument: name,
@@ -922,10 +845,8 @@ export class CommandLineParser {
       }
     }
 
-    // Check for conflicting options
     this.validateConflicts();
 
-    // Throw if validation errors
     if (this.validationErrors.length > 0) {
       const errorMessage = this.validationErrors
         .map(e => `  - ${e.argument}: ${e.message}`)
@@ -934,11 +855,7 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Check for conflicting options
-   */
   private static validateConflicts(): void {
-    // Check debug vs quiet
     if (this.parsedArgs!['debug'] && this.parsedArgs!['quiet']) {
       this.validationErrors.push({
         argument: 'debug/quiet',
@@ -946,11 +863,9 @@ export class CommandLineParser {
       });
     }
 
-    // Check dry-run conflicts
     if (this.parsedArgs!['dry-run']) {
       const conflictingOptions = ['video', 'trace', 'screenshot'];
       for (const opt of conflictingOptions) {
-        // Only check for conflicts if the option was explicitly set by the user
         if (this.parsedArgs![opt] && this.wasExplicitlySet(opt)) {
           this.validationErrors.push({
             argument: opt,
@@ -960,7 +875,6 @@ export class CommandLineParser {
       }
     }
 
-    // Check parallel conflicts - only if workers was explicitly set (not default)
     if (!this.parsedArgs!['parallel'] && this.parsedArgs!['workers'] && this.wasExplicitlySet('workers')) {
       this.validationErrors.push({
         argument: 'workers',
@@ -968,7 +882,6 @@ export class CommandLineParser {
       });
     }
 
-    // Check shard with parallel
     if (this.parsedArgs!['shard'] && this.parsedArgs!['parallel']) {
       this.validationErrors.push({
         argument: 'shard',
@@ -977,9 +890,6 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Check for help or version flags
-   */
   private static checkHelpOrVersion(args: string[]): boolean {
     for (const arg of args) {
       const cleaned = arg.replace(/^-+/, '');
@@ -998,9 +908,6 @@ export class CommandLineParser {
     return false;
   }
 
-  /**
-   * Handle special flags that don't run tests
-   */
   private static handleSpecialFlags(): void {
     if (this.parsedArgs!['list-tags']) {
       this.listTags();
@@ -1023,19 +930,13 @@ export class CommandLineParser {
     }
   }
 
-  /**
-   * Build ExecutionOptions from parsed arguments
-   */
   private static buildExecutionOptions(): ExecutionOptions {
     const options: any = {
-      // Project and Environment
       project: this.parsedArgs!['project'] as string,
       environment: this.parsedArgs!['env'] as string || 'dev',
       
-      // Test selection
       grepInvert: this.parsedArgs!['grep-invert'] as boolean || false,
       
-      // Execution settings
       parallel: this.parsedArgs!['parallel'] as boolean || false,
       workers: this.parsedArgs!['workers'] as number || 1,
       browser: (this.parsedArgs!['browser'] as string) as any || 'chromium',
@@ -1047,34 +948,28 @@ export class CommandLineParser {
       maxFailures: this.parsedArgs!['max-failures'] as number || 0,
       shard: this.parseShardConfig(this.parsedArgs!['shard'] as string),
       
-      // Debug settings
       debug: this.parsedArgs!['debug'] as boolean || false,
       verbose: this.parsedArgs!['verbose'] as boolean || false,
       quiet: this.parsedArgs!['quiet'] as boolean || false,
       noColors: this.parsedArgs!['no-colors'] as boolean || false,
       
-      // Evidence collection
       video: this.parsedArgs!['video'] as boolean || false,
       trace: this.parsedArgs!['trace'] as boolean || false,
       screenshot: (this.parsedArgs!['screenshot'] as 'always' | 'on-failure' | 'never') || 'on-failure',
       updateSnapshots: this.parsedArgs!['update-snapshots'] as boolean || false,
       
-      // Reporting
       reportName: this.parsedArgs!['report-name'] as string || 'Test Execution Report',
       reportPath: this.parsedArgs!['report-path'] as string || './reports',
       reportFormats: this.parseReportFormats(this.parsedArgs!['report-format']),
       outputFormats: this.parseOutputFormats(this.parsedArgs!['output']),
       
-      // CI settings
       ci: this.parsedArgs!['ci'] as boolean || false,
       
-      // Metadata
       executionId: this.generateExecutionId(),
       startTime: new Date(),
       commandLine: process.argv.join(' ')
     };
 
-    // Add optional properties conditionally
     if (this.parsedArgs!['tags']) {
       options.tags = this.parsedArgs!['tags'] as string;
     }
@@ -1113,9 +1008,6 @@ export class CommandLineParser {
     return options as ExecutionOptions;
   }
 
-  /**
-   * Parse report formats
-   */
   private static parseReportFormats(value: any): any[] {
     if (!value) return ['html'];
     
@@ -1126,9 +1018,6 @@ export class CommandLineParser {
     return String(value).split(',').map((f: string) => f.trim());
   }
 
-  /**
-   * Parse output formats
-   */
   private static parseOutputFormats(value: any): any[] {
     if (!value) return [];
     
@@ -1139,9 +1028,6 @@ export class CommandLineParser {
     return String(value).split(',').map((f: string) => f.trim());
   }
 
-  /**
-   * Parse shard configuration
-   */
   private static parseShardConfig(value: string): any {
     if (!value) return undefined;
     
@@ -1149,9 +1035,6 @@ export class CommandLineParser {
     return { current, total };
   }
 
-  /**
-   * Parse proxy authentication
-   */
   private static parseProxyAuth(value: string): { username: string; password: string } | undefined {
     if (!value) return undefined;
     
@@ -1161,9 +1044,6 @@ export class CommandLineParser {
     return { username, password };
   }
 
-  /**
-   * Generate unique execution ID
-   */
   private static generateExecutionId(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
@@ -1172,9 +1052,6 @@ export class CommandLineParser {
     return `${hostname}-${timestamp}-${random}`;
   }
 
-  /**
-   * Show help message
-   */
   private static showHelp(): void {
     console.log(`
 ${this.FRAMEWORK_NAME} v${this.VERSION}
@@ -1184,7 +1061,6 @@ USAGE:
 
 OPTIONS:`);
 
-    // Group options by category
     const categories = {
       'Test Selection': ['env', 'tags', 'feature', 'scenario', 'grep', 'grep-invert'],
       'Execution': ['parallel', 'workers', 'browser', 'headless', 'timeout', 'retry', 'dry-run', 'bail', 'max-failures', 'shard'],
@@ -1204,7 +1080,6 @@ OPTIONS:`);
         
         let line = `  --${arg.name}`;
         
-        // Add aliases
         if (arg.aliases && arg.aliases.length > 0) {
           const shortAliases = arg.aliases.filter(a => a.length === 1);
           const longAliases = arg.aliases.filter(a => a.length > 1);
@@ -1217,15 +1092,12 @@ OPTIONS:`);
           }
         }
         
-        // Add type indicator
         if (arg.type !== 'boolean') {
           line += ` <${arg.type}>`;
         }
         
-        // Add description
         console.log(line.padEnd(40) + arg.description);
         
-        // Add additional info
         if (arg.choices) {
           console.log(''.padEnd(40) + `Choices: ${arg.choices.join(', ')}`);
         }
@@ -1238,7 +1110,6 @@ OPTIONS:`);
       }
     }
 
-    // Add flags section
     console.log('\nFLAGS:');
     for (const [, flag] of this.FLAGS) {
       let line = `  --${flag.name}`;
@@ -1258,7 +1129,6 @@ OPTIONS:`);
       console.log(line.padEnd(40) + flag.description);
     }
 
-    // Add examples
     console.log(`
 EXAMPLES:
   # Run smoke tests in dev environment
@@ -1274,7 +1144,7 @@ EXAMPLES:
   npm test -- --profile=regression --report-name="Regression Suite"
 
   # Run with proxy
-  npm test -- --proxy=http://proxy.company.com:8080 --proxy-auth=user:pass
+  npm test -- --proxy=http://proxy.example.com:8080
 
   # List all available scenarios
   npm test -- --list-scenarios
@@ -1285,18 +1155,14 @@ EXAMPLES:
   # Run specific shard for distributed execution
   npm test -- --shard=2/5
 
-For more information, visit: https://github.com/company/cs-test-framework`);
+For more information, visit: https://github.com/your-framework/docs`);
   }
 
-  /**
-   * Show version information
-   */
   private static showVersion(): void {
     console.log(`${this.FRAMEWORK_NAME} v${this.VERSION}`);
     console.log(`Node.js: ${process.version}`);
     console.log(`Platform: ${process.platform} ${process.arch}`);
     
-    // Show dependency versions
     try {
       const packagePath = path.join(process.cwd(), 'package.json');
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
@@ -1311,13 +1177,9 @@ For more information, visit: https://github.com/company/cs-test-framework`);
         }
       }
     } catch {
-      // Ignore if package.json not found
     }
   }
 
-  /**
-   * List all available tags
-   */
   private static listTags(): void {
     console.log('Discovering tags...\n');
     
@@ -1325,7 +1187,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
       const featuresPath = path.join(process.cwd(), 'features');
       const tags = new Set<string>();
       
-      // Recursively find all .feature files
       const findFeatureFiles = (dir: string): string[] => {
         const files: string[] = [];
         const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -1345,7 +1206,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
       
       const featureFiles = findFeatureFiles(featuresPath);
       
-      // Parse tags from feature files
       for (const file of featureFiles) {
         const content = fs.readFileSync(file, 'utf-8');
         const tagRegex = /@[\w-]+/g;
@@ -1356,7 +1216,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
         }
       }
       
-      // Display tags
       const sortedTags = Array.from(tags).sort();
       
       if (sortedTags.length === 0) {
@@ -1378,16 +1237,12 @@ For more information, visit: https://github.com/company/cs-test-framework`);
     }
   }
 
-  /**
-   * List all feature files
-   */
   private static listFeatures(): void {
     console.log('Discovering feature files...\n');
     
     try {
       const featuresPath = path.join(process.cwd(), 'features');
       
-      // Recursively find all .feature files
       const findFeatureFiles = (dir: string, basePath: string = ''): void => {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
         
@@ -1398,7 +1253,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
           if (entry.isDirectory()) {
             findFeatureFiles(fullPath, relativePath);
           } else if (entry.name.endsWith('.feature')) {
-            // Read first line to get feature name
             const content = fs.readFileSync(fullPath, 'utf-8');
             const lines = content.split('\n');
             const firstLine = lines[0] || '';
@@ -1421,9 +1275,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
     }
   }
 
-  /**
-   * List all scenarios
-   */
   private static listScenarios(): void {
     console.log('Discovering scenarios...\n');
     
@@ -1431,7 +1282,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
       const featuresPath = path.join(process.cwd(), 'features');
       let totalScenarios = 0;
       
-      // Recursively find and parse feature files
       const processFeatureFile = (filePath: string): void => {
         const content = fs.readFileSync(filePath, 'utf-8');
         const lines = content.split('\n');
@@ -1459,7 +1309,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
         }
       };
       
-      // Find all feature files
       const findFeatureFiles = (dir: string): void => {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
         
@@ -1486,39 +1335,29 @@ For more information, visit: https://github.com/company/cs-test-framework`);
     }
   }
 
-  /**
-   * Handle parse errors
-   */
   private static handleParseError(error: any): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`\n❌ Error: ${errorMessage}\n`);
     
-    // Suggest help
     console.error('Run with --help for usage information.');
     
-    // Show relevant help for common errors
     if (errorMessage.includes('Unknown option')) {
       console.error('\nDid you mean one of these?');
       const optionName = errorMessage.match(/Unknown option: (.+)/)?.[1];
       
       if (optionName) {
-        // Find similar options
         const similar = this.findSimilarOptions(optionName);
         similar.forEach(opt => console.error(`  --${opt}`));
       }
     }
   }
 
-  /**
-   * Find similar option names (for error suggestions)
-   */
   private static findSimilarOptions(input: string): string[] {
     const allOptions = [
       ...Array.from(this.ARGUMENTS.keys()),
       ...Array.from(this.FLAGS.keys())
     ];
     
-    // Simple Levenshtein distance
     const getDistance = (a: string, b: string): number => {
       const matrix: number[][] = [];
       
@@ -1555,7 +1394,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
       return lastRow ? (lastRow[a.length] || 0) : 0;
     };
     
-    // Find options with distance <= 3
     const suggestions = allOptions
       .map(opt => ({ option: opt, distance: getDistance(input, opt) }))
       .filter(item => item.distance <= 3)
@@ -1566,25 +1404,16 @@ For more information, visit: https://github.com/company/cs-test-framework`);
     return suggestions;
   }
 
-  /**
-   * Get parsed arguments (for testing)
-   */
   public static getParsedArguments(): ParsedArguments | null {
     return this.parsedArgs;
   }
 
-  /**
-   * Reset parser state (for testing)
-   */
   public static reset(): void {
     this.parsedArgs = null;
     this.validationErrors = [];
     this.explicitlySetArgs.clear();
   }
 
-  /**
-   * Check if an argument was explicitly set by the user
-   */
   private static wasExplicitlySet(name: string): boolean {
     return this.explicitlySetArgs.has(name);
   }
@@ -1596,12 +1425,10 @@ For more information, visit: https://github.com/company/cs-test-framework`);
       const configDir = path.join(process.cwd(), 'config');
       console.log(`🔍 DEBUG: Config directory path: ${configDir}`);
       
-      // Check if config directory exists
       if (!fs.existsSync(configDir)) {
         throw new Error('Configuration directory not found: config/');
       }
 
-      // Get list of available projects from config directory
       const availableProjects = this.getAvailableProjects();
       console.log(`🔍 DEBUG: Available projects: ${JSON.stringify(availableProjects)}`);
       
@@ -1609,7 +1436,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
         throw new Error('No projects found in config/ directory');
       }
 
-      // Check if the specified project exists
       if (!availableProjects.includes(value)) {
         throw new Error(`Invalid project: ${value}. Available projects: ${availableProjects.join(', ')}`);
       }
@@ -1622,9 +1448,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
     }
   }
 
-  /**
-   * Get list of available projects from config directory
-   */
   private static getAvailableProjects(): string[] {
     console.log(`🔍 DEBUG: getAvailableProjects called`);
     
@@ -1648,7 +1471,6 @@ For more information, visit: https://github.com/company/cs-test-framework`);
         if (entry.isDirectory()) {
           const projectPath = path.join(configDir, entry.name);
           
-          // Check if it's a valid project directory (has environments subdirectory)
           const environmentsPath = path.join(projectPath, 'environments');
           const hasEnvironments = fs.existsSync(environmentsPath) && fs.statSync(environmentsPath).isDirectory();
           

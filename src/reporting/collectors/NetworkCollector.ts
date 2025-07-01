@@ -1,8 +1,3 @@
-/**
- * Network Traffic Collector
- * Captures all network activity including HTTP requests, WebSocket frames, and performance metrics
- * Generates HAR files and network analysis reports
- */
 
 import { Page, Request, Response, WebSocket } from 'playwright';
 import * as fs from 'fs';
@@ -42,7 +37,6 @@ export class NetworkCollector {
   private securityInfo: Map<string, SecurityInfo[]> = new Map();
   private throttling: NetworkThrottling | null = null;
   
-  // Step timing tracking
   private stepTimings: Map<string, Map<string, StepTiming>> = new Map();
   private currentSteps: Map<string, string> = new Map();
   private requestToStep: Map<string, string> = new Map();
@@ -65,7 +59,7 @@ export class NetworkCollector {
       analyzeSecurity: true,
       analyzeThirdParty: true,
       captureResponseBodies: true,
-      maxResponseBodySize: 10 * 1024 * 1024, // 10MB
+      maxResponseBodySize: 10 * 1024 * 1024,
       throttling: null,
       ...options
     };
@@ -98,11 +92,9 @@ export class NetworkCollector {
     const scenarioPath = path.join(this.evidencePath, scenarioId);
     await FileUtils.createDir(scenarioPath);
 
-    // Initialize HAR builder for this scenario
     const harBuilder = new HARBuilder(scenarioName);
     this.harBuilders.set(scenarioId, harBuilder);
 
-    // Initialize collections for this scenario
     this.entries.set(scenarioId, []);
     this.webSockets.set(scenarioId, []);
     this.metrics.set(scenarioId, this.createEmptyMetrics());
@@ -110,20 +102,16 @@ export class NetworkCollector {
     this.securityInfo.set(scenarioId, []);
     this.stepTimings.set(scenarioId, new Map());
 
-    // Apply network throttling if configured
     if (this.options.throttling) {
       await this.applyThrottling(page, this.options.throttling);
     }
 
-    // Set up network interception
     await this.setupNetworkInterception(page, scenarioId);
 
-    // Set up WebSocket monitoring if enabled
     if (this.options.captureWebSockets) {
       await this.setupWebSocketMonitoring(page, scenarioId);
     }
 
-    // Collect resource timings periodically
     if (this.options.analyzePerformance) {
       await this.startResourceTimingCollection(page, scenarioId);
     }
@@ -160,7 +148,6 @@ export class NetworkCollector {
       timing.endTime = endTime;
     }
     
-    // Clear current step
     if (this.currentSteps.get(scenarioId) === stepId) {
       this.currentSteps.delete(scenarioId);
     }
@@ -172,12 +159,10 @@ export class NetworkCollector {
     stepText: string,
     status: 'passed' | 'failed' | 'skipped'
   ): Promise<string[]> {
-    // Start step timing if not already started
     if (!this.stepStartTimes.has(`${scenarioId}_${stepId}`)) {
       await this.startStep(scenarioId, stepId);
     }
     
-    // End step timing
     await this.endStep(scenarioId, stepId);
     
     const stepPath = path.join(this.evidencePath, scenarioId, 'steps', stepId);
@@ -186,30 +171,25 @@ export class NetworkCollector {
     const evidenceFiles: string[] = [];
 
     try {
-      // Get entries for this specific step
       const stepEntries = this.getEntriesForStep(scenarioId, stepId);
       
       if (stepEntries.length > 0) {
-        // Generate step-specific HAR file
         const harPath = path.join(stepPath, `${stepId}-network.har`);
         const stepHar = await this.generateStepHAR(stepEntries);
         await fs.promises.writeFile(harPath, JSON.stringify(stepHar, null, 2));
         evidenceFiles.push(harPath);
 
-        // Generate network analysis for the step
         const analysisPath = path.join(stepPath, `${stepId}-network-analysis.json`);
         const analysis = await this.analyzeStepNetwork(stepEntries);
         await fs.promises.writeFile(analysisPath, JSON.stringify(analysis, null, 2));
         evidenceFiles.push(analysisPath);
 
-        // Generate waterfall for this step
         const waterfallPath = path.join(stepPath, `${stepId}-waterfall.json`);
         const waterfall = await this.generateWaterfall(stepEntries);
         await fs.promises.writeFile(waterfallPath, JSON.stringify(waterfall, null, 2));
         evidenceFiles.push(waterfallPath);
       }
 
-      // Capture WebSocket frames for this step
       const wsFrames = this.getWebSocketFramesForStep(scenarioId, stepId);
       if (wsFrames.length > 0) {
         const wsPath = path.join(stepPath, `${stepId}-websocket.json`);
@@ -222,7 +202,6 @@ export class NetworkCollector {
         evidenceFiles.push(wsPath);
       }
 
-      // Generate step-specific metrics
       const stepMetricsPath = path.join(stepPath, `${stepId}-metrics.json`);
       const stepMetrics = this.calculateStepMetrics(stepEntries);
       await fs.promises.writeFile(stepMetricsPath, JSON.stringify(stepMetrics, null, 2));
@@ -244,22 +223,18 @@ export class NetworkCollector {
   }
 
   private async setupNetworkInterception(page: Page, scenarioId: string): Promise<void> {
-    // Intercept all requests
     page.on('request', (request: Request) => {
       this.handleRequest(request, scenarioId);
     });
 
-    // Intercept all responses
     page.on('response', (response: Response) => {
       this.handleResponse(response, scenarioId);
     });
 
-    // Handle request failures
     page.on('requestfailed', (request: Request) => {
       this.handleRequestFailure(request, scenarioId);
     });
 
-    // Handle request completion
     page.on('requestfinished', (request: Request) => {
       this.handleRequestFinished(request, scenarioId);
     });
@@ -309,16 +284,13 @@ export class NetworkCollector {
       pageref: scenarioId
     };
 
-    // Store request metadata
     (request as any)._networkEntry = entry;
     (request as any)._startTime = startTime;
     (request as any)._requestId = requestId;
 
-    // Map request to current step
     if (currentStep) {
       this.requestToStep.set(requestId, currentStep);
       
-      // Add to step timing
       const stepTimings = this.stepTimings.get(scenarioId);
       if (stepTimings) {
         const timing = stepTimings.get(currentStep);
@@ -328,13 +300,11 @@ export class NetworkCollector {
       }
     }
 
-    // Add to HAR builder
     const harBuilder = this.harBuilders.get(scenarioId);
     if (harBuilder) {
       harBuilder.addEntry(entry);
     }
 
-    // Analyze security if HTTPS
     if (request.url().startsWith('https://') && this.options.analyzeSecurity) {
       await this.analyzeRequestSecurity(request, scenarioId);
     }
@@ -350,21 +320,19 @@ export class NetworkCollector {
     entry.endTime = endTime;
     entry.duration = endTime - entry.startTime;
 
-    // Get timing details from response
     const timing = (response as any).timing ? (response as any).timing() : null;
     if (timing) {
       entry.timings = {
         blocked: timing.domainLookupStart > 0 ? timing.domainLookupStart : 0,
         dns: timing.domainLookupEnd - timing.domainLookupStart,
         connect: timing.connectEnd - timing.connectStart,
-        ssl: timing.connectEnd - timing.connectStart, // Approximate
+        ssl: timing.connectEnd - timing.connectStart,
         send: timing.requestStart - timing.connectEnd,
         wait: timing.responseStart - timing.requestStart,
         receive: timing.responseEnd - timing.responseStart
       };
     }
 
-    // Capture response details
     entry.response = {
       status: response.status(),
       statusText: response.statusText(),
@@ -384,14 +352,12 @@ export class NetworkCollector {
       redirectURL: response.headers()['location'] || ''
     };
 
-    // Get server IP and connection info
     const securityDetails = await response.securityDetails();
     if (securityDetails) {
       entry.serverIPAddress = securityDetails.subjectName || '';
       entry.connection = securityDetails.protocol || '';
     }
 
-    // Capture response body if enabled and within size limit
     if (this.options.captureResponseBodies) {
       try {
         const body = await response.body();
@@ -402,39 +368,31 @@ export class NetworkCollector {
         entry.response.bodySize = body.length;
         entry.response.content.size = body.length;
         
-        // Calculate compression
         const contentLength = parseInt(response.headers()['content-length'] || '0', 10);
         if (contentLength > 0) {
           entry.response.content.compression = contentLength - body.length;
         }
       } catch (error) {
-        // Body might not be available for some responses
       }
     }
 
-    // Get server timing information
     const serverTiming = response.headers()['server-timing'];
     if (serverTiming) {
       entry.serverTiming = this.parseServerTiming(serverTiming);
     }
 
-    // Update cache information
     entry.cache = this.analyzeCacheHeaders(response.headers());
 
-    // Store the entry
     const entries = this.entries.get(scenarioId) || [];
     entries.push(entry);
     this.entries.set(scenarioId, entries);
 
-    // Update metrics
     this.updateMetrics(scenarioId, entry);
 
-    // Analyze third-party resources
     if (this.options.analyzeThirdParty) {
       this.analyzeThirdPartyRequest(entry, scenarioId);
     }
 
-    // Update HAR builder
     const harBuilder = this.harBuilders.get(scenarioId);
     if (harBuilder) {
       harBuilder.updateEntry(entry);
@@ -479,7 +437,6 @@ export class NetworkCollector {
       metrics.failedRequests++;
     }
 
-    // Update HAR builder
     const harBuilder = this.harBuilders.get(scenarioId);
     if (harBuilder) {
       harBuilder.updateEntry(entry);
@@ -488,13 +445,12 @@ export class NetworkCollector {
 
   private async handleRequestFinished(request: Request, scenarioId: string): Promise<void> {
     const entry = (request as any)._networkEntry as NetworkEntry;
-    if (!entry || entry.response) return; // Already handled in handleResponse
+    if (!entry || entry.response) return;
 
     const endTime = performance.now();
     entry.endTime = endTime;
     entry.duration = endTime - entry.startTime;
 
-    // This might be a cancelled request
     entry.response = {
       status: -1,
       statusText: 'Cancelled',
@@ -545,7 +501,6 @@ export class NetworkCollector {
         frames.push(frame);
         this.webSockets.set(scenarioId, frames);
 
-        // Add to step timing if we have a current step
         const currentStep = this.currentSteps.get(scenarioId);
         if (currentStep) {
           const stepTimings = this.stepTimings.get(scenarioId);
@@ -578,7 +533,6 @@ export class NetworkCollector {
         frames.push(frame);
         this.webSockets.set(scenarioId, frames);
 
-        // Add to step timing
         const currentStep = this.currentSteps.get(scenarioId);
         if (currentStep) {
           const stepTimings = this.stepTimings.get(scenarioId);
@@ -650,7 +604,6 @@ export class NetworkCollector {
         });
 
         const existingTimings = this.resourceTimings.get(scenarioId) || [];
-        // Convert readonly serverTiming arrays to mutable arrays
         const mutableTimings = timings.map(timing => ({
           ...timing,
           serverTiming: [...timing.serverTiming]
@@ -658,25 +611,19 @@ export class NetworkCollector {
         existingTimings.push(...mutableTimings);
         this.resourceTimings.set(scenarioId, existingTimings);
 
-        // Clear the performance buffer to avoid duplicates
         await page.evaluate(() => performance.clearResourceTimings());
       } catch (error) {
-        // Page might be closed
       }
     };
 
-    // Collect timings every 2 seconds
     const interval = setInterval(collectTimings, 2000);
     
-    // Store interval for cleanup
     (page as any)._resourceTimingInterval = interval;
     
-    // Clear interval when page closes
     page.once('close', () => {
       clearInterval(interval);
     });
 
-    // Collect initial timings
     await collectTimings();
   }
 
@@ -708,12 +655,9 @@ export class NetworkCollector {
     const timing = stepTimings.get(stepId);
     if (!timing) return [];
     
-    // Get entries that belong to this step
     return entries.filter(entry => {
-      // Check if entry was initiated during this step
       if (entry.stepId === stepId) return true;
       
-      // Also check if entry started within step time boundaries
       return entry.startTime >= timing.startTime && 
              entry.startTime <= timing.endTime;
     });
@@ -727,12 +671,9 @@ export class NetworkCollector {
     const timing = stepTimings.get(stepId);
     if (!timing) return [];
     
-    // Get frames that belong to this step
     return frames.filter(frame => {
-      // Check if frame was marked for this step
       if (frame.stepId === stepId) return true;
       
-      // Also check timestamp boundaries
       const frameTime = new Date(frame.timestamp).getTime();
       const stepStartTime = timing.startTime;
       const stepEndTime = timing.endTime || performance.now();
@@ -757,27 +698,22 @@ export class NetworkCollector {
           metrics.failedRequests++;
         }
         
-        // Check if cached
         if (entry.response.status === 304 || 
             (entry.cache.cacheControl && entry.cache.cacheControl.includes('from-cache'))) {
           metrics.cachedRequests++;
         }
       }
       
-      // Update resource type breakdown
       const resourceType = entry.request.resourceType || 'other';
       metrics.resourceTypes[resourceType] = (metrics.resourceTypes[resourceType] || 0) + 1;
       
-      // Update protocol breakdown
       const url = new URL(entry.request.url);
       const protocol = url.protocol.replace(':', '');
       metrics.protocols[protocol] = (metrics.protocols[protocol] || 0) + 1;
       
-      // Update domain breakdown
       metrics.domains[url.hostname] = (metrics.domains[url.hostname] || 0) + 1;
     }
     
-    // Calculate average response time
     if (metrics.totalRequests > 0) {
       metrics.averageResponseTime = metrics.totalTime / metrics.totalRequests;
     }
@@ -810,7 +746,6 @@ export class NetworkCollector {
       score: 100
     };
 
-    // Check for security issues and calculate score
     if (!security.securityHeaders['strict-transport-security']) {
       security.issues.push({
         severity: 'high',
@@ -955,26 +890,21 @@ export class NetworkCollector {
         metrics.failedRequests++;
       }
 
-      // Check if cached
       if (entry.response.status === 304 || 
           (entry.cache.cacheControl && entry.cache.cacheControl.includes('from-cache'))) {
         metrics.cachedRequests++;
       }
     }
 
-    // Update resource type breakdown
     const resourceType = entry.request.resourceType || 'other';
     metrics.resourceTypes[resourceType] = (metrics.resourceTypes[resourceType] || 0) + 1;
 
-    // Update protocol breakdown
     const url = new URL(entry.request.url);
     const protocol = url.protocol.replace(':', '');
     metrics.protocols[protocol] = (metrics.protocols[protocol] || 0) + 1;
 
-    // Update domain breakdown
     metrics.domains[url.hostname] = (metrics.domains[url.hostname] || 0) + 1;
 
-    // Calculate average response time
     if (metrics.totalRequests > 0) {
       metrics.averageResponseTime = metrics.totalTime / metrics.totalRequests;
     }
@@ -987,14 +917,12 @@ export class NetworkCollector {
     const url = new URL(entry.request.url);
     const pageUrl = new URL(metrics.pageUrl || 'http://localhost');
 
-    // Check if it's a third-party request
     if (url.hostname !== pageUrl.hostname && 
         !url.hostname.includes(pageUrl.hostname) &&
         !pageUrl.hostname.includes(url.hostname)) {
       
       metrics.thirdPartyRequests++;
       
-      // Categorize third-party requests
       const hostname = url.hostname.toLowerCase();
       
       if (hostname.includes('google-analytics') || 
@@ -1236,9 +1164,7 @@ export class NetworkCollector {
       }
     };
 
-    // Analyze each entry
     for (const entry of entries) {
-      // Add to requests array
       if (entry.response) {
         analysis.requests.push({
           requestId: entry.id,
@@ -1258,7 +1184,6 @@ export class NetworkCollector {
         });
       }
       
-      // Update summary
       if (entry.response) {
         if (entry.response.status >= 200 && entry.response.status < 300) {
           analysis.summary.successfulRequests++;
@@ -1272,7 +1197,6 @@ export class NetworkCollector {
             error: entry.response.error
           });
           
-          // Add to failures array
           analysis.failures.push({
             requestId: entry.id,
             url: entry.request.url,
@@ -1285,7 +1209,6 @@ export class NetworkCollector {
             }
           });
           
-          // Add to errors if there's an error message
           if (entry.response.error) {
             analysis.errors.push({
               timestamp: new Date(entry.request.timestamp),
@@ -1303,14 +1226,12 @@ export class NetworkCollector {
       
       analysis.summary.totalTime += entry.duration;
       
-      // Track data sent
       if (entry.request.postData) {
         const dataSize = Buffer.byteLength(entry.request.postData);
         analysis.summary.totalDataSent += dataSize;
         analysis.summary.totalDataTransferred += dataSize;
       }
       
-      // Resource breakdown
       const resourceType = entry.request.resourceType || 'other';
       if (!analysis.resourceBreakdown[resourceType]) {
         analysis.resourceBreakdown[resourceType] = {
@@ -1323,7 +1244,6 @@ export class NetworkCollector {
       analysis.resourceBreakdown[resourceType].size += entry.response?.bodySize || 0;
       analysis.resourceBreakdown[resourceType].time += entry.duration;
       
-      // Third-party analysis
       const url = new URL(entry.request.url);
       const isThirdParty = !url.hostname.includes(new URL(entries[0]?.request.url || 'http://localhost').hostname);
       
@@ -1336,14 +1256,12 @@ export class NetworkCollector {
         analysis.thirdPartyAnalysis.performanceImpact += entry.duration;
       }
       
-      // Security analysis
       if (url.protocol === 'https:') {
         analysis.securityAnalysis.httpsRequests++;
       } else if (url.protocol === 'http:') {
         analysis.securityAnalysis.httpRequests++;
       }
       
-      // Cache analysis
       if (entry.cache.isCacheable) {
         analysis.cacheAnalysis.cacheableResources++;
         if (entry.response?.status === 304 || entry.cache.cacheControl?.includes('from-cache')) {
@@ -1353,14 +1271,12 @@ export class NetworkCollector {
       }
     }
 
-    // Calculate averages and rates
     if (analysis.summary.totalRequests > 0) {
       const avgTime = analysis.summary.totalTime / analysis.summary.totalRequests;
       analysis.summary.avgResponseTime = avgTime;
       analysis.summary.averageResponseTime = avgTime;
       analysis.performance.avgResponseTime = avgTime;
       
-      // Calculate response time percentiles
       const responseTimes = entries
         .filter(e => e.response && e.duration > 0)
         .map(e => e.duration)
@@ -1374,17 +1290,15 @@ export class NetworkCollector {
         analysis.summary.minResponseTime = Math.min(...responseTimes);
       }
       
-      // Calculate throughput and error rate
       const duration = (entries[entries.length - 1]?.endTime || 0) - (entries[0]?.startTime || 0);
       if (duration > 0) {
-        analysis.performance.throughput = (analysis.summary.totalRequests / duration) * 1000; // requests per second
+        analysis.performance.throughput = (analysis.summary.totalRequests / duration) * 1000;
         analysis.summary.totalDuration = duration;
       }
       
       analysis.performance.errorRate = (analysis.summary.failedRequests / analysis.summary.totalRequests) * 100;
     }
     
-    // Update timeline
     if (entries.length > 0) {
       const firstEntry = entries[0];
       const lastEntry = entries[entries.length - 1];
@@ -1397,7 +1311,6 @@ export class NetworkCollector {
       }
       analysis.timeline.duration = analysis.timeline.endTime.getTime() - analysis.timeline.startTime.getTime();
       
-      // Add timeline entries for each request
       analysis.timeline.entries = entries.map(entry => ({
         id: entry.id,
         name: `${entry.request.method} ${entry.request.url}`,
@@ -1414,7 +1327,6 @@ export class NetworkCollector {
       }));
     }
     
-    // Update waterfall
     if (entries.length > 0) {
       analysis.waterfall = await this.generateWaterfall(entries);
     }
@@ -1424,7 +1336,6 @@ export class NetworkCollector {
         (analysis.cacheAnalysis.cachedResources / analysis.cacheAnalysis.cacheableResources) * 100;
     }
 
-    // Find slowest requests
     analysis.performance.slowestRequests = entries
       .filter(e => e.response && e.response.status > 0)
       .sort((a, b) => b.duration - a.duration)
@@ -1436,7 +1347,6 @@ export class NetworkCollector {
         type: e.request.resourceType || 'other'
       }));
 
-    // Find largest requests
     analysis.performance.largestRequests = entries
       .filter(e => e.response && e.response.bodySize > 0)
       .sort((a, b) => (b.response?.bodySize || 0) - (a.response?.bodySize || 0))
@@ -1448,7 +1358,6 @@ export class NetworkCollector {
         type: e.request.resourceType || 'other'
       }));
 
-    // Identify render-blocking resources
     analysis.performance.renderBlockingResources = entries
       .filter(e => {
         const type = e.request.resourceType;
@@ -1463,14 +1372,12 @@ export class NetworkCollector {
         size: e.response?.bodySize || 0
       }));
 
-    // Generate recommendations
     this.generateRecommendations(analysis);
 
     return analysis;
   }
 
   private generateRecommendations(analysis: NetworkAnalysis): void {
-    // Cache recommendations
     if (analysis.cacheAnalysis.cacheHitRate < 50) {
       analysis.recommendations.push({
         category: 'cache',
@@ -1482,7 +1389,6 @@ export class NetworkCollector {
       });
     }
 
-    // Performance recommendations
     if (analysis.performance.slowestRequests && 
         analysis.performance.slowestRequests.length > 0 && 
         analysis.performance.slowestRequests[0].duration > 3000) {
@@ -1496,7 +1402,6 @@ export class NetworkCollector {
       });
     }
 
-    // Third-party recommendations
     const thirdPartyPercentage = (analysis.thirdPartyAnalysis.totalRequests / analysis.summary.totalRequests) * 100;
     if (thirdPartyPercentage > 30) {
       analysis.recommendations.push({
@@ -1509,7 +1414,6 @@ export class NetworkCollector {
       });
     }
 
-    // Security recommendations
     if (analysis.securityAnalysis.httpRequests > 0) {
       analysis.recommendations.push({
         category: 'security',
@@ -1521,8 +1425,7 @@ export class NetworkCollector {
       });
     }
 
-    // Large resource recommendations
-    const largeResources = analysis.performance.largestRequests?.filter(r => r.size > 1024 * 1024) || []; // > 1MB
+    const largeResources = analysis.performance.largestRequests?.filter(r => r.size > 1024 * 1024) || [];
     if (largeResources.length > 0) {
       analysis.recommendations.push({
         category: 'performance',
@@ -1534,7 +1437,6 @@ export class NetworkCollector {
       });
     }
 
-    // Render-blocking recommendations
     if (analysis.performance.renderBlockingResources && analysis.performance.renderBlockingResources.length > 5) {
       analysis.recommendations.push({
         category: 'performance',
@@ -1559,7 +1461,6 @@ export class NetworkCollector {
       };
     }
 
-    // Find the earliest start time
     const startTime = Math.min(...entries.map(e => e.startTime));
     const endTime = Math.max(...entries.map(e => e.endTime || e.startTime + e.duration));
 
@@ -1604,7 +1505,6 @@ export class NetworkCollector {
       criticalPath: []
     };
 
-    // Sort entries by start time for waterfall display
     waterfall.entries.sort((a, b) => a.startTime - b.startTime);
 
     return waterfall;
@@ -1613,7 +1513,6 @@ export class NetworkCollector {
   private getResourcePriority(entry: NetworkEntry): string {
     const type = entry.request.resourceType;
     
-    // Infer priority based on resource type
     if (type === 'document') return 'highest';
     if (type === 'stylesheet' || type === 'script') return 'high';
     if (type === 'font') return 'high';
@@ -1625,8 +1524,6 @@ export class NetworkCollector {
   }
 
   private getInitiator(entry: NetworkEntry): string {
-    // In a real browser, we would have initiator information
-    // For now, infer from resource type
     const type = entry.request.resourceType;
     
     if (type === 'document') return 'navigation';
@@ -1641,37 +1538,30 @@ export class NetworkCollector {
     const entries = this.entries.get(scenarioId) || [];
     const securityInfos = this.securityInfo.get(scenarioId) || [];
     
-    // Generate comprehensive analysis
     const analysis = await this.analyzeStepNetwork(entries);
     
-    // Add security information
     analysis.securityAnalysis.securityHeaders.issues = securityInfos
       .flatMap(info => info.issues)
       .filter((issue, index, self) => 
         self.findIndex(i => i.issue === issue.issue) === index
       );
     
-    // Add performance impact analysis
     const resourceTimings = this.resourceTimings.get(scenarioId) || [];
     if (resourceTimings.length > 0) {
       analysis.performance.resourceTimings = resourceTimings;
       
-      // Calculate critical path
       const criticalPath = this.calculateCriticalPath(entries);
       analysis.performance.criticalPath = criticalPath;
     }
     
-    // Add bandwidth analysis
     analysis.bandwidth = this.analyzeBandwidth(entries);
     
-    // Add protocol analysis
     analysis.protocols = this.analyzeProtocols(entries);
     
     return analysis;
   }
 
   private calculateCriticalPath(entries: NetworkEntry[]): any {
-    // Identify resources that block rendering
     const criticalResources = entries.filter(entry => {
       const type = entry.request.resourceType;
       return type === 'document' || 
@@ -1679,19 +1569,15 @@ export class NetworkCollector {
              (type === 'script' && !entry.request.url.includes('async'));
     });
 
-    // Sort by start time
     criticalResources.sort((a, b) => a.startTime - b.startTime);
 
-    // Calculate total blocking time
     let totalBlockingTime = 0;
     let lastEndTime = 0;
 
     for (const resource of criticalResources) {
       if (resource.startTime > lastEndTime) {
-        // Gap between resources, not blocking
         totalBlockingTime += resource.duration;
       } else {
-        // Overlapping, only add the additional time
         const additionalTime = (resource.startTime + resource.duration) - lastEndTime;
         if (additionalTime > 0) {
           totalBlockingTime += additionalTime;
@@ -1714,9 +1600,8 @@ export class NetworkCollector {
 
   private analyzeBandwidth(entries: NetworkEntry[]): any {
     const timeWindows: Map<number, number> = new Map();
-    const windowSize = 1000; // 1 second windows
+    const windowSize = 1000;
 
-    // Group data transferred by time windows
     for (const entry of entries) {
       const window = Math.floor(entry.startTime / windowSize) * windowSize;
       const dataTransferred = entry.response?.bodySize || 0;
@@ -1724,11 +1609,10 @@ export class NetworkCollector {
       timeWindows.set(window, (timeWindows.get(window) || 0) + dataTransferred);
     }
 
-    // Calculate statistics
     const bandwidthData = Array.from(timeWindows.entries())
       .map(([time, bytes]) => ({
         time,
-        bandwidth: (bytes * 8) / 1000 // Convert to kilobits per second
+        bandwidth: (bytes * 8) / 1000
       }))
       .sort((a, b) => a.time - b.time);
 
@@ -1766,7 +1650,6 @@ export class NetworkCollector {
       stats.totalTime += entry.duration;
     }
 
-    // Calculate averages
     protocolStats.forEach(stats => {
       if (stats.count > 0) {
         stats.averageTime = stats.totalTime / stats.count;
@@ -1799,11 +1682,9 @@ export class NetworkCollector {
       securityReports: []
     };
 
-    // Generate final reports for each scenario
     for (const [scenarioId, entries] of this.entries) {
       const scenarioPath = path.join(this.evidencePath, scenarioId);
       
-      // Generate complete HAR file
       if (this.options.captureHAR) {
         const harBuilder = this.harBuilders.get(scenarioId);
         if (harBuilder) {
@@ -1814,7 +1695,6 @@ export class NetworkCollector {
         }
       }
 
-      // Generate network analysis report
       if (this.options.analyzePerformance) {
         const analysisPath = path.join(scenarioPath, `${scenarioId}-analysis.json`);
         const analysis = await this.generateCompleteAnalysis(scenarioId);
@@ -1822,13 +1702,11 @@ export class NetworkCollector {
         summary.analysisReports.push(analysisPath);
       }
 
-      // Generate waterfall diagram data
       const waterfallPath = path.join(scenarioPath, `${scenarioId}-waterfall.json`);
       const waterfall = await this.generateWaterfall(entries);
       await fs.promises.writeFile(waterfallPath, JSON.stringify(waterfall, null, 2));
       summary.waterfallFiles.push(waterfallPath);
 
-      // Generate security report if enabled
       if (this.options.analyzeSecurity) {
         const securityPath = path.join(scenarioPath, `${scenarioId}-security.json`);
         const securityReport = this.generateSecurityReport(scenarioId);
@@ -1836,7 +1714,6 @@ export class NetworkCollector {
         summary.securityReports.push(securityPath);
       }
 
-      // Update summary
       const metrics = this.metrics.get(scenarioId);
       if (metrics) {
         summary.totalRequests += metrics.totalRequests;
@@ -1857,12 +1734,10 @@ export class NetworkCollector {
       }
     }
 
-    // Calculate averages
     if (summary.totalRequests > 0) {
       summary.averageResponseTime = summary.totalTime / summary.totalRequests;
     }
 
-    // Generate WebSocket summary if collected
     const webSocketSummary = await this.generateWebSocketSummary();
     if (webSocketSummary.totalFrames > 0) {
       const wsPath = path.join(this.evidencePath, 'websocket-summary.json');
@@ -1870,11 +1745,9 @@ export class NetworkCollector {
       summary.webSocketReport = wsPath;
     }
 
-    // Generate execution summary
     const summaryPath = path.join(this.evidencePath, 'network-summary.json');
     await fs.promises.writeFile(summaryPath, JSON.stringify(summary, null, 2));
 
-    // Generate consolidated metrics
     const metricsPath = path.join(this.evidencePath, 'network-metrics.json');
     const consolidatedMetrics = this.generateConsolidatedMetrics();
     await fs.promises.writeFile(metricsPath, JSON.stringify(consolidatedMetrics, null, 2));
@@ -1917,7 +1790,6 @@ export class NetworkCollector {
       recommendations: [] as any[]
     };
 
-    // Analyze each request
     for (const entry of entries) {
       const url = new URL(entry.request.url);
       const domain = url.hostname;
@@ -1943,7 +1815,6 @@ export class NetworkCollector {
         report.summary.httpRequests++;
         domainInfo.httpRequests++;
         
-        // HTTP is a security issue
         domainInfo.issues.push({
           severity: 'high',
           issue: 'Unencrypted HTTP connection',
@@ -1953,7 +1824,6 @@ export class NetworkCollector {
       }
     }
 
-    // Analyze security headers
     const headerChecks = [
       'strict-transport-security',
       'content-security-policy',
@@ -1981,7 +1851,6 @@ export class NetworkCollector {
         }
       }
 
-      // Count issues
       for (const issue of info.issues) {
         report.summary.totalIssues++;
         if (issue.severity === 'critical') report.summary.criticalIssues++;
@@ -1991,7 +1860,6 @@ export class NetworkCollector {
       }
     }
 
-    // Calculate security scores
     const scoreDeductions = {
       critical: 25,
       high: 15,
@@ -2006,7 +1874,6 @@ export class NetworkCollector {
       (report.summary.lowIssues * scoreDeductions.low)
     );
 
-    // Generate recommendations
     if (report.summary.httpRequests > 0) {
       report.recommendations.push({
         priority: 'high',
@@ -2017,7 +1884,6 @@ export class NetworkCollector {
       });
     }
 
-    // Convert maps to objects for JSON serialization
     return {
       ...report,
       domains: Object.fromEntries(report.domains),
@@ -2075,7 +1941,6 @@ export class NetworkCollector {
         const typeCount = summary.framesByType.get(frame.type) || 0;
         summary.framesByType.set(frame.type, typeCount + 1);
 
-        // Group by connection
         if (!connectionMap.has(frame.wsId)) {
           connectionMap.set(frame.wsId, {
             wsId: frame.wsId,
@@ -2141,7 +2006,6 @@ export class NetworkCollector {
     let totalCached = 0;
     let totalThirdParty = 0;
 
-    // Aggregate metrics from all scenarios
     for (const [scenarioId, metrics] of this.metrics) {
       consolidated.summary.totalRequests += metrics.totalRequests;
       consolidated.summary.totalDataTransferred += metrics.totalBytesTransferred;
@@ -2150,7 +2014,6 @@ export class NetworkCollector {
       totalCached += metrics.cachedRequests;
       totalThirdParty += metrics.thirdPartyRequests;
 
-      // Aggregate resource types
       for (const [type, count] of Object.entries(metrics.resourceTypes)) {
         if (!consolidated.resourceTypes.has(type)) {
           consolidated.resourceTypes.set(type, { count: 0, scenarios: [] });
@@ -2160,7 +2023,6 @@ export class NetworkCollector {
         typeInfo.scenarios.push(scenarioId);
       }
 
-      // Aggregate protocols
       for (const [protocol, count] of Object.entries(metrics.protocols)) {
         if (!consolidated.protocols.has(protocol)) {
           consolidated.protocols.set(protocol, { count: 0, scenarios: [] });
@@ -2170,7 +2032,6 @@ export class NetworkCollector {
         protocolInfo.scenarios.push(scenarioId);
       }
 
-      // Aggregate domains
       for (const [domain, count] of Object.entries(metrics.domains)) {
         if (!consolidated.domains.has(domain)) {
           consolidated.domains.set(domain, { count: 0, scenarios: [] });
@@ -2181,7 +2042,6 @@ export class NetworkCollector {
       }
     }
 
-    // Calculate performance distribution
     for (const entries of this.entries.values()) {
       for (const entry of entries) {
         if (entry.duration < 100) consolidated.performanceDistribution.under100ms++;
@@ -2190,7 +2050,6 @@ export class NetworkCollector {
         else if (entry.duration < 3000) consolidated.performanceDistribution.under3s++;
         else consolidated.performanceDistribution.over3s++;
 
-        // Status code distribution
         if (entry.response) {
           const statusRange = `${Math.floor(entry.response.status / 100)}xx`;
           consolidated.statusCodeDistribution.set(
@@ -2201,7 +2060,6 @@ export class NetworkCollector {
       }
     }
 
-    // Calculate final metrics
     if (consolidated.summary.totalRequests > 0) {
       consolidated.summary.averageResponseTime = 
         consolidated.summary.totalTime / consolidated.summary.totalRequests;
@@ -2213,10 +2071,9 @@ export class NetworkCollector {
         (totalThirdParty / consolidated.summary.totalRequests) * 100;
     }
 
-    // Sort domains by request count
     const sortedDomains = Array.from(consolidated.domains.entries())
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 20); // Top 20 domains
+      .slice(0, 20);
 
     return {
       ...consolidated,
@@ -2228,7 +2085,6 @@ export class NetworkCollector {
   }
 }
 
-// HAR Builder helper class
 class HARBuilder {
   private har: HARFile;
   private pageId: string;
@@ -2247,7 +2103,6 @@ class HARBuilder {
       }
     };
     
-    // Store additional metadata separately
     (this.har as any).metadata = {
       browser: {
         name: 'Playwright',
@@ -2278,22 +2133,18 @@ class HARBuilder {
   }
 
   build(): HARFile {
-    // Convert all entries to HAR format
     this.har.log.entries = Array.from(this.entries.values())
       .sort((a, b) => a.startTime - b.startTime)
       .map(entry => this.convertToHAREntry(entry));
 
-    // Update page timings if we have entries
     if (this.har.log.entries.length > 0) {
       const firstEntry = this.har.log.entries[0];
       const lastEntry = this.har.log.entries[this.har.log.entries.length - 1];
       
-      // Update page metadata if available
       const metadata = (this.har as any).metadata;
       if (metadata && metadata.pages && metadata.pages[0] && firstEntry && lastEntry) {
         metadata.pages[0].startedDateTime = firstEntry.startedDateTime;
         
-        // Calculate page timings
         const pageStart = new Date(firstEntry.startedDateTime).getTime();
         const pageEnd = new Date(lastEntry.startedDateTime).getTime() + lastEntry.time;
         
@@ -2312,7 +2163,6 @@ class HARBuilder {
     const request = entry.request;
     const response = entry.response;
     
-    // Ensure all required fields are present
     const harEntry = {
       pageref: this.pageId,
       startedDateTime: new Date(entry.startTime).toISOString(),
@@ -2399,7 +2249,6 @@ class HARBuilder {
       comment: entry.stepId ? `Step: ${entry.stepId}` : ''
     };
 
-    // Add optional fields if present
     if (entry.serverTiming && entry.serverTiming.length > 0) {
       (harEntry as any)._serverTiming = entry.serverTiming;
     }
@@ -2481,7 +2330,6 @@ class HARBuilder {
         }
       }
     } else if (contentType.includes('multipart/form-data')) {
-      // Parse multipart data
       const boundary = contentType.match(/boundary=([^;]+)/)?.[1];
       if (boundary) {
         const parts = postData.split(`--${boundary}`);
@@ -2515,7 +2363,6 @@ class HARBuilder {
     let size = 0;
     
     for (const [name, value] of Object.entries(headers)) {
-      // Each header line is: "name: value\r\n"
       size += name.length + 2 + value.toString().length + 2;
     }
     
